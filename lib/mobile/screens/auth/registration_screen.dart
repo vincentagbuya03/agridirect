@@ -74,20 +74,25 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   void _showEmailConfirmationScreen(String email) {
+    final name = _nameController.text.trim();
+    final password = _passwordController.text.trim();
     Timer? confirmationTimer;
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
-        // Start checking for email confirmation
-        confirmationTimer = Timer.periodic(const Duration(seconds: 2), (
+        // Poll every 3 seconds by attempting sign-in to check confirmation
+        confirmationTimer = Timer.periodic(const Duration(seconds: 3), (
           timer,
         ) async {
           try {
-            final user = AuthService().client.auth.currentUser;
-            if (user?.emailConfirmedAt != null) {
-              // Email confirmed! Stop timer and show success
+            final confirmed = await AuthService().checkEmailConfirmed(
+              email: email,
+              password: password,
+              name: name,
+            );
+            if (confirmed) {
               timer.cancel();
               if (mounted && dialogContext.mounted) {
                 Navigator.pop(dialogContext);
@@ -280,13 +285,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     });
   }
 
+  /// Called after email confirmation is detected.
+  /// Signs out the temporary session and ensures the user sees the login page.
+
   void _showEmailConfirmedSuccess(String email) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
-        // Auto navigate to login after 3 seconds
-        Future.delayed(const Duration(seconds: 3), () {
+        // Auto navigate to login after 10 seconds
+        Future.delayed(const Duration(seconds: 10), () {
           if (mounted && dialogContext.mounted) {
             // Close success dialog
             Navigator.pop(dialogContext);
@@ -300,6 +308,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 ),
                 backgroundColor: const Color(0xFF13EC5B),
                 behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -379,7 +388,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
                 // Redirect message
                 Text(
-                  'Redirecting to login in 3 seconds...',
+                  'Redirecting to login in 10 seconds...',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,

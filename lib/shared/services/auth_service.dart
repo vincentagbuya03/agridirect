@@ -219,6 +219,51 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Check if a user's email has been confirmed by attempting sign-in.
+  /// If confirmed, ensures user profile exists in the users table, then signs out.
+  /// Returns true if email is confirmed.
+  Future<bool> checkEmailConfirmed({
+    required String email,
+    required String password,
+    required String name,
+  }) async {
+    try {
+      final response = await _client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      if (response.user != null && response.user!.emailConfirmedAt != null) {
+        // Email is confirmed! Ensure user profile exists in DB
+        final userId = response.user!.id;
+        try {
+          await SupabaseDB.createUserIfNotExists(
+            userId: userId,
+            email: email,
+            name: name,
+          );
+          debugPrint('User profile ensured in users table for $email');
+        } catch (e) {
+          debugPrint('Error ensuring user profile: $e');
+        }
+
+        // Sign out so user can login manually from the login screen
+        await _client.auth.signOut();
+        return true;
+      }
+
+      // Email not confirmed yet - sign out
+      if (response.user != null) {
+        await _client.auth.signOut();
+      }
+      return false;
+    } catch (e) {
+      // Sign-in failed — likely "Email not confirmed" error
+      debugPrint('Email confirmation check: $e');
+      return false;
+    }
+  }
+
   /// Reset password - sends reset link to email
   Future<void> resetPassword({required String email}) async {
     try {
