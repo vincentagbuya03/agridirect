@@ -288,13 +288,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         // Auto navigate to login after 3 seconds
         Future.delayed(const Duration(seconds: 3), () {
           if (mounted && dialogContext.mounted) {
+            // Close success dialog
             Navigator.pop(dialogContext);
-            Navigator.of(context).pushReplacementNamed(
-              '/login',
-              arguments: {
-                'showMessage':
-                    'Email verified! Please login with your credentials.',
-              },
+            // Close registration screen and go back to login
+            Navigator.pop(context);
+            // Show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text(
+                  'Email verified! Please login with your credentials.',
+                ),
+                backgroundColor: const Color(0xFF13EC5B),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             );
           }
         });
