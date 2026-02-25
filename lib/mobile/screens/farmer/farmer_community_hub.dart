@@ -26,7 +26,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
     super.dispose();
   }
 
-  static const Color primary = Color(0xFF13EC13);
+  static const Color primary = Color(0xFF13EC5B);
 
   @override
   Widget build(BuildContext context) {
@@ -59,10 +59,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,
-                    children: [
-                      _buildForumContent(),
-                      _buildArticlesContent(),
-                    ],
+                    children: [_buildForumContent(), _buildArticlesContent()],
                   ),
                 ),
               ],
@@ -72,7 +69,10 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
               bottom: 32,
               right: 16,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: primary,
                   borderRadius: BorderRadius.circular(50),
@@ -290,9 +290,15 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                     children: [
                       Text(
                         userName,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      Text(time, style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+                      Text(
+                        time,
+                        style: TextStyle(fontSize: 10, color: Colors.grey[400]),
+                      ),
                     ],
                   ),
                 ),
@@ -300,11 +306,18 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
               ],
             ),
             const SizedBox(height: 12),
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 8),
             Text(
               body,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600], height: 1.5),
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                height: 1.5,
+              ),
             ),
             if (imageUrl != null) ...[
               const SizedBox(height: 16),
@@ -316,7 +329,8 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                     imageUrl: imageUrl,
                     fit: BoxFit.cover,
                     placeholder: (_, __) => Container(color: Colors.grey[200]),
-                    errorWidget: (_, __, ___) => Container(color: Colors.grey[200]),
+                    errorWidget: (_, __, ___) =>
+                        Container(color: Colors.grey[200]),
                   ),
                 ),
               ),
@@ -331,7 +345,11 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.thumb_up, size: 20, color: isLiked ? primary : Colors.grey[400]),
+                      Icon(
+                        Icons.thumb_up,
+                        size: 20,
+                        color: isLiked ? primary : Colors.grey[400],
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '$likes',
@@ -346,7 +364,11 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                   const SizedBox(width: 16),
                   Row(
                     children: [
-                      Icon(Icons.chat_bubble_outline, size: 20, color: Colors.grey[400]),
+                      Icon(
+                        Icons.chat_bubble_outline,
+                        size: 20,
+                        color: Colors.grey[400],
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '$comments',
@@ -407,22 +429,34 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                   const SizedBox(height: 4),
                   Text(
                     title,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Text('By AgriDirect', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                      Text(
+                        'By AgriDirect',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      ),
                       const SizedBox(width: 8),
                       Container(
                         width: 4,
                         height: 4,
-                        decoration: BoxDecoration(color: Colors.grey[400], shape: BoxShape.circle),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[400],
+                          shape: BoxShape.circle,
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      Text('4 min read', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                      Text(
+                        '4 min read',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      ),
                     ],
                   ),
                 ],
@@ -437,8 +471,10 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                 width: 100,
                 height: 100,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => Container(width: 100, height: 100, color: Colors.grey[200]),
-                errorWidget: (_, __, ___) => Container(width: 100, height: 100, color: Colors.grey[200]),
+                placeholder: (_, __) =>
+                    Container(width: 100, height: 100, color: Colors.grey[200]),
+                errorWidget: (_, __, ___) =>
+                    Container(width: 100, height: 100, color: Colors.grey[200]),
               ),
             ),
           ],
