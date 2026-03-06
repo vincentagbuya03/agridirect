@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../shared/services/supabase_data_service.dart';
 
 /// Home Screen matching the design mockup.
 /// Delivery location, search bar, AI Market Insight, Categories, Featured Farmers.
@@ -64,7 +65,7 @@ class HomeScreen extends StatelessWidget {
                         Icon(Icons.location_on, color: primary, size: 18),
                         const SizedBox(width: 4),
                         Text(
-                          'San Francisco, CA',
+                          'San Carlos City, Pangasinan',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
@@ -346,7 +347,7 @@ class HomeScreen extends StatelessWidget {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 16),
+              separatorBuilder: (_, _) => const SizedBox(width: 16),
               itemBuilder: (_, i) {
                 final cat = categories[i];
                 return _buildCategoryItem(
@@ -427,45 +428,41 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 16),
           SizedBox(
             height: 310,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.none,
-              itemCount: 3,
-              separatorBuilder: (_, __) => const SizedBox(width: 16),
-              itemBuilder: (_, index) {
-                final farmers = [
-                  _FarmerData(
-                    imageUrl:
-                        'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600',
-                    name: 'Green Valley Organic',
-                    distance: '2.4 miles away',
-                    specialty: 'Specializes in root veggies',
-                    rating: '4.9',
-                    badge: 'TOP RATED',
-                    tags: ['Carrots', 'Potatoes', 'Kale'],
-                  ),
-                  _FarmerData(
-                    imageUrl:
-                        'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600',
-                    name: 'Sunny Orchards',
-                    distance: '5.1 miles away',
-                    specialty: 'Fresh seasonal fruits',
-                    rating: '4.7',
-                    badge: 'ORGANIC',
-                    tags: ['Strawberries', 'Apples'],
-                  ),
-                  _FarmerData(
-                    imageUrl:
-                        'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=600',
-                    name: 'Valley Harvest',
-                    distance: '3.8 miles away',
-                    specialty: 'Mixed seasonal produce',
-                    rating: '4.6',
-                    badge: 'LOCAL PICK',
-                    tags: ['Tomatoes', 'Peppers', 'Herbs'],
-                  ),
-                ];
-                return _buildFarmerCard(farmers[index]);
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: SupabaseDataService().getFeaturedFarmers(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final farmers = snapshot.data ?? [];
+                if (farmers.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'No farmers available',
+                      style: TextStyle(color: Colors.grey[500]),
+                    ),
+                  );
+                }
+
+                return ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  clipBehavior: Clip.none,
+                  itemCount: farmers.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 16),
+                  itemBuilder: (_, index) {
+                    final f = farmers[index];
+                    return _buildFarmerCard(_FarmerData(
+                      imageUrl: f['imageUrl'] ?? '',
+                      name: f['name'] ?? '',
+                      distance: f['distance'] ?? '',
+                      specialty: f['specialty'] ?? '',
+                      rating: f['rating'] ?? '4.5',
+                      badge: f['badge'] ?? 'VERIFIED',
+                      tags: (f['tags'] as List<dynamic>?)?.cast<String>() ?? [],
+                    ));
+                  },
+                );
               },
             ),
           ),
@@ -503,9 +500,9 @@ class HomeScreen extends StatelessWidget {
                   height: 150,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) =>
+                  placeholder: (_, _) =>
                       Container(height: 150, color: Colors.grey[200]),
-                  errorWidget: (_, __, ___) => Container(
+                  errorWidget: (_, _, _) => Container(
                     height: 150,
                     color: Colors.grey[200],
                     child: const Icon(

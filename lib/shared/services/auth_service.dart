@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase/src/supabase_client.dart';
 import 'supabase_config.dart';
 
 /// Auth Service using Supabase
@@ -13,6 +14,7 @@ class AuthService extends ChangeNotifier {
   bool _isLoggedIn = false;
   bool _isSeller = false;
   bool _isViewingAsFarmer = false;
+  bool _isAdmin = false;
   String _userName = '';
   String _userEmail = '';
   String _userId = '';
@@ -22,12 +24,13 @@ class AuthService extends ChangeNotifier {
   bool get isLoggedIn => _isLoggedIn;
   bool get isSeller => _isSeller;
   bool get isViewingAsFarmer => _isViewingAsFarmer;
+  bool get isAdmin => _isAdmin;
   String get userName => _userName;
   String get userEmail => _userEmail;
   String get userId => _userId;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  get client => _client;
+  SupabaseClient get client => _client;
 
   /// Extract clean error message from exception
   String _extractErrorMessage(dynamic exception) {
@@ -67,12 +70,43 @@ class AuthService extends ChangeNotifier {
       _userEmail = user.email ?? '';
       _isLoggedIn = true;
 
-      // Fetch user profile from database
-      final profile = await SupabaseDB.getUserProfile(user.id);
-      if (profile != null) {
-        _userName = profile['name'] ?? '';
-        _isSeller = profile['is_seller'] ?? false;
+      // Fetch user profile — if missing, create it from auth metadata
+      var profile = await SupabaseDB.getUserProfile(user.id);
+      if (profile == null) {
+        final metadata = user.userMetadata;
+        final metaName = (metadata?['name'] as String?) ?? '';
+        final metaPhone = metadata?['phone_number'] as String?;
+        try {
+          await SupabaseDB.createUserIfNotExists(
+            userId: user.id,
+            email: user.email ?? '',
+            name: metaName,
+            phoneNumber: metaPhone,
+          );
+          profile = await SupabaseDB.getUserProfile(user.id);
+        } catch (e) {
+          debugPrint('Error creating user profile on initialize: $e');
+        }
       }
+      // If profile name is empty, fall back to auth metadata name and fix DB
+      String resolvedName = (profile?['name'] as String?) ?? '';
+      if (resolvedName.isEmpty) {
+        final metaName = (user.userMetadata?['name'] as String?) ?? '';
+        if (metaName.isNotEmpty) {
+          resolvedName = metaName;
+          try {
+            await SupabaseDB.updateUserName(userId: user.id, name: metaName);
+          } catch (e) {
+            debugPrint('Error updating user name on initialize: $e');
+          }
+        }
+      }
+      _userName = resolvedName;
+
+      // Fetch roles from user_roles table
+      final roles = await SupabaseDB.getUserRoles(user.id);
+      _isSeller = roles.contains('seller');
+      _isAdmin = roles.contains('admin');
       notifyListeners();
     } else if (user != null && user.emailConfirmedAt == null) {
       // User exists but email not confirmed - sign them out
@@ -87,6 +121,7 @@ class AuthService extends ChangeNotifier {
     required String name,
     required String email,
     required String password,
+    String? phoneNumber,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -97,7 +132,7 @@ class AuthService extends ChangeNotifier {
       final response = await _client.auth.signUp(
         email: email,
         password: password,
-        data: {'name': name},
+        data: {'name': name, 'phone_number': ?phoneNumber},
       );
 
       if (response.user == null) {
@@ -109,19 +144,10 @@ class AuthService extends ChangeNotifier {
 
       // Save user profile in database but do NOT log them in yet
       // They must confirm their email first
-      final userId = response.user!.id;
 
-      // Ensure user profile exists in database (fallback if trigger didn't fire)
-      try {
-        await SupabaseDB.createUserIfNotExists(
-          userId: userId,
-          email: email,
-          name: name,
-        );
-      } catch (dbError) {
-        debugPrint('DB fallback error (non-fatal): $dbError');
-        // Non-fatal: the DB trigger should handle user creation
-      }
+      // Note: With email confirmation enabled, there's no active session here.
+      // The database trigger (handle_new_user) will create the user profile.
+      // Client-side insert is skipped because RLS would block it without a session.
 
       // Sign out so user is not auto-logged in before email confirmation
       try {
@@ -173,12 +199,44 @@ class AuthService extends ChangeNotifier {
       _userEmail = email;
       _isLoggedIn = true;
 
-      // Fetch user profile
-      final profile = await SupabaseDB.getUserProfile(_userId);
-      if (profile != null) {
-        _userName = profile['name'] ?? '';
-        _isSeller = profile['is_seller'] ?? false;
+      // Fetch user profile — if missing, create it from auth metadata
+      var profile = await SupabaseDB.getUserProfile(_userId);
+      if (profile == null) {
+        // Profile doesn't exist yet (trigger missing or checkEmailConfirmed failed)
+        final metadata = response.user!.userMetadata;
+        final metaName = (metadata?['name'] as String?) ?? '';
+        final metaPhone = metadata?['phone_number'] as String?;
+        try {
+          await SupabaseDB.createUserIfNotExists(
+            userId: _userId,
+            email: email,
+            name: metaName,
+            phoneNumber: metaPhone,
+          );
+          profile = await SupabaseDB.getUserProfile(_userId);
+        } catch (e) {
+          debugPrint('Error creating user profile on login: $e');
+        }
       }
+      // If profile name is empty, fall back to auth metadata name and fix DB
+      String resolvedName = (profile?['name'] as String?) ?? '';
+      if (resolvedName.isEmpty) {
+        final metaName = (response.user!.userMetadata?['name'] as String?) ?? '';
+        if (metaName.isNotEmpty) {
+          resolvedName = metaName;
+          try {
+            await SupabaseDB.updateUserName(userId: _userId, name: metaName);
+          } catch (e) {
+            debugPrint('Error updating user name on login: $e');
+          }
+        }
+      }
+      _userName = resolvedName;
+
+      // Fetch roles from user_roles table
+      final roles = await SupabaseDB.getUserRoles(_userId);
+      _isSeller = roles.contains('seller');
+      _isAdmin = roles.contains('admin');
 
       _isLoading = false;
       notifyListeners();
@@ -194,7 +252,7 @@ class AuthService extends ChangeNotifier {
   /// Register as a seller (one-time activation)
   Future<void> startSelling() async {
     try {
-      await SupabaseDB.updateSellerStatus(userId: _userId, isSeller: true);
+      await SupabaseDB.addUserRole(userId: _userId, roleName: 'seller');
       _isSeller = true;
       _isViewingAsFarmer = true;
       notifyListeners();
@@ -226,6 +284,7 @@ class AuthService extends ChangeNotifier {
     required String email,
     required String password,
     required String name,
+    String? phoneNumber,
   }) async {
     try {
       final response = await _client.auth.signInWithPassword(
@@ -241,10 +300,12 @@ class AuthService extends ChangeNotifier {
             userId: userId,
             email: email,
             name: name,
+            phoneNumber: phoneNumber,
           );
           debugPrint('User profile ensured in users table for $email');
         } catch (e) {
-          debugPrint('Error ensuring user profile: $e');
+          debugPrint('ERROR ensuring user profile after email confirmation: $e');
+          // Don't return false — user is still confirmed, profile may exist from trigger
         }
 
         // Sign out so user can login manually from the login screen
@@ -284,6 +345,7 @@ class AuthService extends ChangeNotifier {
       await _client.auth.signOut();
       _isLoggedIn = false;
       _isSeller = false;
+      _isAdmin = false;
       _isViewingAsFarmer = false;
       _userName = '';
       _userEmail = '';

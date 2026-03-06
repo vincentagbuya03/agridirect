@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/services/auth_service.dart';
-import 'registration_screen.dart';
+import '../../../shared/router/app_router.dart';
 import 'dart:async';
 
 /// Mobile Login screen with clean design.
@@ -21,8 +23,10 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _hasInternet = true;
+  bool _isWaitingForInternet = false;
   late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
   final Connectivity _connectivity = Connectivity();
+  Timer? _internetWaitTimer;
 
   static const Color primary = Color(0xFF13EC5B);
 
@@ -36,10 +40,16 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
     ) {
       if (mounted) {
         setState(() {
-          _hasInternet =
               result != [ConnectivityResult.none] &&
               !result.contains(ConnectivityResult.none);
         });
+        // If internet is restored while waiting, cancel the timer
+        if (_hasInternet && _isWaitingForInternet) {
+          _internetWaitTimer?.cancel();
+          if (mounted) {
+            setState(() => _isWaitingForInternet = false);
+          }
+        }
       }
     });
   }
@@ -56,6 +66,11 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
             'Internet Status: $_hasInternet, Result: $connectivityResult',
           );
         });
+        
+        // If no internet, start waiting mode
+        if (!_hasInternet && !_isWaitingForInternet) {
+          _startWaitingForInternet();
+        }
       }
     } catch (e) {
       debugPrint('Error checking connectivity: $e');
@@ -66,11 +81,49 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
     }
   }
 
+  void _startWaitingForInternet() {
+    if (mounted) {
+      setState(() => _isWaitingForInternet = true);
+    }
+    
+    // Wait for 10 seconds for internet to connect
+    _internetWaitTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted && _isWaitingForInternet) {
+        // Check one more time if internet is available
+        _checkInternetStatus();
+      }
+    });
+  }
+
+  Future<void> _checkInternetStatus() async {
+    try {
+      final connectivityResult = await _connectivity.checkConnectivity();
+      final hasInternet =
+          connectivityResult != [ConnectivityResult.none] &&
+          !connectivityResult.contains(ConnectivityResult.none);
+      
+      if (mounted) {
+        if (hasInternet) {
+          setState(() => _isWaitingForInternet = false);
+        } else {
+          setState(() => _isWaitingForInternet = false);
+          _showNoInternetDialogWithQuit();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking internet status: $e');
+      if (mounted) {
+        setState(() => _isWaitingForInternet = false);
+      }
+    }
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     _connectivitySubscription.cancel();
+    _internetWaitTimer?.cancel();
     super.dispose();
   }
 
@@ -193,6 +246,71 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'OK',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNoInternetDialogWithQuit() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        title: Row(
+          children: [
+            Icon(Icons.wifi_off_rounded, color: Colors.orange[700], size: 24),
+            const SizedBox(width: 12),
+            Text(
+              'No Internet',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Unable to establish internet connection. Please check your connection and try again.',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            color: Colors.grey[700],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Exit the app
+              Future.delayed(const Duration(milliseconds: 100), () {
+                SystemNavigator.pop();
+              });
+            },
+            child: Text(
+              'Quit',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.red,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _checkInternetConnectivity();
+            },
+            child: Text(
+              'Retry',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -392,16 +510,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                         ),
                         GestureDetector(
                           onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => RegistrationScreen(
-                                  onRegistrationSuccess: () {
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                              ),
-                            );
+                            context.push(AppRoutes.register);
                           },
                           child: Text(
                             'Sign Up',
@@ -421,8 +530,8 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
             ),
           ),
         ),
-        // No internet connection overlay
-        if (!_hasInternet)
+        // Waiting for internet connection overlay
+        if (_isWaitingForInternet)
           Container(
             color: Colors.black.withValues(alpha: 0.5),
             child: Center(
@@ -442,14 +551,17 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.wifi_off_rounded,
-                      size: 48,
-                      color: Colors.orange[700],
+                    const SizedBox(
+                      height: 48,
+                      width: 48,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(primary),
+                      ),
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      'No Internet Connection',
+                      'Connecting to Internet',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -458,33 +570,11 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Please check your internet connection and try again.',
+                      'Please wait while we establish your connection...',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
                         color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _checkInternetConnectivity,
-                        icon: const Icon(Icons.refresh),
-                        label: Text(
-                          'Retry',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
                       ),
                     ),
                   ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../shared/services/supabase_data_service.dart';
 
 /// Farmer Products/Inventory Screen
 class FarmerProductsScreen extends StatefulWidget {
@@ -12,40 +13,6 @@ class FarmerProductsScreen extends StatefulWidget {
 
 class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
   static const Color primary = Color(0xFF13EC5B);
-
-  // Sample products
-  final List<Map<String, dynamic>> products = [
-    {
-      'name': 'Organic Bell Peppers',
-      'price': 4.50,
-      'unit': 'kg',
-      'available': 50,
-      'harvest': 'Oct 24, 2023',
-      'status': 'IN STOCK',
-      'image':
-          'https://images.unsplash.com/photo-1599599810694-b5ac4dd33654?w=400',
-    },
-    {
-      'name': 'Heirloom Tomatoes',
-      'price': 6.20,
-      'unit': 'kg',
-      'available': 0,
-      'harvest': 'Oct 20, 2023',
-      'status': 'SOLD OUT',
-      'image':
-          'https://images.unsplash.com/photo-1592841496694-747e2d5f6c9f?w=400',
-    },
-    {
-      'name': 'Sweet Baby Carrots',
-      'price': 3.75,
-      'unit': 'kg',
-      'available': 12,
-      'harvest': 'Oct 26, 2023',
-      'status': 'LOW STOCK',
-      'image':
-          'https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=400',
-    },
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -156,12 +123,47 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
   }
 
   Widget _buildProductsList() {
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-      itemCount: products.length,
-      itemBuilder: (context, index) {
-        final product = products[index];
-        return _buildProductCard(product);
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: SupabaseDataService().getFarmerProducts(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final products = snapshot.data ?? [];
+        if (products.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  'No products yet',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Add your first product to start selling',
+                  style: TextStyle(color: Colors.grey[500]),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          itemCount: products.length,
+          itemBuilder: (context, index) {
+            final product = products[index];
+            return _buildProductCard(product);
+          },
+        );
       },
     );
   }
@@ -202,7 +204,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                   width: 100,
                   height: 100,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(
+                  placeholder: (_, _) => Container(
                     width: 100,
                     height: 100,
                     color: Colors.grey[200],

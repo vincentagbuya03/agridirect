@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../shared/services/supabase_data_service.dart';
+import '../../../shared/data/app_data.dart';
 
 /// Pre-Order Hub Screen matching the design mockup.
 /// Pre-order cards with countdown days, progress bars, reserve buttons.
@@ -16,45 +18,6 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
   int _selectedFilter = 0;
 
   final _filters = ['All Crops', 'Vegetables', 'Fruits', 'Organic', 'Grains'];
-
-  final _preOrders = const [
-    _PreOrderData(
-      imageUrl:
-          'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=600',
-      daysLeft: 12,
-      price: '\$4.50',
-      discount: '20% OFF PRE-ORDER',
-      name: 'Summer Strawberries',
-      farm: "Farmer John's Organic Acres",
-      reserved: 80,
-      target: '500 lbs',
-      isAlmostGone: false,
-    ),
-    _PreOrderData(
-      imageUrl:
-          'https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=600',
-      daysLeft: 5,
-      price: '\$3.20',
-      discount: 'EARLY BIRD',
-      name: 'Heritage Green Cabbage',
-      farm: 'Blue Ridge Valley Farms',
-      reserved: 92,
-      target: '300 lbs',
-      isAlmostGone: true,
-    ),
-    _PreOrderData(
-      imageUrl:
-          'https://images.unsplash.com/photo-1518977676601-b53f82ber630?w=600',
-      daysLeft: 8,
-      price: '\$5.00',
-      discount: '15% OFF PRE-ORDER',
-      name: 'Vine-Ripened Tomatoes',
-      farm: 'Sunnyvale Farms',
-      reserved: 65,
-      target: '400 lbs',
-      isAlmostGone: false,
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -185,7 +148,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           itemCount: _filters.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
           itemBuilder: (_, i) {
             final isSelected = _selectedFilter == i;
             return GestureDetector(
@@ -250,15 +213,73 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
 
   // ── Pre-Order List ──
   Widget _buildPreOrderList() {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-      itemCount: _preOrders.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 20),
-      itemBuilder: (_, i) => _buildPreOrderCard(_preOrders[i]),
+    return FutureBuilder<List<ProductItem>>(
+      future: SupabaseDataService().getPreOrderProducts(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error loading pre-orders',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+          );
+        }
+
+        final preOrders = snapshot.data ?? [];
+
+        if (preOrders.isEmpty) {
+          return Center(
+            child: Text(
+              'No pre-orders available',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+          itemCount: preOrders.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 20),
+          itemBuilder: (_, i) => _buildPreOrderCard(preOrders[i]),
+        );
+      },
     );
   }
 
-  Widget _buildPreOrderCard(_PreOrderData data) {
+  Widget _buildPreOrderCard(ProductItem product) {
+    // Compute pre-order specific fields from ProductItem
+    final daysLeft = int.tryParse(product.harvestDays ?? '7') ?? 7;
+    final discount = '15% OFF PRE-ORDER';
+    final reviewCount = int.tryParse(product.reviews ?? '0') ?? 0;
+    final reserved = (reviewCount * 10).clamp(0, 100);
+    final target = '100 lbs pre-order';
+    final isAlmostGone = reserved > 80;
+    
+    // Parse price for display
+    final priceNum = double.tryParse(product.price) ?? 0.0;
+    final formattedPrice = '\$${priceNum.toStringAsFixed(2)}';
+    
+    final data = _PreOrderDataAdapter(
+      imageUrl: product.imageUrl,
+      daysLeft: daysLeft,
+      price: formattedPrice,
+      discount: discount,
+      name: product.name,
+      farm: product.farm,
+      reserved: reserved,
+      target: target,
+      isAlmostGone: isAlmostGone,
+    );
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -286,9 +307,9 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) =>
+                  placeholder: (_, _) =>
                       Container(height: 200, color: Colors.grey[200]),
-                  errorWidget: (_, __, ___) => Container(
+                  errorWidget: (_, _, _) => Container(
                     height: 200,
                     color: Colors.grey[200],
                     child: const Icon(
@@ -499,7 +520,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
   }
 }
 
-class _PreOrderData {
+class _PreOrderDataAdapter {
   final String imageUrl;
   final int daysLeft;
   final String price;
@@ -510,7 +531,7 @@ class _PreOrderData {
   final String target;
   final bool isAlmostGone;
 
-  const _PreOrderData({
+  _PreOrderDataAdapter({
     required this.imageUrl,
     required this.daysLeft,
     required this.price,

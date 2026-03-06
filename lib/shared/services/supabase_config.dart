@@ -42,32 +42,74 @@ class SupabaseDB {
     required String userId,
     required String email,
     required String name,
+    String? phoneNumber,
   }) async {
     try {
       // Check if user already exists (trigger may have already inserted)
       final existing = await _client
           .from('users')
-          .select('id')
-          .eq('id', userId)
+          .select('user_id')
+          .eq('user_id', userId)
           .maybeSingle();
 
       if (existing == null) {
         // User doesn't exist yet, insert now
-        await _client.from('users').insert({
-          'id': userId,
+        final userData = {
+          'user_id': userId,
           'email': email,
           'name': name,
-          'is_seller': false,
           'created_at': DateTime.now().toIso8601String(),
+        };
+        if (phoneNumber != null && phoneNumber.isNotEmpty) {
+          userData['phone'] = phoneNumber;
+        }
+        await _client.from('users').insert(userData);
+
+        // Assign default 'consumer' role
+        final roleResponse = await _client
+            .from('roles')
+            .select('role_id')
+            .eq('name', 'consumer')
+            .single();
+        await _client.from('user_roles').insert({
+          'user_id': userId,
+          'role_id': roleResponse['role_id'],
         });
       } else {
-        // User exists from trigger but name might be empty, update it
-        await _client.from('users').update({'name': name}).eq('id', userId);
+        // User exists from trigger but name/phone might be empty, update it
+        final updateData = <String, String>{};
+        if (name.isNotEmpty) {
+          updateData['name'] = name;
+        }
+        if (phoneNumber != null && phoneNumber.isNotEmpty) {
+          updateData['phone'] = phoneNumber;
+        }
+        if (updateData.isNotEmpty) {
+          await _client.from('users').update(updateData).eq('user_id', userId);
+        }
+
+        // Ensure user has at least the 'consumer' role
+        final existingRoles = await _client
+            .from('user_roles')
+            .select('role_id')
+            .eq('user_id', userId);
+        if ((existingRoles as List).isEmpty) {
+          final roleResponse = await _client
+              .from('roles')
+              .select('role_id')
+              .eq('name', 'consumer')
+              .single();
+          await _client.from('user_roles').insert({
+            'user_id': userId,
+            'role_id': roleResponse['role_id'],
+          });
+        }
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error creating/updating user: $e');
-      // Don't rethrow — the DB trigger should handle user creation
-      // This is just a fallback, so we don't want it to break registration
+      debugPrint('Stack trace: $stack');
+      // Rethrow so callers can handle/report the error
+      rethrow;
     }
   }
 
@@ -76,18 +118,78 @@ class SupabaseDB {
     required String userId,
     required String email,
     required String name,
+    String? phoneNumber,
   }) async {
     try {
-      await _client.from('users').insert({
-        'id': userId,
+      final userData = {
+        'user_id': userId,
         'email': email,
         'name': name,
-        'is_seller': false,
         'created_at': DateTime.now().toIso8601String(),
+      };
+      if (phoneNumber != null && phoneNumber.isNotEmpty) {
+        userData['phone'] = phoneNumber;
+      }
+      await _client.from('users').insert(userData);
+
+      // Assign default 'consumer' role
+      final roleResponse = await _client
+          .from('roles')
+          .select('role_id')
+          .eq('name', 'consumer')
+          .single();
+      await _client.from('user_roles').insert({
+        'user_id': userId,
+        'role_id': roleResponse['role_id'],
       });
     } catch (e) {
       print('Error creating user: $e');
       rethrow;
+    }
+  }
+
+  /// Update user name in the users table
+  static Future<void> updateUserName({
+    required String userId,
+    required String name,
+  }) async {
+    try {
+      await _client
+          .from('users')
+          .update({'name': name})
+          .eq('user_id', userId);
+    } catch (e) {
+      print('Error updating user name: $e');
+    }
+  }
+
+  /// Check if an email is already registered in the users table
+  static Future<bool> isEmailAlreadyRegistered(String email) async {
+    try {
+      final result = await _client
+          .from('users')
+          .select('user_id')
+          .eq('email', email)
+          .maybeSingle();
+      return result != null;
+    } catch (e) {
+      print('Error checking email: $e');
+      return false;
+    }
+  }
+
+  /// Check if a phone number is already registered in the users table
+  static Future<bool> isPhoneAlreadyRegistered(String phone) async {
+    try {
+      final result = await _client
+          .from('users')
+          .select('user_id')
+          .eq('phone', phone)
+          .maybeSingle();
+      return result != null;
+    } catch (e) {
+      print('Error checking phone: $e');
+      return false;
     }
   }
 
@@ -97,7 +199,7 @@ class SupabaseDB {
       final response = await _client
           .from('users')
           .select()
-          .eq('id', userId)
+          .eq('user_id', userId)
           .single();
       return response;
     } catch (e) {
@@ -106,23 +208,85 @@ class SupabaseDB {
     }
   }
 
-  /// Update seller status
-  static Future<void> updateSellerStatus({
+  /// Add role to user (e.g., 'seller', 'admin')
+  static Future<void> addUserRole({
     required String userId,
-    required bool isSeller,
+    required String roleName,
   }) async {
     try {
-      await _client
-          .from('users')
-          .update({'is_seller': isSeller})
-          .eq('id', userId);
+      final roleResponse = await _client
+          .from('roles')
+          .select('role_id')
+          .eq('name', roleName)
+          .single();
+      await _client.from('user_roles').upsert({
+        'user_id': userId,
+        'role_id': roleResponse['role_id'],
+      });
     } catch (e) {
-      print('Error updating seller status: $e');
+      print('Error adding user role: $e');
       rethrow;
     }
   }
 
-  /// Submit farmer registration
+  /// Remove role from user
+  static Future<void> removeUserRole({
+    required String userId,
+    required String roleName,
+  }) async {
+    try {
+      final roleResponse = await _client
+          .from('roles')
+          .select('role_id')
+          .eq('name', roleName)
+          .single();
+      await _client
+          .from('user_roles')
+          .delete()
+          .eq('user_id', userId)
+          .eq('role_id', roleResponse['role_id']);
+    } catch (e) {
+      print('Error removing user role: $e');
+      rethrow;
+    }
+  }
+
+  /// Check if user has a specific role
+  static Future<bool> hasRole({
+    required String userId,
+    required String roleName,
+  }) async {
+    try {
+      final response = await _client
+          .from('user_roles')
+          .select('role_id, roles!inner(name)')
+          .eq('user_id', userId)
+          .eq('roles.name', roleName)
+          .maybeSingle();
+      return response != null;
+    } catch (e) {
+      print('Error checking user role: $e');
+      return false;
+    }
+  }
+
+  /// Get all roles for a user
+  static Future<List<String>> getUserRoles(String userId) async {
+    try {
+      final response = await _client
+          .from('user_roles')
+          .select('roles!inner(name)')
+          .eq('user_id', userId);
+      return (response as List)
+          .map((r) => r['roles']['name'] as String)
+          .toList();
+    } catch (e) {
+      print('Error fetching user roles: $e');
+      return [];
+    }
+  }
+
+  /// Submit farmer registration (inserts into farmer_registrations + decomposed tables)
   static Future<void> submitFarmerRegistration({
     required String userId,
     required FarmerRegistration registration,
@@ -130,7 +294,32 @@ class SupabaseDB {
     try {
       final data = registration.toJson();
       data['user_id'] = userId;
-      await _client.from('farmer_registrations').insert(data);
+      final response = await _client.from('farmer_registrations').insert(data).select('registration_id').single();
+      final registrationId = response['registration_id'];
+
+      // Insert education rows
+      final educationRows = registration.toEducationRows();
+      if (educationRows.isNotEmpty) {
+        await _client.from('farmer_education').insert(
+          educationRows.map((e) => {...e, 'registration_id': registrationId}).toList(),
+        );
+      }
+
+      // Insert crop type rows
+      final cropRows = registration.toCropTypeRows();
+      if (cropRows.isNotEmpty) {
+        await _client.from('farmer_crop_types').insert(
+          cropRows.map((c) => {...c, 'registration_id': registrationId}).toList(),
+        );
+      }
+
+      // Insert livestock rows
+      final livestockRows = registration.toLivestockRows();
+      if (livestockRows.isNotEmpty) {
+        await _client.from('farmer_livestock').insert(
+          livestockRows.map((l) => {...l, 'registration_id': registrationId}).toList(),
+        );
+      }
     } catch (e) {
       print('Error submitting farmer registration: $e');
       rethrow;

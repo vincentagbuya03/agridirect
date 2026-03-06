@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/services/auth_service.dart';
-import '../auth/farmer_registration_screen.dart';
+import '../../../shared/router/app_router.dart';
 
 /// Mobile Profile screen for customers.
 /// Contains user info, settings, and the "Start Selling" button
@@ -64,17 +65,10 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
       _handleSwitchToFarmer();
     } else {
       // Show registration screen for new sellers
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => FarmerRegistrationScreen(
-            onRegistrationComplete: () {
-              widget.onModeChanged();
-              // Refresh profile to get updated is_seller status
-              setState(() {});
-            },
-          ),
-        ),
-      );
+      context.push(AppRoutes.farmerRegister, extra: () {
+        widget.onModeChanged();
+        setState(() {});
+      });
     }
   }
 
@@ -232,8 +226,8 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                     imageUrl:
                         'https://lh3.googleusercontent.com/aida-public/AB6AXuA7SO8J3CebwmP_4K0nwWhDkMsWISrTpnfbOkYJ79_ZiTCLVxdvX_FJArJ1xwYsLAJx8gW_Wtk3xValGb9mDShlpRvdPIMoD9UGWJ9LwNRlF0vvmsKesjK6liNaDGy7C5HGWdOAE1hEPvF3UTq81_QK7QkgKAAMQgeICa4pykDXTF8JYtnrFYPiavyC7N-wkK4pGMGQJcdoyKpRglzbFXWGqTdoa3xP-Bm86BGxFKlWg21Mbw-FylTfHiJeJMKgLbfSJr8MhPFg1zqB',
                     fit: BoxFit.cover,
-                    placeholder: (_, __) => Container(color: Colors.grey[200]),
-                    errorWidget: (_, __, ___) =>
+                    placeholder: (_, _) => Container(color: Colors.grey[200]),
+                    errorWidget: (_, _, _) =>
                         const Icon(Icons.person, size: 30),
                   ),
                 ),
@@ -246,7 +240,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                     Text(
                       auth.userName.isNotEmpty
                           ? auth.userName
-                          : 'Alex Henderson',
+                          : 'User',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -257,39 +251,24 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                     Row(
                       children: [
                         Icon(
-                          Icons.location_on_rounded,
+                          Icons.email_outlined,
                           size: 14,
                           color: Colors.grey[500],
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          'San Francisco, CA',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[500],
+                        Flexible(
+                          child: Text(
+                            auth.userEmail.isNotEmpty
+                                ? auth.userEmail
+                                : 'No email',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[500],
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFECFDF5),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'MEMBER SINCE 2022',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: primary,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
                     ),
                   ],
                 ),

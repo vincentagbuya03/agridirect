@@ -3,9 +3,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../shared/models/farmer_registration.dart';
-import '../../shared/services/auth_service.dart';
-import '../../shared/services/supabase_config.dart';
+import '../../../shared/models/farmer_registration.dart';
+import '../../../shared/services/auth_service.dart';
+import '../../../shared/services/supabase_config.dart';
 
 /// Web Farmer Registration — 3-step wizard with wider layout.
 /// Step 1: Personal Data & Farm Details

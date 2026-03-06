@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../shared/services/auth_service.dart';
+import '../../../shared/services/auth_service.dart';
 
 /// Web Login / Register screen.
 /// Full-width split layout with illustration on left, form on right.

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../shared/services/supabase_data_service.dart';
 
 /// Farmer Orders Screen
 class FarmerOrdersScreen extends StatefulWidget {
@@ -14,39 +15,6 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   static const Color primary = Color(0xFF13EC5B);
   int _selectedTab = 0;
   final _tabs = ['Active', 'Completed', 'Refunds'];
-
-  final List<Map<String, dynamic>> activeOrders = [
-    {
-      'customerName': 'Sarah Johnson',
-      'customerImage': 'https://i.pravatar.cc/150?img=1',
-      'orderId': 'AD-8842',
-      'timeAgo': '10m ago',
-      'items': '5.0kg Organic Roma Tomatoes',
-      'total': '\$24.50',
-      'status': 'PENDING HARVEST',
-      'statusColor': const Color(0xFFFFA500),
-    },
-    {
-      'customerName': 'Michael Chen',
-      'customerImage': 'https://i.pravatar.cc/150?img=2',
-      'orderId': 'AD-8845',
-      'timeAgo': '24m ago',
-      'items': '2x Fresh Sourdough Loaf, 1L Milk',
-      'total': '\$18.20',
-      'status': 'READY FOR PICKUP',
-      'statusColor': const Color(0xFF3B82F6),
-    },
-    {
-      'customerName': 'Emma Wilson',
-      'customerImage': 'https://i.pravatar.cc/150?img=3',
-      'orderId': 'AD-8839',
-      'timeAgo': '1h ago',
-      'items': '12x Large Brown Eggs',
-      'total': '\$8.00',
-      'status': 'PROCESSING',
-      'statusColor': const Color(0xFF9333EA),
-    },
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -148,26 +116,116 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   }
 
   Widget _buildOrdersList() {
-    if (_selectedTab == 0) {
-      return ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-        children: [
-          // Today's total card
-          Container(
-            margin: const EdgeInsets.only(bottom: 20),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: primary.withValues(alpha: 0.2)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: SupabaseDataService().getFarmerOrders(status: _tabs[_selectedTab]),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final orders = snapshot.data ?? [];
+
+        if (_selectedTab == 0) {
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            children: [
+              // Today's total card
+              Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: primary.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'TODAY\'S TOTAL',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.grey[600],
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: primary,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.bar_chart_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${orders.length} Orders',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFA500),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${orders.where((o) => o['status'] == 'PENDING').length} Pending',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3B82F6),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${orders.where((o) => o['status'] == 'PROCESSING').length} In Progress',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Active orders header
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
                   children: [
                     Text(
-                      'TODAY\'S TOTAL',
+                      'ACTIVE ORDERS',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -176,105 +234,55 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                       ),
                     ),
                     const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: primary,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        Icons.bar_chart_rounded,
-                        size: 16,
-                        color: Colors.white,
-                      ),
+                    Text(
+                      'Sort by: Earliest',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '28 Orders',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
+              ),
+              // Order cards
+              if (orders.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(40),
+                    child: Column(
+                      children: [
+                        Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No orders yet',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFA500),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '12 Pending',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3B82F6),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '16 In Progress',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // Active orders header
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                Text(
-                  'ACTIVE ORDERS',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.grey[600],
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  'Sort by: Earliest',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                ),
-              ],
-            ),
-          ),
-          // Order cards
-          ...activeOrders.map((order) => _buildOrderCard(order)),
-        ],
-      );
-    }
+                )
+              else
+                ...orders.map((order) => _buildOrderCard(order)),
+            ],
+          );
+        }
 
-    return Center(
-      child: Text(
-        'No orders in this category',
-        style: TextStyle(color: Colors.grey[500]),
-      ),
+        if (orders.isEmpty) {
+          return Center(
+            child: Text(
+              'No orders in this category',
+              style: TextStyle(color: Colors.grey[500]),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          itemCount: orders.length,
+          itemBuilder: (context, index) => _buildOrderCard(orders[index]),
+        );
+      },
     );
   }
 
@@ -306,7 +314,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                   width: 48,
                   height: 48,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) =>
+                  placeholder: (_, _) =>
                       Container(width: 48, height: 48, color: Colors.grey[200]),
                 ),
               ),

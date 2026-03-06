@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../shared/data/app_data.dart';
+import '../../../shared/data/app_data.dart';
+import '../../../shared/services/supabase_data_service.dart';
 
 /// Web-only Pre-order Product Details — two-column layout.
 /// Completely separate UI from the mobile product details.
@@ -161,8 +162,8 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                   imageUrl: AppData.carrotsHeroImageUrl,
                   fit: BoxFit.cover,
                   width: double.infinity,
-                  placeholder: (_, __) => Container(color: Colors.grey[100]),
-                  errorWidget: (_, __, ___) => Container(color: Colors.grey[100], child: const Icon(Icons.image, size: 48)),
+                  placeholder: (_, _) => Container(color: Colors.grey[100]),
+                  errorWidget: (_, _, _) => Container(color: Colors.grey[100], child: const Icon(Icons.image, size: 48)),
                 ),
                 // Pre-order badge
                 Positioned(
@@ -205,8 +206,8 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                         child: CachedNetworkImage(
                           imageUrl: AppData.carrotsHeroImageUrl,
                           fit: BoxFit.cover,
-                          placeholder: (_, __) => Container(color: Colors.grey[100]),
-                          errorWidget: (_, __, ___) => Container(color: Colors.grey[100]),
+                          placeholder: (_, _) => Container(color: Colors.grey[100]),
+                          errorWidget: (_, _, _) => Container(color: Colors.grey[100]),
                         ),
                       ),
                     ),
@@ -477,7 +478,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
           Switch(
             value: _downpaymentEnabled,
             onChanged: (v) => setState(() => _downpaymentEnabled = v),
-            activeColor: _primary,
+            activeThumbColor: _primary,
           ),
         ],
       ),
@@ -523,8 +524,8 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                         child: CachedNetworkImage(
                           imageUrl: AppData.farmStoryAvatarUrl,
                           fit: BoxFit.cover,
-                          placeholder: (_, __) => Container(color: Colors.grey[100]),
-                          errorWidget: (_, __, ___) => const Icon(Icons.person),
+                          placeholder: (_, _) => Container(color: Colors.grey[100]),
+                          errorWidget: (_, _, _) => const Icon(Icons.person),
                         ),
                       ),
                     ),
@@ -571,8 +572,8 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                           imageUrl: AppData.farmMapImageUrl,
                           fit: BoxFit.cover,
                           width: double.infinity,
-                          placeholder: (_, __) => Container(color: Colors.grey[100], height: 180),
-                          errorWidget: (_, __, ___) => Container(color: Colors.grey[100], height: 180),
+                          placeholder: (_, _) => Container(color: Colors.grey[100], height: 180),
+                          errorWidget: (_, _, _) => Container(color: Colors.grey[100], height: 180),
                         ),
                       ),
                       Positioned.fill(
@@ -613,68 +614,83 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
 
   // ─── Related Products ───
   Widget _buildRelatedProducts() {
-    final products = AppData.preOrderProducts.take(4).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'You might also like',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _dark),
-        ),
-        const SizedBox(height: 20),
-        GridView.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 1.1,
-          ),
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: products.length,
-          itemBuilder: (context, i) {
-            final p = products[i];
-            return MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: _border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-                        child: CachedNetworkImage(
-                          imageUrl: p.imageUrl,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => Container(color: Colors.grey[100]),
-                          errorWidget: (_, __, ___) => Container(color: Colors.grey[100]),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(p.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _dark), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          const SizedBox(height: 4),
-                          Text('${p.price}${p.unit}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _primary)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+    return FutureBuilder<List<ProductItem>>(
+      future: SupabaseDataService().getPreOrderProducts(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final allProducts = snapshot.data ?? [];
+        final products = allProducts.take(4).toList();
+
+        if (products.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'You might also like',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _dark),
+            ),
+            const SizedBox(height: 20),
+            GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 1.1,
               ),
-            );
-          },
-        ),
-      ],
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: products.length,
+              itemBuilder: (context, i) {
+                final p = products[i];
+                return MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                            child: CachedNetworkImage(
+                              imageUrl: p.imageUrl,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              placeholder: (_, _) => Container(color: Colors.grey[100]),
+                              errorWidget: (_, _, _) => Container(color: Colors.grey[100]),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(p.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _dark), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              const SizedBox(height: 4),
+                              Text('${p.price}${p.unit}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _primary)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }

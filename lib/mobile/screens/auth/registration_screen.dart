@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:async';
-import '../../../shared/services/auth_service.dart';
+import '../../../shared/services/email_service.dart';
+import '../../../shared/services/otp_service.dart';
+import '../../../shared/services/supabase_config.dart';
+import 'otp_verification_screen.dart';
 
 /// Mobile Registration screen with clean design.
 class RegistrationScreen extends StatefulWidget {
@@ -16,6 +18,7 @@ class RegistrationScreen extends StatefulWidget {
 class _RegistrationScreenState extends State<RegistrationScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
@@ -28,6 +31,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -36,6 +40,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   void _handleRegister() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
@@ -56,365 +61,95 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     setState(() => _isLoading = true);
 
-    final success = await AuthService().register(
-      name: name,
-      email: email,
-      password: password,
-    );
+    try {
+      // Step 0: Check if email is already registered
+      final emailTaken = await SupabaseDB.isEmailAlreadyRegistered(email);
+      if (emailTaken) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          _showSnackBar('This email is already registered. Please log in instead.');
+        }
+        return;
+      }
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      if (success) {
-        // Show email confirmation loading screen
-        _showEmailConfirmationScreen(email);
-      } else {
-        _showSnackBar(AuthService().errorMessage ?? 'Registration failed');
+      // Step 0b: Check if phone number is already registered (if provided)
+      if (phone.isNotEmpty) {
+        final phoneTaken = await SupabaseDB.isPhoneAlreadyRegistered(phone);
+        if (phoneTaken) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            _showSnackBar('This phone number is already associated with an account.');
+          }
+          return;
+        }
+      }
+
+      // Step 1: Check if a valid unexpired OTP already exists for this email
+      final timeRemaining = await OTPService().getOTPTimeRemaining(email: email);
+      final hasExistingOTP = timeRemaining != null && timeRemaining > 0;
+
+      if (!hasExistingOTP) {
+        // Generate and send a new OTP
+        final otpCode = OTPService.generateOTP();
+
+        final otpStored = await OTPService().storeOTP(
+          email: email,
+          code: otpCode,
+        );
+
+        if (!otpStored) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            _showSnackBar('Failed to prepare verification. Please try again.');
+          }
+          return;
+        }
+
+        final emailSent = await EmailService.sendOTPEmail(
+          email: email,
+          otpCode: otpCode,
+        );
+
+        if (!emailSent) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            _showSnackBar('Failed to send verification code. Please try again.');
+          }
+          return;
+        }
+      }
+
+      // Navigate to OTP verification screen (reuse existing OTP time if applicable)
+      if (mounted) {
+        setState(() => _isLoading = false);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OTPVerificationScreen(
+              email: email,
+              name: name,
+              password: password,
+              phoneNumber: phone.isNotEmpty ? phone : null,
+              initialSecondsRemaining: hasExistingOTP ? timeRemaining : 600,
+              onVerificationSuccess: () {
+                _showSnackBar('Account created successfully! Redirecting to login...');
+                Future.delayed(const Duration(seconds: 2), () {
+                  if (mounted) {
+                    Navigator.pop(context);
+                    widget.onRegistrationSuccess();
+                  }
+                });
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showSnackBar('Error: $e');
       }
     }
-  }
-
-  void _showEmailConfirmationScreen(String email) {
-    final name = _nameController.text.trim();
-    final password = _passwordController.text.trim();
-    Timer? confirmationTimer;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        // Poll every 3 seconds by attempting sign-in to check confirmation
-        confirmationTimer = Timer.periodic(const Duration(seconds: 3), (
-          timer,
-        ) async {
-          try {
-            final confirmed = await AuthService().checkEmailConfirmed(
-              email: email,
-              password: password,
-              name: name,
-            );
-            if (confirmed) {
-              timer.cancel();
-              if (mounted && dialogContext.mounted) {
-                Navigator.pop(dialogContext);
-                _showEmailConfirmedSuccess(email);
-              }
-            }
-          } catch (e) {
-            debugPrint('Error checking email confirmation: $e');
-          }
-        });
-
-        return PopScope(
-          onPopInvoked: (didPop) {
-            confirmationTimer?.cancel();
-          },
-          canPop: false,
-          child: AlertDialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            contentPadding: const EdgeInsets.all(32),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Email icon
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0F7F3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.mail_outline_rounded,
-                    color: Color(0xFF13EC5B),
-                    size: 40,
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Title
-                Text(
-                  'Verify Your Email',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Description
-                Text(
-                  'We\'ve sent a confirmation email to:',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 8),
-
-                // Email display
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0F7F3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    email,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF13EC5B),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 30),
-
-                // Loading indicator
-                const SizedBox(
-                  width: 60,
-                  height: 60,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 4,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFF13EC5B),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 28),
-
-                // Waiting message
-                Text(
-                  'Waiting for email confirmation...',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Detailed instructions
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDF4),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFFE0F7F3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '📧 What happens next?',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '1. Check your inbox for our confirmation email\n2. Click the verification link\n3. Your account will be activated\n4. You\'ll be redirected to login',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                          height: 1.6,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Additional note
-                Text(
-                  'Tip: Check your spam folder if you don\'t see the email',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey[500],
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 28),
-
-                // Resend email button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      _showSnackBar('Confirmation email resent to $email');
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF3F4F6),
-                      foregroundColor: Colors.grey[700],
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      'Resend Email',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    ).then((value) {
-      confirmationTimer?.cancel();
-    });
-  }
-
-  /// Called after email confirmation is detected.
-  /// Signs out the temporary session and ensures the user sees the login page.
-
-  void _showEmailConfirmedSuccess(String email) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        // Auto navigate to login after 10 seconds
-        Future.delayed(const Duration(seconds: 10), () {
-          if (mounted && dialogContext.mounted) {
-            // Close success dialog
-            Navigator.pop(dialogContext);
-            // Close registration screen and go back to login
-            Navigator.pop(context);
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text(
-                  'Email verified! Please login with your credentials.',
-                ),
-                backgroundColor: const Color(0xFF13EC5B),
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 10),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            );
-          }
-        });
-
-        return PopScope(
-          canPop: false,
-          child: AlertDialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            contentPadding: const EdgeInsets.all(32),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Success icon
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0F7F3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_circle_rounded,
-                    color: Color(0xFF13EC5B),
-                    size: 40,
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Title
-                Text(
-                  'Email Verified!',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Description
-                Text(
-                  'Your email has been successfully confirmed',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 8),
-
-                // Email display
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0F7F3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    email,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF13EC5B),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 28),
-
-                // Redirect message
-                Text(
-                  'Redirecting to login in 10 seconds...',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Small loading indicator
-                const SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 3,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFF13EC5B),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   void _showSnackBar(String msg) {
@@ -489,6 +224,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   hint: 'Enter your email',
                   icon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 20),
+
+                // Phone field
+                _buildLabel('Phone Number'),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  controller: _phoneController,
+                  hint: 'Enter your phone number (optional)',
+                  icon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: 20),
 

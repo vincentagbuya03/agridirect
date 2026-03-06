@@ -1,5 +1,6 @@
 /// Shared data layer — used by both mobile and web UIs.
 /// Only data & logic lives here; no Flutter widgets.
+library;
 
 class ProductItem {
   final String name;
@@ -92,7 +93,7 @@ class DashboardMetric {
 }
 
 // ─────────────────────────────────────────────
-//  Static data constants shared across platforms
+//  Constants shared across platforms
 // ─────────────────────────────────────────────
 
 class AppData {
@@ -128,140 +129,5 @@ class AppData {
 
   static const String articleImageUrl =
       'https://lh3.googleusercontent.com/aida-public/AB6AXuCEX_FGbTSlEvgcVwHHEMfPDvDPCwf1jJgoRvqWeM8YKnhq8MslvsCTDPBiEOLgf3ghqffQxCGDQaDPrUPojIs8Hun-ffZwkSQqnqYzomI0eTTnZPMnVJBbp9YWKVBJ11uHyhNV9em8FQJ4zwY1NdiWx-7XTpZ99nPgQrz7YSgBAbjFGHI-kjDVMfghvcp1_6wcRXV6PUgvLTA215YdbIKOEwxK0JE2lWioNIZ-pdZHBenPdwZi2VwpDUO-Z7_KTqbiJBgPyZTYBanU';
-
-  // Pre-order products
-  static const List<ProductItem> preOrderProducts = [
-    ProductItem(
-      name: 'Premium Vine Tomatoes',
-      farm: 'Poblacion Farm, Benguet',
-      price: '₱120',
-      unit: '/kg',
-      imageUrl: tomatoImageUrl,
-      harvestDays: '5',
-    ),
-    ProductItem(
-      name: 'Organic Cauliflower',
-      farm: 'Green Valley, Batangas',
-      price: '₱85',
-      unit: '/pc',
-      imageUrl: cauliflowerImageUrl,
-      harvestDays: '3',
-    ),
-    ProductItem(
-      name: 'Fresh Bell Peppers',
-      farm: 'Sunrise Farm',
-      price: '₱95',
-      unit: '/kg',
-      imageUrl: tomatoImageUrl,
-      harvestDays: '7',
-    ),
-    ProductItem(
-      name: 'Organic Spinach',
-      farm: 'Luntian Gardens',
-      price: '₱55',
-      unit: '/bunch',
-      imageUrl: spinachImageUrl,
-      harvestDays: '4',
-    ),
-  ];
-
-  // Nearby farm products
-  static const List<ProductItem> nearbyProducts = [
-    ProductItem(
-      name: 'Sweet Carabao Mango',
-      farm: 'Vibrant Farms, Cavite',
-      price: '₱180',
-      unit: '/kg',
-      imageUrl: mangoImageUrl,
-      rating: '4.8',
-      reviews: '120',
-    ),
-    ProductItem(
-      name: 'Organic Spinach',
-      farm: 'Luntian Gardens, Laguna',
-      price: '₱45',
-      unit: '/bunch',
-      imageUrl: spinachImageUrl,
-      rating: '4.9',
-      reviews: '86',
-    ),
-    ProductItem(
-      name: 'Fresh Carrots',
-      farm: 'Orange Hills Farm',
-      price: '₱60',
-      unit: '/kg',
-      imageUrl: tomatoImageUrl,
-      rating: '4.7',
-      reviews: '156',
-    ),
-  ];
-
-  // Forum posts
-  static const List<ForumPostItem> forumPosts = [
-    ForumPostItem(
-      userName: 'Samuel Green',
-      time: '2 hours ago • Punjab',
-      title: 'Pest control tips for Cabbage',
-      body:
-          "I've found that neem oil works wonders for aphids on young cabbage plants. Make sure to spray in the evening to avoid leaf burn...",
-      imageUrl: forumImageUrl,
-      likes: 24,
-      comments: 12,
-      isLiked: true,
-    ),
-    ForumPostItem(
-      userName: 'Anita Rao',
-      time: '5 hours ago • Karnataka',
-      title: 'New organic fertilizer subsidy?',
-      body:
-          'Has anyone heard about the new state-level subsidies for organic vermicompost setups? Looking for registration details.',
-      likes: 8,
-      comments: 3,
-      isLiked: false,
-    ),
-  ];
-
-  // Articles
-  static const List<ArticleItem> articles = [
-    ArticleItem(
-      title: 'Optimizing Drip Irrigation for Small Farms in 2024',
-      excerpt:
-          'Learn how to maximize water efficiency while reducing operational costs in modern agriculture...',
-      imageUrl: articleImageUrl,
-    ),
-    ArticleItem(
-      title: 'Sustainable Water Management in Agriculture',
-      excerpt:
-          'Learn how to optimize water usage while maintaining crop health...',
-    ),
-    ArticleItem(
-      title: 'Market Trends: Q4 2024',
-      excerpt: 'Overview of upcoming agricultural market opportunities...',
-    ),
-  ];
-
-  // Dashboard metrics
-  static const List<DashboardMetric> dashboardMetrics = [
-    DashboardMetric(
-      label: 'PENDING',
-      value: '12',
-      subtitle: 'Orders to fulfill',
-      iconCodePoint: 0xe8cc, // shopping_cart
-      color: 0xFF10B981,
-    ),
-    DashboardMetric(
-      label: 'LISTINGS',
-      value: '48',
-      subtitle: 'Active products',
-      iconCodePoint: 0xef37, // inventory_2
-      color: 0xFF3B82F6,
-    ),
-    DashboardMetric(
-      label: 'REVENUE',
-      value: '₱4.2K',
-      subtitle: 'This week',
-      iconCodePoint: 0xe8e5, // trending_up
-      color: 0xFFF59E0B,
-    ),
-  ];
 }
+

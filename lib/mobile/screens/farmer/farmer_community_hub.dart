@@ -328,8 +328,8 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                   child: CachedNetworkImage(
                     imageUrl: imageUrl,
                     fit: BoxFit.cover,
-                    placeholder: (_, __) => Container(color: Colors.grey[200]),
-                    errorWidget: (_, __, ___) =>
+                    placeholder: (_, _) => Container(color: Colors.grey[200]),
+                    errorWidget: (_, _, _) =>
                         Container(color: Colors.grey[200]),
                   ),
                 ),
@@ -471,9 +471,9 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                 width: 100,
                 height: 100,
                 fit: BoxFit.cover,
-                placeholder: (_, __) =>
+                placeholder: (_, _) =>
                     Container(width: 100, height: 100, color: Colors.grey[200]),
-                errorWidget: (_, __, ___) =>
+                errorWidget: (_, _, _) =>
                     Container(width: 100, height: 100, color: Colors.grey[200]),
               ),
             ),

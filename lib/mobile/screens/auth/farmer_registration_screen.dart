@@ -2,11 +2,12 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../shared/models/farmer_registration.dart';
 import '../../../shared/services/auth_service.dart';
 import '../../../shared/services/supabase_config.dart';
-import '../common/face_capture_screen.dart';
+import '../../../shared/router/app_router.dart';
 
 /// Mobile Farmer Registration — 3-step wizard.
 /// Step 1: Personal Data & Farm Details
@@ -1117,9 +1118,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
   }
 
   Future<void> _handleFaceScan() async {
-    final path = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const FaceCaptureScreen()),
-    );
+    final path = await context.push<String>(AppRoutes.faceCapture);
     if (path != null && mounted) {
       setState(() {
         _faceScanned = true;

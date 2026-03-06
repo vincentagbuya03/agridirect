@@ -41,22 +41,37 @@ class FarmerRegistration {
     this.certificationAccepted = false,
   });
 
+  /// Convert to JSON for farmer_registrations table (3NF)
+  /// Education, crop types, and livestock are stored in separate tables
   Map<String, dynamic> toJson() => {
-        'full_name': fullName,
         'birth_date': birthDate,
-        'years_in_farming': yearsInFarming,
+        'years_of_experience': int.tryParse(yearsOfExperience) ?? int.tryParse(yearsInFarming) ?? 0,
         'residential_address': residentialAddress,
-        'crop_types': cropTypes,
-        'livestock': livestock,
         'face_photo_path': facePhotoPath,
         'valid_id_path': validIdPath,
-        'elementary': elementary,
-        'high_school': highSchool,
-        'college': college,
         'farming_history': farmingHistory,
-        'years_of_experience': yearsOfExperience,
         'certification_accepted': certificationAccepted,
         'status': 'pending',
         'created_at': DateTime.now().toIso8601String(),
       };
+
+  /// Education levels for farmer_education table
+  List<Map<String, String>> toEducationRows() {
+    final rows = <Map<String, String>>[];
+    if (elementary.isNotEmpty) rows.add({'level': 'elementary', 'school_name': elementary});
+    if (highSchool.isNotEmpty) rows.add({'level': 'high_school', 'school_name': highSchool});
+    if (college.isNotEmpty) rows.add({'level': 'college', 'school_name': college});
+    return rows;
+  }
+
+  /// Crop types for farmer_crop_types table
+  List<Map<String, String>> toCropTypeRows() {
+    return cropTypes.where((c) => c.isNotEmpty).map((c) => {'crop_type': c}).toList();
+  }
+
+  /// Livestock for farmer_livestock table
+  List<Map<String, String>> toLivestockRows() {
+    if (livestock.isEmpty) return [];
+    return livestock.split(',').map((l) => {'livestock_type': l.trim()}).where((m) => m['livestock_type']!.isNotEmpty).toList();
+  }
 }

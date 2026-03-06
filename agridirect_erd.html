@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgrIDirect ERD - Crow's Foot Notation</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      overflow: auto;
+    }
+    .header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 2px solid #13ec5b;
+      padding: 24px 40px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header h1 {
+      font-size: 28px;
+      color: #13ec5b;
+      font-weight: 700;
+    }
+    .header p {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-top: 4px;
+    }
+    .legend {
+      display: flex;
+      gap: 24px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+    .legend-line {
+      width: 60px;
+      height: 2px;
+      position: relative;
+    }
+    .legend-line.one-many {
+      background: #13ec5b;
+    }
+    .legend-line.one-many::after {
+      content: '';
+      position: absolute;
+      right: -2px;
+      top: -6px;
+      width: 0; height: 0;
+      border-left: 8px solid #13ec5b;
+      border-top: 7px solid transparent;
+      border-bottom: 7px solid transparent;
+    }
+    .legend-line.one-one {
+      background: #06b6d4;
+    }
+    .legend-line.one-one::after {
+      content: '|';
+      position: absolute;
+      right: -2px;
+      top: -9px;
+      color: #06b6d4;
+      font-weight: bold;
+    }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-pk { background: #13ec5b22; color: #13ec5b; border: 1px solid #13ec5b44; }
+    .badge-fk { background: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b44; }
+    .badge-uk { background: #06b6d422; color: #06b6d4; border: 1px solid #06b6d444; }
+
+    #canvas-container {
+      position: relative;
+      width: 3200px;
+      height: 3000px;
+      margin: 0 auto;
+    }
+
+    svg.connections {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .entity {
+      position: absolute;
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 12px;
+      min-width: 240px;
+      z-index: 10;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .entity:hover {
+      border-color: #13ec5b;
+      box-shadow: 0 4px 32px rgba(19,236,91,0.15);
+    }
+    .entity-header {
+      padding: 10px 16px;
+      font-weight: 700;
+      font-size: 14px;
+      border-bottom: 2px solid #334155;
+      border-radius: 10px 10px 0 0;
+      text-align: center;
+      letter-spacing: 0.5px;
+    }
+    .entity-header.core { background: linear-gradient(135deg, #13ec5b22, #13ec5b08); color: #13ec5b; }
+    .entity-header.reference { background: linear-gradient(135deg, #06b6d422, #06b6d408); color: #06b6d4; }
+    .entity-header.junction { background: linear-gradient(135deg, #f59e0b22, #f59e0b08); color: #f59e0b; }
+    .entity-header.feature { background: linear-gradient(135deg, #a78bfa22, #a78bfa08); color: #a78bfa; }
+    .entity-header.admin { background: linear-gradient(135deg, #ef444422, #ef444408); color: #ef4444; }
+
+    .entity-body { padding: 6px 0; }
+    .attr-row {
+      display: flex;
+      align-items: center;
+      padding: 3px 12px;
+      font-size: 12px;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .attr-row:hover { background: #334155; }
+    .attr-badges { display: flex; gap: 3px; min-width: 42px; justify-content: flex-end; }
+    .attr-name { color: #f1f5f9; font-weight: 500; flex: 1; }
+    .attr-type { color: #64748b; font-size: 11px; text-align: right; min-width: 80px; }
+
+    .section-label {
+      position: absolute;
+      font-size: 16px;
+      font-weight: 700;
+      color: #475569;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      z-index: 5;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>AgrIDirect Database ERD</h1>
+  <p>Third Normal Form (3NF) &bull; 25 Tables &bull; 7 Computed VIEWs &bull; Crow's Foot Notation</p>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-line one-many"></div> One-to-Many (1:N)</div>
+    <div class="legend-item"><div class="legend-line one-one"></div> One-to-One (1:1)</div>
+    <div class="legend-item"><span class="badge badge-pk">PK</span> Primary Key</div>
+    <div class="legend-item"><span class="badge badge-fk">FK</span> Foreign Key</div>
+    <div class="legend-item"><span class="badge badge-uk">UK</span> Unique Key</div>
+  </div>
+</div>
+
+<div id="canvas-container">
+  <svg class="connections" id="svg-lines"></svg>
+
+  <!-- Section Labels -->
+  <div class="section-label" style="top:20px;left:60px;">&#9635; Core User System</div>
+  <div class="section-label" style="top:20px;left:1060px;">&#9635; Product Management</div>
+  <div class="section-label" style="top:860px;left:60px;">&#9635; Farmer System</div>
+  <div class="section-label" style="top:860px;left:1200px;">&#9635; Shopping &amp; Orders</div>
+  <div class="section-label" style="top:1650px;left:60px;">&#9635; Community &amp; Forum</div>
+  <div class="section-label" style="top:1650px;left:1200px;">&#9635; Content &amp; Admin</div>
+
+  <!-- ==================== CORE USER SYSTEM ==================== -->
+
+  <div class="entity" id="users" style="top:60px;left:60px;">
+    <div class="entity-header core">USERS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">user_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-uk">UK</span></div><span class="attr-name">email</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">name</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">phone</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">avatar_url</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">bio</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">email_verified</span><span class="attr-type">boolean</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">updated_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="roles" style="top:60px;left:540px;">
+    <div class="entity-header reference">ROLES</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">role_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-uk">UK</span></div><span class="attr-name">name</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="user_roles" style="top:220px;left:380px;">
+    <div class="entity-header junction">USER_ROLES</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">user_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">role_id</span><span class="attr-type">uuid</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="user_addresses" style="top:380px;left:60px;">
+    <div class="entity-header core">USER_ADDRESSES</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">address_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span><span class="badge badge-uk">UK</span></div><span class="attr-name">user_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">street</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">barangay</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">city</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">province</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">zip_code</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">updated_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="user_suspensions" style="top:380px;left:540px;">
+    <div class="entity-header admin">USER_SUSPENSIONS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">suspension_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span><span class="badge badge-uk">UK</span></div><span class="attr-name">user_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">reason</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">suspended_by</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">suspended_at</span><span class="attr-type">timestamptz</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">expires_at</span><span class="attr-type">timestamptz</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">is_permanent</span><span class="attr-type">boolean</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <!-- ==================== PRODUCT MANAGEMENT ==================== -->
+
+  <div class="entity" id="categories" style="top:60px;left:1060px;">
+    <div class="entity-header reference">CATEGORIES</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">category_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-uk">UK</span></div><span class="attr-name">name</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">description</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">icon</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="units" style="top:60px;left:1380px;">
+    <div class="entity-header reference">UNITS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">unit_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-uk">UK</span></div><span class="attr-name">name</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-uk">UK</span></div><span class="attr-name">abbreviation</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="products" style="top:280px;left:1060px;">
+    <div class="entity-header core">PRODUCTS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">product_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">name</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">price</span><span class="attr-type">decimal(12,2)</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">image_url</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">harvest_days</span><span class="attr-type">integer</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">is_preorder</span><span class="attr-type">boolean</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">farmer_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">category_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">unit_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">updated_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="product_reviews" style="top:280px;left:1420px;">
+    <div class="entity-header feature">PRODUCT_REVIEWS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">review_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">product_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">user_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">rating</span><span class="attr-type">decimal(3,2)</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">review_text</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">updated_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="product_tags" style="top:600px;left:1420px;">
+    <div class="entity-header reference">PRODUCT_TAGS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">tag_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-uk">UK</span></div><span class="attr-name">name</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="product_tag_mappings" style="top:600px;left:1100px;">
+    <div class="entity-header junction">PRODUCT_TAG_MAPPINGS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">product_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">tag_id</span><span class="attr-type">uuid</span></div>
+    </div>
+  </div>
+
+  <!-- ==================== FARMER SYSTEM ==================== -->
+
+  <div class="entity" id="farmer_profiles" style="top:900px;left:60px;">
+    <div class="entity-header core">FARMER_PROFILES</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">profile_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span><span class="badge badge-uk">UK</span></div><span class="attr-name">user_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">farm_name</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">specialty</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">location</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">badge</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">image_url</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">is_verified</span><span class="attr-type">boolean</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">updated_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="farmer_specializations" style="top:900px;left:400px;">
+    <div class="entity-header feature">FARMER_SPECIALIZATIONS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">specialization_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">farmer_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">specialization</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="farmer_registrations" style="top:1140px;left:60px;">
+    <div class="entity-header core">FARMER_REGISTRATIONS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">registration_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span><span class="badge badge-uk">UK</span></div><span class="attr-name">user_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">birth_date</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">years_of_experience</span><span class="attr-type">integer</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">residential_address</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">face_photo_path</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">valid_id_path</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">farming_history</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">certification_accepted</span><span class="attr-type">boolean</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">status</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">updated_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="farmer_education" style="top:1140px;left:420px;">
+    <div class="entity-header feature">FARMER_EDUCATION</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">education_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">registration_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">level</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">school_name</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="farmer_crop_types" style="top:1340px;left:420px;">
+    <div class="entity-header feature">FARMER_CROP_TYPES</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">crop_type_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">registration_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">crop_type</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="farmer_livestock" style="top:1500px;left:420px;">
+    <div class="entity-header feature">FARMER_LIVESTOCK</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">livestock_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">registration_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">livestock_type</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <!-- ==================== SHOPPING & ORDERS ==================== -->
+
+  <div class="entity" id="orders" style="top:900px;left:1200px;">
+    <div class="entity-header core">ORDERS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">order_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-uk">UK</span></div><span class="attr-name">order_number</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">customer_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">farmer_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">status</span><span class="attr-type">order_status</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">updated_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="order_items" style="top:900px;left:1540px;">
+    <div class="entity-header feature">ORDER_ITEMS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">order_item_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">order_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">product_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">quantity</span><span class="attr-type">decimal(10,2)</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">unit_price</span><span class="attr-type">decimal(12,2)</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <!-- ==================== COMMUNITY & FORUM ==================== -->
+
+  <div class="entity" id="forum_posts" style="top:1700px;left:60px;">
+    <div class="entity-header core">FORUM_POSTS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">post_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">user_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">title</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">body</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">image_url</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">updated_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="forum_comments" style="top:1700px;left:400px;">
+    <div class="entity-header feature">FORUM_COMMENTS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">comment_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">post_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">user_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">body</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">updated_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="post_likes" style="top:1960px;left:60px;">
+    <div class="entity-header junction">POST_LIKES</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">like_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">post_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">user_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <!-- ==================== CONTENT & ADMIN ==================== -->
+
+  <div class="entity" id="articles" style="top:1700px;left:1200px;">
+    <div class="entity-header feature">ARTICLES</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">article_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">title</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">content</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">author_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">read_time</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">image_url</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">published</span><span class="attr-type">boolean</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">updated_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="admin_logs" style="top:1700px;left:1540px;">
+    <div class="entity-header admin">ADMIN_LOGS</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">log_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">admin_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">action</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">details</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">target_user_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+  <div class="entity" id="reported_content" style="top:1980px;left:1200px;">
+    <div class="entity-header admin">REPORTED_CONTENT</div>
+    <div class="entity-body">
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-pk">PK</span></div><span class="attr-name">report_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">reporter_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">content_type</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">content_id</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">reason</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">description</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">status</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"><span class="badge badge-fk">FK</span></div><span class="attr-name">resolved_by</span><span class="attr-type">uuid</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">resolution_notes</span><span class="attr-type">text</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">created_at</span><span class="attr-type">timestamptz</span></div>
+      <div class="attr-row"><div class="attr-badges"></div><span class="attr-name">resolved_at</span><span class="attr-type">timestamptz</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const svg = document.getElementById('svg-lines');
+
+// Connection definitions: [fromId, toId, type, fromSide, toSide]
+// type: '1:N' = one-to-many, '1:1' = one-to-one/zero-or-one
+const connections = [
+  // Core User
+  ['users', 'user_roles', '1:N'],
+  ['roles', 'user_roles', '1:N'],
+  ['users', 'user_addresses', '1:1'],
+  ['users', 'user_suspensions', '1:1'],
+  // Products
+  ['users', 'products', '1:N'],
+  ['categories', 'products', '1:N'],
+  ['units', 'products', '1:N'],
+  ['products', 'product_reviews', '1:N'],
+  ['users', 'product_reviews', '1:N'],
+  ['products', 'product_tag_mappings', '1:N'],
+  ['product_tags', 'product_tag_mappings', '1:N'],
+  // Farmer
+  ['users', 'farmer_profiles', '1:1'],
+  ['farmer_profiles', 'farmer_specializations', '1:N'],
+  ['users', 'farmer_registrations', '1:1'],
+  ['farmer_registrations', 'farmer_education', '1:N'],
+  ['farmer_registrations', 'farmer_crop_types', '1:N'],
+  ['farmer_registrations', 'farmer_livestock', '1:N'],
+  // Orders
+  ['users', 'orders', '1:N'],
+  ['orders', 'order_items', '1:N'],
+  ['products', 'order_items', '1:N'],
+  // Forum
+  ['users', 'forum_posts', '1:N'],
+  ['forum_posts', 'forum_comments', '1:N'],
+  ['users', 'forum_comments', '1:N'],
+  ['forum_posts', 'post_likes', '1:N'],
+  ['users', 'post_likes', '1:N'],
+  // Content & Admin
+  ['users', 'articles', '1:N'],
+  ['users', 'admin_logs', '1:N'],
+  ['users', 'reported_content', '1:N'],
+  ['users', 'reported_content', '1:N'], // resolved_by relationship
+];
+
+function getCenter(el) {
+  const r = el.getBoundingClientRect();
+  const container = document.getElementById('canvas-container').getBoundingClientRect();
+  return {
+    x: r.left - container.left + r.width / 2,
+    y: r.top - container.top + r.height / 2,
+    top: r.top - container.top,
+    bottom: r.top - container.top + r.height,
+    left: r.left - container.left,
+    right: r.left - container.left + r.width,
+    w: r.width,
+    h: r.height
+  };
+}
+
+function getBestPorts(a, b) {
+  // Find the best side to connect
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+
+  let fromX, fromY, toX, toY;
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    // Horizontal dominant
+    if (dx > 0) {
+      fromX = a.right; fromY = a.y;
+      toX = b.left; toY = b.y;
+    } else {
+      fromX = a.left; fromY = a.y;
+      toX = b.right; toY = b.y;
+    }
+  } else {
+    // Vertical dominant
+    if (dy > 0) {
+      fromX = a.x; fromY = a.bottom;
+      toX = b.x; toY = b.top;
+    } else {
+      fromX = a.x; fromY = a.top;
+      toX = b.x; toY = b.bottom;
+    }
+  }
+
+  return { fromX, fromY, toX, toY };
+}
+
+function drawCrowsFoot(x, y, angle) {
+  const len = 10;
+  const spread = 8;
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  
+  // Three prongs
+  for (let offset of [-spread, 0, spread]) {
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    const endX = x - len * Math.cos(angle) + offset * Math.cos(angle + Math.PI/2);
+    const endY = y - len * Math.sin(angle) + offset * Math.sin(angle + Math.PI/2);
+    line.setAttribute('x1', x);
+    line.setAttribute('y1', y);
+    line.setAttribute('x2', endX);
+    line.setAttribute('y2', endY);
+    line.setAttribute('stroke', '#13ec5b');
+    line.setAttribute('stroke-width', '2');
+    g.appendChild(line);
+  }
+  return g;
+}
+
+function drawOneMark(x, y, angle) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  const perpX = 10 * Math.cos(angle + Math.PI/2);
+  const perpY = 10 * Math.sin(angle + Math.PI/2);
+  const offsetX = x - 8 * Math.cos(angle);
+  const offsetY = y - 8 * Math.sin(angle);
+  
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', offsetX - perpX);
+  line.setAttribute('y1', offsetY - perpY);
+  line.setAttribute('x2', offsetX + perpX);
+  line.setAttribute('y2', offsetY + perpY);
+  line.setAttribute('stroke', '#13ec5b');
+  line.setAttribute('stroke-width', '2');
+  g.appendChild(line);
+  return g;
+}
+
+function drawOneOneMark(x, y, angle) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  const perpX = 10 * Math.cos(angle + Math.PI/2);
+  const perpY = 10 * Math.sin(angle + Math.PI/2);
+
+  // Two parallel lines
+  for (let d of [6, 14]) {
+    const offsetX = x - d * Math.cos(angle);
+    const offsetY = y - d * Math.sin(angle);
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', offsetX - perpX);
+    line.setAttribute('y1', offsetY - perpY);
+    line.setAttribute('x2', offsetX + perpX);
+    line.setAttribute('y2', offsetY + perpY);
+    line.setAttribute('stroke', '#06b6d4');
+    line.setAttribute('stroke-width', '2');
+    g.appendChild(line);
+  }
+  return g;
+}
+
+function drawConnection(fromId, toId, type) {
+  const fromEl = document.getElementById(fromId);
+  const toEl = document.getElementById(toId);
+  if (!fromEl || !toEl) return;
+
+  const a = getCenter(fromEl);
+  const b = getCenter(toEl);
+  const ports = getBestPorts(a, b);
+
+  const color = type === '1:1' ? '#06b6d4' : '#13ec5b';
+
+  // Draw path with smooth curve
+  const midX = (ports.fromX + ports.toX) / 2;
+  const midY = (ports.fromY + ports.toY) / 2;
+
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  
+  // Use cubic bezier for smooth routing
+  const dx = ports.toX - ports.fromX;
+  const dy = ports.toY - ports.fromY;
+  let d;
+  
+  if (Math.abs(dx) > Math.abs(dy)) {
+    d = `M ${ports.fromX} ${ports.fromY} C ${ports.fromX + dx*0.4} ${ports.fromY}, ${ports.toX - dx*0.4} ${ports.toY}, ${ports.toX} ${ports.toY}`;
+  } else {
+    d = `M ${ports.fromX} ${ports.fromY} C ${ports.fromX} ${ports.fromY + dy*0.4}, ${ports.toX} ${ports.toY - dy*0.4}, ${ports.toX} ${ports.toY}`;
+  }
+
+  path.setAttribute('d', d);
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width', '1.5');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('opacity', '0.6');
+  svg.appendChild(path);
+
+  // Angle at destination
+  const angle = Math.atan2(ports.toY - ports.fromY, ports.toX - ports.fromX);
+  const fromAngle = Math.atan2(ports.fromY - ports.toY, ports.fromX - ports.toX);
+
+  // "One" side mark (from)
+  svg.appendChild(drawOneMark(ports.fromX, ports.fromY, angle));
+
+  // "Many" or "One" side mark (to)
+  if (type === '1:N') {
+    svg.appendChild(drawCrowsFoot(ports.toX, ports.toY, angle));
+  } else {
+    svg.appendChild(drawOneOneMark(ports.toX, ports.toY, angle));
+  }
+}
+
+// Draw all connections
+connections.forEach(c => drawConnection(c[0], c[1], c[2]));
+</script>
+
+</body>
+</html>

@@ -1,38 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../shared/services/auth_service.dart';
-import 'web_farmer_registration_screen.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
+import '../../../shared/services/auth_service.dart';
+import '../../../shared/router/app_router.dart';
 
 /// Web Profile screen.
 /// Shows user info, "Start Selling" button, and account settings.
 class WebProfileScreen extends StatefulWidget {
   final VoidCallback onModeChanged;
   final VoidCallback onLogout;
+  final Function(int) onNavigate;
+  final int currentIndex;
 
   const WebProfileScreen({
     super.key,
     required this.onModeChanged,
     required this.onLogout,
+    required this.onNavigate,
+    required this.currentIndex,
   });
 
   @override
   State<WebProfileScreen> createState() => _WebProfileScreenState();
 }
 
-class _WebProfileScreenState extends State<WebProfileScreen> {
+class _WebProfileScreenState extends State<WebProfileScreen> with TickerProviderStateMixin {
   static const Color primary = Color(0xFF13EC5B);
   static const Color _accent = Color(0xFF10B981);
+  static const Color _dark = Color(0xFF0F172A);
+
+  // Animations
+  late AnimationController _fadeInController;
+  final Set<int> _hoveredButtons = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeInController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _fadeInController.dispose();
+    super.dispose();
+  }
 
   void _handleStartSelling() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => WebFarmerRegistrationScreen(
-          onRegistrationComplete: () {
-            widget.onModeChanged();
-          },
-        ),
-      ),
-    );
+    context.push(AppRoutes.webFarmerRegister, extra: () {
+      widget.onModeChanged();
+    });
   }
 
   void _handleSwitchToFarmer() {
@@ -48,16 +68,20 @@ class _WebProfileScreenState extends State<WebProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = AuthService();
-    return Container(
-      color: const Color(0xFFF8FAFB),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 860),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFB),
+      body: Column(
+        children: [
+          _buildSiteHeader(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 860),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                 // Page title
                 const Text(
                   'Profile',
@@ -139,6 +163,97 @@ class _WebProfileScreenState extends State<WebProfileScreen> {
           ),
         ),
       ),
+    ),
+    ],
+    ),
+    );
+  }
+
+  // ─── Site Header ───
+  Widget _buildSiteHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+      color: Colors.white,
+      child: Row(
+        children: [
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => widget.onNavigate(0),
+              child: Row(
+                children: [
+                  Image.asset(
+                    'assets/icon/logo.png',
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'AGRIDIRECT',
+                    style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w800, color: _dark, letterSpacing: 0.5),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 48),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildHeaderNavItem('Home', onTap: () => widget.onNavigate(0)),
+              const SizedBox(width: 32),
+              _buildHeaderNavItem('Shop', onTap: () => widget.onNavigate(1)),
+              const SizedBox(width: 32),
+              _buildHeaderNavItem('Community', onTap: () => widget.onNavigate(2)),
+              const SizedBox(width: 32),
+              _buildHeaderNavItem('About Us', onTap: () {}),
+            ],
+          ),
+          const Spacer(),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: _accent.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: _accent),
+            ),
+            child: Icon(Icons.person_rounded, size: 20, color: _accent),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderNavItem(String text, {bool isActive = false, required VoidCallback onTap}) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              text,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                color: isActive ? _accent : _dark,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Container(
+              width: 16,
+              height: 2,
+              decoration: BoxDecoration(
+                color: isActive ? _accent : Colors.transparent,
+                borderRadius: BorderRadius.circular(1),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -176,8 +291,8 @@ class _WebProfileScreenState extends State<WebProfileScreen> {
                 imageUrl:
                     'https://lh3.googleusercontent.com/aida-public/AB6AXuA7SO8J3CebwmP_4K0nwWhDkMsWISrTpnfbOkYJ79_ZiTCLVxdvX_FJArJ1xwYsLAJx8gW_Wtk3xValGb9mDShlpRvdPIMoD9UGWJ9LwNRlF0vvmsKesjK6liNaDGy7C5HGWdOAE1hEPvF3UTq81_QK7QkgKAAMQgeICa4pykDXTF8JYtnrFYPiavyC7N-wkK4pGMGQJcdoyKpRglzbFXWGqTdoa3xP-Bm86BGxFKlWg21Mbw-FylTfHiJeJMKgLbfSJr8MhPFg1zqB',
                 fit: BoxFit.cover,
-                placeholder: (_, __) => Container(color: Colors.grey[200]),
-                errorWidget: (_, __, ___) => const Icon(Icons.person, size: 36),
+                placeholder: (_, _) => Container(color: Colors.grey[200]),
+                errorWidget: (_, _, _) => const Icon(Icons.person, size: 36),
               ),
             ),
           ),
@@ -318,11 +433,14 @@ class _WebProfileScreenState extends State<WebProfileScreen> {
             const SizedBox(height: 20),
             MouseRegion(
               cursor: SystemMouseCursors.click,
+              onEnter: (_) => setState(() => _hoveredButtons.add(0)),
+              onExit: (_) => setState(() => _hoveredButtons.remove(0)),
               child: GestureDetector(
                 onTap: isViewingAsFarmer
                     ? _handleSwitchToCustomer
                     : _handleSwitchToFarmer,
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 12,
@@ -334,40 +452,54 @@ class _WebProfileScreenState extends State<WebProfileScreen> {
                           : [const Color(0xFF10B981), const Color(0xFF13EC5B)],
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color:
-                            (isViewingAsFarmer
-                                    ? const Color(0xFF3B82F6)
-                                    : primary)
-                                .withValues(alpha: 0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    boxShadow: _hoveredButtons.contains(0)
+                        ? [
+                            BoxShadow(
+                              color: (isViewingAsFarmer
+                                      ? const Color(0xFF3B82F6)
+                                      : primary)
+                                  .withValues(alpha: 0.5),
+                              blurRadius: 16,
+                              offset: const Offset(0, 8),
+                            ),
+                          ]
+                        : [
+                            BoxShadow(
+                              color: (isViewingAsFarmer
+                                      ? const Color(0xFF3B82F6)
+                                      : primary)
+                                  .withValues(alpha: 0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isViewingAsFarmer
-                            ? Icons.shopping_bag_rounded
-                            : Icons.storefront_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isViewingAsFarmer
-                            ? 'Switch to Customer'
-                            : 'Switch to Farmer',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
+                  child: AnimatedScale(
+                    scale: _hoveredButtons.contains(0) ? 1.05 : 1.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isViewingAsFarmer
+                              ? Icons.shopping_bag_rounded
+                              : Icons.storefront_rounded,
                           color: Colors.white,
+                          size: 18,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Text(
+                          isViewingAsFarmer
+                              ? 'Switch to Customer'
+                              : 'Switch to Farmer',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -454,9 +586,12 @@ class _WebProfileScreenState extends State<WebProfileScreen> {
               const SizedBox(height: 24),
               MouseRegion(
                 cursor: SystemMouseCursors.click,
+                onEnter: (_) => setState(() => _hoveredButtons.add(1)),
+                onExit: (_) => setState(() => _hoveredButtons.remove(1)),
                 child: GestureDetector(
                   onTap: _handleStartSelling,
-                  child: Container(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 28,
                       vertical: 14,
@@ -464,32 +599,44 @@ class _WebProfileScreenState extends State<WebProfileScreen> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(colors: [_accent, primary]),
                       borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: primary.withValues(alpha: 0.3),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
+                      boxShadow: _hoveredButtons.contains(1)
+                          ? [
+                              BoxShadow(
+                                color: primary.withValues(alpha: 0.5),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
+                              ),
+                            ]
+                          : [
+                              BoxShadow(
+                                color: primary.withValues(alpha: 0.3),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.storefront_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        SizedBox(width: 10),
-                        Text(
-                          'Start Selling',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
+                    child: AnimatedScale(
+                      scale: _hoveredButtons.contains(1) ? 1.05 : 1.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.storefront_rounded,
                             color: Colors.white,
+                            size: 20,
                           ),
-                        ),
-                      ],
+                          SizedBox(width: 10),
+                          Text(
+                            'Start Selling',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

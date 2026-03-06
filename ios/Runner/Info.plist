@@ -49,5 +49,9 @@
 	<string>AgriDirect needs camera access for face verification and ID photo capture during farmer registration.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>AgriDirect needs photo library access to upload your valid ID for farmer registration.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>AgriDirect needs access to your location to provide weather alerts and crop recommendations specific to your farm location.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>AgriDirect needs access to your location to provide weather alerts and crop recommendations specific to your farm location.</string>
 </dict>
 </plist>

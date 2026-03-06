@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../shared/services/supabase_data_service.dart';
+import '../../../shared/data/app_data.dart';
 
 /// Marketplace Screen matching the design mockup.
 /// Product grid with filters/chips, heart icons, prices.
@@ -16,69 +18,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   int _selectedFilter = 0;
 
   final _filters = ['All Products', 'Vegetables', 'Fruits', 'Dairy', 'Grains'];
-
-  final _products = const [
-    _ProductData(
-      imageUrl:
-          'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=400',
-      badge: 'ORGANIC FARM',
-      name: 'Fresh Strawberries',
-      farm: 'Sunnyside Acres',
-      distance: '2.4mi',
-      price: '\$6.50',
-      unit: '/lb',
-    ),
-    _ProductData(
-      imageUrl:
-          'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=400',
-      badge: 'PASTURE RAISED',
-      name: 'Dozen Brown Eggs',
-      farm: 'Maple Ridge Farm',
-      distance: '4.1mi',
-      price: '\$7.20',
-      unit: '/dz',
-    ),
-    _ProductData(
-      imageUrl:
-          'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400',
-      badge: 'NON-GMO',
-      name: 'Organic Curly Kale',
-      farm: 'Green Valley',
-      distance: '1.8mi',
-      price: '\$3.99',
-      unit: '/bn',
-    ),
-    _ProductData(
-      imageUrl:
-          'https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=400',
-      badge: 'LOCAL HONEY',
-      name: 'Wildflower Honey',
-      farm: 'Bee Happy Apiary',
-      distance: '5.0mi',
-      price: '\$12.00',
-      unit: '/16oz',
-    ),
-    _ProductData(
-      imageUrl:
-          'https://images.unsplash.com/photo-1447175008436-054170c2e979?w=400',
-      badge: 'HERITAGE',
-      name: 'Rainbow Carrots',
-      farm: 'Hillside Organic',
-      distance: '3.2mi',
-      price: '\$4.50',
-      unit: '/bn',
-    ),
-    _ProductData(
-      imageUrl:
-          'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400',
-      badge: 'GRASS FED',
-      name: 'Whole Raw Milk',
-      farm: 'Dairy Delight',
-      distance: '6.7mi',
-      price: '\$8.50',
-      unit: '/gal',
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -216,7 +155,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           itemCount: _filters.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
           itemBuilder: (_, i) {
             final isSelected = _selectedFilter == i;
             return GestureDetector(
@@ -299,38 +238,57 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   // ── Product Grid ──
   Widget _buildProductGrid() {
-    return Stack(
-      children: [
-        GridView.builder(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: 0.62,
-          ),
-          itemCount: _products.length,
-          itemBuilder: (_, i) => _buildProductCard(_products[i]),
-        ),
-        // Bottom filter pills
-        Positioned(
-          bottom: 20,
-          left: 0,
-          right: 0,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildFilterPill(Icons.sell, '\$2 - \$50', primary),
-              const SizedBox(width: 10),
-              _buildFilterPill(
-                Icons.location_on,
-                'Within 10 miles',
-                const Color(0xFF334155),
+    return FutureBuilder<List<ProductItem>>(
+      future: SupabaseDataService().getNearbyProducts(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final products = snapshot.data ?? [];
+        if (products.isEmpty) {
+          return Center(
+            child: Text(
+              'No products available',
+              style: TextStyle(color: Colors.grey[500]),
+            ),
+          );
+        }
+
+        return Stack(
+          children: [
+            GridView.builder(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
+                childAspectRatio: 0.62,
               ),
-            ],
-          ),
-        ),
-      ],
+              itemCount: products.length,
+              itemBuilder: (_, i) => _buildProductCard(products[i]),
+            ),
+            // Bottom filter pills
+            Positioned(
+              bottom: 20,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildFilterPill(Icons.sell, '\$2 - \$50', primary),
+                  const SizedBox(width: 10),
+                  _buildFilterPill(
+                    Icons.location_on,
+                    'Within 10 miles',
+                    const Color(0xFF334155),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -366,7 +324,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     );
   }
 
-  Widget _buildProductCard(_ProductData product) {
+  Widget _buildProductCard(ProductItem product) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -394,9 +352,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   height: 130,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) =>
+                  placeholder: (_, _) =>
                       Container(height: 130, color: Colors.grey[200]),
-                  errorWidget: (_, __, ___) => Container(
+                  errorWidget: (_, _, _) => Container(
                     height: 130,
                     color: Colors.grey[200],
                     child: const Icon(Icons.image, color: Colors.grey),
@@ -429,15 +387,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Badge
+                  // Farm/Category badge
                   Text(
-                    product.badge,
+                    product.farm.split(',').first,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       color: primary,
                       letterSpacing: 0.5,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   // Name
@@ -452,9 +412,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
-                  // Farm + distance
+                  // Farm info
                   Text(
-                    '${product.farm} · ${product.distance}',
+                    product.farm,
                     style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -508,24 +468,4 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       ),
     );
   }
-}
-
-class _ProductData {
-  final String imageUrl;
-  final String badge;
-  final String name;
-  final String farm;
-  final String distance;
-  final String price;
-  final String unit;
-
-  const _ProductData({
-    required this.imageUrl,
-    required this.badge,
-    required this.name,
-    required this.farm,
-    required this.distance,
-    required this.price,
-    required this.unit,
-  });
 }

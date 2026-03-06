@@ -232,9 +232,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   width: 80,
                   height: 80,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) =>
+                  placeholder: (_, _) =>
                       Container(width: 80, height: 80, color: Colors.grey[200]),
-                  errorWidget: (_, __, ___) => Container(
+                  errorWidget: (_, _, _) => Container(
                     width: 80,
                     height: 80,
                     color: Colors.grey[200],

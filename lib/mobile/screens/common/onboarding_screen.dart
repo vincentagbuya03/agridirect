@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lottie/lottie.dart';
 import '../../../shared/services/onboarding_service.dart';
 
 /// Onboarding screen shown once for first-time users.
-/// Matches the provided 3-page design mockups.
+/// Uses Lottie animations for a beautiful, modern experience.
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onOnboardingComplete;
 
@@ -20,6 +21,41 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   int _currentPage = 0;
 
   static const Color _primary = Color(0xFF13EC5B);
+  static const Color _darkGreen = Color(0xFF004D2B);
+
+  // Lottie animation URLs (agriculture/marketplace themed)
+  static const List<String> _lottieUrls = [
+    // Page 1: Farm/organic produce
+    'https://assets3.lottiefiles.com/packages/lf20_ysrn2iwp.json',
+    // Page 2: Shopping/delivery
+    'https://assets3.lottiefiles.com/packages/lf20_jmejybvu.json',
+    // Page 3: Analytics/insights
+    'https://assets3.lottiefiles.com/packages/lf20_fcfjwiyb.json',
+  ];
+
+  static const List<Map<String, dynamic>> _pages = [
+    {
+      'title': 'Direct From Farm',
+      'subtitle':
+          'Connect directly with local farmers for the freshest produce, ensuring fair prices for everyone.',
+      'icon': Icons.eco_rounded,
+      'gradientColors': [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
+    },
+    {
+      'title': 'Pre-Order Upcoming\nHarvests',
+      'subtitle':
+          'Secure your seasonal favorites before harvest at exclusive prices and get notified when they\'re ready.',
+      'icon': Icons.shopping_basket_rounded,
+      'gradientColors': [Color(0xFFFFF8E1), Color(0xFFFFECB3)],
+    },
+    {
+      'title': 'AI-Powered\nInsights',
+      'subtitle':
+          'Stay ahead with weather alerts, demand predictions, and a community of growers sharing knowledge.',
+      'icon': Icons.auto_awesome_rounded,
+      'gradientColors': [Color(0xFFE3F2FD), Color(0xFFBBDEFB)],
+    },
+  ];
 
   @override
   void initState() {
@@ -53,547 +89,73 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
   }
 
-  void _goToLogin() => _completeOnboarding();
-
-  // ---------- DOT INDICATORS ----------
-  Widget _buildDots({
-    Color activeColor = _primary,
-    Color inactiveColor = const Color(0xFFE0E0E0),
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(3, (i) {
-        final isActive = i == _currentPage;
-        return GestureDetector(
-          onTap: () => _pageController.animateToPage(
-            i,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          ),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            height: 6,
-            width: isActive ? 24 : 8,
-            decoration: BoxDecoration(
-              color: isActive ? activeColor : inactiveColor,
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-        );
-      }),
-    );
-  }
-
-  // =====================================================
-  //  PAGE 1 – Direct From Farm
-  // =====================================================
-  Widget _buildPage1() {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Background image
-        Image.asset(
-          'assets/images/00018379-scaled.webp',
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) =>
-              Container(color: const Color(0xFF76B399)),
-        ),
-        // Dark overlay
-        Container(color: Colors.black.withAlpha(40)),
-        // Top header with app name and skip
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 12,
-          left: 20,
-          right: 20,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'AgriDirect',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              _buildSkipText(color: Colors.white),
-            ],
-          ),
-        ),
-        // Bottom white card
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(32),
-                topRight: Radius.circular(32),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Dots
-                _buildDots(),
-                const SizedBox(height: 20),
-                // Title
-                Text(
-                  'Direct From Farm',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF004D2B),
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Subtitle
-                Text(
-                  'Connect directly with local farmers for the freshest produce, ensuring fair prices for everyone.',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400,
-                    color: const Color(0xFF6B7280),
-                    height: 1.55,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Next button full width
-                _buildNextButton(compact: false),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // =====================================================
-  //  PAGE 2 – Pre-Order Upcoming Harvests
-  // =====================================================
-  Widget _buildPage2() {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Background image
-        Image.asset(
-          'assets/images/istockphoto-1137976179-612x612.jpg',
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) =>
-              Container(color: const Color(0xFF8B4513)),
-        ),
-        // Dark overlay
-        Container(color: Colors.black.withAlpha(20)),
-        // Top bar: dash indicators + Skip
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 12,
-          left: 20,
-          right: 20,
-          child: Row(
-            children: [
-              ..._buildDashIndicators(),
-              const Spacer(),
-              _buildSkipText(color: Colors.white70),
-            ],
-          ),
-        ),
-        // Days to harvest timer
-        Positioned(
-          top: 120,
-          left: 0,
-          right: 0,
-          child: Center(child: _buildHarvestTimer()),
-        ),
-        // Bottom white card
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(32),
-                topRight: Radius.circular(32),
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Shopping basket icon
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: Color(0xFF13EC5B).withOpacity(0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.shopping_basket_outlined,
-                    color: Color(0xFF13EC5B),
-                    size: 32,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Title
-                Text(
-                  'Pre-Order Upcoming\nHarvests',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1A1A1A),
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Subtitle
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    'Secure your seasonal favorites before harvest at exclusive prices and get notified when they are ready for delivery.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      color: const Color(0xFF6B7280),
-                      height: 1.55,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Next button in dark navy
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _next,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Next',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.arrow_forward,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // =====================================================
-  //  PAGE 3 – AI-Powered Insights
-  // =====================================================
-  Widget _buildPage3() {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Background image
-        Image.asset(
-          'assets/images/638342653_1435027501422399_4429077061672726972_n.png',
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) =>
-              Container(color: const Color(0xFF76B399)),
-        ),
-        // Light overlay
-        Container(color: Colors.white.withAlpha(0)),
-        // Top bar: dash indicators + Skip
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 12,
-          left: 20,
-          right: 20,
-          child: Row(
-            children: [
-              ..._buildDashIndicators(),
-              const Spacer(),
-              _buildSkipText(color: Colors.grey[600]),
-            ],
-          ),
-        ),
-        // Bottom white card
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(32),
-                topRight: Radius.circular(32),
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Sparkle icon
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: Color(0xFF13EC5B).withOpacity(0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.auto_awesome_rounded,
-                    color: Color(0xFF13EC5B),
-                    size: 32,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Title
-                Text(
-                  'AI-Powered Insights',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1A1A1A),
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Subtitle
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    'Stay ahead with weather alerts, demand predictions, and a community of growers sharing knowledge.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      color: const Color(0xFF6B7280),
-                      height: 1.55,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Get Started button
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _completeOnboarding,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Get Started',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.arrow_forward,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ---------- SHARED WIDGETS ----------
-
-  Widget _buildSkipChip({bool light = false}) {
-    return GestureDetector(
-      onTap: _skip,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        decoration: BoxDecoration(
-          color: light ? Colors.white.withAlpha(200) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          'Skip',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: light ? const Color(0xFF4A4A4A) : Colors.grey[400],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSkipText({Color? color}) {
-    return GestureDetector(
-      onTap: _skip,
-      child: Text(
-        'Skip',
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-          color: color ?? Colors.grey[400],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNextButton({required bool compact}) {
-    if (compact) {
-      return SizedBox(
-        height: 52,
-        child: ElevatedButton(
-          onPressed: _next,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _primary,
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(26),
-            ),
-            elevation: 0,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Next',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: _next,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          elevation: 0,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Next',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildDashIndicators() {
-    return List.generate(3, (i) {
-      final isActive = i == _currentPage;
-      return AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        margin: const EdgeInsets.symmetric(horizontal: 3),
-        height: 4,
-        width: isActive ? 28 : 20,
-        decoration: BoxDecoration(
-          color: isActive ? _primary : Colors.white.withAlpha(120),
-          borderRadius: BorderRadius.circular(2),
-        ),
-      );
-    });
-  }
-
-  Widget _buildHarvestTimer() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.black.withAlpha(100),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+  // ---------- BUILD ----------
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: _primary, shape: BoxShape.circle),
-            child: const Icon(
-              Icons.schedule_rounded,
-              color: Colors.black,
-              size: 20,
-            ),
+          // Page content
+          PageView.builder(
+            controller: _pageController,
+            onPageChanged: (page) => setState(() => _currentPage = page),
+            itemCount: 3,
+            itemBuilder: (context, index) => _buildPage(index),
           ),
-          const SizedBox(height: 8),
-          Text(
-            '05',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-            ),
-          ),
-          Text(
-            'DAYS TO HARVEST',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Colors.white70,
-              letterSpacing: 0.8,
+          // Top bar with logo and skip
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 12,
+            left: 24,
+            right: 24,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: _primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.eco_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'AgriDirect',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: _darkGreen,
+                      ),
+                    ),
+                  ],
+                ),
+                GestureDetector(
+                  onTap: _skip,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Skip',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -601,20 +163,198 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  // ---------- BUILD ----------
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (page) => setState(() => _currentPage = page),
-        children: [_buildPage1(), _buildPage2(), _buildPage3()],
+  Widget _buildPage(int index) {
+    final page = _pages[index];
+    final gradientColors = page['gradientColors'] as List<Color>;
+    final isLastPage = index == 2;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            gradientColors[0],
+            gradientColors[1],
+            Colors.white,
+            Colors.white,
+          ],
+          stops: const [0.0, 0.35, 0.55, 1.0],
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: 60),
+
+            // Lottie animation area
+            Expanded(
+              flex: 5,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: _buildLottieAnimation(index, page),
+              ),
+            ),
+
+            // Bottom content area
+            Expanded(
+              flex: 5,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(32, 32, 32, 24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(36),
+                    topRight: Radius.circular(36),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 20,
+                      offset: const Offset(0, -5),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Page indicators
+                    _buildPageIndicators(),
+                    const SizedBox(height: 24),
+
+                    // Title
+                    Text(
+                      page['title'] as String,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        color: _darkGreen,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Subtitle
+                    Text(
+                      page['subtitle'] as String,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
+                        color: const Color(0xFF6B7280),
+                        height: 1.6,
+                      ),
+                    ),
+
+                    const Spacer(),
+
+                    // Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: _next,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              isLastPage ? 'Get Started' : 'Next',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              isLastPage
+                                  ? Icons.rocket_launch_rounded
+                                  : Icons.arrow_forward_rounded,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
-}
 
-// =====================================================
-//  Custom painters for illustrations
-// =====================================================
-/// Custom painters removed - now using Image.network for backgrounds
+  Widget _buildLottieAnimation(int index, Map<String, dynamic> page) {
+    return Center(
+      child: Lottie.network(
+        _lottieUrls[index],
+        fit: BoxFit.contain,
+        repeat: true,
+        animate: true,
+        errorBuilder: (context, error, stackTrace) {
+          // Beautiful fallback with animated icon
+          return TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 800),
+            curve: Curves.elasticOut,
+            builder: (context, value, child) {
+              return Transform.scale(
+                scale: value,
+                child: child,
+              );
+            },
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                color: (page['gradientColors'] as List<Color>)[0],
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: _primary.withOpacity(0.2),
+                    blurRadius: 40,
+                    spreadRadius: 10,
+                  ),
+                ],
+              ),
+              child: Icon(
+                page['icon'] as IconData,
+                color: _primary,
+                size: 80,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPageIndicators() {
+    return Row(
+      children: List.generate(3, (i) {
+        final isActive = i == _currentPage;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          margin: const EdgeInsets.only(right: 8),
+          height: 6,
+          width: isActive ? 28 : 8,
+          decoration: BoxDecoration(
+            color: isActive ? _primary : const Color(0xFFE0E0E0),
+            borderRadius: BorderRadius.circular(3),
+          ),
+        );
+      }),
+    );
+  }
+}

@@ -1,19 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../shared/data/app_data.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../shared/data/app_data.dart';
+import '../../../shared/services/supabase_data_service.dart';
 
 /// Web-only Community Hub — two-column layout with sidebar.
 /// Completely separate UI from the mobile community hub.
 class WebCommunityHub extends StatefulWidget {
-  const WebCommunityHub({super.key});
+  final Function(int) onNavigate;
+  final int currentIndex;
+
+  const WebCommunityHub({
+    super.key,
+    required this.onNavigate,
+    required this.currentIndex,
+  });
 
   @override
   State<WebCommunityHub> createState() => _WebCommunityHubState();
 }
 
 class _WebCommunityHubState extends State<WebCommunityHub>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late TabController _tabController;
+  late AnimationController _fadeInController;
+  late List<AnimationController> _postControllers;
+  final Set<int> _hoveredPosts = {};
 
   static const Color _primary = Color(0xFF10B981);
   static const Color _dark = Color(0xFF0F172A);
@@ -25,11 +37,39 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _fadeInController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    )..forward();
+
+    // Create controllers for 6 example posts
+    _postControllers = List.generate(
+      6,
+      (i) => AnimationController(
+        duration: const Duration(milliseconds: 500),
+        vsync: this,
+      ),
+    );
+
+    // Stagger animations
+    Future.delayed(const Duration(milliseconds: 300), () {
+      for (int i = 0; i < _postControllers.length; i++) {
+        Future.delayed(Duration(milliseconds: 80 * i), () {
+          if (mounted) {
+            _postControllers[i].forward();
+          }
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _fadeInController.dispose();
+    for (final controller in _postControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -39,6 +79,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
       backgroundColor: _surface,
       body: Column(
         children: [
+          _buildSiteHeader(),
           _buildTopBar(),
           Expanded(
             child: Row(
@@ -67,6 +108,100 @@ class _WebCommunityHubState extends State<WebCommunityHub>
         icon: const Icon(Icons.edit_rounded, size: 20),
         label: const Text('New Post', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    );
+  }
+
+  // ─── Site Header (consistent across all pages) ───
+  Widget _buildSiteHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+      color: Colors.white,
+      child: Row(
+        children: [
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => widget.onNavigate(0),
+              child: Row(
+                children: [
+                  Image.asset(
+                    'assets/icon/logo.png',
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'AGRIDIRECT',
+                    style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w800, color: _dark, letterSpacing: 0.5),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 48),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildHeaderNavItem('Home', onTap: () => widget.onNavigate(0)),
+              const SizedBox(width: 32),
+              _buildHeaderNavItem('Shop', onTap: () => widget.onNavigate(1)),
+              const SizedBox(width: 32),
+              _buildHeaderNavItem('Community', isActive: true, onTap: () => widget.onNavigate(2)),
+              const SizedBox(width: 32),
+              _buildHeaderNavItem('About Us', onTap: () {}),
+            ],
+          ),
+          const Spacer(),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => widget.onNavigate(3),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: _surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: _border),
+                ),
+                child: Icon(Icons.person_outline_rounded, size: 20, color: _dark),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderNavItem(String text, {bool isActive = false, required VoidCallback onTap}) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              text,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                color: isActive ? _primary : _dark,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Container(
+              width: 16,
+              height: 2,
+              decoration: BoxDecoration(
+                color: isActive ? _primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(1),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -149,24 +284,83 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildForumFeed() {
-    final posts = AppData.forumPosts;
-    return ListView.builder(
-      padding: const EdgeInsets.all(32),
-      itemCount: posts.length,
-      itemBuilder: (context, i) => Padding(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: _buildForumCard(posts[i]),
+    return FutureBuilder<List<ForumPostItem>>(
+      future: SupabaseDataService().getForumPosts(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        final posts = snapshot.data ?? [];
+        if (posts.isEmpty) {
+          return Center(
+            child: Text('No forum posts yet', style: TextStyle(color: _muted)),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(32),
+          itemCount: posts.length,
+          itemBuilder: (context, i) {
+            if (i < _postControllers.length) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: _buildAnimatedForumCard(i, posts[i]),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: _buildForumCard(posts[i]),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildAnimatedForumCard(int index, ForumPostItem post) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0, end: 1).animate(
+        CurvedAnimation(parent: _postControllers[index], curve: Curves.easeInOut),
+      ),
+      child: SlideTransition(
+        position: Tween<Offset>(begin: const Offset(-0.2, 0), end: Offset.zero).animate(
+          CurvedAnimation(parent: _postControllers[index], curve: Curves.easeOutCubic),
+        ),
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hoveredPosts.add(index)),
+          onExit: (_) => setState(() => _hoveredPosts.remove(index)),
+          child: _buildForumCard(post, _hoveredPosts.contains(index)),
+        ),
       ),
     );
   }
 
-  Widget _buildForumCard(ForumPostItem post) {
-    return Container(
+  Widget _buildForumCard(ForumPostItem post, [bool isHovered = false]) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border),
+        border: Border.all(
+          color: isHovered ? _primary : _border,
+          width: isHovered ? 2 : 1,
+        ),
+        boxShadow: isHovered
+            ? [
+                BoxShadow(
+                  color: _primary.withValues(alpha: 0.1),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : [],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -224,8 +418,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                 child: CachedNetworkImage(
                   imageUrl: post.imageUrl!,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(color: Colors.grey[100]),
-                  errorWidget: (_, __, ___) => Container(color: Colors.grey[100]),
+                  placeholder: (_, _) => Container(color: Colors.grey[100]),
+                  errorWidget: (_, _, _) => Container(color: Colors.grey[100]),
                 ),
               ),
             ),
@@ -276,14 +470,33 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildArticlesFeed() {
-    final articles = AppData.articles;
-    return ListView.builder(
-      padding: const EdgeInsets.all(32),
-      itemCount: articles.length,
-      itemBuilder: (context, i) => Padding(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: _buildArticleCard(articles[i]),
-      ),
+    return FutureBuilder<List<ArticleItem>>(
+      future: SupabaseDataService().getArticles(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        final articles = snapshot.data ?? [];
+        if (articles.isEmpty) {
+          return Center(
+            child: Text('No articles yet', style: TextStyle(color: _muted)),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(32),
+          itemCount: articles.length,
+          itemBuilder: (context, i) => Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: _buildArticleCard(articles[i]),
+          ),
+        );
+      },
     );
   }
 
@@ -340,8 +553,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                   width: 120,
                   height: 90,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(width: 120, height: 90, color: Colors.grey[100]),
-                  errorWidget: (_, __, ___) => Container(width: 120, height: 90, color: Colors.grey[100]),
+                  placeholder: (_, _) => Container(width: 120, height: 90, color: Colors.grey[100]),
+                  errorWidget: (_, _, _) => Container(width: 120, height: 90, color: Colors.grey[100]),
                 ),
               ),
             ],
