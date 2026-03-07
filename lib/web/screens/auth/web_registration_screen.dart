@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/email_service.dart';
 import '../../../shared/services/otp_service.dart';
 import '../../../shared/services/supabase_config.dart';
-import 'web_otp_verification_screen.dart';
+import 'web_otp_verification_screen.dart' show WebOTPVerificationScreen;
 
 /// Web Registration screen.
 /// Full-width split layout with illustration on left, registration form on right.
