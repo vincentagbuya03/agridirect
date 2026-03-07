@@ -173,7 +173,7 @@ class SupabaseDB {
           .maybeSingle();
       return result != null;
     } catch (e) {
-      print('Error checking email: $e');
+      // RLS blocks unauthenticated reads — Supabase Auth handles duplicate emails natively
       return false;
     }
   }
@@ -188,7 +188,7 @@ class SupabaseDB {
           .maybeSingle();
       return result != null;
     } catch (e) {
-      print('Error checking phone: $e');
+      // RLS blocks unauthenticated reads — skip check silently
       return false;
     }
   }

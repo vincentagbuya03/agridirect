@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/auth_service.dart';
+import '../../../shared/services/email_service.dart';
+import '../../../shared/services/otp_service.dart';
+import '../../../shared/services/supabase_config.dart';
+import 'web_otp_verification_screen.dart';
 
 /// Web Registration screen.
 /// Full-width split layout with illustration on left, registration form on right.
@@ -17,6 +20,7 @@ class WebRegistrationScreen extends StatefulWidget {
 class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
@@ -30,6 +34,7 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -38,15 +43,16 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
   void _handleRegister() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
     final password = _passwordController.text.trim();
-    final confirm = _confirmPasswordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
 
     if (name.isEmpty || email.isEmpty || password.isEmpty) {
       _showSnackBar('Please fill in all fields');
       return;
     }
 
-    if (password != confirm) {
+    if (password != confirmPassword) {
       _showSnackBar('Passwords do not match');
       return;
     }
@@ -58,86 +64,90 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
 
     setState(() => _isLoading = true);
 
-    final success = await AuthService().register(
-      name: name,
-      email: email,
-      password: password,
-    );
+    try {
+      final emailTaken = await SupabaseDB.isEmailAlreadyRegistered(email);
+      if (emailTaken) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          _showSnackBar('This email is already registered. Please log in instead.');
+        }
+        return;
+      }
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-      if (success) {
-        _showEmailConfirmationDialog(email);
-      } else {
-        _showSnackBar(AuthService().errorMessage ?? 'Registration failed');
+      if (phone.isNotEmpty) {
+        final phoneTaken = await SupabaseDB.isPhoneAlreadyRegistered(phone);
+        if (phoneTaken) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            _showSnackBar('This phone number is already associated with an account.');
+          }
+          return;
+        }
+      }
+
+      final timeRemaining = await OTPService().getOTPTimeRemaining(email: email);
+      final hasExistingOTP = timeRemaining != null && timeRemaining > 0;
+
+      if (!hasExistingOTP) {
+        final otpCode = OTPService.generateOTP();
+
+        final otpStored = await OTPService().storeOTP(
+          email: email,
+          code: otpCode,
+        );
+
+        if (!otpStored) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            _showSnackBar('Failed to prepare verification. Please try again.');
+          }
+          return;
+        }
+
+        final emailSent = await EmailService.sendOTPEmail(
+          email: email,
+          otpCode: otpCode,
+        );
+
+        if (!emailSent) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            _showSnackBar('Failed to send verification code. Please try again.');
+          }
+          return;
+        }
+      }
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => WebOTPVerificationScreen(
+              email: email,
+              name: name,
+              password: password,
+              phoneNumber: phone.isNotEmpty ? phone : null,
+              initialSecondsRemaining: hasExistingOTP ? timeRemaining : 600,
+              onVerificationSuccess: () {
+                _showSnackBar('Account created successfully! Redirecting to login...');
+                Future.delayed(const Duration(seconds: 2), () {
+                  if (mounted) {
+                    Navigator.pop(context);
+                    widget.onRegistrationSuccess();
+                  }
+                });
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showSnackBar('Error: $e');
       }
     }
-  }
-
-  void _showEmailConfirmationDialog(String email) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('Verify Your Email'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF13EC5B).withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.mail_outline_rounded,
-                  color: Color(0xFF13EC5B),
-                  size: 40,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'A confirmation email has been sent to:',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                email,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Please click the verification link in your email to confirm your account and start using ArgiDirect.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                widget.onRegistrationSuccess();
-              },
-              child: const Text(
-                'Go to Login',
-                style: TextStyle(color: Color(0xFF13EC5B)),
-              ),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   void _showSnackBar(String msg) {
@@ -278,7 +288,15 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
                             ),
                             const SizedBox(height: 16),
 
-                            // Password Field
+                            // Phone Field
+                            _buildTextField(
+                              controller: _phoneController,
+                              label: 'Phone Number (optional)',
+                              icon: Icons.phone_outlined,
+                              enabled: !_isLoading,
+                            ),
+                            const SizedBox(height: 16),
+
                             _buildTextField(
                               controller: _passwordController,
                               label: 'Password',

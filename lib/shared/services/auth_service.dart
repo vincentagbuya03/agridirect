@@ -142,9 +142,6 @@ class AuthService extends ChangeNotifier {
         return false;
       }
 
-      // Save user profile in database but do NOT log them in yet
-      // They must confirm their email first
-
       // Note: With email confirmation enabled, there's no active session here.
       // The database trigger (handle_new_user) will create the user profile.
       // Client-side insert is skipped because RLS would block it without a session.

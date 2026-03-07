@@ -70,3 +70,5 @@ ios/Flutter/Flutter.podspec
 .DS_Store
 .env
 *.swp
+.vercel
+.env*.local
