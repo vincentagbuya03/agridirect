@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../widgets/animated_components.dart';
+import '../../widgets/animated_components.dart';
 
 /// Web Sales Dashboard — Modern Design
 /// Professional analytics dashboard for farmers
@@ -19,20 +21,21 @@ class WebSalesDashboard extends StatefulWidget {
 
 class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProviderStateMixin {
   // Modern colors
-  static const Color _primary = Color(0xFF10B981);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _success = Color(0xFF06B6D4);
   static const Color _warning = Color(0xFFF59E0B);
 
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _border = Color(0xFFE2E8F0);
-  static const Color _surface = Color(0xFFF8FAFC);
+  static const Color _dark = Color(0xFF111827);
+  static const Color _muted = Color(0xFF6B7280);
+  static const Color _border = Color(0xFFE5E7EB);
+  static const Color _surface = Color(0xFFFAFAFA);
   static const Color _white = Color(0xFFFFFFFF);
 
   // ─── Animations ───
   late AnimationController _fadeInController;
   late List<AnimationController> _metricControllers;
   final Set<int> _hoveredMetrics = {};
+  int _hoveredNav = -1;
 
   @override
   void initState() {
@@ -79,7 +82,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _buildSiteHeader(),
+            _buildNavBar(),
             _buildTopBar(),
             Padding(
               padding: const EdgeInsets.all(40),
@@ -104,95 +107,118 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   }
 
   // ─── Site Header ───
-  Widget _buildSiteHeader() {
+  Widget _buildNavBar() {
+    final navItems = ['Home', 'Shop', 'Community'];
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-      color: _white,
+      margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Row(
         children: [
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(0),
-              child: Row(
-                children: [
-                  Image.asset(
-                    'assets/icon/logo.png',
-                    width: 40,
-                    height: 40,
-                    fit: BoxFit.contain,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'AGRIDIRECT',
-                    style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w800, color: _dark, letterSpacing: 0.5),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 48),
+          // Logo with pulsing glow
           Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              _buildHeaderNavItem('Dashboard', isActive: true, onTap: () => widget.onNavigate(0)),
-              const SizedBox(width: 32),
-              _buildHeaderNavItem('Shop', onTap: () => widget.onNavigate(1)),
-              const SizedBox(width: 32),
-              _buildHeaderNavItem('Community', onTap: () => widget.onNavigate(2)),
-              const SizedBox(width: 32),
-              _buildHeaderNavItem('Profile', onTap: () => widget.onNavigate(3)),
+              PulsingGlow(
+                color: _primary,
+                radius: 20,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: AgriColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: AnimatedLeafIcon(size: 22, color: Colors.white),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'AgriDirect',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: _dark,
+                  letterSpacing: -0.5,
+                ),
+              ),
             ],
           ),
+          const SizedBox(width: 48),
+          // Nav items
+          ...List.generate(navItems.length, (i) {
+            final isActive = i == widget.currentIndex;
+            final isHovered = _hoveredNav == i;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                onEnter: (_) => setState(() => _hoveredNav = i),
+                onExit: (_) => setState(() => _hoveredNav = -1),
+                child: GestureDetector(
+                  onTap: () => widget.onNavigate(i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: isActive
+                          ? _primary.withValues(alpha: 0.08)
+                          : isHovered
+                              ? _border.withValues(alpha: 0.5)
+                              : Colors.transparent,
+                    ),
+                    child: Text(
+                      navItems[i],
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                        color: isActive ? _primary : isHovered ? _dark : _muted,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
           const Spacer(),
+          // Circle person icon
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               onTap: () => widget.onNavigate(3),
               child: Container(
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: _surface,
+                  color: const Color(0xFFDCFCE7),
                   shape: BoxShape.circle,
-                  border: Border.all(color: _border),
+                  border: Border.all(
+                    color: _primary,
+                    width: 1.5,
+                  ),
                 ),
-                child: Icon(Icons.person_outline_rounded, size: 20, color: _dark),
+                child: Icon(
+                  Icons.person_rounded,
+                  color: _primary,
+                  size: 22,
+                ),
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildHeaderNavItem(String text, {bool isActive = false, required VoidCallback onTap}) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              text,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
-                color: isActive ? _primary : _dark,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Container(
-              width: 16,
-              height: 2,
-              decoration: BoxDecoration(
-                color: isActive ? _primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(1),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -209,7 +235,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         children: [
           Text(
             'Dashboard',
-            style: GoogleFonts.manrope(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 20,
               fontWeight: FontWeight.w800,
               color: _dark,
@@ -265,7 +291,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           children: [
             Text(
               'Good Morning, John',
-              style: GoogleFonts.manrope(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 28,
                 fontWeight: FontWeight.w800,
                 color: _dark,
@@ -414,12 +440,23 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: color == _warning || color == Colors.amber
+                      ? AgriColors.goldGradient
+                      : LinearGradient(
+                          colors: [color, color.withValues(alpha: 0.7)],
+                        ),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                child: Icon(icon, color: color, size: 20),
+                child: Icon(icon, color: Colors.white, size: 20),
               ),
               const Icon(Icons.more_horiz, size: 18, color: _muted),
             ],
@@ -437,7 +474,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           const SizedBox(height: 6),
           Text(
             value,
-            style: GoogleFonts.manrope(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 28,
               fontWeight: FontWeight.w800,
               color: _dark,
@@ -505,7 +542,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                     children: [
                       Text(
                         '₱4,250',
-                        style: GoogleFonts.manrope(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 28,
                           fontWeight: FontWeight.w800,
                           color: _dark,
@@ -556,33 +593,16 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             ],
           ),
           const SizedBox(height: 24),
-          Container(
+          // Animated bar chart
+          SizedBox(
             height: 200,
-            decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: BorderRadius.circular(8),
+            child: MiniBarChart(
+              values: const [650, 480, 820, 560, 930, 780, 1100],
+              labels: const ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
+              barColor: _primary,
+              height: 160,
+              barWidth: 32,
             ),
-            child: Center(
-              child: Text(
-                'Sales Chart Placeholder',
-                style: GoogleFonts.inter(color: _muted),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              for (final day in ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'])
-                Text(
-                  day,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: _muted,
-                  ),
-                ),
-            ],
           ),
         ],
       ),
@@ -610,16 +630,32 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             ),
           ),
           const SizedBox(height: 20),
-          Container(
-            height: 180,
-            decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Center(
-              child: Text(
-                'Chart',
-                style: GoogleFonts.inter(color: _muted),
+          // Animated donut chart
+          Center(
+            child: MiniDonutChart(
+              values: const [45, 35, 20],
+              colors: const [_primary, _success, _warning],
+              size: 160,
+              strokeWidth: 20,
+              center: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '₱4.2K',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                    ),
+                  ),
+                  Text(
+                    'total',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: _muted,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -691,7 +727,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             children: [
               Text(
                 'Recent Orders',
-                style: GoogleFonts.manrope(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: _dark,

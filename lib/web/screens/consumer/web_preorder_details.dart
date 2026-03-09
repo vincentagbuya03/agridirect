@@ -13,12 +13,12 @@ class WebPreorderDetails extends StatefulWidget {
 }
 
 class _WebPreorderDetailsState extends State<WebPreorderDetails> {
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _accent = Color(0xFF13EC5B);
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _border = Color(0xFFE2E8F0);
-  static const Color _surface = Color(0xFFF8FAFC);
+  static const Color _primary = Color(0xFF16A34A);
+  static const Color _accent = Color(0xFF22C55E);
+  static const Color _dark = Color(0xFF111827);
+  static const Color _muted = Color(0xFF6B7280);
+  static const Color _border = Color(0xFFE5E7EB);
+  static const Color _surface = Color(0xFFFAFAFA);
 
   bool _downpaymentEnabled = true;
   int _quantity = 10;

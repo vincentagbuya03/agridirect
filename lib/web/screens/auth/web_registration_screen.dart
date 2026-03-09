@@ -5,13 +5,11 @@ import '../../../shared/services/otp_service.dart';
 import '../../../shared/services/supabase_config.dart';
 import 'web_otp_verification_screen.dart' show WebOTPVerificationScreen;
 
-/// Web Registration screen.
-/// Full-width split layout with illustration on left, registration form on right.
+/// Web Registration screen — modern split layout.
 class WebRegistrationScreen extends StatefulWidget {
   final VoidCallback onRegistrationSuccess;
 
-  const WebRegistrationScreen(
-      {super.key, required this.onRegistrationSuccess});
+  const WebRegistrationScreen({super.key, required this.onRegistrationSuccess});
 
   @override
   State<WebRegistrationScreen> createState() => _WebRegistrationScreenState();
@@ -27,8 +25,12 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
-  static const Color primary = Color(0xFF13EC5B);
-  static const Color sidebarBg = Color(0xFF0F172A);
+  static const Color _primary = Color(0xFF16A34A);
+  static const Color _accent = Color(0xFF22C55E);
+  static const Color _dark = Color(0xFF111827);
+  static const Color _muted = Color(0xFF9CA3AF);
+  static const Color _mutedDark = Color(0xFF6B7280);
+  static const Color _inputBg = Color(0xFFF9FAFB);
 
   @override
   void dispose() {
@@ -153,302 +155,301 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
   void _showSnackBar(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg),
+        content: Text(msg, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500)),
+        backgroundColor: _dark,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 1200;
+    final isCompact = screenWidth < 1100;
 
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Row(
-          children: [
-            // Left side - Illustration (Hidden on small screens)
-            if (!isSmallScreen)
-              Expanded(
-                child: Container(
-                  height: screenHeight,
-                  color: sidebarBg,
-                  child: Center(
+      backgroundColor: Colors.white,
+      body: Row(
+        children: [
+          // Left branding panel
+          if (!isCompact)
+            Expanded(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF064E3B),
+                      Color(0xFF065F46),
+                      Color(0xFF047857),
+                    ],
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: -80,
+                      right: -60,
+                      child: Container(
+                        width: 280,
+                        height: 280,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [_accent.withOpacity(0.12), Colors.transparent],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: -60,
+                      left: -60,
+                      child: Container(
+                        width: 220,
+                        height: 220,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [const Color(0xFF34D399).withOpacity(0.1), Colors.transparent],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 48),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                                  ),
+                                  child: const Icon(Icons.eco_rounded, color: Colors.white, size: 26),
+                                ),
+                                const SizedBox(width: 14),
+                                Text(
+                                  'AgriDirect',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 30,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 48),
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.07),
+                                borderRadius: BorderRadius.circular(28),
+                                border: Border.all(color: Colors.white.withOpacity(0.1)),
+                              ),
+                              child: SizedBox(
+                                width: 280,
+                                height: 240,
+                                child: Center(
+                                  child: Icon(
+                                    Icons.person_add_rounded,
+                                    size: 100,
+                                    color: Colors.white.withOpacity(0.4),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 36),
+                            Text(
+                              'Join Our Growing\nCommunity',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 34,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                height: 1.2,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              'Connect with verified local farmers\nand access fresh produce directly.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                color: Colors.white.withOpacity(0.65),
+                                height: 1.7,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Right form panel
+          Expanded(
+            child: Container(
+              color: Colors.white,
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 440),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isCompact ? 24 : 44,
+                      vertical: 48,
+                    ),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Icon(
-                          Icons.agriculture_outlined,
-                          size: 120,
-                          color: primary.withValues(alpha: 0.8),
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [_primary.withOpacity(0.1), _accent.withOpacity(0.08)],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(Icons.person_add_rounded, color: _primary, size: 26),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Create Account',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w800,
+                            color: _dark,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Sign up to join our farming community',
+                          style: GoogleFonts.inter(fontSize: 15, color: _muted, height: 1.5),
                         ),
                         const SizedBox(height: 32),
-                        Text(
-                          'Join ArgiDirect',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 48,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+
+                        _buildField('Full Name', 'Juan Dela Cruz', Icons.person_outline_rounded, _nameController),
+                        const SizedBox(height: 18),
+                        _buildField('Email Address', 'you@example.com', Icons.email_outlined, _emailController),
+                        const SizedBox(height: 18),
+                        _buildField('Phone (optional)', '09XX XXX XXXX', Icons.phone_outlined, _phoneController),
+                        const SizedBox(height: 18),
+                        _buildField('Password', 'Min. 6 characters', Icons.lock_outline_rounded, _passwordController,
+                            obscure: _obscurePassword,
+                            onToggle: () => setState(() => _obscurePassword = !_obscurePassword)),
+                        const SizedBox(height: 18),
+                        _buildField('Confirm Password', 'Re-enter password', Icons.lock_outline_rounded,
+                            _confirmPasswordController,
+                            obscure: _obscureConfirmPassword,
+                            onToggle: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword)),
+                        const SizedBox(height: 28),
+
+                        SizedBox(
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _handleRegister,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _primary,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: _primary.withOpacity(0.6),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 22, height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : Text('Create Account',
+                                    style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700)),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: 300,
-                          child: Text(
-                            'Connect directly with farmers and access fresh, local produce',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 16,
-                              color: Colors.grey[300],
-                              height: 1.6,
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Already have an account? ',
+                                style: GoogleFonts.inter(fontSize: 14, color: _muted)),
+                            MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              child: GestureDetector(
+                                onTap: _isLoading ? null : () => Navigator.pop(context),
+                                child: Text('Login',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 14, fontWeight: FontWeight.w700, color: _primary)),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
                   ),
                 ),
               ),
-
-            // Right side - Registration Form
-            Expanded(
-              child: Container(
-                color: Colors.grey[50],
-                child: Center(
-                  child: SingleChildScrollView(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal:
-                            isSmallScreen ? 24 : 48, // More padding on larger screens
-                        vertical: 40,
-                      ),
-                      child: SizedBox(
-                        width: 400,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Logo
-                            Center(
-                              child: Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  Icons.agriculture_outlined,
-                                  color: primary,
-                                  size: 28,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-
-                            // Title
-                            Text(
-                              'Create Account',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Sign up to join our farming community',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 32),
-
-                            // Name Field
-                            _buildTextField(
-                              controller: _nameController,
-                              label: 'Full Name',
-                              icon: Icons.person_outline_rounded,
-                              enabled: !_isLoading,
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Email Field
-                            _buildTextField(
-                              controller: _emailController,
-                              label: 'Email Address',
-                              icon: Icons.email_outlined,
-                              enabled: !_isLoading,
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Phone Field
-                            _buildTextField(
-                              controller: _phoneController,
-                              label: 'Phone Number (optional)',
-                              icon: Icons.phone_outlined,
-                              enabled: !_isLoading,
-                            ),
-                            const SizedBox(height: 16),
-
-                            _buildTextField(
-                              controller: _passwordController,
-                              label: 'Password',
-                              icon: Icons.lock_outline_rounded,
-                              obscure: _obscurePassword,
-                              onObscureToggle: () {
-                                setState(
-                                    () => _obscurePassword = !_obscurePassword);
-                              },
-                              enabled: !_isLoading,
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Confirm Password Field
-                            _buildTextField(
-                              controller: _confirmPasswordController,
-                              label: 'Confirm Password',
-                              icon: Icons.lock_outline_rounded,
-                              obscure: _obscureConfirmPassword,
-                              onObscureToggle: () {
-                                setState(() =>
-                                    _obscureConfirmPassword =
-                                        !_obscureConfirmPassword);
-                              },
-                              enabled: !_isLoading,
-                            ),
-                            const SizedBox(height: 24),
-
-                            // Register Button
-                            _buildPrimaryButton(
-                              'Create Account',
-                              _handleRegister,
-                              isLoading: _isLoading,
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Already have an account
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'Already have an account? ',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: _isLoading
-                                      ? null
-                                      : () {
-                                          Navigator.pop(context);
-                                        },
-                                  child: Text(
-                                    'Login',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: primary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    bool obscure = false,
-    VoidCallback? onObscureToggle,
-    bool enabled = true,
-  }) {
-    return TextField(
-      controller: controller,
-      obscureText: obscure,
-      enabled: enabled,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: Colors.grey[400], size: 20),
-        suffixIcon: obscure != false
-            ? GestureDetector(
-                onTap: onObscureToggle,
-                child: Icon(
-                  obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                  color: Colors.grey[400],
-                  size: 20,
-                ),
-              )
-            : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: primary, width: 2),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
-    );
-  }
-
-  Widget _buildPrimaryButton(
-    String text,
-    VoidCallback onPressed, {
-    bool isLoading = false,
-  }) {
-    return ElevatedButton(
-      onPressed: isLoading ? null : onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: primary,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      child: isLoading
-          ? const SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            )
-          : Text(
-              text,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
+  Widget _buildField(String label, String hint, IconData icon, TextEditingController controller,
+      {bool obscure = false, VoidCallback? onToggle}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF1F2937))),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          obscureText: obscure,
+          enabled: !_isLoading,
+          style: GoogleFonts.inter(fontSize: 14, color: _dark),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: GoogleFonts.inter(color: _muted, fontSize: 14),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 14, right: 10),
+              child: Icon(icon, color: _mutedDark, size: 20),
             ),
+            prefixIconConstraints: const BoxConstraints(minWidth: 44),
+            suffixIcon: onToggle != null
+                ? IconButton(
+                    icon: Icon(obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                        color: _muted, size: 20),
+                    onPressed: onToggle,
+                  )
+                : null,
+            filled: true,
+            fillColor: _inputBg,
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: _primary, width: 1.5)),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+        ),
+      ],
     );
   }
 }

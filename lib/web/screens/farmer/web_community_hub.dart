@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/services/supabase_data_service.dart';
+import '../../widgets/animated_components.dart';
 
 /// Web-only Community Hub — two-column layout with sidebar.
 /// Completely separate UI from the mobile community hub.
@@ -26,12 +27,13 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   late AnimationController _fadeInController;
   late List<AnimationController> _postControllers;
   final Set<int> _hoveredPosts = {};
+  int _hoveredNav = -1;
 
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _border = Color(0xFFE2E8F0);
-  static const Color _surface = Color(0xFFF8FAFC);
+  static const Color _primary = Color(0xFF16A34A);
+  static const Color _dark = Color(0xFF111827);
+  static const Color _muted = Color(0xFF6B7280);
+  static const Color _border = Color(0xFFE5E7EB);
+  static const Color _surface = Color(0xFFFAFAFA);
 
   @override
   void initState() {
@@ -79,7 +81,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
       backgroundColor: _surface,
       body: Column(
         children: [
-          _buildSiteHeader(),
+          _buildNavBar(),
           _buildTopBar(),
           Expanded(
             child: Row(
@@ -113,95 +115,118 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   // ─── Site Header (consistent across all pages) ───
-  Widget _buildSiteHeader() {
+  Widget _buildNavBar() {
+    final navItems = ['Home', 'Shop', 'Community'];
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-      color: Colors.white,
+      margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Row(
         children: [
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(0),
-              child: Row(
-                children: [
-                  Image.asset(
-                    'assets/icon/logo.png',
-                    width: 40,
-                    height: 40,
-                    fit: BoxFit.contain,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'AGRIDIRECT',
-                    style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w800, color: _dark, letterSpacing: 0.5),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 48),
+          // Logo with pulsing glow
           Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              _buildHeaderNavItem('Home', onTap: () => widget.onNavigate(0)),
-              const SizedBox(width: 32),
-              _buildHeaderNavItem('Shop', onTap: () => widget.onNavigate(1)),
-              const SizedBox(width: 32),
-              _buildHeaderNavItem('Community', isActive: true, onTap: () => widget.onNavigate(2)),
-              const SizedBox(width: 32),
-              _buildHeaderNavItem('About Us', onTap: () {}),
+              PulsingGlow(
+                color: _primary,
+                radius: 20,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: AgriColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: AnimatedLeafIcon(size: 22, color: Colors.white),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'AgriDirect',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: _dark,
+                  letterSpacing: -0.5,
+                ),
+              ),
             ],
           ),
+          const SizedBox(width: 48),
+          // Nav items
+          ...List.generate(navItems.length, (i) {
+            final isActive = i == widget.currentIndex;
+            final isHovered = _hoveredNav == i;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                onEnter: (_) => setState(() => _hoveredNav = i),
+                onExit: (_) => setState(() => _hoveredNav = -1),
+                child: GestureDetector(
+                  onTap: () => widget.onNavigate(i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: isActive
+                          ? _primary.withValues(alpha: 0.08)
+                          : isHovered
+                              ? _border.withValues(alpha: 0.5)
+                              : Colors.transparent,
+                    ),
+                    child: Text(
+                      navItems[i],
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                        color: isActive ? _primary : isHovered ? _dark : _muted,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
           const Spacer(),
+          // Circle person icon
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               onTap: () => widget.onNavigate(3),
               child: Container(
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: _surface,
+                  color: const Color(0xFFDCFCE7),
                   shape: BoxShape.circle,
-                  border: Border.all(color: _border),
+                  border: Border.all(
+                    color: _primary,
+                    width: 1.5,
+                  ),
                 ),
-                child: Icon(Icons.person_outline_rounded, size: 20, color: _dark),
+                child: Icon(
+                  Icons.person_rounded,
+                  color: _primary,
+                  size: 22,
+                ),
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildHeaderNavItem(String text, {bool isActive = false, required VoidCallback onTap}) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              text,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
-                color: isActive ? _primary : _dark,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Container(
-              width: 16,
-              height: 2,
-              decoration: BoxDecoration(
-                color: isActive ? _primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(1),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

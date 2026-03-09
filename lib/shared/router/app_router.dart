@@ -14,6 +14,7 @@ import '../../web/screens/auth/web_registration_screen.dart';
 import '../../web/screens/auth/web_farmer_registration_screen.dart';
 import '../../web/screens/consumer/web_preorder_details.dart';
 import '../../web/screens/admin/admin_dashboard_redesigned.dart';
+import '../../web/screens/common/web_welcome_screen.dart';
 
 /// Route name constants for type-safe navigation
 class AppRoutes {
@@ -21,6 +22,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String register = '/register';
   static const String onboarding = '/onboarding';
+  static const String webWelcome = '/web-welcome';
   static const String farmerRegister = '/farmer-register';
   static const String webFarmerRegister = '/web-farmer-register';
   static const String faceCapture = '/face-capture';
@@ -48,12 +50,22 @@ GoRouter createAppRouter() {
         AppRoutes.login,
         AppRoutes.register,
         AppRoutes.onboarding,
+        AppRoutes.webWelcome,
       ];
       final isPublicRoute = publicRoutes.contains(location);
 
       // Check screen width for mobile vs web detection
       final width = MediaQuery.of(context).size.width;
       final isMobile = width <= 800;
+
+      // Web: check welcome screen first for unauthenticated users at home
+      if (!isMobile && !isLoggedIn && location == AppRoutes.home) {
+        final onboardingComplete =
+            await OnboardingService.isOnboardingComplete();
+        if (!onboardingComplete) {
+          return AppRoutes.webWelcome;
+        }
+      }
 
       // Mobile: check onboarding first
       if (isMobile && location == AppRoutes.home) {
@@ -113,6 +125,12 @@ GoRouter createAppRouter() {
         builder: (context, state) => OnboardingScreen(
           onOnboardingComplete: () => context.go(AppRoutes.home),
         ),
+      ),
+
+      // ── Web Welcome (Web only) ──
+      GoRoute(
+        path: AppRoutes.webWelcome,
+        builder: (context, state) => const WebWelcomeScreen(),
       ),
 
       // ── Login ──

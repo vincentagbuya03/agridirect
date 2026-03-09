@@ -21,12 +21,12 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
   int _currentPage = 0;
   String _searchQuery = '';
 
-  static const Color _primary = Color(0xFF13EC5B);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _danger = Color(0xFFEF4444);
-  static const Color _darker = Color(0xFF0F172A);
+  static const Color _darker = Color(0xFF111827);
   static const Color _cardBg = Color(0xFF1E293B);
   static const Color _surface = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
   static const Color _border = Color(0xFF334155);
 
   @override
@@ -74,7 +74,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
               children: [
                 Text(
                   'User Directory',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -92,10 +92,10 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                       ),
                       child: TextField(
                         controller: _searchController,
-                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
+                        style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13),
                         decoration: InputDecoration(
                           hintText: 'Search users...',
-                          hintStyle: GoogleFonts.poppins(color: _muted, fontSize: 13),
+                          hintStyle: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 13),
                           prefixIcon: Icon(Icons.search, color: _muted, size: 20),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -116,10 +116,10 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                 ),
                 child: TextField(
                   controller: _searchController,
-                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
+                  style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13),
                   decoration: InputDecoration(
                     hintText: 'Search users...',
-                    hintStyle: GoogleFonts.poppins(color: _muted, fontSize: 13),
+                    hintStyle: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 13),
                     prefixIcon: Icon(Icons.search, color: _muted, size: 20),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -138,7 +138,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                 if (snapshot.hasError) {
                   return Center(
                     child: Text('Failed to load users',
-                        style: GoogleFonts.poppins(color: _danger)),
+                        style: GoogleFonts.plusJakartaSans(color: _danger)),
                   );
                 }
 
@@ -147,7 +147,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                 if (users.isEmpty) {
                   return Center(
                     child: Text('No users found',
-                        style: GoogleFonts.poppins(color: _muted)),
+                        style: GoogleFonts.plusJakartaSans(color: _muted)),
                   );
                 }
 
@@ -190,7 +190,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                             border: Border.all(color: _border),
                           ),
                           child: Text('Page ${_currentPage + 1}',
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.plusJakartaSans(
                                   fontWeight: FontWeight.w600, color: Colors.white, fontSize: 13)),
                         ),
                         const SizedBox(width: 16),
@@ -236,7 +236,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
             Icon(icon, color: enabled ? Colors.white : _muted, size: 16),
             const SizedBox(width: 8),
             Text(label,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.plusJakartaSans(
                     color: enabled ? Colors.white : _muted, fontSize: 13)),
           ],
         ),
@@ -249,12 +249,12 @@ class _UsersTable extends StatelessWidget {
   final List<Map<String, dynamic>> users;
   final AdminService adminService;
 
-  static const Color _primary = Color(0xFF13EC5B);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _secondary = Color(0xFF06B6D4);
   static const Color _warning = Color(0xFFFFA500);
   static const Color _cardBg = Color(0xFF1E293B);
   static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
 
   const _UsersTable({
     required this.users,
@@ -274,22 +274,22 @@ class _UsersTable extends StatelessWidget {
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: DataTable(
-            headingRowColor: WidgetStateProperty.all(const Color(0xFF0F172A)),
+            headingRowColor: WidgetStateProperty.all(const Color(0xFF111827)),
             dataRowColor: WidgetStateProperty.all(_cardBg),
             dividerThickness: 0.5,
             columns: [
-              DataColumn(label: Text('Email', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Name', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Type', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Status', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Actions', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Email', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Name', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Type', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Status', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Actions', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
             ],
             rows: [
               for (final user in users)
                 DataRow(
                   cells: [
-                    DataCell(Text(user['email'] ?? '-', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13))),
-                    DataCell(Text(user['name'] ?? '-', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13))),
+                    DataCell(Text(user['email'] ?? '-', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13))),
+                    DataCell(Text(user['name'] ?? '-', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13))),
                     DataCell(
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -300,7 +300,7 @@ class _UsersTable extends StatelessWidget {
                         ),
                         child: Text(
                           _getUserTypeLabel(user),
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                             color: _getUserTypeColor(user),
@@ -316,7 +316,7 @@ class _UsersTable extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text('Active',
-                            style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: _primary)),
+                            style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: _primary)),
                       ),
                     ),
                     DataCell(
@@ -373,7 +373,7 @@ class _UsersTable extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'User Actions: ${user['name']}',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white),
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -384,7 +384,7 @@ class _UsersTable extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   backgroundColor: _primary,
-                  content: Text('User verified', style: GoogleFonts.poppins(color: const Color(0xFF0F172A))),
+                  content: Text('User verified', style: GoogleFonts.plusJakartaSans(color: const Color(0xFF111827))),
                 ),
               );
             }),
@@ -399,7 +399,7 @@ class _UsersTable extends StatelessWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     backgroundColor: _primary,
-                    content: Text('User promoted to admin', style: GoogleFonts.poppins(color: const Color(0xFF0F172A))),
+                    content: Text('User promoted to admin', style: GoogleFonts.plusJakartaSans(color: const Color(0xFF111827))),
                   ),
                 );
               }),
@@ -410,7 +410,7 @@ class _UsersTable extends StatelessWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     backgroundColor: _warning,
-                    content: Text('Admin role removed', style: GoogleFonts.poppins(color: const Color(0xFF0F172A))),
+                    content: Text('Admin role removed', style: GoogleFonts.plusJakartaSans(color: const Color(0xFF111827))),
                   ),
                 );
               }),
@@ -430,7 +430,7 @@ class _UsersTable extends StatelessWidget {
         ),
         child: Icon(icon, color: color, size: 20),
       ),
-      title: Text(title, style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+      title: Text(title, style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 14)),
       onTap: onTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       hoverColor: const Color(0xFF334155),
@@ -446,46 +446,46 @@ class _UsersTable extends StatelessWidget {
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Suspend User', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text('Suspend User', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: reasonController,
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
+              style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13),
               decoration: InputDecoration(
                 labelText: 'Reason for suspension',
-                labelStyle: GoogleFonts.poppins(color: _muted, fontSize: 13),
+                labelStyle: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 13),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: Color(0xFF334155)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFF13EC5B)),
+                  borderSide: const BorderSide(color: Color(0xFF16A34A)),
                 ),
                 filled: true,
-                fillColor: const Color(0xFF0F172A),
+                fillColor: const Color(0xFF111827),
               ),
               maxLines: 3,
             ),
             const SizedBox(height: 16),
             TextField(
               controller: daysController,
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
+              style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13),
               decoration: InputDecoration(
                 labelText: 'Days to suspend (0 for permanent)',
-                labelStyle: GoogleFonts.poppins(color: _muted, fontSize: 13),
+                labelStyle: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 13),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: Color(0xFF334155)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFF13EC5B)),
+                  borderSide: const BorderSide(color: Color(0xFF16A34A)),
                 ),
                 filled: true,
-                fillColor: const Color(0xFF0F172A),
+                fillColor: const Color(0xFF111827),
               ),
               keyboardType: TextInputType.number,
             ),
@@ -494,7 +494,7 @@ class _UsersTable extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: _muted)),
+            child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: _muted)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -511,7 +511,7 @@ class _UsersTable extends StatelessWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   backgroundColor: const Color(0xFFEF4444),
-                  content: Text('User suspended', style: GoogleFonts.poppins(color: Colors.white)),
+                  content: Text('User suspended', style: GoogleFonts.plusJakartaSans(color: Colors.white)),
                 ),
               );
             },
@@ -520,7 +520,7 @@ class _UsersTable extends StatelessWidget {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: Text('Suspend', style: GoogleFonts.poppins()),
+            child: Text('Suspend', style: GoogleFonts.plusJakartaSans()),
           ),
         ],
       ),
@@ -533,12 +533,12 @@ class _UserCard extends StatelessWidget {
   final AdminService adminService;
   final VoidCallback onAction;
 
-  static const Color _primary = Color(0xFF13EC5B);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _secondary = Color(0xFF06B6D4);
   static const Color _warning = Color(0xFFFFA500);
   static const Color _cardBg = Color(0xFF1E293B);
   static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
 
   const _UserCard({
     required this.user,
@@ -567,10 +567,10 @@ class _UserCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(user['name'] ?? '-',
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: Colors.white)),
                     const SizedBox(height: 4),
                     Text(user['email'] ?? '-',
-                        style: GoogleFonts.poppins(fontSize: 12, color: _muted)),
+                        style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _muted)),
                   ],
                 ),
               ),
@@ -583,7 +583,7 @@ class _UserCard extends StatelessWidget {
                 ),
                 child: Text(
                   _getUserTypeLabel(),
-                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: _getUserTypeColor()),
+                  style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: _getUserTypeColor()),
                 ),
               ),
             ],
@@ -596,10 +596,10 @@ class _UserCard extends StatelessWidget {
                   onPressed: () => adminService.verifyUser(user['user_id']),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _primary,
-                    foregroundColor: const Color(0xFF0F172A),
+                    foregroundColor: const Color(0xFF111827),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: Text('Verify', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 13)),
+                  child: Text('Verify', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 13)),
                 ),
               ),
               const SizedBox(width: 8),
@@ -611,7 +611,7 @@ class _UserCard extends StatelessWidget {
                     side: const BorderSide(color: Color(0xFF334155)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: Text('Suspend', style: GoogleFonts.poppins(fontSize: 13)),
+                  child: Text('Suspend', style: GoogleFonts.plusJakartaSans(fontSize: 13)),
                 ),
               ),
             ],

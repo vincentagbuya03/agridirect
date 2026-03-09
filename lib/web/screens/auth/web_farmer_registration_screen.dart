@@ -26,12 +26,10 @@ class WebFarmerRegistrationScreen extends StatefulWidget {
 
 class _WebFarmerRegistrationScreenState
     extends State<WebFarmerRegistrationScreen> {
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _accent = Color(0xFF13EC5B);
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _border = Color(0xFFE2E8F0);
-  static const Color _surface = Color(0xFFF8FAFC);
+  static const Color _primary = Color(0xFF16A34A);
+  static const Color _dark = Color(0xFF111827);
+  static const Color _muted = Color(0xFF6B7280);
+  static const Color _border = Color(0xFFE5E7EB);
 
   int _currentStep = 0;
   bool _isSubmitting = false;
@@ -81,7 +79,7 @@ class _WebFarmerRegistrationScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _surface,
+      backgroundColor: Colors.white,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
@@ -129,13 +127,13 @@ class _WebFarmerRegistrationScreenState
                 }
               },
               child: Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
+                  color: const Color(0xFFF9FAFB),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: _border),
                 ),
-                child: const Icon(Icons.arrow_back, color: _dark, size: 20),
+                child: const Icon(Icons.arrow_back_rounded, color: _dark, size: 20),
               ),
             ),
           ),
@@ -873,19 +871,8 @@ class _WebFarmerRegistrationScreenState
                 : (isLastStep ? _handleSubmit : _handleNext),
             child: Container(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isLastStep
-                      ? [const Color(0xFF10B981), const Color(0xFF059669)]
-                      : [const Color(0xFF10B981), _accent],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: _primary.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                color: _primary,
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Center(
                 child: _isSubmitting
@@ -979,24 +966,31 @@ class _WebFarmerRegistrationScreenState
     IconData? suffixIcon,
     IconData? prefixIcon,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _border),
-      ),
-      child: TextField(
+    return TextField(
         controller: controller,
         maxLines: maxLines,
         keyboardType: keyboardType,
-        style: GoogleFonts.plusJakartaSans(fontSize: 14, color: _dark),
+        style: GoogleFonts.inter(fontSize: 14, color: _dark),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: GoogleFonts.plusJakartaSans(
+          hintStyle: GoogleFonts.inter(
             fontSize: 14,
-            color: _muted.withValues(alpha: 0.5),
+            color: _muted.withOpacity(0.6),
           ),
-          border: InputBorder.none,
+          filled: true,
+          fillColor: const Color(0xFFF9FAFB),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _primary, width: 1.5),
+          ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 14,
@@ -1008,7 +1002,6 @@ class _WebFarmerRegistrationScreenState
               ? Icon(prefixIcon, size: 20, color: _muted)
               : null,
         ),
-      ),
     );
   }
 
@@ -1288,7 +1281,7 @@ class _WebFarmerRegistrationScreenState
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(colors: [_primary, _accent]),
+                          color: _primary,
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Center(
@@ -1336,7 +1329,7 @@ class _WebSignaturePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF0F172A)
+      ..color = const Color(0xFF111827)
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 2.5;
     for (int i = 0; i < points.length - 1; i++) {

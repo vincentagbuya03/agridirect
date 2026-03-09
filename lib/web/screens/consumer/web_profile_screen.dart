@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/auth_service.dart';
 import '../../../shared/router/app_router.dart';
+import '../../widgets/animated_components.dart';
 
 /// Web Profile screen.
 /// Shows user info, "Start Selling" button, and account settings.
@@ -26,13 +27,16 @@ class WebProfileScreen extends StatefulWidget {
 }
 
 class _WebProfileScreenState extends State<WebProfileScreen> with TickerProviderStateMixin {
-  static const Color primary = Color(0xFF13EC5B);
-  static const Color _accent = Color(0xFF10B981);
-  static const Color _dark = Color(0xFF0F172A);
+  static const Color primary = Color(0xFF16A34A);
+  static const Color _accent = Color(0xFF22C55E);
+  static const Color _dark = Color(0xFF111827);
+  static const Color _muted = Color(0xFF6B7280);
+  static const Color _border = Color(0xFFE5E7EB);
 
   // Animations
   late AnimationController _fadeInController;
   final Set<int> _hoveredButtons = {};
+  int _hoveredNav = -1;
 
   @override
   void initState() {
@@ -69,10 +73,10 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
   Widget build(BuildContext context) {
     final auth = AuthService();
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFB),
+      backgroundColor: const Color(0xFFFAFAFA),
       body: Column(
         children: [
-          _buildSiteHeader(),
+          _buildNavBar(),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(32),
@@ -169,90 +173,113 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
     );
   }
 
-  // ─── Site Header ───
-  Widget _buildSiteHeader() {
+  // ─── Navigation Bar ───
+  Widget _buildNavBar() {
+    final navItems = ['Home', 'Shop', 'Community'];
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-      color: Colors.white,
-      child: Row(
-        children: [
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(0),
-              child: Row(
-                children: [
-                  Image.asset(
-                    'assets/icon/logo.png',
-                    width: 40,
-                    height: 40,
-                    fit: BoxFit.contain,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'AGRIDIRECT',
-                    style: GoogleFonts.manrope(fontSize: 16, fontWeight: FontWeight.w800, color: _dark, letterSpacing: 0.5),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 48),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildHeaderNavItem('Home', onTap: () => widget.onNavigate(0)),
-              const SizedBox(width: 32),
-              _buildHeaderNavItem('Shop', onTap: () => widget.onNavigate(1)),
-              const SizedBox(width: 32),
-              _buildHeaderNavItem('Community', onTap: () => widget.onNavigate(2)),
-              const SizedBox(width: 32),
-              _buildHeaderNavItem('About Us', onTap: () {}),
-            ],
-          ),
-          const Spacer(),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: _accent.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-              border: Border.all(color: _accent),
-            ),
-            child: Icon(Icons.person_rounded, size: 20, color: _accent),
+      margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildHeaderNavItem(String text, {bool isActive = false, required VoidCallback onTap}) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              text,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
-                color: isActive ? _accent : _dark,
+      child: Row(
+        children: [
+          // Logo with pulsing glow
+          Row(
+            children: [
+              PulsingGlow(
+                color: primary,
+                radius: 20,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: AgriColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: AnimatedLeafIcon(size: 22, color: Colors.white),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'AgriDirect',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: _dark,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 48),
+          // Nav items
+          ...List.generate(navItems.length, (i) {
+            final isActive = i == widget.currentIndex;
+            final isHovered = _hoveredNav == i;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                onEnter: (_) => setState(() => _hoveredNav = i),
+                onExit: (_) => setState(() => _hoveredNav = -1),
+                child: GestureDetector(
+                  onTap: () => widget.onNavigate(i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: isActive
+                          ? primary.withValues(alpha: 0.08)
+                          : isHovered
+                              ? _border.withValues(alpha: 0.5)
+                              : Colors.transparent,
+                    ),
+                    child: Text(
+                      navItems[i],
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                        color: isActive ? primary : isHovered ? _dark : _muted,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+          const Spacer(),
+          // Circle person icon (active — profile page)
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFDCFCE7),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: primary,
+                width: 1.5,
               ),
             ),
-            const SizedBox(height: 2),
-            Container(
-              width: 16,
-              height: 2,
-              decoration: BoxDecoration(
-                color: isActive ? _accent : Colors.transparent,
-                borderRadius: BorderRadius.circular(1),
-              ),
+            child: Icon(
+              Icons.person_rounded,
+              color: primary,
+              size: 22,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -426,7 +453,7 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
                   : 'You are viewing as a customer. Switch to farmer mode to manage your products and sales.',
               style: const TextStyle(
                 fontSize: 14,
-                color: Color(0xFF64748B),
+                color: Color(0xFF6B7280),
                 height: 1.6,
               ),
             ),
@@ -449,7 +476,7 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
                     gradient: LinearGradient(
                       colors: isViewingAsFarmer
                           ? [const Color(0xFF3B82F6), const Color(0xFF60A5FA)]
-                          : [const Color(0xFF10B981), const Color(0xFF13EC5B)],
+                          : [const Color(0xFF22C55E), const Color(0xFF16A34A)],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: _hoveredButtons.contains(0)
@@ -579,7 +606,7 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
                 'and connect directly with buyers across the platform.',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF64748B),
+                  color: Color(0xFF6B7280),
                   height: 1.6,
                 ),
               ),

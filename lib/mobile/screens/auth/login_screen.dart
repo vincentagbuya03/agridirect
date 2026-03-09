@@ -430,7 +430,6 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                       alignment: Alignment.centerRight,
                       child: GestureDetector(
                         onTap: () {
-                          // TODO: Implement forgot password
                         },
                         child: Text(
                           'Forgot Password?',

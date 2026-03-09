@@ -19,13 +19,13 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
   late Future<Map<String, dynamic>?> _statsFuture;
 
   // Enterprise dark theme colors
-  static const Color _primary = Color(0xFF13EC5B);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _secondary = Color(0xFF06B6D4);
   static const Color _warning = Color(0xFFFFA500);
   static const Color _danger = Color(0xFFEF4444);
-  static const Color _darker = Color(0xFF0F172A);
+  static const Color _darker = Color(0xFF111827);
   static const Color _surface = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
   static const Color _cardBg = Color(0xFF1E293B);
   static const Color _border = Color(0xFF334155);
 
@@ -108,10 +108,10 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextField(
-                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
+                    style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13),
                     decoration: InputDecoration(
                       hintText: 'Global search for farmers, orders, or SKUs...',
-                      hintStyle: GoogleFonts.poppins(color: _muted, fontSize: 13),
+                      hintStyle: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 13),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.zero,
                     ),
@@ -136,11 +136,11 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.add, color: Color(0xFF0F172A), size: 18),
+                const Icon(Icons.add, color: Color(0xFF111827), size: 18),
                 const SizedBox(width: 8),
                 Text('Quick Action',
-                    style: GoogleFonts.poppins(
-                        color: const Color(0xFF0F172A),
+                    style: GoogleFonts.plusJakartaSans(
+                        color: const Color(0xFF111827),
                         fontSize: 13,
                         fontWeight: FontWeight.w600)),
               ],
@@ -246,7 +246,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Financial Performance',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.plusJakartaSans(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Colors.white)),
@@ -259,7 +259,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text('Year 2024',
-                        style: GoogleFonts.poppins(fontSize: 12, color: _muted)),
+                        style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _muted)),
                   ),
                   const SizedBox(width: 8),
                   Container(
@@ -279,11 +279,11 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
             children: [
               Container(width: 8, height: 8, decoration: const BoxDecoration(color: _primary, shape: BoxShape.circle)),
               const SizedBox(width: 6),
-              Text('Monthly Revenue', style: GoogleFonts.poppins(fontSize: 11, color: _muted)),
+              Text('Monthly Revenue', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: _muted)),
               const SizedBox(width: 16),
               Container(width: 8, height: 8, decoration: BoxDecoration(color: _muted.withOpacity(0.5), shape: BoxShape.circle)),
               const SizedBox(width: 6),
-              Text('Previous Period', style: GoogleFonts.poppins(fontSize: 11, color: _muted)),
+              Text('Previous Period', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: _muted)),
             ],
           ),
           const SizedBox(height: 24),
@@ -313,7 +313,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: yLabels
-                          .map((label) => Text(label, style: GoogleFonts.poppins(fontSize: 10, color: _muted)))
+                          .map((label) => Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 10, color: _muted)))
                           .toList(),
                     ),
                   ),
@@ -332,7 +332,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(color: _primary, borderRadius: BorderRadius.circular(6)),
                                 child: Text('₱${values[i]}k',
-                                    style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A))),
+                                    style: GoogleFonts.plusJakartaSans(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF111827))),
                               ),
                             if (isHighlighted) const SizedBox(height: 4),
                             Container(
@@ -357,7 +357,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: months.asMap().entries.map((e) => Text(e.value,
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.plusJakartaSans(
                         fontSize: 10,
                         color: e.key == 2 ? Colors.white : _muted,
                         fontWeight: e.key == 2 ? FontWeight.w600 : FontWeight.normal))).toList(),
@@ -384,7 +384,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('System Events',
-                  style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                  style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
               Icon(Icons.filter_list, color: _muted, size: 20),
             ],
           ),
@@ -422,7 +422,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
           const SizedBox(height: 24),
           Center(
             child: Text('VIEW FULL ACTIVITY LOGS',
-                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: _muted, letterSpacing: 1)),
+                style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: _muted, letterSpacing: 1)),
           ),
         ],
       ),
@@ -456,17 +456,17 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(title, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
-                  Text(time, style: GoogleFonts.poppins(fontSize: 11, color: _muted)),
+                  Text(title, style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                  Text(time, style: GoogleFonts.plusJakartaSans(fontSize: 11, color: _muted)),
                 ],
               ),
               const SizedBox(height: 4),
-              Text(description, style: GoogleFonts.poppins(fontSize: 12, color: _muted)),
+              Text(description, style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _muted)),
               if (showActions) ...[
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    _buildActionBtn('Action', _primary, const Color(0xFF0F172A)),
+                    _buildActionBtn('Action', _primary, const Color(0xFF111827)),
                     const SizedBox(width: 8),
                     _buildActionBtn('Dismiss', _surface, _muted),
                   ],
@@ -490,7 +490,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-      child: Text(text, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: textColor)),
+      child: Text(text, style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: textColor)),
     );
   }
 
@@ -529,7 +529,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
           children: [
             Icon(Icons.error_outline, color: _danger, size: 48),
             const SizedBox(height: 16),
-            Text('Failed to load statistics', style: GoogleFonts.poppins(color: _danger, fontSize: 14)),
+            Text('Failed to load statistics', style: GoogleFonts.plusJakartaSans(color: _danger, fontSize: 14)),
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: () {
@@ -537,8 +537,8 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
                   _statsFuture = widget.adminService.getDashboardStats();
                 });
               },
-              style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: const Color(0xFF0F172A)),
-              child: Text('Retry', style: GoogleFonts.poppins()),
+              style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: const Color(0xFF111827)),
+              child: Text('Retry', style: GoogleFonts.plusJakartaSans()),
             ),
           ],
         ),
@@ -590,7 +590,7 @@ class _EnterpriseStatCardState extends State<_EnterpriseStatCard> {
 
   static const Color _cardBg = Color(0xFF1E293B);
   static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
 
   @override
   Widget build(BuildContext context) {
@@ -634,7 +634,7 @@ class _EnterpriseStatCardState extends State<_EnterpriseStatCard> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(widget.badge!,
-                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: widget.badgeColor)),
+                        style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: widget.badgeColor)),
                   ),
                 if (widget.badgeText != null)
                   Container(
@@ -645,15 +645,15 @@ class _EnterpriseStatCardState extends State<_EnterpriseStatCard> {
                       border: Border.all(color: widget.badgeColor.withOpacity(0.3)),
                     ),
                     child: Text(widget.badgeText!,
-                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: widget.badgeColor)),
+                        style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: widget.badgeColor)),
                   ),
               ],
             ),
             const SizedBox(height: 16),
             Text(widget.title,
-                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: _muted, letterSpacing: 0.5)),
+                style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: _muted, letterSpacing: 0.5)),
             const SizedBox(height: 4),
-            Text(widget.value, style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(widget.value, style: GoogleFonts.plusJakartaSans(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
           ],
         ),
       ),

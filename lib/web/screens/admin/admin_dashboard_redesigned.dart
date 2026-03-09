@@ -28,11 +28,11 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
   final _authService = AuthService();
 
   // Color scheme matching the reference design
-  static const Color _primary = Color(0xFF13EC5B);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _danger = Color(0xFFEF4444);
   static const Color _dark = Color(0xFF1E293B);
-  static const Color _darker = Color(0xFF0F172A);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _darker = Color(0xFF111827);
+  static const Color _muted = Color(0xFF6B7280);
   static const Color _surface = Color(0xFF334155);
 
   final List<NavItem> _navItems = [
@@ -80,7 +80,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                           children: [
                             Text(
                               'AGRIDIRECT',
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.plusJakartaSans(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
@@ -89,7 +89,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                             ),
                             Text(
                               'ENTERPRISE CONSOLE',
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.plusJakartaSans(
                                 fontSize: 9,
                                 fontWeight: FontWeight.w500,
                                 color: _muted,
@@ -135,7 +135,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                             _authService.userName
                                     .substring(0, 1)
                                     .toUpperCase(),
-                            style: GoogleFonts.poppins(
+                            style: GoogleFonts.plusJakartaSans(
                               fontWeight: FontWeight.bold,
                               color: _darker,
                             ),
@@ -144,7 +144,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                         const SizedBox(height: 12),
                         Text(
                           _authService.userName,
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -154,7 +154,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                         ),
                         Text(
                           'Super Administrator',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 10,
                             color: _muted,
                           ),
@@ -167,7 +167,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                             icon: const Icon(Icons.logout, size: 16),
                             label: Text(
                               'Logout',
-                              style: GoogleFonts.poppins(fontSize: 11),
+                              style: GoogleFonts.plusJakartaSans(fontSize: 11),
                             ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: _danger,
@@ -196,7 +196,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                     children: [
                       Text(
                         _getCurrentSectionName(),
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -253,7 +253,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
               title,
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: _muted,
@@ -303,7 +303,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                 const SizedBox(width: 12),
                 Text(
                   item.label,
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                     color: isSelected ? _primary : Colors.white,
@@ -352,21 +352,21 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
         backgroundColor: _dark,
         title: Text(
           'Logout',
-          style: GoogleFonts.poppins(
+          style: GoogleFonts.plusJakartaSans(
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
         content: Text(
           'Are you sure you want to logout?',
-          style: GoogleFonts.poppins(color: Colors.white70),
+          style: GoogleFonts.plusJakartaSans(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancel',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.plusJakartaSans(
                 color: _muted,
               ),
             ),
@@ -378,7 +378,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
             },
             child: Text(
               'Logout',
-              style: GoogleFonts.poppins(color: _danger),
+              style: GoogleFonts.plusJakartaSans(color: _danger),
             ),
           ),
         ],

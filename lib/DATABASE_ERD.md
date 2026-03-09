@@ -9,35 +9,42 @@
 
 ```mermaid
 erDiagram
-    USERS ||--o{ USER_ROLES : has
-    ROLES ||--o{ USER_ROLES : assigned_to
-    USERS ||--o| USER_ADDRESSES : lives_at
-    USERS ||--o{ PRODUCTS : creates
-    USERS ||--o{ PRODUCT_REVIEWS : writes
-    USERS ||--o{ FORUM_POSTS : creates
-    USERS ||--o{ FORUM_COMMENTS : writes
-    USERS ||--o{ POST_LIKES : gives
-    USERS ||--o{ ORDERS : places
-    USERS ||--o{ ORDERS : fulfills
-    USERS ||--o| FARMER_PROFILES : has
-    USERS ||--o| FARMER_REGISTRATIONS : registers
-    USERS ||--o| USER_SUSPENSIONS : may_have
-    USERS ||--o{ ADMIN_LOGS : performs
-    USERS ||--o{ REPORTED_CONTENT : submits
-    USERS ||--o{ REPORTED_CONTENT : resolves
-    PRODUCTS ||--o{ PRODUCT_REVIEWS : has
-    PRODUCTS ||--o{ ORDER_ITEMS : included_in
-    PRODUCTS ||--o{ PRODUCT_TAG_MAPPINGS : tagged_with
-    CATEGORIES ||--o{ PRODUCTS : contains
-    UNITS ||--o{ PRODUCTS : measured_by
-    PRODUCT_TAGS ||--o{ PRODUCT_TAG_MAPPINGS : maps_to
-    FORUM_POSTS ||--o{ POST_LIKES : receives
-    FORUM_POSTS ||--o{ FORUM_COMMENTS : has
-    ORDERS ||--o{ ORDER_ITEMS : contains
-    FARMER_PROFILES ||--o{ FARMER_SPECIALIZATIONS : specializes_in
-    FARMER_REGISTRATIONS ||--o{ FARMER_EDUCATION : educated_at
-    FARMER_REGISTRATIONS ||--o{ FARMER_CROP_TYPES : grows
-    FARMER_REGISTRATIONS ||--o{ FARMER_LIVESTOCK : raises
+    %% Relationship notation:
+    %% || = exactly one (REQUIRED FK)
+    %% o| = zero or one (OPTIONAL, max 1)
+    %% o{ = zero or many (OPTIONAL, can have none)
+    %% Left side ||  = child FK is REQUIRED (must reference a parent)
+    %% Right side o  = child records are OPTIONAL (parent can exist without them)
+
+    USERS ||--o{ USER_ROLES : "has (optional, 0 or more)"
+    ROLES ||--o{ USER_ROLES : "assigned to (optional, 0 or more)"
+    USERS ||--o| USER_ADDRESSES : "lives at (optional, 0 or 1)"
+    USERS ||--o{ PRODUCTS : "creates (optional, 0 or more)"
+    USERS ||--o{ PRODUCT_REVIEWS : "writes (optional, 0 or more)"
+    USERS ||--o{ FORUM_POSTS : "creates (optional, 0 or more)"
+    USERS ||--o{ FORUM_COMMENTS : "writes (optional, 0 or more)"
+    USERS ||--o{ POST_LIKES : "gives (optional, 0 or more)"
+    USERS ||--o{ ORDERS : "places (optional, 0 or more)"
+    USERS ||--o{ ORDERS : "fulfills (optional, 0 or more)"
+    USERS ||--o| FARMER_PROFILES : "has (optional, 0 or 1)"
+    USERS ||--o| FARMER_REGISTRATIONS : "registers (optional, 0 or 1)"
+    USERS ||--o| USER_SUSPENSIONS : "may have (optional, 0 or 1)"
+    USERS ||--o{ ADMIN_LOGS : "performs (optional, 0 or more)"
+    USERS ||--o{ REPORTED_CONTENT : "submits (optional, 0 or more)"
+    USERS ||--o{ REPORTED_CONTENT : "resolves (optional, 0 or more)"
+    PRODUCTS ||--o{ PRODUCT_REVIEWS : "has (optional, 0 or more)"
+    PRODUCTS ||--o{ ORDER_ITEMS : "included in (optional, 0 or more)"
+    PRODUCTS ||--o{ PRODUCT_TAG_MAPPINGS : "tagged with (optional, 0 or more)"
+    CATEGORIES ||--o{ PRODUCTS : "contains (optional, 0 or more)"
+    UNITS ||--o{ PRODUCTS : "measured by (optional, 0 or more)"
+    PRODUCT_TAGS ||--o{ PRODUCT_TAG_MAPPINGS : "maps to (optional, 0 or more)"
+    FORUM_POSTS ||--o{ POST_LIKES : "receives (optional, 0 or more)"
+    FORUM_POSTS ||--o{ FORUM_COMMENTS : "has (optional, 0 or more)"
+    ORDERS ||--o{ ORDER_ITEMS : "contains (optional, 0 or more)"
+    FARMER_PROFILES ||--o{ FARMER_SPECIALIZATIONS : "specializes in (optional, 0 or more)"
+    FARMER_REGISTRATIONS ||--o{ FARMER_EDUCATION : "educated at (optional, 0 or more)"
+    FARMER_REGISTRATIONS ||--o{ FARMER_CROP_TYPES : "grows (optional, 0 or more)"
+    FARMER_REGISTRATIONS ||--o{ FARMER_LIVESTOCK : "raises (optional, 0 or more)"
     
     USERS {
         uuid user_id PK

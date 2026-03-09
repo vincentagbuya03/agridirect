@@ -19,14 +19,14 @@ class _AdminOrdersTabState extends State<AdminOrdersTab> {
   late Future<List<Map<String, dynamic>>> _ordersFuture;
   int _currentPage = 0;
 
-  static const Color _primary = Color(0xFF13EC5B);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _secondary = Color(0xFF06B6D4);
   static const Color _warning = Color(0xFFFFA500);
   static const Color _danger = Color(0xFFEF4444);
-  static const Color _darker = Color(0xFF0F172A);
+  static const Color _darker = Color(0xFF111827);
   static const Color _cardBg = Color(0xFF1E293B);
   static const Color _surface = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
   static const Color _border = Color(0xFF334155);
 
   @override
@@ -67,7 +67,7 @@ class _AdminOrdersTabState extends State<AdminOrdersTab> {
           children: [
             Text(
               'Sales Performance',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -84,7 +84,7 @@ class _AdminOrdersTabState extends State<AdminOrdersTab> {
                 if (snapshot.hasError) {
                   return Center(
                     child: Text('Failed to load orders',
-                        style: GoogleFonts.poppins(color: _danger)),
+                        style: GoogleFonts.plusJakartaSans(color: _danger)),
                   );
                 }
 
@@ -93,7 +93,7 @@ class _AdminOrdersTabState extends State<AdminOrdersTab> {
                 if (orders.isEmpty) {
                   return Center(
                     child: Text('No orders found',
-                        style: GoogleFonts.poppins(color: _muted)),
+                        style: GoogleFonts.plusJakartaSans(color: _muted)),
                   );
                 }
 
@@ -137,7 +137,7 @@ class _AdminOrdersTabState extends State<AdminOrdersTab> {
                             border: Border.all(color: _border),
                           ),
                           child: Text('Page ${_currentPage + 1}',
-                              style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 13)),
+                              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 13)),
                         ),
                         const SizedBox(width: 16),
                         _buildPaginationBtn(
@@ -174,7 +174,7 @@ class _AdminOrdersTabState extends State<AdminOrdersTab> {
           children: [
             Icon(icon, color: enabled ? Colors.white : _muted, size: 16),
             const SizedBox(width: 8),
-            Text(label, style: GoogleFonts.poppins(color: enabled ? Colors.white : _muted, fontSize: 13)),
+            Text(label, style: GoogleFonts.plusJakartaSans(color: enabled ? Colors.white : _muted, fontSize: 13)),
           ],
         ),
       ),
@@ -187,11 +187,11 @@ class _OrdersTable extends StatelessWidget {
   final Color Function(String) getStatusColor;
   final VoidCallback onReload;
 
-  static const Color _primary = Color(0xFF13EC5B);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _secondary = Color(0xFF06B6D4);
   static const Color _cardBg = Color(0xFF1E293B);
   static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
 
   const _OrdersTable({
     required this.orders,
@@ -212,27 +212,27 @@ class _OrdersTable extends StatelessWidget {
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: DataTable(
-            headingRowColor: WidgetStateProperty.all(const Color(0xFF0F172A)),
+            headingRowColor: WidgetStateProperty.all(const Color(0xFF111827)),
             dataRowColor: WidgetStateProperty.all(_cardBg),
             dividerThickness: 0.5,
             columns: [
-              DataColumn(label: Text('Order #', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Customer', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Total', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Status', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Date', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Actions', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Order #', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Customer', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Total', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Status', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Date', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Actions', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
             ],
             rows: [
               for (final order in orders)
                 DataRow(
                   cells: [
                     DataCell(Text(order['order_number'] ?? '-',
-                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 13))),
+                        style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13))),
                     DataCell(Text(order['customer_name'] ?? 'Unknown',
-                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 13))),
+                        style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13))),
                     DataCell(Text('₱${order['total'] ?? 0}',
-                        style: GoogleFonts.poppins(color: _primary, fontSize: 13, fontWeight: FontWeight.w600))),
+                        style: GoogleFonts.plusJakartaSans(color: _primary, fontSize: 13, fontWeight: FontWeight.w600))),
                     DataCell(
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -243,7 +243,7 @@ class _OrdersTable extends StatelessWidget {
                         ),
                         child: Text(
                           order['status'] ?? 'UNKNOWN',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                             color: getStatusColor(order['status'] ?? ''),
@@ -252,7 +252,7 @@ class _OrdersTable extends StatelessWidget {
                       ),
                     ),
                     DataCell(Text(_formatDate(order['created_at']),
-                        style: GoogleFonts.poppins(color: _muted, fontSize: 13))),
+                        style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 13))),
                     DataCell(
                       Row(
                         children: [
@@ -273,20 +273,20 @@ class _OrdersTable extends StatelessWidget {
                                 SnackBar(
                                   backgroundColor: _primary,
                                   content: Text('Order $value',
-                                      style: GoogleFonts.poppins(color: const Color(0xFF0F172A))),
+                                      style: GoogleFonts.plusJakartaSans(color: const Color(0xFF111827))),
                                 ),
                               );
                               onReload();
                             },
                             itemBuilder: (BuildContext context) => [
                               PopupMenuItem(value: 'approved',
-                                  child: Text('Approve', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13))),
+                                  child: Text('Approve', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13))),
                               PopupMenuItem(value: 'shipped',
-                                  child: Text('Mark Shipped', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13))),
+                                  child: Text('Mark Shipped', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13))),
                               PopupMenuItem(value: 'delivered',
-                                  child: Text('Mark Delivered', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13))),
+                                  child: Text('Mark Delivered', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13))),
                               PopupMenuItem(value: 'cancelled',
-                                  child: Text('Cancel', style: GoogleFonts.poppins(color: const Color(0xFFEF4444), fontSize: 13))),
+                                  child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: const Color(0xFFEF4444), fontSize: 13))),
                             ],
                           ),
                         ],
@@ -329,7 +329,7 @@ class _OrdersTable extends StatelessWidget {
         backgroundColor: const Color(0xFF1E293B),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Order #${order['order_number']}',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,7 +343,7 @@ class _OrdersTable extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Close', style: GoogleFonts.poppins(color: _muted)),
+            child: Text('Close', style: GoogleFonts.plusJakartaSans(color: _muted)),
           ),
         ],
       ),
@@ -355,8 +355,8 @@ class _OrdersTable extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Text('$label: ', style: GoogleFonts.poppins(color: _muted, fontSize: 13)),
-          Text(value, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+          Text('$label: ', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 13)),
+          Text(value, style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13)),
         ],
       ),
     );
@@ -368,10 +368,10 @@ class _OrderCard extends StatelessWidget {
   final Color Function(String) getStatusColor;
   final VoidCallback onReload;
 
-  static const Color _primary = Color(0xFF13EC5B);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _cardBg = Color(0xFF1E293B);
   static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
 
   const _OrderCard({
     required this.order,
@@ -402,15 +402,15 @@ class _OrderCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Order #${order['order_number'] ?? '-'}',
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: Colors.white)),
                     const SizedBox(height: 4),
                     Text(order['customer_name'] ?? 'Unknown',
-                        style: GoogleFonts.poppins(fontSize: 12, color: _muted)),
+                        style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _muted)),
                   ],
                 ),
               ),
               Text('₱${order['total'] ?? 0}',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16, color: _primary)),
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16, color: _primary)),
             ],
           ),
           const SizedBox(height: 12),
@@ -425,10 +425,10 @@ class _OrderCard extends StatelessWidget {
                   border: Border.all(color: statusColor.withOpacity(0.3)),
                 ),
                 child: Text(order['status'] ?? 'UNKNOWN',
-                    style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor)),
+                    style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor)),
               ),
               Text(_formatDate(order['created_at']),
-                  style: GoogleFonts.poppins(fontSize: 12, color: _muted)),
+                  style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _muted)),
             ],
           ),
           const SizedBox(height: 12),
@@ -438,10 +438,10 @@ class _OrderCard extends StatelessWidget {
               onPressed: () => _showActions(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primary,
-                foregroundColor: const Color(0xFF0F172A),
+                foregroundColor: const Color(0xFF111827),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: Text('Update Status', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 13)),
+              child: Text('Update Status', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 13)),
             ),
           ),
         ],
@@ -489,11 +489,11 @@ class _OrderCard extends StatelessWidget {
         decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
         child: Icon(icon, color: color, size: 20),
       ),
-      title: Text(title, style: GoogleFonts.poppins(color: Colors.white, fontSize: 14)),
+      title: Text(title, style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 14)),
       onTap: () {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(backgroundColor: color, content: Text(msg, style: GoogleFonts.poppins(color: const Color(0xFF0F172A)))),
+          SnackBar(backgroundColor: color, content: Text(msg, style: GoogleFonts.plusJakartaSans(color: const Color(0xFF111827)))),
         );
         onReload();
       },

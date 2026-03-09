@@ -22,10 +22,10 @@ class _AdminModerationTabState extends State<AdminModerationTab>
   late Future<List<Map<String, dynamic>>> _pendingReportsFuture;
   late Future<List<Map<String, dynamic>>> _resolvedReportsFuture;
 
-  static const Color _primary = Color(0xFF13EC5B);
-  static const Color _darker = Color(0xFF0F172A);
+  static const Color _primary = Color(0xFF16A34A);
+  static const Color _darker = Color(0xFF111827);
   static const Color _cardBg = Color(0xFF1E293B);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
   static const Color _border = Color(0xFF334155);
 
   @override
@@ -62,8 +62,8 @@ class _AdminModerationTabState extends State<AdminModerationTab>
               indicatorSize: TabBarIndicatorSize.tab,
               labelColor: _primary,
               unselectedLabelColor: _muted,
-              labelStyle: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600),
-              unselectedLabelStyle: GoogleFonts.poppins(fontSize: 13),
+              labelStyle: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600),
+              unselectedLabelStyle: GoogleFonts.plusJakartaSans(fontSize: 13),
               dividerColor: Colors.transparent,
               tabs: const [
                 Tab(text: 'Pending Reports'),
@@ -105,9 +105,9 @@ class _ReportsListView extends StatelessWidget {
   final AdminService adminService;
   final VoidCallback onReload;
 
-  static const Color _primary = Color(0xFF13EC5B);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _danger = Color(0xFFEF4444);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
 
   const _ReportsListView({
     required this.future,
@@ -131,7 +131,7 @@ class _ReportsListView extends StatelessWidget {
           if (snapshot.hasError) {
             return Center(
               child: Text('Failed to load reports',
-                  style: GoogleFonts.poppins(color: _danger)),
+                  style: GoogleFonts.plusJakartaSans(color: _danger)),
             );
           }
 
@@ -145,7 +145,7 @@ class _ReportsListView extends StatelessWidget {
                   Icon(Icons.check_circle_outline, color: _muted, size: 48),
                   const SizedBox(height: 12),
                   Text('No reports found',
-                      style: GoogleFonts.poppins(color: _muted, fontSize: 14)),
+                      style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 14)),
                 ],
               ),
             );
@@ -172,14 +172,14 @@ class _ReportCard extends StatelessWidget {
   final AdminService adminService;
   final VoidCallback onReload;
 
-  static const Color _primary = Color(0xFF13EC5B);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _secondary = Color(0xFF06B6D4);
   static const Color _warning = Color(0xFFFFA500);
   static const Color _danger = Color(0xFFEF4444);
   static const Color _cardBg = Color(0xFF1E293B);
-  static const Color _darker = Color(0xFF0F172A);
+  static const Color _darker = Color(0xFF111827);
   static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
 
   const _ReportCard({
     required this.report,
@@ -232,7 +232,7 @@ class _ReportCard extends StatelessWidget {
                 ),
                 child: Text(
                   report['content_type'] ?? 'unknown',
-                  style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: typeColor),
+                  style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: typeColor),
                 ),
               ),
               Container(
@@ -244,7 +244,7 @@ class _ReportCard extends StatelessWidget {
                 ),
                 child: Text(
                   status.toUpperCase(),
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: isResolved ? _secondary : _danger,
@@ -257,20 +257,20 @@ class _ReportCard extends StatelessWidget {
 
           // Reason
           Text('Reason',
-              style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: _muted)),
+              style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600, color: _muted)),
           const SizedBox(height: 4),
           Text(report['reason'] ?? 'No reason provided',
-              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white)),
+              style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white)),
           const SizedBox(height: 12),
 
           // Description
           if (report['description'] != null && (report['description'] as String).isNotEmpty) ...[
             Text('Description',
-                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: _muted)),
+                style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600, color: _muted)),
             const SizedBox(height: 4),
             Text(
               report['description'] ?? '',
-              style: GoogleFonts.poppins(fontSize: 13, color: _muted),
+              style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _muted),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),
@@ -290,10 +290,10 @@ class _ReportCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Resolution',
-                      style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: _muted)),
+                      style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600, color: _muted)),
                   const SizedBox(height: 4),
                   Text(report['resolution_notes'] ?? '',
-                      style: GoogleFonts.poppins(fontSize: 13, color: Colors.white)),
+                      style: GoogleFonts.plusJakartaSans(fontSize: 13, color: Colors.white)),
                 ],
               ),
             ),
@@ -305,10 +305,10 @@ class _ReportCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Reported: ${_formatDate(report['created_at'])}',
-                  style: GoogleFonts.poppins(fontSize: 11, color: _muted)),
+                  style: GoogleFonts.plusJakartaSans(fontSize: 11, color: _muted)),
               if (report['resolved_at'] != null)
                 Text('Resolved: ${_formatDate(report['resolved_at'])}',
-                    style: GoogleFonts.poppins(fontSize: 11, color: _muted)),
+                    style: GoogleFonts.plusJakartaSans(fontSize: 11, color: _muted)),
             ],
           ),
           const SizedBox(height: 16),
@@ -321,7 +321,7 @@ class _ReportCard extends StatelessWidget {
                   child: ElevatedButton.icon(
                     onPressed: () => _showResolveDialog(context),
                     icon: const Icon(Icons.check_circle, size: 18),
-                    label: Text('Resolve', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 13)),
+                    label: Text('Resolve', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 13)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _primary,
                       foregroundColor: _darker,
@@ -336,13 +336,13 @@ class _ReportCard extends StatelessWidget {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           backgroundColor: _muted,
-                          content: Text('Report dismissed', style: GoogleFonts.poppins(color: Colors.white)),
+                          content: Text('Report dismissed', style: GoogleFonts.plusJakartaSans(color: Colors.white)),
                         ),
                       );
                       onReload();
                     },
                     icon: const Icon(Icons.close, size: 18),
-                    label: Text('Dismiss', style: GoogleFonts.poppins(fontSize: 13)),
+                    label: Text('Dismiss', style: GoogleFonts.plusJakartaSans(fontSize: 13)),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _muted,
                       side: const BorderSide(color: Color(0xFF334155)),
@@ -379,13 +379,13 @@ class _ReportCard extends StatelessWidget {
           backgroundColor: _cardBg,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text('Resolve Report',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: Colors.white)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Resolution Action',
-                  style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: _muted)),
+                  style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600, color: _muted)),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(8),
@@ -423,17 +423,17 @@ class _ReportCard extends StatelessWidget {
               const SizedBox(height: 16),
               TextField(
                 controller: notesController,
-                style: GoogleFonts.poppins(color: Colors.white, fontSize: 13),
+                style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13),
                 decoration: InputDecoration(
                   labelText: 'Resolution notes',
-                  labelStyle: GoogleFonts.poppins(color: _muted, fontSize: 13),
+                  labelStyle: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 13),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: Color(0xFF334155)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFF13EC5B)),
+                    borderSide: const BorderSide(color: Color(0xFF16A34A)),
                   ),
                   filled: true,
                   fillColor: _darker,
@@ -445,7 +445,7 @@ class _ReportCard extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Cancel', style: GoogleFonts.poppins(color: _muted)),
+              child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: _muted)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -461,7 +461,7 @@ class _ReportCard extends StatelessWidget {
                   SnackBar(
                     backgroundColor: _primary,
                     content: Text('Report resolved',
-                        style: GoogleFonts.poppins(color: _darker)),
+                        style: GoogleFonts.plusJakartaSans(color: _darker)),
                   ),
                 );
                 onReload();
@@ -471,7 +471,7 @@ class _ReportCard extends StatelessWidget {
                 foregroundColor: _darker,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: Text('Resolve', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+              child: Text('Resolve', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
             ),
           ],
         ),
@@ -488,7 +488,7 @@ class _ReportCard extends StatelessWidget {
     required void Function(String?) onChanged,
   }) {
     return RadioListTile<String>(
-      title: Text(title, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+      title: Text(title, style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13)),
       value: value,
       groupValue: groupValue,
       activeColor: _primary,

@@ -19,12 +19,12 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
   late Future<List<Map<String, dynamic>>> _productsFuture;
   int _currentPage = 0;
 
-  static const Color _primary = Color(0xFF13EC5B);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _danger = Color(0xFFEF4444);
-  static const Color _darker = Color(0xFF0F172A);
+  static const Color _darker = Color(0xFF111827);
   static const Color _cardBg = Color(0xFF1E293B);
   static const Color _surface = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
   static const Color _border = Color(0xFF334155);
 
   @override
@@ -50,7 +50,7 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
           children: [
             Text(
               'Product Moderation',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -67,7 +67,7 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                 if (snapshot.hasError) {
                   return Center(
                     child: Text('Failed to load products',
-                        style: GoogleFonts.poppins(color: _danger)),
+                        style: GoogleFonts.plusJakartaSans(color: _danger)),
                   );
                 }
 
@@ -76,7 +76,7 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                 if (products.isEmpty) {
                   return Center(
                     child: Text('No products found',
-                        style: GoogleFonts.poppins(color: _muted)),
+                        style: GoogleFonts.plusJakartaSans(color: _muted)),
                   );
                 }
 
@@ -112,7 +112,7 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                             border: Border.all(color: _border),
                           ),
                           child: Text('Page ${_currentPage + 1}',
-                              style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 13)),
+                              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 13)),
                         ),
                         const SizedBox(width: 16),
                         _buildPaginationBtn(
@@ -149,7 +149,7 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
           children: [
             Icon(icon, color: enabled ? Colors.white : _muted, size: 16),
             const SizedBox(width: 8),
-            Text(label, style: GoogleFonts.poppins(color: enabled ? Colors.white : _muted, fontSize: 13)),
+            Text(label, style: GoogleFonts.plusJakartaSans(color: enabled ? Colors.white : _muted, fontSize: 13)),
           ],
         ),
       ),
@@ -161,10 +161,10 @@ class _ProductsTable extends StatelessWidget {
   final List<Map<String, dynamic>> products;
   final VoidCallback onReload;
 
-  static const Color _primary = Color(0xFF13EC5B);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _cardBg = Color(0xFF1E293B);
   static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
 
   const _ProductsTable({required this.products, required this.onReload});
 
@@ -181,29 +181,29 @@ class _ProductsTable extends StatelessWidget {
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: DataTable(
-            headingRowColor: WidgetStateProperty.all(const Color(0xFF0F172A)),
+            headingRowColor: WidgetStateProperty.all(const Color(0xFF111827)),
             dataRowColor: WidgetStateProperty.all(_cardBg),
             dividerThickness: 0.5,
             columns: [
-              DataColumn(label: Text('Product Name', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Farm', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Price', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Rating', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Pre-order', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Actions', style: GoogleFonts.poppins(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Product Name', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Farm', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Price', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Rating', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Pre-order', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Actions', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 12, fontWeight: FontWeight.w600))),
             ],
             rows: [
               for (final product in products)
                 DataRow(
                   cells: [
-                    DataCell(Text(product['name'] ?? '-', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13))),
-                    DataCell(Text(product['farm'] ?? '-', style: GoogleFonts.poppins(color: _muted, fontSize: 13))),
+                    DataCell(Text(product['name'] ?? '-', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13))),
+                    DataCell(Text(product['farm'] ?? '-', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 13))),
                     DataCell(Text('₱${product['price'] ?? 0}',
-                        style: GoogleFonts.poppins(color: _primary, fontSize: 13, fontWeight: FontWeight.w600))),
+                        style: GoogleFonts.plusJakartaSans(color: _primary, fontSize: 13, fontWeight: FontWeight.w600))),
                     DataCell(
                       Row(
                         children: [
-                          Text('${product['rating'] ?? 0}', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                          Text('${product['rating'] ?? 0}', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13)),
                           const SizedBox(width: 4),
                           const Icon(Icons.star, color: Color(0xFFFFA500), size: 16),
                         ],
@@ -218,7 +218,7 @@ class _ProductsTable extends StatelessWidget {
                         ),
                         child: Text(
                           product['is_preorder'] == true ? 'Yes' : 'No',
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                             color: product['is_preorder'] == true ? _primary : _muted,
@@ -234,7 +234,7 @@ class _ProductsTable extends StatelessWidget {
                           _buildActionIcon(Icons.check_circle, _primary, () {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(backgroundColor: _primary,
-                                  content: Text('Product approved', style: GoogleFonts.poppins(color: const Color(0xFF0F172A)))),
+                                  content: Text('Product approved', style: GoogleFonts.plusJakartaSans(color: const Color(0xFF111827)))),
                             );
                             onReload();
                           }),
@@ -242,7 +242,7 @@ class _ProductsTable extends StatelessWidget {
                           _buildActionIcon(Icons.delete, const Color(0xFFEF4444), () {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(backgroundColor: const Color(0xFFEF4444),
-                                  content: Text('Product removed', style: GoogleFonts.poppins(color: Colors.white))),
+                                  content: Text('Product removed', style: GoogleFonts.plusJakartaSans(color: Colors.white))),
                             );
                             onReload();
                           }),
@@ -276,7 +276,7 @@ class _ProductsTable extends StatelessWidget {
         backgroundColor: const Color(0xFF1E293B),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(product['name'] ?? 'Product',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,7 +291,7 @@ class _ProductsTable extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Close', style: GoogleFonts.poppins(color: _muted)),
+            child: Text('Close', style: GoogleFonts.plusJakartaSans(color: _muted)),
           ),
         ],
       ),
@@ -303,8 +303,8 @@ class _ProductsTable extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Text('$label: ', style: GoogleFonts.poppins(color: _muted, fontSize: 13)),
-          Text(value, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+          Text('$label: ', style: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 13)),
+          Text(value, style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13)),
         ],
       ),
     );
@@ -315,10 +315,10 @@ class _ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   final VoidCallback onReload;
 
-  static const Color _primary = Color(0xFF13EC5B);
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _cardBg = Color(0xFF1E293B);
   static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
+  static const Color _muted = Color(0xFF6B7280);
 
   const _ProductCard({required this.product, required this.onReload});
 
@@ -343,15 +343,15 @@ class _ProductCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(product['name'] ?? '-',
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, color: Colors.white)),
                     const SizedBox(height: 4),
                     Text(product['farm'] ?? '-',
-                        style: GoogleFonts.poppins(fontSize: 12, color: _muted)),
+                        style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _muted)),
                   ],
                 ),
               ),
               Text('₱${product['price'] ?? 0}',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16, color: _primary)),
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16, color: _primary)),
             ],
           ),
           const SizedBox(height: 12),
@@ -359,7 +359,7 @@ class _ProductCard extends StatelessWidget {
             children: [
               const Icon(Icons.star, color: Color(0xFFFFA500), size: 16),
               const SizedBox(width: 4),
-              Text('${product['rating'] ?? 0}', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+              Text('${product['rating'] ?? 0}', style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13)),
               const SizedBox(width: 16),
               if (product['is_preorder'] == true)
                 Container(
@@ -369,7 +369,7 @@ class _ProductCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text('Pre-order',
-                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: _primary)),
+                      style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: _primary)),
                 ),
             ],
           ),
@@ -381,16 +381,16 @@ class _ProductCard extends StatelessWidget {
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(backgroundColor: _primary,
-                          content: Text('Product approved', style: GoogleFonts.poppins(color: const Color(0xFF0F172A)))),
+                          content: Text('Product approved', style: GoogleFonts.plusJakartaSans(color: const Color(0xFF111827)))),
                     );
                     onReload();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _primary,
-                    foregroundColor: const Color(0xFF0F172A),
+                    foregroundColor: const Color(0xFF111827),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: Text('Approve', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 13)),
+                  child: Text('Approve', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 13)),
                 ),
               ),
               const SizedBox(width: 8),
@@ -399,7 +399,7 @@ class _ProductCard extends StatelessWidget {
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(backgroundColor: const Color(0xFFEF4444),
-                          content: Text('Product removed', style: GoogleFonts.poppins(color: Colors.white))),
+                          content: Text('Product removed', style: GoogleFonts.plusJakartaSans(color: Colors.white))),
                     );
                     onReload();
                   },
@@ -408,7 +408,7 @@ class _ProductCard extends StatelessWidget {
                     side: const BorderSide(color: Color(0xFF334155)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: Text('Remove', style: GoogleFonts.poppins(fontSize: 13)),
+                  child: Text('Remove', style: GoogleFonts.plusJakartaSans(fontSize: 13)),
                 ),
               ),
             ],
