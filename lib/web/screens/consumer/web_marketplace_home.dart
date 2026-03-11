@@ -33,6 +33,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
 
   late AnimationController _fadeCtrl;
   late AnimationController _floatingCtrl;
+  late AnimationController _waveController;
   final Set<int> _hoveredProducts = {};
   final Set<int> _hoveredCategories = {};
   int _hoveredNav = -1;
@@ -49,12 +50,17 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
       duration: const Duration(seconds: 3),
       vsync: this,
     )..repeat(reverse: true);
+    _waveController = AnimationController(
+      duration: const Duration(seconds: 8),
+      vsync: this,
+    )..repeat();
   }
 
   @override
   void dispose() {
     _fadeCtrl.dispose();
     _floatingCtrl.dispose();
+    _waveController.dispose();
     super.dispose();
   }
 
@@ -194,23 +200,169 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
   }
 
   // ─────────────────────────────────────────────
-  // HERO — Light mint background with gradient
+  // HERO — Animated dark emerald background (matches Welcome Screen)
   // ─────────────────────────────────────────────
   Widget _buildHero() {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            _heroMint,
-            const Color(0xFFE8F8F1),
-          ],
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 60),
-      child: Row(
+      constraints: const BoxConstraints(minHeight: 640),
+      child: Stack(
+        children: [
+          // Background gradient — warm dark hero (same as welcome screen)
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: AgriColors.warmHeroGradient,
+              ),
+            ),
+          ),
+
+          // Aurora glow — ambient color blobs
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _waveController,
+              builder: (context, _) {
+                return CustomPaint(
+                  painter: AuroraGlowPainter(animationValue: _waveController.value),
+                );
+              },
+            ),
+          ),
+
+          // Hex pattern overlay
+          Positioned.fill(
+            child: CustomPaint(
+              painter: HexPatternPainter(opacity: 0.025, color: Colors.white),
+            ),
+          ),
+
+          // Ribbon curves
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _waveController,
+              builder: (context, _) {
+                return CustomPaint(
+                  painter: RibbonPainter(
+                    animationValue: _waveController.value,
+                    color: Colors.white.withValues(alpha: 0.04),
+                    strokeWidth: 1.0,
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Animated blob — emerald top right
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _waveController,
+              builder: (context, _) {
+                return CustomPaint(
+                  painter: BlobPainter(
+                    animationValue: _waveController.value,
+                    color: AgriColors.emerald400.withValues(alpha: 0.08),
+                    center: const Offset(0.8, 0.3),
+                    radius: 280,
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Animated blob — teal bottom left
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _waveController,
+              builder: (context, _) {
+                return CustomPaint(
+                  painter: BlobPainter(
+                    animationValue: 1 - _waveController.value,
+                    color: AgriColors.teal400.withValues(alpha: 0.06),
+                    center: const Offset(0.2, 0.7),
+                    radius: 220,
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Animated blob — gold accent top far right
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _waveController,
+              builder: (context, _) {
+                return CustomPaint(
+                  painter: BlobPainter(
+                    animationValue: _waveController.value * 0.7,
+                    color: AgriColors.gold400.withValues(alpha: 0.03),
+                    center: const Offset(0.9, 0.15),
+                    radius: 120,
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Floating particles — mixed green + gold
+          const Positioned.fill(
+            child: FloatingParticles(
+              count: 35,
+              maxSize: 3.5,
+              color: Color(0xFF34D399),
+              height: 640,
+            ),
+          ),
+          const Positioned.fill(
+            child: FloatingParticles(
+              count: 6,
+              maxSize: 2,
+              color: Color(0xFFFBBF24),
+              height: 640,
+            ),
+          ),
+
+          // Animated waves at bottom
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 120,
+            child: AnimatedBuilder(
+              animation: _waveController,
+              builder: (context, _) {
+                return CustomPaint(
+                  painter: WavePainter(
+                    animationValue: _waveController.value,
+                    color: Colors.white.withValues(alpha: 0.06),
+                    amplitude: 25,
+                  ),
+                );
+              },
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 80,
+            child: AnimatedBuilder(
+              animation: _waveController,
+              builder: (context, _) {
+                return CustomPaint(
+                  painter: WavePainter(
+                    animationValue: 1 - _waveController.value,
+                    color: Colors.white.withValues(alpha: 0.04),
+                    amplitude: 15,
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Content
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 60),
+            child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Left content
@@ -219,22 +371,47 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Badge
+                // Badge — gold accent (matches welcome screen)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: _primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _primary.withValues(alpha: 0.2)),
-                  ),
-                  child: Text(
-                    'DIRECT FROM SOURCE',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: _primary,
-                      letterSpacing: 1.2,
+                    gradient: LinearGradient(
+                      colors: [
+                        AgriColors.gold400.withValues(alpha: 0.15),
+                        AgriColors.emerald400.withValues(alpha: 0.1),
+                      ],
                     ),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(color: AgriColors.gold300.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          gradient: AgriColors.goldGradient,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AgriColors.gold400.withValues(alpha: 0.5),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'FARM-TO-TABLE MARKETPLACE',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AgriColors.gold200,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -244,7 +421,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 52,
                     fontWeight: FontWeight.w900,
-                    color: _dark,
+                    color: Colors.white,
                     height: 1.05,
                     letterSpacing: -1,
                   ),
@@ -254,7 +431,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 52,
                     fontWeight: FontWeight.w900,
-                    color: _primary,
+                    color: AgriColors.emerald300,
                     height: 1.1,
                     letterSpacing: -1,
                   ),
@@ -266,7 +443,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     'Experience the true taste of nature with direct-from-farm produce delivered to your doorstep within 24 hours.',
                     style: GoogleFonts.inter(
                       fontSize: 15,
-                      color: _muted,
+                      color: Colors.white.withValues(alpha: 0.6),
                       height: 1.7,
                     ),
                   ),
@@ -360,63 +537,117 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                       ),
                     ),
                   ),
-                  // Main image card with improved opacity & overlay
+                  // Main image card with animated background
                   ClipRRect(
                     borderRadius: BorderRadius.circular(24),
-                    child: Stack(
-                      children: [
-                        CachedNetworkImage(
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&q=80',
-                          height: 360,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          placeholder: (ctx, url) => Container(
-                            height: 360,
+                    child: SizedBox(
+                      height: 360,
+                      width: double.infinity,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // ── Animated background (from welcome screen) ──
+                          Container(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [
-                                  const Color(0xFFD1F2EB),
-                                  const Color(0xFFE8F8F1),
-                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [_heroMint, const Color(0xFFD1FAE5)],
                               ),
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            child: const Center(
-                              child: CircularProgressIndicator(color: _primary),
                             ),
                           ),
-                          errorWidget: (ctx, url, err) => Container(
+                          AnimatedBuilder(
+                            animation: _waveController,
+                            builder: (context, _) => CustomPaint(
+                              painter: AuroraGlowPainter(animationValue: _waveController.value),
+                            ),
+                          ),
+                          CustomPaint(
+                            painter: HexPatternPainter(opacity: 0.04, color: _primary),
+                          ),
+                          AnimatedBuilder(
+                            animation: _waveController,
+                            builder: (context, _) => CustomPaint(
+                              painter: BlobPainter(
+                                animationValue: _waveController.value,
+                                color: _primary.withValues(alpha: 0.10),
+                                center: const Offset(0.8, 0.2),
+                                radius: 180,
+                              ),
+                            ),
+                          ),
+                          AnimatedBuilder(
+                            animation: _waveController,
+                            builder: (context, _) => CustomPaint(
+                              painter: BlobPainter(
+                                animationValue: 1 - _waveController.value,
+                                color: const Color(0xFF34D399).withValues(alpha: 0.08),
+                                center: const Offset(0.2, 0.8),
+                                radius: 140,
+                              ),
+                            ),
+                          ),
+                          AnimatedBuilder(
+                            animation: _waveController,
+                            builder: (context, _) => CustomPaint(
+                              painter: RibbonPainter(
+                                animationValue: _waveController.value,
+                                color: _primary.withValues(alpha: 0.05),
+                                strokeWidth: 1.0,
+                              ),
+                            ),
+                          ),
+                          const FloatingParticles(
+                            count: 22,
+                            maxSize: 2.8,
+                            color: Color(0xFF16A34A),
                             height: 360,
+                          ),
+                          // Wave at bottom of card
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: 80,
+                            child: AnimatedBuilder(
+                              animation: _waveController,
+                              builder: (context, _) => CustomPaint(
+                                painter: WavePainter(
+                                  animationValue: _waveController.value,
+                                  color: Colors.white.withValues(alpha: 0.10),
+                                  amplitude: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                          // ── Photo overlay (semi-transparent so animation shows) ──
+                          Opacity(
+                            opacity: 0.45,
+                            child: CachedNetworkImage(
+                              imageUrl:
+                                  'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&q=80',
+                              height: 360,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              placeholder: (ctx, url) => const SizedBox.shrink(),
+                              errorWidget: (ctx, url, err) => const SizedBox.shrink(),
+                            ),
+                          ),
+                          // Gradient scrim so text/badge reads cleanly
+                          Container(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
                                 colors: [
-                                  const Color(0xFFD1F2EB),
-                                  const Color(0xFFE8F8F1),
+                                  Colors.transparent,
+                                  _primary.withValues(alpha: 0.15),
                                 ],
                               ),
-                              borderRadius: const BorderRadius.all(Radius.circular(24)),
                             ),
-                            child: const Icon(Icons.eco_rounded, color: _primary, size: 80),
                           ),
-                        ),
-                        // Semi-transparent overlay to ensure mint shows through
-                        Container(
-                          height: 360,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                _heroMint.withValues(alpha: 0.08),
-                                _surface.withValues(alpha: 0.04),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   // Floating delivery badge
@@ -508,6 +739,9 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
               ),
             ),
           ),
+        ],
+      ),
+    ),
         ],
       ),
     );
