@@ -79,37 +79,69 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _surface,
-      body: Column(
+      body: Stack(
         children: [
-          _buildNavBar(),
-          _buildTopBar(),
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Main content
-                Expanded(
-                  flex: 3,
-                  child: _buildMainContent(),
-                ),
-                // Right sidebar
-                SizedBox(
-                  width: 320,
-                  child: _buildRightSidebar(),
-                ),
-              ],
+          // Subtle dot pattern background
+          Positioned.fill(
+            child: CustomPaint(
+              painter: DotPatternPainter(opacity: 0.03, color: const Color(0xFF10B981)),
             ),
+          ),
+          // Particles
+          const Positioned.fill(
+            child: FloatingParticles(
+              count: 8,
+              maxSize: 1.8,
+              color: Color(0xFF34D399),
+              height: 1000,
+            ),
+          ),
+          Column(
+            children: [
+              _buildNavBar(),
+              _buildTopBar(),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Main content
+                    Expanded(
+                      flex: 3,
+                      child: _buildMainContent(),
+                    ),
+                    // Right sidebar
+                    SizedBox(
+                      width: 320,
+                      child: _buildRightSidebar(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
-        backgroundColor: _primary,
-        foregroundColor: Colors.white,
-        elevation: 2,
-        icon: const Icon(Icons.edit_rounded, size: 20),
-        label: const Text('New Post', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: AgriColors.primaryGradient,
+          boxShadow: [
+            BoxShadow(
+              color: AgriColors.emerald500.withValues(alpha: 0.4),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: () {},
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          icon: const Icon(Icons.edit_rounded, size: 20),
+          label: Text('New Post', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
       ),
     );
   }
@@ -443,8 +475,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                 child: CachedNetworkImage(
                   imageUrl: post.imageUrl!,
                   fit: BoxFit.cover,
-                  placeholder: (_, _) => Container(color: Colors.grey[100]),
-                  errorWidget: (_, _, _) => Container(color: Colors.grey[100]),
+                  placeholder: (ctx, url) => Container(color: Colors.grey[100]),
+                  errorWidget: (ctx, url, err) => Container(color: Colors.grey[100]),
                 ),
               ),
             ),
@@ -578,8 +610,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                   width: 120,
                   height: 90,
                   fit: BoxFit.cover,
-                  placeholder: (_, _) => Container(width: 120, height: 90, color: Colors.grey[100]),
-                  errorWidget: (_, _, _) => Container(width: 120, height: 90, color: Colors.grey[100]),
+                  placeholder: (ctx, url) => Container(width: 120, height: 90, color: Colors.grey[100]),
+                  errorWidget: (ctx, url, err) => Container(width: 120, height: 90, color: Colors.grey[100]),
                 ),
               ),
             ],
@@ -667,23 +699,43 @@ class _WebCommunityHubState extends State<WebCommunityHub>
         children: [
           const Text('Trending Topics', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _dark)),
           const SizedBox(height: 16),
-          ...topics.map((t) => Padding(
+          ...topics.asMap().entries.map((entry) {
+            final i = entry.key;
+            final t = entry.value;
+            return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
                   children: [
                     Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(color: _primary, shape: BoxShape.circle),
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        gradient: i == 0 ? AgriColors.goldGradient : AgriColors.primaryGradient,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${i + 1}',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(t.$1, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _dark)),
                     ),
-                    Text('${t.$2} posts', style: TextStyle(fontSize: 12, color: _muted)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text('${t.$2}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _primary)),
+                    ),
                   ],
                 ),
-              )),
+              );
+          }),
         ],
       ),
     );

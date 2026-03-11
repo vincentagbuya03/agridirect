@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/animated_components.dart';
-import '../../widgets/animated_components.dart';
 
 /// Web Sales Dashboard — Modern Design
 /// Professional analytics dashboard for farmers
@@ -79,114 +78,99 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _surface,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildNavBar(),
-            _buildTopBar(),
-            Padding(
-              padding: const EdgeInsets.all(40),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildGreeting(),
-                  const SizedBox(height: 32),
-                  _buildMetricsRow(),
-                  const SizedBox(height: 32),
-                  _buildChartsRow(),
-                  const SizedBox(height: 32),
-                  _buildRecentOrdersSection(),
-                  const SizedBox(height: 40),
-                ],
-              ),
+      body: Stack(
+        children: [
+          // Subtle dot pattern background
+          Positioned.fill(
+            child: CustomPaint(
+              painter: DotPatternPainter(opacity: 0.04, color: const Color(0xFF10B981)),
             ),
-          ],
-        ),
+          ),
+          // Subtle floating particles
+          const Positioned.fill(
+            child: FloatingParticles(
+              count: 10,
+              maxSize: 2,
+              color: Color(0xFF34D399),
+              height: 1200,
+            ),
+          ),
+          SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildNavBar(),
+                _buildTopBar(),
+                Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildGreeting(),
+                      const SizedBox(height: 32),
+                      _buildMetricsRow(),
+                      const SizedBox(height: 32),
+                      _buildChartsRow(),
+                      const SizedBox(height: 32),
+                      _buildRecentOrdersSection(),
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
   // ─── Site Header ───
   Widget _buildNavBar() {
-    final navItems = ['Home', 'Shop', 'Community'];
+    final navItems = ['Home', 'Shop', 'Farmers', 'About'];
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _border.withValues(alpha: 0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 14),
       child: Row(
         children: [
-          // Logo with pulsing glow
           Row(
             children: [
-              PulsingGlow(
-                color: _primary,
-                radius: 20,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    gradient: AgriColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: AnimatedLeafIcon(size: 22, color: Colors.white),
-                  ),
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: _primary,
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                child: const Icon(Icons.eco_rounded, color: Colors.white, size: 17),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Text(
                 'AgriDirect',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 22,
+                  fontSize: 18,
                   fontWeight: FontWeight.w800,
                   color: _dark,
-                  letterSpacing: -0.5,
                 ),
               ),
             ],
           ),
-          const SizedBox(width: 48),
-          // Nav items
+          const SizedBox(width: 40),
           ...List.generate(navItems.length, (i) {
-            final isActive = i == widget.currentIndex;
             final isHovered = _hoveredNav == i;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                onEnter: (_) => setState(() => _hoveredNav = i),
-                onExit: (_) => setState(() => _hoveredNav = -1),
-                child: GestureDetector(
-                  onTap: () => widget.onNavigate(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: isActive
-                          ? _primary.withValues(alpha: 0.08)
-                          : isHovered
-                              ? _border.withValues(alpha: 0.5)
-                              : Colors.transparent,
-                    ),
-                    child: Text(
-                      navItems[i],
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                        color: isActive ? _primary : isHovered ? _dark : _muted,
-                      ),
+            return MouseRegion(
+              cursor: SystemMouseCursors.click,
+              onEnter: (_) => setState(() => _hoveredNav = i),
+              onExit: (_) => setState(() => _hoveredNav = -1),
+              child: GestureDetector(
+                onTap: () => widget.onNavigate(i),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  child: Text(
+                    navItems[i],
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: isHovered ? _primary : _dark,
                     ),
                   ),
                 ),
@@ -194,26 +178,28 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             );
           }),
           const Spacer(),
-          // Circle person icon
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: const Icon(Icons.shopping_cart_outlined, size: 22, color: _dark),
+          ),
+          const SizedBox(width: 20),
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               onTap: () => widget.onNavigate(3),
               child: Container(
-                width: 44,
-                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: _primary,
-                    width: 1.5,
-                  ),
-                ),
-                child: Icon(
-                  Icons.person_rounded,
                   color: _primary,
-                  size: 22,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Sign Up',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),

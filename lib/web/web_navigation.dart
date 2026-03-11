@@ -8,10 +8,7 @@ import 'screens/consumer/web_profile_screen.dart';
 import 'screens/auth/web_login_screen.dart';
 import 'screens/admin/admin_dashboard_redesigned.dart';
 
-/// Web Navigation Wrapper
-/// No sidebar — each screen has its own header with integrated navigation.
-/// Customer mode: Marketplace, Community, Profile
-/// Farmer mode: Dashboard, Community, Profile
+
 class WebNavigation extends StatefulWidget {
   final VoidCallback onLogout;
 

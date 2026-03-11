@@ -318,8 +318,8 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
                 imageUrl:
                     'https://lh3.googleusercontent.com/aida-public/AB6AXuA7SO8J3CebwmP_4K0nwWhDkMsWISrTpnfbOkYJ79_ZiTCLVxdvX_FJArJ1xwYsLAJx8gW_Wtk3xValGb9mDShlpRvdPIMoD9UGWJ9LwNRlF0vvmsKesjK6liNaDGy7C5HGWdOAE1hEPvF3UTq81_QK7QkgKAAMQgeICa4pykDXTF8JYtnrFYPiavyC7N-wkK4pGMGQJcdoyKpRglzbFXWGqTdoa3xP-Bm86BGxFKlWg21Mbw-FylTfHiJeJMKgLbfSJr8MhPFg1zqB',
                 fit: BoxFit.cover,
-                placeholder: (_, _) => Container(color: Colors.grey[200]),
-                errorWidget: (_, _, _) => const Icon(Icons.person, size: 36),
+                placeholder: (ctx, url) => Container(color: Colors.grey[200]),
+                errorWidget: (ctx, url, err) => const Icon(Icons.person, size: 36),
               ),
             ),
           ),

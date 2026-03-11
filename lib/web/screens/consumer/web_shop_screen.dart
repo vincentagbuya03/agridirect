@@ -692,11 +692,11 @@ class _WebShopScreenState extends State<WebShopScreen>
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: _primary,
+                          gradient: AgriColors.primaryGradient,
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: _primary.withValues(alpha: 0.25),
+                              color: _primary.withValues(alpha: 0.3),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -830,13 +830,30 @@ class _WebShopScreenState extends State<WebShopScreen>
               width: 4,
               height: 28,
               decoration: BoxDecoration(
-                color: _primary,
+                gradient: AgriColors.goldGradient,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(width: 12),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                gradient: AgriColors.goldGradient,
+                borderRadius: BorderRadius.circular(7),
+                boxShadow: [
+                  BoxShadow(
+                    color: AgriColors.gold400.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.star_rounded, size: 16, color: Colors.white),
+            ),
+            const SizedBox(width: 10),
             Text(
-              '⭐ Featured This Week',
+              'Featured This Week',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
@@ -940,8 +957,8 @@ class _WebShopScreenState extends State<WebShopScreen>
                               ? CachedNetworkImage(
                                   imageUrl: product.imageUrl,
                                   fit: BoxFit.cover,
-                                  placeholder: (_, _) => _buildImagePlaceholder(),
-                                  errorWidget: (_, _, _) => _buildImagePlaceholder(),
+                                  placeholder: (ctx, url) => _buildImagePlaceholder(),
+                                  errorWidget: (ctx, url, err) => _buildImagePlaceholder(),
                                 )
                               : _buildImagePlaceholder(),
                         ),
@@ -1411,8 +1428,8 @@ class _WebShopScreenState extends State<WebShopScreen>
                               ? CachedNetworkImage(
                                   imageUrl: product.imageUrl,
                                   fit: BoxFit.cover,
-                                  placeholder: (_, _) => _buildImagePlaceholder(),
-                                  errorWidget: (_, _, _) => _buildImagePlaceholder(),
+                                  placeholder: (ctx, url) => _buildImagePlaceholder(),
+                                  errorWidget: (ctx, url, err) => _buildImagePlaceholder(),
                                 )
                               : _buildImagePlaceholder(),
                           // Overlay on hover - inspired by home screen
