@@ -7,6 +7,7 @@ import 'screens/farmer/web_community_hub.dart';
 import 'screens/consumer/web_profile_screen.dart';
 import 'screens/auth/web_login_screen.dart';
 import 'screens/admin/admin_dashboard_redesigned.dart';
+import 'screens/common/web_welcome_screen.dart';
 
 
 class WebNavigation extends StatefulWidget {
@@ -96,6 +97,11 @@ class _WebNavigationState extends State<WebNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    // If user is not logged in, show the welcome screen
+    if (!_auth.isLoggedIn) {
+      return const WebWelcomeScreen();
+    }
+
     // If user is admin, show admin dashboard
     if (_auth.isAdmin) {
       return AdminDashboardRedesigned(onLogout: widget.onLogout);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'shared/services/auth_service.dart';
 import 'shared/services/supabase_config.dart';
@@ -6,6 +7,9 @@ import 'shared/router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Use clean path URLs instead of hash URLs for web
+  setUrlStrategy(PathUrlStrategy());
 
   await SupabaseConfig.initialize();
 
