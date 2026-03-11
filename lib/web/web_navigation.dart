@@ -97,9 +97,9 @@ class _WebNavigationState extends State<WebNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    // If user is not logged in, show the welcome screen
+    // If user is not logged in, show the marketplace (browsable without login)
     if (!_auth.isLoggedIn) {
-      return const WebWelcomeScreen();
+      return WebMarketplaceHome(onNavigate: _navigateTo, currentIndex: _currentIndex);
     }
 
     // If user is admin, show admin dashboard
