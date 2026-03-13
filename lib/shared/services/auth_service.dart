@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase/src/supabase_client.dart';
@@ -13,7 +14,6 @@ class AuthService extends ChangeNotifier {
   AuthService._internal();
 
   final _client = SupabaseConfig.client;
-  bool _googleInitialized = false;
   bool _isLoggedIn = false;
   bool _isSeller = false;
   bool _isViewingAsFarmer = false;
@@ -334,31 +334,64 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Sign in / sign up with Google
+  /// Sign in / sign up with Google (uses Supabase OAuth for cross-platform support)
+  ///
+  /// IMPORTANT: Before using this, configure Supabase Google OAuth:
+  /// 1. Go to Supabase Dashboard → Authentication → Providers → Google
+  /// 2. Enable Google and add your Web Client ID from Google Cloud Console
+  /// 3. Go to Authentication → URL Configuration
+  /// 4. Add your redirect URL: https://yourdomain.com/auth/callback
+  /// 5. Update the redirectTo URL below to match your deployment domain
   Future<bool> signInWithGoogle() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      // Initialize once before first use
-      if (!_googleInitialized) {
-        await GoogleSignIn.instance.initialize(
-          serverClientId:
-              '971354937445-ism5m8bol1l18qqfndkbalj16tl73tiv.apps.googleusercontent.com',
-        );
-        _googleInitialized = true;
-      }
-
-      // Check platform supports interactive sign-in
-      if (!GoogleSignIn.instance.supportsAuthenticate()) {
-        _errorMessage = 'Google Sign-In is not supported on this platform';
+      if (kIsWeb) {
+        // WEB: Use Supabase OAuth (opens Google login in same tab)
+        try {
+          await _client.auth.signInWithOAuth(
+            OAuthProvider.google,
+            redirectTo: 'https://argidirect.vercel.app/auth/callback',
+          );
+        } catch (e) {
+          // OAuth will redirect if successful, so if we catch an error, it's real
+          debugPrint('Web OAuth error: $e');
+          _errorMessage = 'Google Sign-In failed: ${_extractErrorMessage(e)}';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+        // Return true immediately — the page will redirect to Google
+        // No error should show during this process
         _isLoading = false;
         notifyListeners();
-        return false;
+        return true;
+      } else {
+        // MOBILE: Use native Google Sign-In
+        return await _signInWithGoogleMobile();
       }
+    } catch (e) {
+      debugPrint('Google sign-in error: $e');
+      _errorMessage = 'Google Sign-In failed: ${_extractErrorMessage(e)}';
+      _isLoggedIn = false;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
 
-      // Trigger the interactive sign-in flow (v7 API)
+  /// Sign in with Google on Mobile using native GoogleSignIn
+  Future<bool> _signInWithGoogleMobile() async {
+    try {
+      // Initialize once before first use
+      await GoogleSignIn.instance.initialize(
+        serverClientId:
+            '971354937445-ism5m8bol1l18qqfndkbalj16tl73tiv.apps.googleusercontent.com',
+      );
+
+      // Trigger the interactive sign-in flow
       final googleUser = await GoogleSignIn.instance.authenticate();
 
       // Check if user cancelled sign-in
@@ -369,17 +402,14 @@ class AuthService extends ChangeNotifier {
         return false;
       }
 
-      // idToken is a synchronous getter in v7
+      // Get tokens
       final idToken = googleUser.authentication.idToken;
-
-      // accessToken requires a separate async call in v7
       final auth = await googleUser.authorizationClient
           .authorizationForScopes(['email', 'profile']);
       final accessToken = auth?.accessToken;
 
       if (idToken == null) {
-        _errorMessage =
-            'Failed to get Google ID token. Ensure serverClientId is configured.';
+        _errorMessage = 'Failed to get Google ID token';
         _isLoading = false;
         notifyListeners();
         return false;
@@ -406,7 +436,7 @@ class AuthService extends ChangeNotifier {
       final displayName =
           googleUser.displayName ?? googleUser.email.split('@')[0];
 
-      // Check if this is a new user (not yet in the users table)
+      // Check if this is a new user
       final existingProfile = await SupabaseDB.getUserProfile(_userId);
 
       if (existingProfile == null) {
@@ -436,13 +466,31 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint('Google sign-in error: $e');
+      debugPrint('Mobile Google sign-in error: $e');
       _errorMessage = _extractGoogleError(e);
       _isLoggedIn = false;
       _isLoading = false;
       notifyListeners();
       return false;
     }
+  }
+
+  /// Extract meaningful error from Google Sign-In exceptions
+  String _extractGoogleError(dynamic e) {
+    final msg = e.toString();
+    if (msg.contains('12501') || msg.contains('canceled')) {
+      return 'Sign-in cancelled';
+    }
+    if (msg.contains('10') || msg.contains('DEVELOPER_ERROR')) {
+      return 'Google Sign-In not configured. Check SHA-1 fingerprint.';
+    }
+    if (msg.contains('7') || msg.contains('NETWORK_ERROR')) {
+      return 'Network error. Please check your connection.';
+    }
+    if (msg.contains('UnsupportedError')) {
+      return 'Google Sign-In is not supported on this device.';
+    }
+    return 'Google Sign-In error: $msg';
   }
 
   /// Complete profile for new Google sign-in users
@@ -495,28 +543,6 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Extract meaningful error from Google Sign-In exceptions
-  String _extractGoogleError(dynamic e) {
-    final msg = e.toString();
-    if (msg.contains('12501') || msg.contains('canceled')) {
-      return 'Sign-in cancelled';
-    }
-    if (msg.contains('10') || msg.contains('DEVELOPER_ERROR')) {
-      return 'Google Sign-In not configured. Check google-services.json and SHA-1 fingerprint.';
-    }
-    if (msg.contains('7') || msg.contains('NETWORK_ERROR')) {
-      return 'Network error. Please check your connection.';
-    }
-    if (msg.contains('12500')) {
-      return 'Google Sign-In failed. Please try again.';
-    }
-    if (msg.contains('UnsupportedError')) {
-      return 'Google Sign-In is not supported on this device.';
-    }
-    // Show raw error for easier debugging
-    return 'Google Sign-In error: $msg';
-  }
-
   /// Reset password - sends reset link to email
   Future<void> resetPassword({required String email}) async {
     try {
@@ -534,7 +560,11 @@ class AuthService extends ChangeNotifier {
   /// Logout
   Future<void> logout() async {
     try {
-      await GoogleSignIn.instance.signOut();
+      // Sign out from mobile GoogleSignIn if not web
+      if (!kIsWeb) {
+        await GoogleSignIn.instance.signOut();
+      }
+
       await _client.auth.signOut();
       _isLoggedIn = false;
       _isSeller = false;

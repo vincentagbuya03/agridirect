@@ -89,6 +89,39 @@ class _WebLoginScreenState extends State<WebLoginScreen>
     }
   }
 
+  void _handleGoogleLogin() async {
+    setState(() => _loginLoading = true);
+    final authService = AuthService();
+
+    // On web, this will redirect to Google login
+    // On mobile, it will show account picker
+    final success = await authService.signInWithGoogle();
+
+    // If we reach here, we need to check the result
+    if (mounted) {
+      setState(() => _loginLoading = false);
+
+      // On mobile, check if there was an actual error
+      // On web, we might reach here if redirect didn't happen, which is rare
+      if (!success && authService.errorMessage != null && authService.errorMessage!.isNotEmpty) {
+        _showLoginErrorDialog(authService.errorMessage!);
+        return;
+      }
+
+      // Check if new user needs profile completion (mobile only)
+      if (authService.needsProfileCompletion) {
+        _showSnackBar('Complete your profile to finish setup');
+        // TODO: Navigate to profile completion screen for web
+        return;
+      }
+
+      // Existing user - proceed with login
+      if (success) {
+        widget.onLoginSuccess();
+      }
+    }
+  }
+
   void _showLoginErrorDialog(String errorMessage) {
     showDialog(
       context: context,
@@ -948,29 +981,47 @@ class _WebLoginScreenState extends State<WebLoginScreen>
   Widget _buildSocialButtons() {
     return Row(
       children: [
-        Expanded(child: _buildSocialButton(Icons.g_mobiledata_rounded, 'Google')),
+        Expanded(
+          child: _buildSocialButton(
+            Icons.g_mobiledata_rounded,
+            'Google',
+            onPressed: _loginLoading ? null : _handleGoogleLogin,
+          ),
+        ),
         const SizedBox(width: 12),
-        Expanded(child: _buildSocialButton(Icons.facebook_rounded, 'Facebook')),
+        Expanded(
+          child: _buildSocialButton(
+            Icons.facebook_rounded,
+            'Facebook',
+            onPressed: null, // Not implemented yet
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildSocialButton(IconData icon, String label) {
+  Widget _buildSocialButton(
+    IconData icon,
+    String label, {
+    VoidCallback? onPressed,
+  }) {
     return SizedBox(
       height: 48,
       child: OutlinedButton.icon(
-        onPressed: () {},
-        icon: Icon(icon, size: 20, color: _darkSecondary),
+        onPressed: onPressed,
+        icon: Icon(icon, size: 20, color: onPressed != null ? _darkSecondary : _muted),
         label: Text(
           label,
           style: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: _darkSecondary,
+            color: onPressed != null ? _darkSecondary : _muted,
           ),
         ),
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Color(0xFFE5E7EB)),
+          side: BorderSide(
+            color: onPressed != null ? const Color(0xFFE5E7EB) : const Color(0xFFE5E7EB).withOpacity(0.5),
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
