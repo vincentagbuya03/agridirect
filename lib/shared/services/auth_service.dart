@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase/src/supabase_client.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_config.dart';
 
 /// Auth Service using Supabase
@@ -11,6 +13,7 @@ class AuthService extends ChangeNotifier {
   AuthService._internal();
 
   final _client = SupabaseConfig.client;
+  bool _googleInitialized = false;
   bool _isLoggedIn = false;
   bool _isSeller = false;
   bool _isViewingAsFarmer = false;
@@ -21,6 +24,12 @@ class AuthService extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
+  // Pending Google sign-in state (new user needs to complete profile)
+  bool _needsProfileCompletion = false;
+  String _pendingGoogleUserId = '';
+  String _pendingGoogleEmail = '';
+  String _pendingGoogleName = '';
+
   bool get isLoggedIn => _isLoggedIn;
   bool get isSeller => _isSeller;
   bool get isViewingAsFarmer => _isViewingAsFarmer;
@@ -30,6 +39,9 @@ class AuthService extends ChangeNotifier {
   String get userId => _userId;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get needsProfileCompletion => _needsProfileCompletion;
+  String get pendingGoogleEmail => _pendingGoogleEmail;
+  String get pendingGoogleName => _pendingGoogleName;
   SupabaseClient get client => _client;
 
   /// Extract clean error message from exception
@@ -322,6 +334,189 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Sign in / sign up with Google
+  Future<bool> signInWithGoogle() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      // Initialize once before first use
+      if (!_googleInitialized) {
+        await GoogleSignIn.instance.initialize(
+          serverClientId:
+              '971354937445-ism5m8bol1l18qqfndkbalj16tl73tiv.apps.googleusercontent.com',
+        );
+        _googleInitialized = true;
+      }
+
+      // Check platform supports interactive sign-in
+      if (!GoogleSignIn.instance.supportsAuthenticate()) {
+        _errorMessage = 'Google Sign-In is not supported on this platform';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Trigger the interactive sign-in flow (v7 API)
+      final googleUser = await GoogleSignIn.instance.authenticate();
+
+      // Check if user cancelled sign-in
+      if (googleUser == null) {
+        _errorMessage = 'Sign-in cancelled';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // idToken is a synchronous getter in v7
+      final idToken = googleUser.authentication.idToken;
+
+      // accessToken requires a separate async call in v7
+      final auth = await googleUser.authorizationClient
+          .authorizationForScopes(['email', 'profile']);
+      final accessToken = auth?.accessToken;
+
+      if (idToken == null) {
+        _errorMessage =
+            'Failed to get Google ID token. Ensure serverClientId is configured.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Sign in to Supabase with the Google ID token
+      final response = await _client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+
+      if (response.user == null) {
+        _errorMessage = 'Google sign-in failed';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      final user = response.user!;
+      _userId = user.id;
+      _userEmail = user.email ?? googleUser.email;
+
+      final displayName =
+          googleUser.displayName ?? googleUser.email.split('@')[0];
+
+      // Check if this is a new user (not yet in the users table)
+      final existingProfile = await SupabaseDB.getUserProfile(_userId);
+
+      if (existingProfile == null) {
+        // New user — store pending data and ask them to complete their profile
+        _pendingGoogleUserId = _userId;
+        _pendingGoogleEmail = _userEmail;
+        _pendingGoogleName = displayName;
+        _needsProfileCompletion = true;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+
+      // Existing user — proceed normally
+      _userName = (existingProfile['name'] as String?)?.isNotEmpty == true
+          ? existingProfile['name'] as String
+          : displayName;
+
+      // Fetch roles
+      final roles = await SupabaseDB.getUserRoles(_userId);
+      _isSeller = roles.contains('seller');
+      _isAdmin = roles.contains('admin');
+
+      _isLoggedIn = true;
+      _needsProfileCompletion = false;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Google sign-in error: $e');
+      _errorMessage = _extractGoogleError(e);
+      _isLoggedIn = false;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Complete profile for new Google sign-in users
+  /// Called after they fill in phone number (and optional password)
+  Future<bool> completeGoogleProfile({
+    required String phoneNumber,
+    String? password,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      // Create user in the database now
+      await SupabaseDB.createUserIfNotExists(
+        userId: _pendingGoogleUserId,
+        email: _pendingGoogleEmail,
+        name: _pendingGoogleName,
+        phoneNumber: phoneNumber,
+      );
+
+      // If user wants a password for email/password login, update it
+      if (password != null && password.isNotEmpty) {
+        await _client.auth.updateUser(UserAttributes(password: password));
+      }
+
+      // Finalize auth state
+      _userId = _pendingGoogleUserId;
+      _userEmail = _pendingGoogleEmail;
+      _userName = _pendingGoogleName;
+      _needsProfileCompletion = false;
+      _pendingGoogleUserId = '';
+      _pendingGoogleEmail = '';
+      _pendingGoogleName = '';
+
+      final roles = await SupabaseDB.getUserRoles(_userId);
+      _isSeller = roles.contains('seller');
+      _isAdmin = roles.contains('admin');
+
+      _isLoggedIn = true;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Complete Google profile error: $e');
+      _errorMessage = 'Failed to save profile. Please try again.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Extract meaningful error from Google Sign-In exceptions
+  String _extractGoogleError(dynamic e) {
+    final msg = e.toString();
+    if (msg.contains('12501') || msg.contains('canceled')) {
+      return 'Sign-in cancelled';
+    }
+    if (msg.contains('10') || msg.contains('DEVELOPER_ERROR')) {
+      return 'Google Sign-In not configured. Check google-services.json and SHA-1 fingerprint.';
+    }
+    if (msg.contains('7') || msg.contains('NETWORK_ERROR')) {
+      return 'Network error. Please check your connection.';
+    }
+    if (msg.contains('12500')) {
+      return 'Google Sign-In failed. Please try again.';
+    }
+    if (msg.contains('UnsupportedError')) {
+      return 'Google Sign-In is not supported on this device.';
+    }
+    // Show raw error for easier debugging
+    return 'Google Sign-In error: $msg';
+  }
+
   /// Reset password - sends reset link to email
   Future<void> resetPassword({required String email}) async {
     try {
@@ -339,6 +534,7 @@ class AuthService extends ChangeNotifier {
   /// Logout
   Future<void> logout() async {
     try {
+      await GoogleSignIn.instance.signOut();
       await _client.auth.signOut();
       _isLoggedIn = false;
       _isSeller = false;

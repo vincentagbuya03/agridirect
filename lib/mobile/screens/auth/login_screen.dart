@@ -22,6 +22,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
   bool _hasInternet = true;
   bool _isWaitingForInternet = false;
   late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
@@ -160,6 +161,34 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
         } else {
           _showSnackBar(errorMessage);
         }
+      }
+    }
+  }
+
+  void _handleGoogleSignIn() async {
+    await _checkInternetConnectivity();
+    if (!_hasInternet) {
+      _showNoInternetDialog();
+      return;
+    }
+
+    setState(() => _isGoogleLoading = true);
+
+    final success = await AuthService().signInWithGoogle();
+
+    if (mounted) {
+      setState(() => _isGoogleLoading = false);
+      if (success) {
+        if (AuthService().needsProfileCompletion) {
+          // New Google user — send to profile completion screen
+          context.push(AppRoutes.googleCompleteProfile);
+        } else {
+          widget.onLoginSuccess();
+        }
+      } else {
+        final errorMessage =
+            AuthService().errorMessage ?? 'Google sign-in failed';
+        _showSnackBar(errorMessage);
       }
     }
   }
@@ -483,6 +512,8 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                           child: _buildSocialButton(
                             'Google',
                             Icons.g_mobiledata_rounded,
+                            onTap: _handleGoogleSignIn,
+                            isLoading: _isGoogleLoading,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -670,28 +701,46 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
     );
   }
 
-  Widget _buildSocialButton(String label, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 20, color: const Color(0xFF334155)),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF334155),
+  Widget _buildSocialButton(
+    String label,
+    IconData icon, {
+    VoidCallback? onTap,
+    bool isLoading = false,
+  }) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Color(0xFF334155)),
+                    ),
+                  )
+                : Icon(icon, size: 20, color: const Color(0xFF334155)),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF334155),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

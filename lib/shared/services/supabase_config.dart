@@ -45,7 +45,7 @@ class SupabaseDB {
     String? phoneNumber,
   }) async {
     try {
-      // Check if user already exists (trigger may have already inserted)
+      // Check if user already exists
       final existing = await _client
           .from('users')
           .select('user_id')
@@ -64,19 +64,8 @@ class SupabaseDB {
           userData['phone'] = phoneNumber;
         }
         await _client.from('users').insert(userData);
-
-        // Assign default 'consumer' role
-        final roleResponse = await _client
-            .from('roles')
-            .select('role_id')
-            .eq('name', 'consumer')
-            .single();
-        await _client.from('user_roles').insert({
-          'user_id': userId,
-          'role_id': roleResponse['role_id'],
-        });
       } else {
-        // User exists from trigger but name/phone might be empty, update it
+        // User exists but name/phone might be empty, update it
         final updateData = <String, String>{};
         if (name.isNotEmpty) {
           updateData['name'] = name;
@@ -87,28 +76,10 @@ class SupabaseDB {
         if (updateData.isNotEmpty) {
           await _client.from('users').update(updateData).eq('user_id', userId);
         }
-
-        // Ensure user has at least the 'consumer' role
-        final existingRoles = await _client
-            .from('user_roles')
-            .select('role_id')
-            .eq('user_id', userId);
-        if ((existingRoles as List).isEmpty) {
-          final roleResponse = await _client
-              .from('roles')
-              .select('role_id')
-              .eq('name', 'consumer')
-              .single();
-          await _client.from('user_roles').insert({
-            'user_id': userId,
-            'role_id': roleResponse['role_id'],
-          });
-        }
       }
     } catch (e, stack) {
       debugPrint('Error creating/updating user: $e');
       debugPrint('Stack trace: $stack');
-      // Rethrow so callers can handle/report the error
       rethrow;
     }
   }
@@ -131,17 +102,6 @@ class SupabaseDB {
         userData['phone'] = phoneNumber;
       }
       await _client.from('users').insert(userData);
-
-      // Assign default 'consumer' role
-      final roleResponse = await _client
-          .from('roles')
-          .select('role_id')
-          .eq('name', 'consumer')
-          .single();
-      await _client.from('user_roles').insert({
-        'user_id': userId,
-        'role_id': roleResponse['role_id'],
-      });
     } catch (e) {
       print('Error creating user: $e');
       rethrow;
@@ -208,21 +168,23 @@ class SupabaseDB {
     }
   }
 
-  /// Add role to user (e.g., 'seller', 'admin')
+  /// Add role to user ('seller' = create farmer profile, 'admin' = create admin profile)
   static Future<void> addUserRole({
     required String userId,
     required String roleName,
   }) async {
     try {
-      final roleResponse = await _client
-          .from('roles')
-          .select('role_id')
-          .eq('name', roleName)
-          .single();
-      await _client.from('user_roles').upsert({
-        'user_id': userId,
-        'role_id': roleResponse['role_id'],
-      });
+      if (roleName == 'seller') {
+        // Create farmer record for this user
+        await _client.from('farmers').insert({
+          'user_id': userId,
+        });
+      } else if (roleName == 'admin') {
+        // Create admin record for this user
+        await _client.from('admins').insert({
+          'user_id': userId,
+        });
+      }
     } catch (e) {
       print('Error adding user role: $e');
       rethrow;
@@ -235,16 +197,13 @@ class SupabaseDB {
     required String roleName,
   }) async {
     try {
-      final roleResponse = await _client
-          .from('roles')
-          .select('role_id')
-          .eq('name', roleName)
-          .single();
-      await _client
-          .from('user_roles')
-          .delete()
-          .eq('user_id', userId)
-          .eq('role_id', roleResponse['role_id']);
+      if (roleName == 'seller') {
+        // Delete farmer record for this user
+        await _client.from('farmers').delete().eq('user_id', userId);
+      } else if (roleName == 'admin') {
+        // Delete admin record for this user
+        await _client.from('admins').delete().eq('user_id', userId);
+      }
     } catch (e) {
       print('Error removing user role: $e');
       rethrow;
@@ -257,32 +216,57 @@ class SupabaseDB {
     required String roleName,
   }) async {
     try {
-      final response = await _client
-          .from('user_roles')
-          .select('role_id, roles!inner(name)')
-          .eq('user_id', userId)
-          .eq('roles.name', roleName)
-          .maybeSingle();
-      return response != null;
+      if (roleName == 'seller') {
+        final response = await _client
+            .from('farmers')
+            .select('farmer_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+        return response != null;
+      } else if (roleName == 'admin') {
+        final response = await _client
+            .from('admins')
+            .select('admin_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+        return response != null;
+      }
+      return false;
     } catch (e) {
       print('Error checking user role: $e');
       return false;
     }
   }
 
-  /// Get all roles for a user
+  /// Get all roles for a user (checks farmers, admins tables)
   static Future<List<String>> getUserRoles(String userId) async {
     try {
-      final response = await _client
-          .from('user_roles')
-          .select('roles!inner(name)')
-          .eq('user_id', userId);
-      return (response as List)
-          .map((r) => r['roles']['name'] as String)
-          .toList();
+      final roles = <String>['consumer']; // Default role
+
+      // Check if user is a farmer (seller)
+      final farmer = await _client
+          .from('farmers')
+          .select('farmer_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (farmer != null) {
+        roles.add('seller');
+      }
+
+      // Check if user is an admin
+      final admin = await _client
+          .from('admins')
+          .select('admin_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (admin != null) {
+        roles.add('admin');
+      }
+
+      return roles;
     } catch (e) {
       print('Error fetching user roles: $e');
-      return [];
+      return ['consumer'];
     }
   }
 
