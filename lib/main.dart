@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'shared/services/auth_service.dart';
 import 'shared/services/supabase_config.dart';
 import 'shared/router/app_router.dart';
+import 'shared/utils/url_strategy.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Use clean path URLs instead of hash URLs for web
-  setUrlStrategy(PathUrlStrategy());
+  // Applies web URL strategy only on web, no-op on mobile/desktop.
+  configureUrlStrategy();
 
-  await SupabaseConfig.initialize();
-
-  await AuthService().initialize();
+  try {
+    await SupabaseConfig.initialize();
+    await AuthService().initialize();
+  } catch (e) {
+    debugPrint('Initialization error: $e');
+    // Continue anyway - app will show error screen if needed
+  }
 
   runApp(AgriDirectApp());
 }
