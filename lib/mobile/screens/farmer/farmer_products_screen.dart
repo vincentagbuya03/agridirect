@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import '../../../shared/services/supabase_data_service.dart';
+import '../../../shared/services/product/product_service.dart';
+import 'add_product_screen_improved.dart';
+import 'modern_add_product_screen.dart';
 
 /// Farmer Products/Inventory Screen
 class FarmerProductsScreen extends StatefulWidget {
@@ -13,6 +17,85 @@ class FarmerProductsScreen extends StatefulWidget {
 
 class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
   static const Color primary = Color(0xFF13EC5B);
+
+  final _productService = ProductService();
+  int _refreshKey = 0;
+
+  static const _fakeProd = <String, dynamic>{
+    'name': 'Product Name Here',
+    'status': 'AVAILABLE',
+    'price': 0.0,
+    'stock': 0,
+    'harvest_date': '2025-01-01',
+    'image': '',
+    'unit': 'kg',
+    'available': 0,
+    'harvest': 'Ready',
+    'id': '',
+  };
+
+  Future<void> _navigateToAddProduct() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const ModernAddProductScreen()),
+    );
+    if (result == true && mounted) {
+      setState(() => _refreshKey++);
+      // Product success message is shown from add product screen
+    }
+  }
+
+  Future<void> _confirmDelete(Map<String, dynamic> product) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Delete Product',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${product['name']}"? This cannot be undone.',
+          style: GoogleFonts.plusJakartaSans(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await _productService.deleteProduct(product['id'] as String);
+        if (mounted) {
+          setState(() => _refreshKey++);
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Product deleted')));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +111,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: _navigateToAddProduct,
         backgroundColor: primary,
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -50,26 +133,29 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
             ),
           ),
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: primary,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.add, size: 18, color: Colors.white),
-                const SizedBox(width: 6),
-                Text(
-                  'Add Product',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+          GestureDetector(
+            onTap: _navigateToAddProduct,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: primary,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.add, size: 18, color: Colors.white),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Add Product',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -124,19 +210,23 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
 
   Widget _buildProductsList() {
     return FutureBuilder<List<Map<String, dynamic>>>(
+      key: ValueKey(_refreshKey),
       future: SupabaseDataService().getFarmerProducts(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
+        final bool isLoading =
+            snapshot.connectionState == ConnectionState.waiting;
         final products = snapshot.data ?? [];
-        if (products.isEmpty) {
+
+        if (!isLoading && products.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
+                Icon(
+                  Icons.inventory_2_outlined,
+                  size: 64,
+                  color: Colors.grey[400],
+                ),
                 const SizedBox(height: 16),
                 Text(
                   'No products yet',
@@ -151,18 +241,40 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                   'Add your first product to start selling',
                   style: TextStyle(color: Colors.grey[500]),
                 ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _navigateToAddProduct,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Product'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: const Color(0xFF0F172A),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
               ],
             ),
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          itemCount: products.length,
-          itemBuilder: (context, index) {
-            final product = products[index];
-            return _buildProductCard(product);
-          },
+        final displayProducts = isLoading
+            ? List.generate(4, (_) => _fakeProd)
+            : products;
+
+        return Skeletonizer(
+          enabled: isLoading,
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            itemCount: displayProducts.length,
+            itemBuilder: (context, index) =>
+                _buildProductCard(displayProducts[index]),
+          ),
         );
       },
     );
@@ -200,7 +312,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: CachedNetworkImage(
-                  imageUrl: product['image'],
+                  imageUrl: (product['image'] as String?) ?? '',
                   width: 100,
                   height: 100,
                   fit: BoxFit.cover,
@@ -208,6 +320,21 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                     width: 100,
                     height: 100,
                     color: Colors.grey[200],
+                    child: Icon(
+                      Icons.image_outlined,
+                      color: Colors.grey[400],
+                      size: 32,
+                    ),
+                  ),
+                  errorWidget: (_, _, _) => Container(
+                    width: 100,
+                    height: 100,
+                    color: Colors.grey[200],
+                    child: Icon(
+                      Icons.image_outlined,
+                      color: Colors.grey[400],
+                      size: 32,
+                    ),
                   ),
                 ),
               ),
@@ -217,7 +344,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      product['name'],
+                      product['name'] as String? ?? '',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -235,7 +362,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        product['status'],
+                        product['status'] as String? ?? '',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -246,7 +373,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '\$${product['price']} / ${product['unit']}',
+                      '₱${product['price']} / ${product['unit']}',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -299,55 +426,65 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
           Row(
             children: [
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.edit_rounded,
-                        size: 16,
-                        color: Colors.grey[700],
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Edit',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                child: GestureDetector(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Edit coming soon')),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.edit_rounded,
+                          size: 16,
                           color: Colors.grey[700],
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Text(
+                          'Edit',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.delete_rounded, size: 16, color: Colors.red),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Delete',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.red,
+                child: GestureDetector(
+                  onTap: () => _confirmDelete(product),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.delete_rounded, size: 16, color: Colors.red),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Delete',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.red,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

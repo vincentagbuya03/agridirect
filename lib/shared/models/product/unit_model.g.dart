@@ -7,15 +7,17 @@ part of 'unit_model.dart';
 // **************************************************************************
 
 Unit _$UnitFromJson(Map<String, dynamic> json) => Unit(
-  unitId: json['unitId'] as String,
+  unitId: json['unit_id'] as String,
   name: json['name'] as String,
   abbreviation: json['abbreviation'] as String,
-  createdAt: DateTime.parse(json['createdAt'] as String),
+  createdAt: json['created_at'] == null
+      ? null
+      : DateTime.parse(json['created_at'] as String),
 );
 
 Map<String, dynamic> _$UnitToJson(Unit instance) => <String, dynamic>{
-  'unitId': instance.unitId,
+  'unit_id': instance.unitId,
   'name': instance.name,
   'abbreviation': instance.abbreviation,
-  'createdAt': instance.createdAt.toIso8601String(),
+  'created_at': instance.createdAt.toIso8601String(),
 };

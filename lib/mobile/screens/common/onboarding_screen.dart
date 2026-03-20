@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
-import '../../../shared/services/onboarding_service.dart';
+import '../../../shared/services/user/onboarding_service.dart';
 
 /// Onboarding screen shown once for first-time users.
 /// Uses Lottie animations for a beautiful, modern experience.

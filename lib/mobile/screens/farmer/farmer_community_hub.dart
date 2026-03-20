@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 /// Mobile-only Community Hub.
 /// No web/responsive branches - purely mobile UI.
@@ -13,11 +14,15 @@ class FarmerCommunityHub extends StatefulWidget {
 class _FarmerCommunityHubState extends State<FarmerCommunityHub>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => _isLoading = false);
+    });
   }
 
   @override
@@ -57,9 +62,12 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                 ),
                 // Content
                 Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [_buildForumContent(), _buildArticlesContent()],
+                  child: Skeletonizer(
+                    enabled: _isLoading,
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [_buildForumContent(), _buildArticlesContent()],
+                    ),
                   ),
                 ),
               ],

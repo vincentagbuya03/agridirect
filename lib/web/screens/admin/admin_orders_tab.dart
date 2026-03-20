@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/admin_service.dart';
+import '../../../shared/services/admin/admin_service.dart';
 
 /// Admin Orders Tab - View and manage all platform orders
 class AdminOrdersTab extends StatefulWidget {

@@ -1,8 +1,10 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import '../../../shared/services/weather_service.dart';
 import '../../../shared/models/weather_model.dart';
+import '../../../shared/services/auth/auth_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 
@@ -20,7 +22,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   bool _isLoadingWeather = true;
   String? _weatherError;
   Position? _currentPosition;
-  late StreamSubscription<Position> _positionStream;
+  StreamSubscription<Position>? _positionStream;
   Timer? _refreshTimer;
 
   static const Color primary = Color(0xFF13EC5B);
@@ -85,7 +87,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           } catch (e2) {
             debugPrint('Medium accuracy position error: $e2');
             if (mounted) {
-              _loadWeatherData();
+              await _loadWeatherData();
             }
           }
         }
@@ -98,12 +100,15 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             timeLimit: Duration(seconds: 30),
           ),
         ).listen((Position position) {
+          if (!mounted) return; // Prevent updates after dispose
           _currentPosition = position;
           debugPrint(
             'Location updated: ${position.latitude}, ${position.longitude}',
           );
           // Refresh weather when location changes significantly
-          _loadWeatherData();
+          _loadWeatherData().catchError((e) {
+            debugPrint('Error updating weather on location change: $e');
+          });
         }, onError: (error) {
           debugPrint('Position stream error: $error');
         });
@@ -111,14 +116,14 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         // Permission denied, load with fallback
         debugPrint('Location permission denied: $permission');
         if (mounted) {
-          _loadWeatherData();
+          await _loadWeatherData();
         }
       }
     } catch (e) {
       debugPrint('Location initialization error: $e');
       // Fallback: load weather without location
       if (mounted) {
-        _loadWeatherData();
+        await _loadWeatherData();
       }
     }
   }
@@ -193,7 +198,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
   @override
   void dispose() {
-    _positionStream.cancel();
+    _positionStream?.cancel();
     _refreshTimer?.cancel();
     super.dispose();
   }
@@ -216,13 +221,19 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildMetricsGrid(),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
+                    _buildSectionLabel('Sales Analytics'),
+                    const SizedBox(height: 10),
                     _buildSalesAnalytics(),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
+                    _buildSectionLabel('Weather & Forecast'),
+                    const SizedBox(height: 10),
                     _buildWeatherAlert(),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 12),
                     _buildForecast(),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
+                    _buildSectionLabel('AI Crop Insights'),
+                    const SizedBox(height: 10),
                     _buildAICropInsights(),
                     const SizedBox(height: 24),
                   ],
@@ -236,86 +247,206 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   }
 
   Widget _buildHeader() {
+    final auth = AuthService();
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? 'Good Morning'
+        : hour < 17
+            ? 'Good Afternoon'
+            : 'Good Evening';
+    final greetingEmoji = hour < 12 ? '🌅' : hour < 17 ? '☀️' : '🌙';
+
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-      child: Row(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF13EC5B), Color(0xFF059950)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Stack(
         children: [
-          ClipOval(
-            child: CachedNetworkImage(
-              imageUrl:
-                  'https://lh3.googleusercontent.com/aida-public/AB6AXuA7SO8J3CebwmP_4K0nwWhDkMsWISrTpnfbOkYJ79_ZiTCLVxdvX_FJArJ1xwYsLAJx8gW_Wtk3xValGb9mDShlpRvdPIMoD9UGWJ9LwNRlF0vvmsKesjK6liNaDGy7C5HGWdOAE1hEPvF3UTq81_QK7QkgKAAMQgeICa4pykDXTF8JYtnrFYPiavyC7N-wkK4pGMGQJcdoyKpRglzbFXWGqTdoa3xP-Bm86BGxFKlWg21Mbw-FylTfHiJeJMKgLbfSJr8MhPFg1zqB',
-              width: 48,
-              height: 48,
-              fit: BoxFit.cover,
-              placeholder: (_, _) =>
-                  Container(width: 48, height: 48, color: Colors.grey[200]),
+          // Decorative circles
+          Positioned(
+            top: -20,
+            right: -15,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.07),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
+          Positioned(
+            top: 30,
+            right: 50,
+            child: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Good morning,',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                ),
-                Text(
-                  'Farmer Marcus',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                if (_currentPosition != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.location_on_rounded,
-                          size: 12,
-                          color: const Color(0xFF13EC5B),
+                // Top row: avatar + greeting + notification
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Avatar
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl:
+                              'https://lh3.googleusercontent.com/aida-public/AB6AXuA7SO8J3CebwmP_4K0nwWhDkMsWISrTpnfbOkYJ79_ZiTCLVxdvX_FJArJ1xwYsLAJx8gW_Wtk3xValGb9mDShlpRvdPIMoD9UGWJ9LwNRlF0vvmsKesjK6liNaDGy7C5HGWdOAE1hEPvF3UTq81_QK7QkgKAAMQgeICa4pykDXTF8JYtnrFYPiavyC7N-wkK4pGMGQJcdoyKpRglzbFXWGqTdoa3xP-Bm86BGxFKlWg21Mbw-FylTfHiJeJMKgLbfSJr8MhPFg1zqB',
+                          fit: BoxFit.cover,
+                          placeholder: (_, _) =>
+                              Container(color: Colors.white24),
+                          errorWidget: (_, _, _) => Container(
+                            color: Colors.white24,
+                            child: const Icon(Icons.person,
+                                size: 24, color: Colors.white),
+                          ),
                         ),
-                        const SizedBox(width: 4),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$greetingEmoji $greeting,',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            auth.userName.isNotEmpty
+                                ? auth.userName
+                                : 'Farmer',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Notification bell
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Stack(
+                        children: [
+                          const Icon(Icons.notifications_outlined,
+                              size: 20, color: Colors.white),
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF59E0B),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Bottom info bar: weather + location
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      // Weather inline
+                      if (!_isLoadingWeather && _weatherData != null) ...[
                         Text(
-                          '${_currentPosition!.latitude.toStringAsFixed(2)}, ${_currentPosition!.longitude.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[500],
+                          _getWeatherEmoji(
+                              _weatherData!.description, false),
+                          style: const TextStyle(fontSize: 18),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${_weatherData!.temperature.toStringAsFixed(1)}°C',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Container(
+                          margin:
+                              const EdgeInsets.symmetric(horizontal: 10),
+                          width: 1,
+                          height: 14,
+                          color: Colors.white.withValues(alpha: 0.4),
+                        ),
+                      ] else if (_isLoadingWeather) ...[
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Loading weather...',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            color: Colors.white70,
                           ),
                         ),
                       ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Stack(
-              children: [
-                Icon(
-                  Icons.notifications_outlined,
-                  size: 20,
-                  color: Colors.grey[600],
-                ),
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
+                      // Location
+                      const Icon(Icons.location_on_rounded,
+                          size: 13, color: Colors.white70),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          _weatherData?.location ??
+                              (_currentPosition != null
+                                  ? '${_currentPosition!.latitude.toStringAsFixed(1)}°, ${_currentPosition!.longitude.toStringAsFixed(1)}°'
+                                  : 'Locating...'),
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -327,144 +458,178 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   }
 
   Widget _buildMetricsGrid() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 12,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "Today's Overview",
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'REVENUE',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[500],
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: primary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '+5.2%',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: primary,
-                        ),
-                      ),
-                    ),
-                  ],
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'This Week',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: primary,
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  '\$1,240',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'VS. YESTERDAY',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[500],
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 12,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                label: 'Revenue',
+                value: '₱1,240',
+                change: '+5.2%',
+                changePositive: true,
+                icon: Icons.payments_rounded,
+                iconColor: const Color(0xFF13EC5B),
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'LISTINGS',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[500],
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    Text(
-                      '0%',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '14',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'ACTIVE ITEMS',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[500],
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                label: 'Orders',
+                value: '8',
+                change: '+2 today',
+                changePositive: true,
+                icon: Icons.receipt_long_rounded,
+                iconColor: const Color(0xFF3B82F6),
+              ),
             ),
-          ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                label: 'Products',
+                value: '14',
+                change: 'Active items',
+                changePositive: null,
+                icon: Icons.inventory_2_rounded,
+                iconColor: const Color(0xFF8B5CF6),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                label: 'Avg. Rating',
+                value: '4.8',
+                change: '★ Excellent',
+                changePositive: true,
+                icon: Icons.star_rounded,
+                iconColor: const Color(0xFFF59E0B),
+              ),
+            ),
+          ],
         ),
       ],
+    );
+  }
+
+  Widget _buildMetricCard({
+    required String label,
+    required String value,
+    required String change,
+    required bool? changePositive,
+    required IconData icon,
+    required Color iconColor,
+  }) {
+    final changeBgColor = changePositive == null
+        ? Colors.grey[100]!
+        : changePositive
+            ? primary.withValues(alpha: 0.12)
+            : Colors.red.withValues(alpha: 0.1);
+    final changeTextColor = changePositive == null
+        ? Colors.grey[500]!
+        : changePositive
+            ? primary
+            : Colors.red;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 16, color: iconColor),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: changeBgColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  change,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: changeTextColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[500],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -572,18 +737,41 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
   Widget _buildWeatherAlert() {
     if (_isLoadingWeather) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        child: const Center(
-          child: SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
+      return Skeletonizer(
+        enabled: true,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE0F7F3),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFB3E5DB)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: primary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                        width: 100, height: 14, color: Colors.white),
+                    const SizedBox(height: 6),
+                    Container(
+                        width: double.infinity, height: 11, color: Colors.white),
+                    const SizedBox(height: 4),
+                    Container(width: 140, height: 11, color: Colors.white),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -873,18 +1061,64 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
   Widget _buildForecast() {
     if (_isLoadingWeather) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        child: const Center(
-          child: SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
+      return Skeletonizer(
+        enabled: true,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(width: 80, height: 12, color: Colors.white),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 180,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: 5,
+                  separatorBuilder: (_, _) => const SizedBox(width: 12),
+                  itemBuilder: (_, __) => Container(
+                    width: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(width: 50, height: 11, color: Colors.white),
+                        const SizedBox(height: 4),
+                        Container(width: 40, height: 10, color: Colors.white),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(width: 30, height: 16, color: Colors.white),
+                        const SizedBox(height: 4),
+                        Container(width: 44, height: 11, color: Colors.white),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -1058,39 +1292,21 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     return '🌤️'; // Default partly cloudy
   }
 
+  Widget _buildSectionLabel(String title) {
+    return Text(
+      title,
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
+        color: const Color(0xFF0F172A),
+      ),
+    );
+  }
+
   Widget _buildAICropInsights() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'AI Crop Insights',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'Refresh',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: primary,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
         _buildInsightCard(
           icon: Icons.trending_up_rounded,
           iconColor: const Color(0xFF7C3AED),

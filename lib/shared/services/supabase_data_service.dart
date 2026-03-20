@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'supabase_config.dart';
+import 'config/supabase_config.dart';
 import '../data/app_data.dart';
 
 /// Supabase Data Service for fetching products, posts, and articles

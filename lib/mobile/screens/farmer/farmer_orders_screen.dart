@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import '../../../shared/services/supabase_data_service.dart';
 
 /// Farmer Orders Screen
@@ -15,6 +16,19 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   static const Color primary = Color(0xFF13EC5B);
   int _selectedTab = 0;
   final _tabs = ['Active', 'Completed', 'Refunds'];
+
+  static final _fakeOrders = List.generate(
+    3,
+    (_) => <String, dynamic>{
+      'order_id': '000000',
+      'customer_name': 'Customer Name',
+      'items': '3 items',
+      'total': 0.0,
+      'status': 'PENDING',
+      'created_at': DateTime.now().toIso8601String(),
+      'avatar_url': '',
+    },
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -119,14 +133,15 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: SupabaseDataService().getFarmerOrders(status: _tabs[_selectedTab]),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final orders = snapshot.data ?? [];
+        final bool isLoading =
+            snapshot.connectionState == ConnectionState.waiting;
+        final orders =
+            snapshot.data ?? (isLoading ? _fakeOrders : []);
 
         if (_selectedTab == 0) {
-          return ListView(
+          return Skeletonizer(
+            enabled: isLoading,
+            child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             children: [
               // Today's total card
@@ -265,10 +280,11 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
               else
                 ...orders.map((order) => _buildOrderCard(order)),
             ],
+          ),
           );
         }
 
-        if (orders.isEmpty) {
+        if (!isLoading && orders.isEmpty) {
           return Center(
             child: Text(
               'No orders in this category',
@@ -277,10 +293,13 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-          itemCount: orders.length,
-          itemBuilder: (context, index) => _buildOrderCard(orders[index]),
+        return Skeletonizer(
+          enabled: isLoading,
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            itemCount: orders.length,
+            itemBuilder: (context, index) => _buildOrderCard(orders[index]),
+          ),
         );
       },
     );

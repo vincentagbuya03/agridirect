@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../services/auth_service.dart';
-import '../services/onboarding_service.dart';
+import '../services/auth/auth_service.dart';
+import '../services/user/onboarding_service.dart';
 import '../../mobile/mobile_navigation.dart';
 import '../../mobile/screens/auth/login_screen.dart';
 import '../../mobile/screens/auth/registration_screen.dart';
@@ -13,9 +13,16 @@ import '../../web/web_navigation.dart';
 import '../../web/screens/auth/web_login_screen.dart';
 import '../../web/screens/auth/web_registration_screen.dart';
 import '../../web/screens/auth/web_farmer_registration_screen.dart';
+import '../../web/screens/auth/web_google_complete_profile_screen.dart';
 import '../../web/screens/consumer/web_preorder_details.dart';
 import '../../web/screens/admin/admin_dashboard_redesigned.dart';
 import '../../web/screens/common/web_welcome_screen.dart';
+import '../../mobile/screens/common/messages_screen.dart';
+import '../../mobile/screens/common/conversation_screen.dart';
+import '../../mobile/screens/common/notifications_screen.dart';
+import '../../web/screens/common/web_messages_screen.dart';
+import '../../web/screens/common/web_conversation_screen.dart';
+import '../../web/screens/common/web_notifications_screen.dart';
 
 /// Route name constants for type-safe navigation.
 class AppRoutes {
@@ -33,13 +40,18 @@ class AppRoutes {
   static const String googleCompleteProfile    = '/google-complete-profile';
 
   // ── Web-specific ──
-  static const String webWelcome        = '/web-welcome';
+  static const String webWelcome        = '/welcome';
   static const String marketplace       = '/marketplace';       // consumer home / index 0
   static const String shop              = '/shop';              // index 1
   static const String community         = '/community';         // index 2
   static const String profile           = '/profile';           // index 3 (auth required)
   static const String farmerDashboard   = '/farmer-dashboard';  // farmer home / index 0
   static const String webFarmerRegister = '/web-farmer-register';
+
+  // ── New feature routes ──
+  static const String messages         = '/messages';
+  static const String conversation     = '/conversation';
+  static const String notifications    = '/notifications';
 
   // ── Web tab helpers ──
 
@@ -80,6 +92,17 @@ GoRouter createAppRouter() {
       final width       = MediaQuery.of(context).size.width;
       final isMobile    = width <= 800;
 
+      // Profile completion takes priority on all platforms
+      if (auth.needsProfileCompletion &&
+          location != AppRoutes.googleCompleteProfile) {
+        return AppRoutes.googleCompleteProfile;
+      }
+
+      // Once profile is complete and user is logged in, leave the completion screen
+      if (auth.isLoggedIn && location == AppRoutes.googleCompleteProfile) {
+        return AppRoutes.home;
+      }
+
       // ── Mobile redirect logic ──────────────────────────────────────────────
       if (isMobile) {
         // First-time launch → onboarding
@@ -119,6 +142,14 @@ GoRouter createAppRouter() {
 
       // Farmer dashboard requires login
       if (location == AppRoutes.farmerDashboard && !isLoggedIn) return AppRoutes.marketplace;
+
+      // Messages and notifications require login on web
+      if ((location == AppRoutes.messages ||
+           location == AppRoutes.notifications ||
+           location.startsWith(AppRoutes.conversation)) &&
+          !isLoggedIn) {
+        return AppRoutes.login;
+      }
 
       // Logged-in users skip login/register pages
       if (isLoggedIn && (location == AppRoutes.login || location == AppRoutes.register)) {
@@ -245,8 +276,17 @@ GoRouter createAppRouter() {
       // ── Google Complete Profile ───────────────────────────────────────────
       GoRoute(
         path: AppRoutes.googleCompleteProfile,
-        builder: (context, state) => GoogleCompleteProfileScreen(
-          onComplete: () => context.go(AppRoutes.home),
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 800) {
+              return WebGoogleCompleteProfileScreen(
+                onComplete: () => context.go(AppRoutes.home),
+              );
+            }
+            return GoogleCompleteProfileScreen(
+              onComplete: () => context.go(AppRoutes.home),
+            );
+          },
         ),
       ),
 
@@ -293,6 +333,48 @@ GoRouter createAppRouter() {
       GoRoute(
         path: AppRoutes.preorderDetails,
         builder: (context, state) => const WebPreorderDetails(),
+      ),
+
+      // ── Messages ──────────────────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.messages,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 800) {
+              return const WebMessagesScreen();
+            }
+            return const MessagesScreen();
+          },
+        ),
+      ),
+
+      // ── Conversation Detail ───────────────────────────────────────────────
+      GoRoute(
+        path: '${AppRoutes.conversation}/:id',
+        builder: (context, state) {
+          final conversationId = state.pathParameters['id']!;
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth > 800) {
+                return WebConversationScreen(conversationId: conversationId);
+              }
+              return ConversationScreen(conversationId: conversationId);
+            },
+          );
+        },
+      ),
+
+      // ── Notifications ─────────────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.notifications,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 800) {
+              return const WebNotificationsScreen();
+            }
+            return const NotificationsScreen();
+          },
+        ),
       ),
     ],
 

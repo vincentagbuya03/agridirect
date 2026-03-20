@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
-import '../../../shared/services/auth_service.dart';
-import '../../../shared/services/email_service.dart';
-import '../../../shared/services/otp_service.dart';
-import '../../../shared/services/supabase_config.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/auth/email_service.dart';
+import '../../../shared/services/auth/otp_service.dart';
+import '../../../shared/services/config/supabase_config.dart';
 import 'web_otp_verification_screen.dart';
 
 /// Web Login / Register screen.
@@ -496,7 +496,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                                   width: 300,
                                   height: 260,
                                   child: Lottie.asset(
-                                    'assets/lottie/register.json',
+                                    'assets/lottie/Security.json',
                                     fit: BoxFit.contain,
                                     repeat: true,
                                     errorBuilder: (context, error, stack) => Center(

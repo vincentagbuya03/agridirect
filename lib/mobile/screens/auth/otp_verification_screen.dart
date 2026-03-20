@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
-import '../../../shared/services/auth_service.dart';
-import '../../../shared/services/email_service.dart';
-import '../../../shared/services/otp_service.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/auth/email_service.dart';
+import '../../../shared/services/auth/otp_service.dart';
 
 /// OTP Verification Screen - User enters 6-digit code received via email
 class OTPVerificationScreen extends StatefulWidget {

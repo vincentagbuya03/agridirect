@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'shared/services/auth_service.dart';
-import 'shared/services/supabase_config.dart';
+import 'shared/services/auth/auth_service.dart';
+import 'shared/services/config/supabase_config.dart';
+import 'shared/services/config/firebase_config.dart';
 import 'shared/router/app_router.dart';
 import 'shared/utils/url_strategy.dart';
 
@@ -13,6 +14,14 @@ void main() async {
 
   try {
     await SupabaseConfig.initialize();
+
+    // Debug: Verify Supabase initialization
+    debugPrint('✓ Supabase initialized');
+    debugPrint('  URL: ${SupabaseConfig.supabaseUrl}');
+    debugPrint('  Client: ${SupabaseConfig.client}');
+    debugPrint('  Current User: ${SupabaseConfig.currentUser}');
+
+    await FirebaseConfig.initialize(); // web only (no-op on mobile)
     await AuthService().initialize();
   } catch (e) {
     debugPrint('Initialization error: $e');

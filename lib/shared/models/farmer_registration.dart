@@ -10,11 +10,11 @@ class FarmerRegistration {
   List<String> cropTypes; // Rice, Corn, Vegetables, etc.
   String livestock;
 
-  // Step 2: Identity Verification
+  // Step 2: Identity Verification (OPTIONAL)
   String? facePhotoPath;
   String? validIdPath;
 
-  // Step 3: Final Submission
+  // Step 3: Final Submission (OPTIONAL)
   String elementary;
   String highSchool;
   String college;

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/admin_service.dart';
+import '../../../shared/services/admin/admin_service.dart';
 
 /// Admin Users Tab - Manage all users, verify, suspend, promote
 class AdminUsersTab extends StatefulWidget {

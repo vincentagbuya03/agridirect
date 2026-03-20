@@ -1,14 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import '../../../shared/services/supabase_data_service.dart';
+import '../../../shared/services/notification/notification_service.dart';
+import '../../../shared/services/message/message_service.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/router/app_router.dart';
 
 /// Home Screen matching the design mockup.
 /// Delivery location, search bar, AI Market Insight, Categories, Featured Farmers.
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   static const Color primary = Color(0xFF13EC5B);
+
+  final NotificationService _notificationService = NotificationService();
+  final MessageService _messageService = MessageService();
+
+  int _unreadNotifications = 0;
+  int _unreadMessages = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBadgeCounts();
+  }
+
+  Future<void> _loadBadgeCounts() async {
+    if (!AuthService().isLoggedIn) return;
+    try {
+      final notifications = await _notificationService.getUnreadCount();
+      final messages = await _messageService.getUnreadCount();
+      if (mounted) {
+        setState(() {
+          _unreadNotifications = notifications;
+          _unreadMessages = messages;
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,36 +120,91 @@ class HomeScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              // Notification bell
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Stack(
-                  children: [
-                    const Center(
-                      child: Icon(
-                        Icons.notifications_outlined,
-                        size: 22,
-                        color: Color(0xFF334155),
-                      ),
-                    ),
-                    Positioned(
-                      top: 10,
-                      right: 10,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF13EC5B),
-                          shape: BoxShape.circle,
+              // Messages icon
+              GestureDetector(
+                onTap: () => context.push(AppRoutes.messages),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Stack(
+                    children: [
+                      const Center(
+                        child: Icon(
+                          Icons.chat_bubble_outline,
+                          size: 22,
+                          color: Color(0xFF334155),
                         ),
                       ),
-                    ),
-                  ],
+                      if (_unreadMessages > 0)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              _unreadMessages > 9 ? '9+' : '$_unreadMessages',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Notification bell
+              GestureDetector(
+                onTap: () => context.push(AppRoutes.notifications),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Stack(
+                    children: [
+                      const Center(
+                        child: Icon(
+                          Icons.notifications_outlined,
+                          size: 22,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                      if (_unreadNotifications > 0)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFEF4444),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              _unreadNotifications > 9 ? '9+' : '$_unreadNotifications',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -431,12 +523,11 @@ class HomeScreen extends StatelessWidget {
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: SupabaseDataService().getFeaturedFarmers(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
+                final bool isLoading =
+                    snapshot.connectionState == ConnectionState.waiting;
                 final farmers = snapshot.data ?? [];
-                if (farmers.isEmpty) {
+
+                if (!isLoading && farmers.isEmpty) {
                   return Center(
                     child: Text(
                       'No farmers available',
@@ -445,23 +536,42 @@ class HomeScreen extends StatelessWidget {
                   );
                 }
 
-                return ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  clipBehavior: Clip.none,
-                  itemCount: farmers.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 16),
-                  itemBuilder: (_, index) {
-                    final f = farmers[index];
-                    return _buildFarmerCard(_FarmerData(
-                      imageUrl: f['imageUrl'] ?? '',
-                      name: f['name'] ?? '',
-                      distance: f['distance'] ?? '',
-                      specialty: f['specialty'] ?? '',
-                      rating: f['rating'] ?? '4.5',
-                      badge: f['badge'] ?? 'VERIFIED',
-                      tags: (f['tags'] as List<dynamic>?)?.cast<String>() ?? [],
-                    ));
-                  },
+                final displayFarmers = isLoading
+                    ? List.generate(
+                        3,
+                        (_) => <String, dynamic>{
+                          'imageUrl': '',
+                          'name': 'Farmer Name',
+                          'distance': '2.5 km away',
+                          'specialty': 'Vegetables & Fruits',
+                          'rating': '4.5',
+                          'badge': 'VERIFIED',
+                          'tags': <String>['Organic', 'Fresh'],
+                        },
+                      )
+                    : farmers;
+
+                return Skeletonizer(
+                  enabled: isLoading,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    clipBehavior: Clip.none,
+                    itemCount: displayFarmers.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 16),
+                    itemBuilder: (_, index) {
+                      final f = displayFarmers[index];
+                      return _buildFarmerCard(_FarmerData(
+                        imageUrl: f['imageUrl'] ?? '',
+                        name: f['name'] ?? '',
+                        distance: f['distance'] ?? '',
+                        specialty: f['specialty'] ?? '',
+                        rating: f['rating'] ?? '4.5',
+                        badge: f['badge'] ?? 'VERIFIED',
+                        tags:
+                            (f['tags'] as List<dynamic>?)?.cast<String>() ?? [],
+                      ));
+                    },
+                  ),
                 );
               },
             ),

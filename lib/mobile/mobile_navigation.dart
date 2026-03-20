@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../shared/services/auth_service.dart';
+import '../shared/services/auth/auth_service.dart';
 import 'screens/consumer/home_screen.dart';
 import 'screens/consumer/marketplace_screen.dart';
 import 'screens/consumer/preorder_hub_screen.dart';

@@ -9,27 +9,36 @@ part 'farmer_profile_model.g.dart';
 
 @JsonSerializable()
 class FarmerProfile {
-  final String profileId;
-  final String userId;
+  @JsonKey(name: 'farmer_id')
+  final String farmerId;
+  @JsonKey(name: 'farm_name')
   final String farmName;
   final String? specialty;
   final String? location;
   final String? badge;
+  @JsonKey(name: 'image_url')
   final String? imageUrl;
+  @JsonKey(name: 'is_verified')
   final bool isVerified;
+  @JsonKey(name: 'created_at')
   final DateTime createdAt;
+  @JsonKey(name: 'updated_at')
   final DateTime updatedAt;
 
   // Related data from view
+  @JsonKey(name: 'farmer_name')
   final String? farmerName;
+  @JsonKey(name: 'farmer_email')
   final String? farmerEmail;
+  @JsonKey(name: 'farmer_phone')
   final String? farmerPhone;
+  @JsonKey(name: 'average_rating')
   final double? averageRating;
+  @JsonKey(name: 'total_reviews')
   final int? totalReviews;
 
   FarmerProfile({
-    required this.profileId,
-    required this.userId,
+    required this.farmerId,
     required this.farmName,
     this.specialty,
     this.location,
@@ -50,8 +59,7 @@ class FarmerProfile {
   Map<String, dynamic> toJson() => _$FarmerProfileToJson(this);
 
   FarmerProfile copyWith({
-    String? profileId,
-    String? userId,
+    String? farmerId,
     String? farmName,
     String? specialty,
     String? location,
@@ -67,8 +75,7 @@ class FarmerProfile {
     int? totalReviews,
   }) {
     return FarmerProfile(
-      profileId: profileId ?? this.profileId,
-      userId: userId ?? this.userId,
+      farmerId: farmerId ?? this.farmerId,
       farmName: farmName ?? this.farmName,
       specialty: specialty ?? this.specialty,
       location: location ?? this.location,

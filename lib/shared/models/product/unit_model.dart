@@ -9,17 +9,19 @@ part 'unit_model.g.dart';
 
 @JsonSerializable()
 class Unit {
+  @JsonKey(name: 'unit_id')
   final String unitId;
   final String name;
   final String abbreviation;
+  @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
   Unit({
     required this.unitId,
     required this.name,
     required this.abbreviation,
-    required this.createdAt,
-  });
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
 
   factory Unit.fromJson(Map<String, dynamic> json) => _$UnitFromJson(json);
   Map<String, dynamic> toJson() => _$UnitToJson(this);

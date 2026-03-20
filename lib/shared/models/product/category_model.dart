@@ -9,10 +9,12 @@ part 'category_model.g.dart';
 
 @JsonSerializable()
 class Category {
+  @JsonKey(name: 'category_id')
   final String categoryId;
   final String name;
   final String? description;
   final String? icon;
+  @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
   Category({
@@ -20,8 +22,8 @@ class Category {
     required this.name,
     this.description,
     this.icon,
-    required this.createdAt,
-  });
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
 
   factory Category.fromJson(Map<String, dynamic> json) =>
       _$CategoryFromJson(json);

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/email_service.dart';
-import '../../../shared/services/otp_service.dart';
-import '../../../shared/services/supabase_config.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/auth/email_service.dart';
+import '../../../shared/services/auth/otp_service.dart';
+import '../../../shared/services/config/supabase_config.dart';
 import 'otp_verification_screen.dart';
 
 /// Mobile Registration screen with clean design.
@@ -24,6 +25,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
 
   static const Color primary = Color(0xFF13EC5B);
 
@@ -148,6 +150,25 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         _showSnackBar('Error: $e');
+      }
+    }
+  }
+
+  void _handleGoogleSignIn() async {
+    setState(() => _isGoogleLoading = true);
+
+    final success = await AuthService().signInWithGoogle();
+
+    if (mounted) {
+      setState(() => _isGoogleLoading = false);
+      // Do NOT call onRegistrationSuccess here — GoRouter handles navigation
+      // automatically via notifyListeners() inside signInWithGoogle():
+      //   • New Google user  → needsProfileCompletion = true → /google-complete-profile
+      //   • Existing user    → isLoggedIn = true             → home/marketplace
+      if (!success) {
+        final errorMessage =
+            AuthService().errorMessage ?? 'Google sign-in failed';
+        _showSnackBar(errorMessage);
       }
     }
   }
@@ -323,6 +344,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       child: _buildSocialButton(
                         'Google',
                         Icons.g_mobiledata_rounded,
+                        onTap: _handleGoogleSignIn,
+                        isLoading: _isGoogleLoading,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -451,28 +474,46 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
-  Widget _buildSocialButton(String label, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 20, color: const Color(0xFF334155)),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF334155),
+  Widget _buildSocialButton(
+    String label,
+    IconData icon, {
+    VoidCallback? onTap,
+    bool isLoading = false,
+  }) {
+    return GestureDetector(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Color(0xFF334155)),
+                    ),
+                  )
+                : Icon(icon, size: 20, color: const Color(0xFF334155)),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF334155),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

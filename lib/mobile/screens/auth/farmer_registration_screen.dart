@@ -5,8 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../shared/models/farmer_registration.dart';
-import '../../../shared/services/auth_service.dart';
-import '../../../shared/services/supabase_config.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/config/supabase_config.dart';
 import '../../../shared/router/app_router.dart';
 
 /// Mobile Farmer Registration — 3-step wizard.
@@ -360,6 +360,33 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
+
+        // Info banner
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE0F7F3),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _primary.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: _primary, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Photos are optional. You can skip this step.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: _primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
 
         // Face Scan
         Center(
@@ -1186,30 +1213,20 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         _showError('Please enter your residential address');
         return;
       }
+      if (_selectedCrops.isEmpty) {
+        _showError('Please select at least one crop type');
+        return;
+      }
     } else if (_currentStep == 1) {
-      if (!_faceScanned) {
-        _showError('Please complete the face scan');
-        return;
-      }
-      if (!_idUploaded) {
-        _showError('Please upload a valid ID');
-        return;
-      }
+      // Photos are now OPTIONAL - no validation needed
+      // Users can skip step 2 entirely
     }
 
     setState(() => _currentStep++);
   }
 
   Future<void> _handleSubmit() async {
-    if (!_certificationAccepted) {
-      _showError('Please accept the certification to proceed');
-      return;
-    }
-    if (_signaturePoints.isEmpty) {
-      _showError('Please provide your electronic signature');
-      return;
-    }
-
+    // Remove strict validation - certification and signature now optional
     setState(() => _isSubmitting = true);
 
     // Populate the registration model
@@ -1232,14 +1249,11 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     try {
       final auth = AuthService();
 
-      // Submit registration to Supabase
-      await SupabaseDB.submitFarmerRegistration(
+      // Submit registration to Supabase with file uploads
+      await SupabaseDB.submitFarmerRegistrationWithFiles(
         userId: auth.userId,
         registration: _registration,
       );
-
-      // Activate seller mode
-      await auth.startSelling();
 
       if (mounted) {
         // Show success dialog
@@ -1272,7 +1286,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Your farmer registration has been submitted for approval. You can now access the Farmer Dashboard.',
+                  'Your application is under review. An admin will verify your details and notify you once approved.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
@@ -1297,7 +1311,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                       ),
                       child: Center(
                         child: Text(
-                          'Go to Dashboard',
+                          'Back to Home',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,

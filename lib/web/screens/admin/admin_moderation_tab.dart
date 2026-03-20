@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/admin_service.dart';
-import '../../../shared/services/auth_service.dart';
+import '../../../shared/services/admin/admin_service.dart';
+import '../../../shared/services/auth/auth_service.dart';
 
 /// Admin Moderation Tab - Manage reported content and community moderation
 class AdminModerationTab extends StatefulWidget {

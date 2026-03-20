@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/services/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
+import '../../../shared/models/order/order_item_model.dart';
+import 'checkout_screen.dart';
 
 /// Pre-Order Hub Screen matching the design mockup.
 /// Pre-order cards with countdown days, progress bars, reserve buttons.
@@ -473,19 +475,51 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: primary,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Reserve Now',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                      child: GestureDetector(
+                        onTap: () {
+                          // Parse price from product
+                          final priceNum = double.tryParse(
+                            product.price.replaceAll(RegExp(r'[^\d.]'), ''),
+                          ) ?? 0.0;
+                          final qty = 1.0;
+
+                          final items = [
+                            OrderItem(
+                              orderItemId: '',
+                              orderId: '',
+                              productId: product.name, // Use name as ID for now
+                              quantity: qty,
+                              unitPrice: priceNum,
+                              createdAt: DateTime.now(),
+                              productName: product.name,
+                            ),
+                          ];
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CheckoutScreen(
+                                items: items,
+                                totalAmount: priceNum * qty,
+                                farmerId: product.farm,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: primary,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Reserve Now',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),

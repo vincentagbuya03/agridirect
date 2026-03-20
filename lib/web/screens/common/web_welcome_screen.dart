@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
-import '../../../shared/services/onboarding_service.dart';
+import '../../../shared/services/user/onboarding_service.dart';
 import '../../widgets/animated_components.dart';
 
 /// Web Welcome Screen — Premium animated landing page
@@ -150,7 +150,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
             // Nav items
             ...List.generate(navItems.length, (i) {
               final isHovered = _hoveredNav == i;
-              final navRoutes = ['/shop', '/shop', '/community']; // Home, Shop, Community
+              final navRoutes = ['/', '/shop', '/community']; // Home, Shop, Community
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: MouseRegion(

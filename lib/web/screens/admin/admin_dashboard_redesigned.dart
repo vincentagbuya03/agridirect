@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/admin_service.dart';
-import '../../../shared/services/auth_service.dart';
+import '../../../shared/services/admin/admin_service.dart';
+import '../../../shared/services/auth/auth_service.dart';
 import 'admin_analytics_tab.dart';
 import 'admin_users_tab.dart';
 import 'admin_products_tab.dart';
 import 'admin_orders_tab.dart';
 import 'admin_moderation_tab.dart';
+import 'admin_farmer_registrations_tab.dart';
 
 /// Redesigned Admin Dashboard with Sidebar Navigation
 class AdminDashboardRedesigned extends StatefulWidget {
@@ -42,6 +43,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
     NavItem(icon: Icons.shopping_cart, label: 'Orders', index: 3),
     NavItem(icon: Icons.bar_chart, label: 'Sales Performance', index: 4),
     NavItem(icon: Icons.analytics, label: 'Governance', index: 5),
+    NavItem(icon: Icons.agriculture, label: 'Farmer Applications', index: 6),
   ];
 
   @override
@@ -117,6 +119,9 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                         _buildNavSection('ANALYTICS', [
                           _navItems[4], // Sales
                           _navItems[5], // Governance
+                        ]),
+                        _buildNavSection('APPLICATIONS', [
+                          _navItems[6], // Farmer Applications
                         ]),
                       ],
                     ),
@@ -331,6 +336,8 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
         return AdminAnalyticsTab(adminService: _adminService);
       case 5: // Governance
         return AdminModerationTab(adminService: _adminService);
+      case 6: // Farmer Applications
+        return AdminFarmerRegistrationsTab(adminService: _adminService);
       default:
         return AdminAnalyticsTab(adminService: _adminService);
     }

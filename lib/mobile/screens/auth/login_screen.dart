@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import '../../../shared/services/auth_service.dart';
+import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/router/app_router.dart';
 import 'dart:async';
 
