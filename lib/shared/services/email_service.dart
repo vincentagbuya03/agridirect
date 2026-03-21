@@ -28,4 +28,28 @@ class EmailService {
       return false;
     }
   }
+
+  /// Send password reset code email via AWS SES
+  static Future<bool> sendPasswordResetCode({
+    required String email,
+    required String code,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse(_awsSesEndpoint),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'to': email,
+          'subject': 'AgriDirect - Password Reset Code',
+          'body':
+              'Your password reset code is: $code\n\nThis code expires in 10 minutes.\n\nIf you did not request this code, please ignore this email.',
+          'resetCode': code,
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('[EmailService] Error sending password reset code: $e');
+      return false;
+    }
+  }
 }
