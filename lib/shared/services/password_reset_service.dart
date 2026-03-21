@@ -48,7 +48,7 @@ class PasswordResetService {
         'code': code,
         'created_at': DateTime.now().toIso8601String(),
         'expires_at': DateTime.now().add(_codeExpiration).toIso8601String(),
-        'is_used': false,
+        'used': false,
       });
 
       debugPrint('✅ Code stored in database');
@@ -81,6 +81,7 @@ class PasswordResetService {
           .select()
           .eq('email', email)
           .eq('code', code)
+          .eq('used', false)
           .maybeSingle();
 
       if (resetRecord == null) {
@@ -94,7 +95,7 @@ class PasswordResetService {
       }
 
       // Check if code has already been used
-      if (resetRecord['is_used'] == true) {
+      if (resetRecord['used'] == true) {
         throw 'This code has already been used';
       }
 
@@ -118,7 +119,7 @@ class PasswordResetService {
       // Mark code as used
       await _client
           .from('password_reset_codes')
-          .update({'is_used': true})
+          .update({'used': true})
           .eq('email', email)
           .eq('code', code);
 
@@ -136,7 +137,7 @@ class PasswordResetService {
           .from('password_reset_codes')
           .select()
           .eq('email', email)
-          .eq('is_used', false)
+          .eq('used', false)
           .maybeSingle();
 
       if (resetRecord == null) return null;
