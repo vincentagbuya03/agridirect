@@ -1961,9 +1961,6 @@ file_selector_windows
 flutter_plugin_android_lifecycle
 go_router
 google_fonts
-google_sign_in_android
-google_sign_in_ios
-google_sign_in_web
 image_picker_for_web
 image_picker_macos
 image_picker_platform_interface
@@ -6431,12 +6428,6 @@ limitations under the License.
 flutter
 
 Copyright 2014 The Flutter Authors. All rights reserved.
-Use of this source code is governed by a BSD-style license that can be
-found in the LICENSE file.
---------------------------------------------------------------------------------
-flutter
-
-Copyright 2014 The Flutter Authors. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
@@ -6462,6 +6453,12 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+--------------------------------------------------------------------------------
+flutter
+
+Copyright 2014 The Flutter Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
 --------------------------------------------------------------------------------
 flutter
 
@@ -6602,7 +6599,10 @@ SOFTWARE.
 flutter_lints
 google_identity_services_web
 google_sign_in
+google_sign_in_android
+google_sign_in_ios
 google_sign_in_platform_interface
+google_sign_in_web
 image_picker_linux
 image_picker_windows
 path_provider
