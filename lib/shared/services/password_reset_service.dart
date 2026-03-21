@@ -36,14 +36,15 @@ class PasswordResetService {
       final code = _generateCode();
       debugPrint('🔐 Generated code: $code');
 
-      // Delete any existing codes for this email
+      // Delete any existing codes for this user
       await _client
           .from('password_reset_codes')
           .delete()
-          .eq('email', email);
+          .eq('user_id', user['user_id']);
 
       // Store code in database
       await _client.from('password_reset_codes').insert({
+        'user_id': user['user_id'],
         'email': email,
         'code': code,
         'created_at': DateTime.now().toIso8601String(),
