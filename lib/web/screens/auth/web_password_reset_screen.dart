@@ -19,6 +19,8 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
   bool _obscureConfirm = true;
   bool _isLoading = false;
   bool _resetSuccess = false;
+  bool _hasValidSession = false;
+  String? _errorMessage;
 
   static const Color _primary = Color(0xFF16A34A);
   static const Color _dark = Color(0xFF111827);
@@ -27,6 +29,23 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
   static const Color _mutedDark = Color(0xFF6B7280);
   static const Color _border = Color(0xFFE5E7EB);
   static const Color _danger = Color(0xFFEF4444);
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSession();
+  }
+
+  Future<void> _checkSession() async {
+    // Check if we have an active session (from the email link)
+    final session = SupabaseConfig.client.auth.currentSession;
+    setState(() {
+      _hasValidSession = session != null;
+      if (session == null) {
+        _errorMessage = 'Invalid or expired reset link. Please request a new one.';
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -103,10 +122,77 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
           child: Container(
             width: isMobile ? double.infinity : 480,
             padding: EdgeInsets.all(isMobile ? 24 : 48),
-            child: _resetSuccess ? _buildSuccessView() : _buildResetForm(),
+            child: _resetSuccess
+                ? _buildSuccessView()
+                : !_hasValidSession
+                    ? _buildErrorView()
+                    : _buildResetForm(),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: _danger.withOpacity(0.08),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.error_outline_rounded,
+            color: _danger,
+            size: 48,
+          ),
+        ),
+        const SizedBox(height: 32),
+        Text(
+          'Invalid Reset Link',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 28,
+            fontWeight: FontWeight.w700,
+            color: _dark,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          _errorMessage ?? 'This password reset link is invalid or has expired.',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            fontSize: 15,
+            color: _mutedDark,
+            height: 1.6,
+          ),
+        ),
+        const SizedBox(height: 32),
+        SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: ElevatedButton(
+            onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: Text(
+              'Back to Login',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
