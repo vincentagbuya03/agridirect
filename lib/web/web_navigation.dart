@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../shared/services/auth_service.dart';
 import 'screens/consumer/web_marketplace_home.dart';
 import 'screens/consumer/web_shop_screen.dart';
@@ -7,8 +8,6 @@ import 'screens/farmer/web_community_hub.dart';
 import 'screens/consumer/web_profile_screen.dart';
 import 'screens/auth/web_login_screen.dart';
 import 'screens/admin/admin_dashboard_redesigned.dart';
-import 'screens/common/web_welcome_screen.dart';
-
 
 class WebNavigation extends StatefulWidget {
   final VoidCallback onLogout;
@@ -51,11 +50,13 @@ class _WebNavigationState extends State<WebNavigation> {
   void _showLoginDialog() {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
+      builder: (dialogContext) => Dialog(
         child: WebLoginScreen(
           onLoginSuccess: () {
-            Navigator.of(context).pop();
-            setState(() => _currentIndex = 3);
+            Navigator.of(dialogContext).pop();
+            // Re-render to let WebNavigation.build() check admin status
+            // This will show AdminDashboard if _auth.isAdmin is true
+            if (mounted) setState(() {});
           },
         ),
       ),
@@ -97,24 +98,33 @@ class _WebNavigationState extends State<WebNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🔵 WebNavigation.build() called');
+    debugPrint('   isLoggedIn: ${_auth.isLoggedIn}');
+    debugPrint('   isAdmin: ${_auth.isAdmin}');
+    debugPrint('   isViewingAsFarmer: ${_auth.isViewingAsFarmer}');
+
     // If user is not logged in, show the marketplace (browsable without login)
     if (!_auth.isLoggedIn) {
-      return WebMarketplaceHome(onNavigate: _navigateTo, currentIndex: _currentIndex);
+      debugPrint('   → Showing marketplace (not logged in)');
+      return WebMarketplaceHome(
+        onNavigate: _navigateTo,
+        currentIndex: _currentIndex,
+      );
     }
 
     // If user is admin, show admin dashboard
     if (_auth.isAdmin) {
+      debugPrint('   → Showing admin dashboard');
       return AdminDashboardRedesigned(onLogout: widget.onLogout);
     }
 
+    debugPrint('   → Showing customer dashboard (current tab: $_currentIndex)');
     final screens = _screens;
 
     if (_currentIndex >= screens.length) {
       _currentIndex = 0;
     }
 
-    return Scaffold(
-      body: screens[_currentIndex],
-    );
+    return Scaffold(body: screens[_currentIndex]);
   }
 }

@@ -103,7 +103,9 @@ class _WebLoginScreenState extends State<WebLoginScreen>
 
       // On mobile, check if there was an actual error
       // On web, we might reach here if redirect didn't happen, which is rare
-      if (!success && authService.errorMessage != null && authService.errorMessage!.isNotEmpty) {
+      if (!success &&
+          authService.errorMessage != null &&
+          authService.errorMessage!.isNotEmpty) {
         _showLoginErrorDialog(authService.errorMessage!);
         return;
       }
@@ -265,7 +267,9 @@ class _WebLoginScreenState extends State<WebLoginScreen>
       if (emailTaken) {
         if (mounted) {
           setState(() => _registerLoading = false);
-          _showSnackBar('This email is already registered. Please log in instead.');
+          _showSnackBar(
+            'This email is already registered. Please log in instead.',
+          );
         }
         return;
       }
@@ -275,13 +279,17 @@ class _WebLoginScreenState extends State<WebLoginScreen>
         if (phoneTaken) {
           if (mounted) {
             setState(() => _registerLoading = false);
-            _showSnackBar('This phone number is already associated with an account.');
+            _showSnackBar(
+              'This phone number is already associated with an account.',
+            );
           }
           return;
         }
       }
 
-      final timeRemaining = await OTPService().getOTPTimeRemaining(email: email);
+      final timeRemaining = await OTPService().getOTPTimeRemaining(
+        email: email,
+      );
       final hasExistingOTP = timeRemaining != null && timeRemaining > 0;
 
       if (!hasExistingOTP) {
@@ -308,7 +316,9 @@ class _WebLoginScreenState extends State<WebLoginScreen>
         if (!emailSent) {
           if (mounted) {
             setState(() => _registerLoading = false);
-            _showSnackBar('Failed to send verification code. Please try again.');
+            _showSnackBar(
+              'Failed to send verification code. Please try again.',
+            );
           }
           return;
         }
@@ -326,7 +336,9 @@ class _WebLoginScreenState extends State<WebLoginScreen>
               phoneNumber: phone.isNotEmpty ? phone : null,
               initialSecondsRemaining: hasExistingOTP ? timeRemaining : 600,
               onVerificationSuccess: () {
-                _showSnackBar('Account created successfully! Redirecting to login...');
+                _showSnackBar(
+                  'Account created successfully! Redirecting to login...',
+                );
                 Future.delayed(const Duration(seconds: 2), () {
                   if (mounted) {
                     Navigator.pop(context);
@@ -425,13 +437,16 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                           child: GridView.count(
                             crossAxisCount: 5,
                             physics: const NeverScrollableScrollPhysics(),
-                            children: List.generate(25, (_) => Container(
-                              margin: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white,
+                            children: List.generate(
+                              25,
+                              (_) => Container(
+                                margin: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white,
+                                ),
                               ),
-                            )),
+                            ),
                           ),
                         ),
                       ),
@@ -496,21 +511,34 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                                   width: 300,
                                   height: 260,
                                   child: Lottie.asset(
-                                    'assets/lottie/register.json',
+                                    'assets/lottie/Security.json',
                                     fit: BoxFit.contain,
                                     repeat: true,
-                                    errorBuilder: (context, error, stack) => Center(
-                                      child: ScaleTransition(
-                                        scale: Tween<double>(begin: 0.8, end: 1.0).animate(
-                                          CurvedAnimation(parent: _fadeController, curve: Curves.easeOutBack),
+                                    errorBuilder: (context, error, stack) =>
+                                        Center(
+                                          child: ScaleTransition(
+                                            scale:
+                                                Tween<double>(
+                                                  begin: 0.8,
+                                                  end: 1.0,
+                                                ).animate(
+                                                  CurvedAnimation(
+                                                    parent: _fadeController,
+                                                    curve: Curves.easeOutBack,
+                                                  ),
+                                                ),
+                                            child: Icon(
+                                              _isRegister
+                                                  ? Icons
+                                                        .shopping_basket_rounded
+                                                  : Icons.eco_rounded,
+                                              size: 120,
+                                              color: Colors.white.withOpacity(
+                                                0.4,
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                        child: Icon(
-                                          _isRegister ? Icons.shopping_basket_rounded : Icons.eco_rounded,
-                                          size: 120,
-                                          color: Colors.white.withOpacity(0.4),
-                                        ),
-                                      ),
-                                    ),
                                   ),
                                 ),
                               ),
@@ -548,11 +576,20 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  _buildTrustBadge(Icons.verified_rounded, '500+ Farmers'),
+                                  _buildTrustBadge(
+                                    Icons.verified_rounded,
+                                    '500+ Farmers',
+                                  ),
                                   const SizedBox(width: 12),
-                                  _buildTrustBadge(Icons.eco_rounded, '100% Organic'),
+                                  _buildTrustBadge(
+                                    Icons.eco_rounded,
+                                    '100% Organic',
+                                  ),
                                   const SizedBox(width: 12),
-                                  _buildTrustBadge(Icons.bolt_rounded, 'Same Day'),
+                                  _buildTrustBadge(
+                                    Icons.bolt_rounded,
+                                    'Same Day',
+                                  ),
                                 ],
                               ),
                             ],
@@ -652,7 +689,11 @@ class _WebLoginScreenState extends State<WebLoginScreen>
             ),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: const Icon(Icons.waving_hand_rounded, color: _primary, size: 26),
+          child: const Icon(
+            Icons.waving_hand_rounded,
+            color: _primary,
+            size: 26,
+          ),
         ),
         const SizedBox(height: 24),
         Text(
@@ -667,11 +708,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
         const SizedBox(height: 8),
         Text(
           'Sign in to discover fresh farm products',
-          style: GoogleFonts.inter(
-            fontSize: 15,
-            color: _muted,
-            height: 1.5,
-          ),
+          style: GoogleFonts.inter(fontSize: 15, color: _muted, height: 1.5),
         ),
         const SizedBox(height: 36),
 
@@ -691,7 +728,9 @@ class _WebLoginScreenState extends State<WebLoginScreen>
           obscure: _loginObscure,
           suffixIcon: IconButton(
             icon: Icon(
-              _loginObscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+              _loginObscure
+                  ? Icons.visibility_off_rounded
+                  : Icons.visibility_rounded,
               color: _muted,
               size: 20,
             ),
@@ -750,7 +789,11 @@ class _WebLoginScreenState extends State<WebLoginScreen>
             ),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: const Icon(Icons.person_add_rounded, color: _primary, size: 26),
+          child: const Icon(
+            Icons.person_add_rounded,
+            color: _primary,
+            size: 26,
+          ),
         ),
         const SizedBox(height: 24),
         Text(
@@ -765,11 +808,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
         const SizedBox(height: 8),
         Text(
           'Join the AgriDirect farming community',
-          style: GoogleFonts.inter(
-            fontSize: 15,
-            color: _muted,
-            height: 1.5,
-          ),
+          style: GoogleFonts.inter(fontSize: 15, color: _muted, height: 1.5),
         ),
         const SizedBox(height: 32),
 
@@ -804,11 +843,14 @@ class _WebLoginScreenState extends State<WebLoginScreen>
           obscure: _registerObscure,
           suffixIcon: IconButton(
             icon: Icon(
-              _registerObscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+              _registerObscure
+                  ? Icons.visibility_off_rounded
+                  : Icons.visibility_rounded,
               color: _muted,
               size: 20,
             ),
-            onPressed: () => setState(() => _registerObscure = !_registerObscure),
+            onPressed: () =>
+                setState(() => _registerObscure = !_registerObscure),
           ),
         ),
         const SizedBox(height: 18),
@@ -930,7 +972,11 @@ class _WebLoginScreenState extends State<WebLoginScreen>
     );
   }
 
-  Widget _buildSwitchPrompt(String question, String action, VoidCallback onTap) {
+  Widget _buildSwitchPrompt(
+    String question,
+    String action,
+    VoidCallback onTap,
+  ) {
     return Center(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1009,7 +1055,11 @@ class _WebLoginScreenState extends State<WebLoginScreen>
       height: 48,
       child: OutlinedButton.icon(
         onPressed: onPressed,
-        icon: Icon(icon, size: 20, color: onPressed != null ? _darkSecondary : _muted),
+        icon: Icon(
+          icon,
+          size: 20,
+          color: onPressed != null ? _darkSecondary : _muted,
+        ),
         label: Text(
           label,
           style: GoogleFonts.inter(
@@ -1020,7 +1070,9 @@ class _WebLoginScreenState extends State<WebLoginScreen>
         ),
         style: OutlinedButton.styleFrom(
           side: BorderSide(
-            color: onPressed != null ? const Color(0xFFE5E7EB) : const Color(0xFFE5E7EB).withOpacity(0.5),
+            color: onPressed != null
+                ? const Color(0xFFE5E7EB)
+                : const Color(0xFFE5E7EB).withOpacity(0.5),
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),

@@ -45,7 +45,14 @@ class SupabaseDB {
     String? phoneNumber,
   }) async {
     try {
+      debugPrint('🔵 createUserIfNotExists called');
+      debugPrint('🔵 userId: $userId');
+      debugPrint('🔵 email: $email');
+      debugPrint('🔵 name: $name');
+      debugPrint('🔵 phone: $phoneNumber');
+
       // Check if user already exists
+      debugPrint('🔵 Checking if user exists...');
       final existing = await _client
           .from('users')
           .select('user_id')
@@ -53,6 +60,7 @@ class SupabaseDB {
           .maybeSingle();
 
       if (existing == null) {
+        debugPrint('🔵 User does not exist, inserting...');
         // User doesn't exist yet, insert now
         final userData = {
           'user_id': userId,
@@ -64,7 +72,26 @@ class SupabaseDB {
           userData['phone'] = phoneNumber;
         }
         await _client.from('users').insert(userData);
+        debugPrint('✅ User inserted successfully');
+
+        // Auto-create customer profile
+        debugPrint('🔵 Creating customer profile...');
+        await _client.from('customers').insert({'user_id': userId});
+        debugPrint('✅ Customer profile created');
+
+        // Auto-create admin if this is an admin email
+        if (email == 'noreplyagridirect@gmail.com' ||
+            email == 'vincentagbuya3@gmail.com') {
+          debugPrint('🔵 Creating admin profile for admin email...');
+          await _client.from('admins').insert({
+            'user_id': userId,
+            'role_level': 3,
+            'is_active': true,
+          });
+          debugPrint('✅ Admin profile created');
+        }
       } else {
+        debugPrint('🔵 User exists, updating name/phone...');
         // User exists but name/phone might be empty, update it
         final updateData = <String, String>{};
         if (name.isNotEmpty) {
@@ -74,12 +101,17 @@ class SupabaseDB {
           updateData['phone'] = phoneNumber;
         }
         if (updateData.isNotEmpty) {
+          debugPrint('🔵 Updating with data: $updateData');
           await _client.from('users').update(updateData).eq('user_id', userId);
+          debugPrint('✅ User updated successfully');
+        } else {
+          debugPrint('✅ No updates needed');
         }
       }
     } catch (e, stack) {
-      debugPrint('Error creating/updating user: $e');
-      debugPrint('Stack trace: $stack');
+      debugPrint('❌ Error creating/updating user: $e');
+      debugPrint('❌ Error type: ${e.runtimeType}');
+      debugPrint('❌ Stack trace: $stack');
       rethrow;
     }
   }
@@ -114,10 +146,7 @@ class SupabaseDB {
     required String name,
   }) async {
     try {
-      await _client
-          .from('users')
-          .update({'name': name})
-          .eq('user_id', userId);
+      await _client.from('users').update({'name': name}).eq('user_id', userId);
     } catch (e) {
       print('Error updating user name: $e');
     }
@@ -153,7 +182,7 @@ class SupabaseDB {
     }
   }
 
-  /// Get user profile
+  /// Get user profile by userId
   static Future<Map<String, dynamic>?> getUserProfile(String userId) async {
     try {
       final response = await _client
@@ -168,6 +197,23 @@ class SupabaseDB {
     }
   }
 
+  /// Get user profile by email
+  static Future<Map<String, dynamic>?> getUserProfileByEmail(
+    String email,
+  ) async {
+    try {
+      final response = await _client
+          .from('users')
+          .select()
+          .eq('email', email)
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      print('Error fetching user by email: $e');
+      return null;
+    }
+  }
+
   /// Add role to user ('seller' = create farmer profile, 'admin' = create admin profile)
   static Future<void> addUserRole({
     required String userId,
@@ -175,14 +221,16 @@ class SupabaseDB {
   }) async {
     try {
       if (roleName == 'seller') {
-        // Create farmer record for this user
+        // Create farmer record for this user (farm_name is required)
         await _client.from('farmers').insert({
           'user_id': userId,
+          'farm_name': 'My Farm', // Default farm name
         });
       } else if (roleName == 'admin') {
         // Create admin record for this user
         await _client.from('admins').insert({
           'user_id': userId,
+          'role_level': 1, // Default moderator level
         });
       }
     } catch (e) {
@@ -238,35 +286,70 @@ class SupabaseDB {
     }
   }
 
-  /// Get all roles for a user (checks farmers, admins tables)
-  static Future<List<String>> getUserRoles(String userId) async {
+  /// Ensure admin profile exists for known admin emails
+  /// Call this when a user logs in if they have an admin email
+  static Future<void> ensureAdminProfileExists({
+    required String userId,
+    required String email,
+  }) async {
     try {
-      final roles = <String>['consumer']; // Default role
-
-      // Check if user is a farmer (seller)
-      final farmer = await _client
-          .from('farmers')
-          .select('farmer_id')
-          .eq('user_id', userId)
-          .maybeSingle();
-      if (farmer != null) {
-        roles.add('seller');
+      // Check if this email is a known admin email
+      if (email != 'noreplyagridirect@gmail.com' &&
+          email != 'vincentagbuya3@gmail.com') {
+        return; // Not an admin email, skip
       }
 
-      // Check if user is an admin
-      final admin = await _client
+      // Check if admin profile already exists
+      final existing = await _client
           .from('admins')
           .select('admin_id')
           .eq('user_id', userId)
           .maybeSingle();
-      if (admin != null) {
-        roles.add('admin');
-      }
 
-      return roles;
+      if (existing == null) {
+        // Admin profile doesn't exist, create it
+        debugPrint('🔵 Creating admin profile for known admin email: $email');
+        await _client.from('admins').insert({
+          'user_id': userId,
+          'role_level': 3,
+          'is_active': true,
+        });
+        debugPrint('✅ Admin profile created successfully');
+      } else {
+        debugPrint('✅ Admin profile already exists for: $email');
+      }
     } catch (e) {
-      print('Error fetching user roles: $e');
-      return ['consumer'];
+      debugPrint('❌ Error ensuring admin profile: $e');
+      // Don't fail the login — admin will be fetched from DB regardless
+    }
+  }
+
+  /// Get all roles for a user using secure stored function (bypasses RLS)
+  static Future<List<String>> getUserRoles(String userId) async {
+    try {
+      debugPrint('🔵 getUserRoles called for userId: $userId');
+
+      // Use stored function that bypasses RLS
+      final response = await _client.rpc(
+        'get_user_roles',
+        params: {'checked_user_id': userId},
+      ) as List<dynamic>;
+
+      final roles = response
+          .map((item) => (item as Map<String, dynamic>)['role_name'] as String)
+          .toList();
+
+      debugPrint('✅ getUserRoles returning: $roles');
+      return roles;
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error in getUserRoles: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+      debugPrint('');
+      debugPrint('🔧 TROUBLESHOOTING:');
+      debugPrint('   1. Make sure get_user_roles() function exists in database');
+      debugPrint('   2. Run GET_USER_ROLES_FUNCTION.sql from lib/shared/data/');
+      debugPrint('   3. Check function definition: SELECT * FROM information_schema.routines WHERE routine_name=\'get_user_roles\'');
+      return ['consumer']; // Default to consumer role if any error
     }
   }
 
@@ -276,33 +359,58 @@ class SupabaseDB {
     required FarmerRegistration registration,
   }) async {
     try {
+      // Get farmer_id for this user
+      final farmerRecord = await _client
+          .from('farmers')
+          .select('farmer_id')
+          .eq('user_id', userId)
+          .single();
+
+      final farmerId = farmerRecord['farmer_id'];
+
       final data = registration.toJson();
-      data['user_id'] = userId;
-      final response = await _client.from('farmer_registrations').insert(data).select('registration_id').single();
+      data['farmer_id'] = farmerId;
+      final response = await _client
+          .from('farmer_registrations')
+          .insert(data)
+          .select('registration_id')
+          .single();
       final registrationId = response['registration_id'];
 
       // Insert education rows
       final educationRows = registration.toEducationRows();
       if (educationRows.isNotEmpty) {
-        await _client.from('farmer_education').insert(
-          educationRows.map((e) => {...e, 'registration_id': registrationId}).toList(),
-        );
+        await _client
+            .from('farmer_education')
+            .insert(
+              educationRows
+                  .map((e) => {...e, 'registration_id': registrationId})
+                  .toList(),
+            );
       }
 
       // Insert crop type rows
       final cropRows = registration.toCropTypeRows();
       if (cropRows.isNotEmpty) {
-        await _client.from('farmer_crop_types').insert(
-          cropRows.map((c) => {...c, 'registration_id': registrationId}).toList(),
-        );
+        await _client
+            .from('farmer_crop_types')
+            .insert(
+              cropRows
+                  .map((c) => {...c, 'registration_id': registrationId})
+                  .toList(),
+            );
       }
 
       // Insert livestock rows
       final livestockRows = registration.toLivestockRows();
       if (livestockRows.isNotEmpty) {
-        await _client.from('farmer_livestock').insert(
-          livestockRows.map((l) => {...l, 'registration_id': registrationId}).toList(),
-        );
+        await _client
+            .from('farmer_livestock')
+            .insert(
+              livestockRows
+                  .map((l) => {...l, 'registration_id': registrationId})
+                  .toList(),
+            );
       }
     } catch (e) {
       print('Error submitting farmer registration: $e');
@@ -315,10 +423,22 @@ class SupabaseDB {
     String userId,
   ) async {
     try {
+      // First get farmer_id for this user
+      final farmerRecord = await _client
+          .from('farmers')
+          .select('farmer_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (farmerRecord == null) return null;
+
+      final farmerId = farmerRecord['farmer_id'];
+
+      // Now get the registration
       final response = await _client
           .from('farmer_registrations')
           .select()
-          .eq('user_id', userId)
+          .eq('farmer_id', farmerId)
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();

@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:supabase/src/supabase_client.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_config.dart';
+import '../utils/google_signin_debug_helper.dart';
 
 /// Auth Service using Supabase
 /// Handles user registration, login, logout, and seller mode
@@ -44,6 +44,52 @@ class AuthService extends ChangeNotifier {
   String get pendingGoogleName => _pendingGoogleName;
   SupabaseClient get client => _client;
 
+  static String _sellerKey(String userId) => 'auth.isSeller.$userId';
+  static String _adminKey(String userId) => 'auth.isAdmin.$userId';
+  static String _nameKey(String userId) => 'auth.userName.$userId';
+
+  Future<void> _restoreCachedUserState(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _isSeller = prefs.getBool(_sellerKey(userId)) ?? _isSeller;
+      _isAdmin = prefs.getBool(_adminKey(userId)) ?? _isAdmin;
+      _userName = prefs.getString(_nameKey(userId)) ?? _userName;
+    } catch (e) {
+      debugPrint('Failed to restore cached auth state: $e');
+    }
+  }
+
+  Future<void> _persistCachedUserState() async {
+    if (_userId.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_sellerKey(_userId), _isSeller);
+      await prefs.setBool(_adminKey(_userId), _isAdmin);
+      await prefs.setString(_nameKey(_userId), _userName);
+    } catch (e) {
+      debugPrint('Failed to persist cached auth state: $e');
+    }
+  }
+
+  Future<void> _clearCachedUserState(String userId) async {
+    if (userId.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_sellerKey(userId));
+      await prefs.remove(_adminKey(userId));
+      await prefs.remove(_nameKey(userId));
+    } catch (e) {
+      debugPrint('Failed to clear cached auth state: $e');
+    }
+  }
+
+  void _clearPendingGoogleProfileState() {
+    _needsProfileCompletion = false;
+    _pendingGoogleUserId = '';
+    _pendingGoogleEmail = '';
+    _pendingGoogleName = '';
+  }
+
   /// Extract clean error message from exception
   String _extractErrorMessage(dynamic exception) {
     final errString = exception.toString();
@@ -74,6 +120,9 @@ class AuthService extends ChangeNotifier {
   /// Initialize auth on app startup
   /// Only logs in if user exists AND email is confirmed
   Future<void> initialize() async {
+    // Prevent stale route/UI state after app relaunch.
+    _clearPendingGoogleProfileState();
+
     final user = _client.auth.currentUser;
 
     // Only proceed if user exists AND email is confirmed
@@ -81,6 +130,9 @@ class AuthService extends ChangeNotifier {
       _userId = user.id;
       _userEmail = user.email ?? '';
       _isLoggedIn = true;
+
+      // Use cached state first so offline startup still recognizes seller/admin.
+      await _restoreCachedUserState(user.id);
 
       // Fetch user profile — if missing, create it from auth metadata
       var profile = await SupabaseDB.getUserProfile(user.id);
@@ -100,6 +152,20 @@ class AuthService extends ChangeNotifier {
           debugPrint('Error creating user profile on initialize: $e');
         }
       }
+
+      // Check if profile is incomplete (missing required fields like phone)
+      if (profile != null) {
+        final phone = profile['phone'] as String?;
+        final isIncompleteProfile = phone == null || phone.isEmpty;
+
+        if (isIncompleteProfile) {
+          // User needs to complete their profile
+          _needsProfileCompletion = true;
+          _pendingGoogleUserId = user.id;
+          _pendingGoogleEmail = user.email ?? '';
+          _pendingGoogleName = (profile['name'] as String?) ?? '';
+        }
+      }
       // If profile name is empty, fall back to auth metadata name and fix DB
       String resolvedName = (profile?['name'] as String?) ?? '';
       if (resolvedName.isEmpty) {
@@ -115,10 +181,46 @@ class AuthService extends ChangeNotifier {
       }
       _userName = resolvedName;
 
+      // Ensure admin profile exists for known admin emails
+      try {
+        await SupabaseDB.ensureAdminProfileExists(
+          userId: user.id,
+          email: user.email ?? '',
+        );
+      } catch (e) {
+        debugPrint('Warning: Could not ensure admin profile: $e');
+      }
+
       // Fetch roles from user_roles table
-      final roles = await SupabaseDB.getUserRoles(user.id);
-      _isSeller = roles.contains('seller');
-      _isAdmin = roles.contains('admin');
+      try {
+        final roles = await SupabaseDB.getUserRoles(user.id);
+        _isSeller = roles.contains('seller');
+        _isAdmin = roles.contains('admin');
+      } catch (e) {
+        debugPrint('Error fetching roles on initialize, using cache: $e');
+      }
+
+      // If seller status exists locally but sync may have failed, retry
+      if (_isSeller) {
+        try {
+          // Check if farmer record exists in database
+          final exists = await SupabaseDB.hasRole(
+            userId: user.id,
+            roleName: 'seller',
+          );
+          if (!exists) {
+            debugPrint(
+              'Seller marked locally but missing in DB, retrying sync...',
+            );
+            await SupabaseDB.addUserRole(userId: user.id, roleName: 'seller');
+          }
+        } catch (e) {
+          debugPrint('Retry seller sync failed (offline?): $e');
+          // Keep isSeller=true locally even if sync fails
+        }
+      }
+
+      await _persistCachedUserState();
       notifyListeners();
     } else if (user != null && user.emailConfirmedAt == null) {
       // User exists but email not confirmed - sign them out
@@ -230,7 +332,8 @@ class AuthService extends ChangeNotifier {
       // If profile name is empty, fall back to auth metadata name and fix DB
       String resolvedName = (profile?['name'] as String?) ?? '';
       if (resolvedName.isEmpty) {
-        final metaName = (response.user!.userMetadata?['name'] as String?) ?? '';
+        final metaName =
+            (response.user!.userMetadata?['name'] as String?) ?? '';
         if (metaName.isNotEmpty) {
           resolvedName = metaName;
           try {
@@ -242,10 +345,30 @@ class AuthService extends ChangeNotifier {
       }
       _userName = resolvedName;
 
+      // Ensure admin profile exists for known admin emails
+      try {
+        await SupabaseDB.ensureAdminProfileExists(
+          userId: _userId,
+          email: email,
+        );
+      } catch (e) {
+        debugPrint('Warning: Could not ensure admin profile: $e');
+      }
+
       // Fetch roles from user_roles table
       final roles = await SupabaseDB.getUserRoles(_userId);
       _isSeller = roles.contains('seller');
       _isAdmin = roles.contains('admin');
+
+      debugPrint('🔴 === LOGIN DEBUG === 🔴');
+      debugPrint('User Email: $email');
+      debugPrint('User ID: $_userId');
+      debugPrint('Roles fetched: $roles');
+      debugPrint('Is Seller: $_isSeller');
+      debugPrint('Is Admin: $_isAdmin');
+      debugPrint('🔴 ==================== 🔴');
+
+      await _persistCachedUserState();
 
       _isLoading = false;
       notifyListeners();
@@ -259,16 +382,22 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Register as a seller (one-time activation)
+  /// Sets seller status locally immediately, then tries to sync to database.
+  /// This ensures offline users can use seller features and sync when online.
   Future<void> startSelling() async {
+    // Mark as seller locally immediately — this won't be lost even if DB write fails
+    _isSeller = true;
+    _isViewingAsFarmer = true;
+    await _persistCachedUserState();
+    notifyListeners();
+
+    // Try to sync the seller role to the database
     try {
       await SupabaseDB.addUserRole(userId: _userId, roleName: 'seller');
-      _isSeller = true;
-      _isViewingAsFarmer = true;
-      notifyListeners();
+      debugPrint('Seller role synced to database');
     } catch (e) {
-      _errorMessage =
-          'Failed to activate seller mode: ${_extractErrorMessage(e)}';
-      notifyListeners();
+      debugPrint('Failed to sync seller role to database (offline?): $e');
+      // Don't fail — local state is set, will retry when online
     }
   }
 
@@ -313,7 +442,9 @@ class AuthService extends ChangeNotifier {
           );
           debugPrint('User profile ensured in users table for $email');
         } catch (e) {
-          debugPrint('ERROR ensuring user profile after email confirmation: $e');
+          debugPrint(
+            'ERROR ensuring user profile after email confirmation: $e',
+          );
           // Don't return false — user is still confirmed, profile may exist from trigger
         }
 
@@ -343,6 +474,11 @@ class AuthService extends ChangeNotifier {
   /// 4. Add your redirect URL: https://yourdomain.com/auth/callback
   /// 5. Update the redirectTo URL below to match your deployment domain
   Future<bool> signInWithGoogle() async {
+    GoogleSignInDebugHelper.logDebugInfo(
+      stage: 'Starting Google Sign-In',
+      additionalInfo: {'platform': kIsWeb ? 'web' : 'mobile'},
+    );
+
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -350,13 +486,24 @@ class AuthService extends ChangeNotifier {
     try {
       if (kIsWeb) {
         // WEB: Use Supabase OAuth (opens Google login in same tab)
+        GoogleSignInDebugHelper.logDebugInfo(
+          stage: 'Web OAuth Flow',
+          message: 'Redirecting to Google OAuth',
+        );
+
         try {
           await _client.auth.signInWithOAuth(
             OAuthProvider.google,
-            redirectTo: 'https://argidirect.vercel.app/auth/callback',
+            redirectTo: kDebugMode
+                ? 'http://localhost:3000/auth/callback'
+                : 'https://agridirect.vercel.app/auth/callback',
           );
         } catch (e) {
           // OAuth will redirect if successful, so if we catch an error, it's real
+          GoogleSignInDebugHelper.logDebugInfo(
+            stage: 'Web OAuth Error',
+            error: e,
+          );
           debugPrint('Web OAuth error: $e');
           _errorMessage = 'Google Sign-In failed: ${_extractErrorMessage(e)}';
           _isLoading = false;
@@ -370,9 +517,17 @@ class AuthService extends ChangeNotifier {
         return true;
       } else {
         // MOBILE: Use native Google Sign-In
+        GoogleSignInDebugHelper.logDebugInfo(
+          stage: 'Mobile Native Flow',
+          message: 'Using native Google Sign-In',
+        );
         return await _signInWithGoogleMobile();
       }
     } catch (e) {
+      GoogleSignInDebugHelper.logDebugInfo(
+        stage: 'General Sign-In Error',
+        error: e,
+      );
       debugPrint('Google sign-in error: $e');
       _errorMessage = 'Google Sign-In failed: ${_extractErrorMessage(e)}';
       _isLoggedIn = false;
@@ -383,92 +538,271 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Sign in with Google on Mobile using native GoogleSignIn
+  /// Now working with google_sign_in v6.2.1 (compatible API)
   Future<bool> _signInWithGoogleMobile() async {
     try {
-      // Initialize once before first use
-      await GoogleSignIn.instance.initialize(
-        serverClientId:
-            '971354937445-ism5m8bol1l18qqfndkbalj16tl73tiv.apps.googleusercontent.com',
+      GoogleSignInDebugHelper.logDebugInfo(
+        stage: 'Mobile Google Sign-In Start',
+        message: 'Initializing native Google Sign-In with v6.2.1',
       );
 
-      // Trigger the interactive sign-in flow
-      final googleUser = await GoogleSignIn.instance.authenticate();
+      // Initialize GoogleSignIn with the stable v6.2.1 API
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+      );
 
-      // Check if user cancelled sign-in
+      // Clear any existing sign-in state
+      await googleSignIn.signOut();
+
+      GoogleSignInDebugHelper.logDebugInfo(
+        stage: 'Starting Sign-In Flow',
+        message: 'Triggering Google account selection',
+      );
+
+      // Trigger the authentication flow
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
       if (googleUser == null) {
+        // User cancelled the sign-in
+        GoogleSignInDebugHelper.logDebugInfo(
+          stage: 'Sign-In Cancelled',
+          message: 'User cancelled the sign-in process',
+        );
         _errorMessage = 'Sign-in cancelled';
         _isLoading = false;
         notifyListeners();
         return false;
       }
 
-      // Get tokens
-      final idToken = googleUser.authentication.idToken;
-      final auth = await googleUser.authorizationClient
-          .authorizationForScopes(['email', 'profile']);
-      final accessToken = auth?.accessToken;
+      GoogleSignInDebugHelper.logDebugInfo(
+        stage: 'Google Account Selected',
+        additionalInfo: {
+          'email': googleUser.email,
+          'displayName': googleUser.displayName,
+          'id': googleUser.id,
+        },
+      );
 
-      if (idToken == null) {
-        _errorMessage = 'Failed to get Google ID token';
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      GoogleSignInDebugHelper.logDebugInfo(
+        stage: 'Authentication Tokens Retrieved',
+        additionalInfo: {
+          'hasIdToken': googleAuth.idToken != null,
+          'hasAccessToken': googleAuth.accessToken != null,
+        },
+      );
+
+      if (googleAuth.idToken == null) {
+        GoogleSignInDebugHelper.logDebugInfo(
+          stage: 'Authentication Error',
+          message: 'Failed to get ID token from Google',
+        );
+        _errorMessage = 'Failed to get authentication token from Google';
         _isLoading = false;
         notifyListeners();
         return false;
       }
 
-      // Sign in to Supabase with the Google ID token
+      GoogleSignInDebugHelper.logDebugInfo(
+        stage: 'Supabase Authentication',
+        message: 'Signing in to Supabase with Google ID token',
+      );
+
+      // Sign in to Supabase using the Google ID token
       final response = await _client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: accessToken,
+        idToken: googleAuth.idToken!,
+        accessToken: googleAuth.accessToken,
       );
 
       if (response.user == null) {
-        _errorMessage = 'Google sign-in failed';
+        GoogleSignInDebugHelper.logDebugInfo(
+          stage: 'Supabase Authentication Failed',
+          message: 'No user returned from Supabase authentication',
+        );
+        _errorMessage = 'Authentication with Supabase failed';
         _isLoading = false;
         notifyListeners();
         return false;
       }
 
       final user = response.user!;
-      _userId = user.id;
-      _userEmail = user.email ?? googleUser.email;
 
-      final displayName =
-          googleUser.displayName ?? googleUser.email.split('@')[0];
+      GoogleSignInDebugHelper.logDebugInfo(
+        stage: 'Supabase Authentication Success',
+        additionalInfo: {'userId': user.id, 'email': user.email},
+      );
 
-      // Check if this is a new user
-      final existingProfile = await SupabaseDB.getUserProfile(_userId);
+      // Check if this is a new user (no profile exists or incomplete profile)
+      var profile = await SupabaseDB.getUserProfile(user.id);
+      final isIncompleteProfile =
+          profile == null ||
+          profile['phone'] == null ||
+          (profile['phone'] as String).isEmpty;
 
-      if (existingProfile == null) {
-        // New user — store pending data and ask them to complete their profile
-        _pendingGoogleUserId = _userId;
-        _pendingGoogleEmail = _userEmail;
-        _pendingGoogleName = displayName;
+      if (isIncompleteProfile) {
+        // Check if an existing user already has this email (from email/password signup)
+        GoogleSignInDebugHelper.logDebugInfo(
+          stage: 'Checking for existing email',
+          additionalInfo: {'email': user.email},
+        );
+
+        try {
+          final existingProfile = await SupabaseDB.getUserProfileByEmail(
+            user.email ?? '',
+          );
+          if (existingProfile != null) {
+            // Check if the existing profile has a phone number (is complete)
+            final existingPhone = existingProfile['phone'] as String?;
+            final existingProfileIsComplete =
+                existingPhone != null && existingPhone.isNotEmpty;
+
+            if (existingProfileIsComplete) {
+              // Email already registered with complete profile - just log them in
+              GoogleSignInDebugHelper.logDebugInfo(
+                stage: 'Existing Complete Profile Found',
+                message:
+                    'User already has complete account with this email, logging in...',
+              );
+
+              _userId = user.id;
+              _userEmail = user.email ?? '';
+              _userName = (existingProfile['name'] as String?) ?? '';
+              _isLoggedIn = true;
+
+              // Ensure admin profile exists for known admin emails
+              try {
+                await SupabaseDB.ensureAdminProfileExists(
+                  userId: _userId,
+                  email: _userEmail,
+                );
+              } catch (e) {
+                debugPrint('Warning: Could not ensure admin profile: $e');
+              }
+
+              // Fetch user roles from database
+              final roles = await SupabaseDB.getUserRoles(_userId);
+              _isSeller = roles.contains('seller');
+              _isAdmin = roles.contains('admin');
+
+              GoogleSignInDebugHelper.logDebugInfo(
+                stage: 'User Roles Retrieved',
+                additionalInfo: {
+                  'isSeller': _isSeller,
+                  'isAdmin': _isAdmin,
+                  'roles': roles,
+                },
+              );
+
+              // Cache the user state for offline access
+              await _persistCachedUserState();
+
+              GoogleSignInDebugHelper.logDebugInfo(
+                stage: 'Mobile Google Sign-In Complete',
+                message: 'Successfully signed in existing user with Google',
+              );
+
+              _isLoading = false;
+              notifyListeners();
+              return true;
+            }
+            // Profile exists but incomplete (no phone) - continue to profile completion
+            GoogleSignInDebugHelper.logDebugInfo(
+              stage: 'Existing Incomplete Profile',
+              message: 'Profile exists but phone is missing, needs completion',
+            );
+          }
+        } catch (e) {
+          debugPrint('Error checking for existing email: $e');
+          // Continue with profile completion flow if check fails
+        }
+
+        // Truly new user - set up profile completion flow
+        GoogleSignInDebugHelper.logDebugInfo(
+          stage: 'New User Profile Setup',
+          message: 'User profile not found, setting up completion flow',
+        );
+
         _needsProfileCompletion = true;
+        _pendingGoogleUserId = user.id;
+        _pendingGoogleEmail = user.email ?? '';
+        _pendingGoogleName =
+            user.userMetadata?['full_name'] ??
+            user.userMetadata?['name'] ??
+            googleUser.displayName ??
+            '';
+
+        GoogleSignInDebugHelper.logDebugInfo(
+          stage: 'Profile Completion Required',
+          additionalInfo: {
+            'pendingUserId': _pendingGoogleUserId,
+            'pendingEmail': _pendingGoogleEmail,
+            'pendingName': _pendingGoogleName,
+          },
+        );
+
         _isLoading = false;
         notifyListeners();
-        return true;
+        return true; // Success, but needs profile completion
       }
 
-      // Existing user — proceed normally
-      _userName = (existingProfile['name'] as String?)?.isNotEmpty == true
-          ? existingProfile['name'] as String
-          : displayName;
+      // Existing user - complete login process
+      GoogleSignInDebugHelper.logDebugInfo(
+        stage: 'Existing User Login',
+        message: 'Completing login for existing user',
+      );
 
-      // Fetch roles
+      _userId = user.id;
+      _userEmail = user.email ?? '';
+      _userName = (profile['name'] as String?) ?? '';
+      _isLoggedIn = true;
+
+      // Ensure admin profile exists for known admin emails
+      try {
+        await SupabaseDB.ensureAdminProfileExists(
+          userId: _userId,
+          email: _userEmail,
+        );
+      } catch (e) {
+        debugPrint('Warning: Could not ensure admin profile: $e');
+      }
+
+      // Fetch user roles from database
       final roles = await SupabaseDB.getUserRoles(_userId);
       _isSeller = roles.contains('seller');
       _isAdmin = roles.contains('admin');
 
-      _isLoggedIn = true;
-      _needsProfileCompletion = false;
+      GoogleSignInDebugHelper.logDebugInfo(
+        stage: 'User Roles Retrieved',
+        additionalInfo: {
+          'isSeller': _isSeller,
+          'isAdmin': _isAdmin,
+          'roles': roles,
+        },
+      );
+
+      // Cache the user state for offline access
+      await _persistCachedUserState();
+
+      GoogleSignInDebugHelper.logDebugInfo(
+        stage: 'Mobile Google Sign-In Complete',
+        message: 'Successfully signed in user',
+      );
+
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
+      GoogleSignInDebugHelper.logDebugInfo(
+        stage: 'Mobile Sign-In Error',
+        error: e,
+      );
+
       debugPrint('Mobile Google sign-in error: $e');
       _errorMessage = _extractGoogleError(e);
-      _isLoggedIn = false;
       _isLoading = false;
       notifyListeners();
       return false;
@@ -477,20 +811,38 @@ class AuthService extends ChangeNotifier {
 
   /// Extract meaningful error from Google Sign-In exceptions
   String _extractGoogleError(dynamic e) {
-    final msg = e.toString();
-    if (msg.contains('12501') || msg.contains('canceled')) {
-      return 'Sign-in cancelled';
+    final msg = e.toString().toLowerCase();
+
+    // Common Google Sign-In error codes
+    if (msg.contains('12501') ||
+        msg.contains('canceled') ||
+        msg.contains('cancelled')) {
+      return 'Sign-in cancelled by user';
     }
-    if (msg.contains('10') || msg.contains('DEVELOPER_ERROR')) {
-      return 'Google Sign-In not configured. Check SHA-1 fingerprint.';
+    if (msg.contains('10') || msg.contains('developer_error')) {
+      return 'Google Sign-In configuration error. Please check SHA-1 fingerprint in Firebase Console.';
     }
-    if (msg.contains('7') || msg.contains('NETWORK_ERROR')) {
-      return 'Network error. Please check your connection.';
+    if (msg.contains('7') || msg.contains('network_error')) {
+      return 'Network error. Please check your internet connection.';
     }
-    if (msg.contains('UnsupportedError')) {
+    if (msg.contains('unsupportederror')) {
       return 'Google Sign-In is not supported on this device.';
     }
-    return 'Google Sign-In error: $msg';
+    if (msg.contains('account_exists_with_different_credential')) {
+      return 'An account already exists with this email using a different sign-in method.';
+    }
+    if (msg.contains('invalid_credential')) {
+      return 'Invalid Google credentials. Please try again.';
+    }
+    if (msg.contains('user_disabled')) {
+      return 'Your account has been disabled. Please contact support.';
+    }
+    if (msg.contains('operation_not_allowed')) {
+      return 'Google Sign-In is not enabled. Please contact support.';
+    }
+
+    // Return a generic error for unknown cases
+    return 'Google Sign-In failed. Please try again or use email/password login.';
   }
 
   /// Complete profile for new Google sign-in users
@@ -504,6 +856,12 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
 
     try {
+      debugPrint('🔵 Step 1: Creating/updating user in database...');
+      debugPrint('🔵 User ID: $_pendingGoogleUserId');
+      debugPrint('🔵 Email: $_pendingGoogleEmail');
+      debugPrint('🔵 Name: $_pendingGoogleName');
+      debugPrint('🔵 Phone: $phoneNumber');
+
       // Create user in the database now
       await SupabaseDB.createUserIfNotExists(
         userId: _pendingGoogleUserId,
@@ -511,11 +869,31 @@ class AuthService extends ChangeNotifier {
         name: _pendingGoogleName,
         phoneNumber: phoneNumber,
       );
+      debugPrint('✅ Step 1 completed: User created/updated successfully');
 
       // If user wants a password for email/password login, update it
       if (password != null && password.isNotEmpty) {
+        debugPrint('🔵 Step 2: Updating password...');
         await _client.auth.updateUser(UserAttributes(password: password));
+        debugPrint('✅ Step 2 completed: Password updated');
       }
+
+      // Ensure admin profile exists for known admin emails
+      debugPrint(
+        '🔵 Step 2.5: Checking if admin profile needs to be created...',
+      );
+      try {
+        await SupabaseDB.ensureAdminProfileExists(
+          userId: _pendingGoogleUserId,
+          email: _pendingGoogleEmail,
+        );
+      } catch (e) {
+        debugPrint('Warning: Could not ensure admin profile: $e');
+      }
+
+      debugPrint('🔵 Step 3: Getting user roles...');
+      final roles = await SupabaseDB.getUserRoles(_pendingGoogleUserId);
+      debugPrint('✅ Step 3 completed: User roles = $roles');
 
       // Finalize auth state
       _userId = _pendingGoogleUserId;
@@ -526,17 +904,20 @@ class AuthService extends ChangeNotifier {
       _pendingGoogleEmail = '';
       _pendingGoogleName = '';
 
-      final roles = await SupabaseDB.getUserRoles(_userId);
       _isSeller = roles.contains('seller');
       _isAdmin = roles.contains('admin');
+      debugPrint('🔵 Is Seller: $_isSeller, Is Admin: $_isAdmin');
 
       _isLoggedIn = true;
+      await _persistCachedUserState();
       _isLoading = false;
       notifyListeners();
+      debugPrint('✅ Profile completion successful!');
       return true;
-    } catch (e) {
-      debugPrint('Complete Google profile error: $e');
-      _errorMessage = 'Failed to save profile. Please try again.';
+    } catch (e, stackTrace) {
+      debugPrint('❌ Complete Google profile error: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+      _errorMessage = 'Failed to save profile: ${e.toString()}';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -562,20 +943,47 @@ class AuthService extends ChangeNotifier {
     try {
       // Sign out from mobile GoogleSignIn if not web
       if (!kIsWeb) {
-        await GoogleSignIn.instance.signOut();
+        try {
+          final GoogleSignIn googleSignIn = GoogleSignIn();
+          await googleSignIn.signOut();
+          GoogleSignInDebugHelper.logDebugInfo(
+            stage: 'Mobile Google Sign-Out',
+            message: 'Successfully signed out from Google on mobile',
+          );
+        } catch (e) {
+          GoogleSignInDebugHelper.logDebugInfo(
+            stage: 'Mobile Google Sign-Out Error',
+            error: e,
+          );
+          // Don't fail the entire logout process if Google sign-out fails
+          debugPrint('Google sign-out error (non-fatal): $e');
+        }
       }
 
+      // Sign out from Supabase (handles both web OAuth and email/password)
       await _client.auth.signOut();
+
+      // Clear all user state
       _isLoggedIn = false;
+      final previousUserId = _userId;
       _isSeller = false;
       _isAdmin = false;
       _isViewingAsFarmer = false;
       _userName = '';
       _userEmail = '';
       _userId = '';
+      _clearPendingGoogleProfileState();
+      await _clearCachedUserState(previousUserId);
       _errorMessage = null;
+
+      GoogleSignInDebugHelper.logDebugInfo(
+        stage: 'Complete Logout',
+        message: 'User successfully logged out',
+      );
+
       notifyListeners();
     } catch (e) {
+      GoogleSignInDebugHelper.logDebugInfo(stage: 'Logout Error', error: e);
       _errorMessage = 'Logout failed: $e';
       notifyListeners();
     }

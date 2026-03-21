@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "971354937445",
+    "project_id": "agridirect-8592b",
+    "storage_bucket": "agridirect-8592b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:971354937445:android:11d1cf7d729eda5b07ce8c",
+        "android_client_info": {
+          "package_name": "com.example.agridirect"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "971354937445-rhlf4h8qafoq8ehiljpeojdndf3ojg65.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.agridirect",
+            "certificate_hash": "fb94a7670eaf64963098618dc3789faf212ad5ae"
+          }
+        },
+        {
+          "client_id": "971354937445-v8cfmpblo7q42c4pmovqubmjbcae8q7e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.agridirect",
+            "certificate_hash": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+          }
+        },
+        {
+          "client_id": "971354937445-069lmm2u0u2sn8819f4oebotnait2b1m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFjlGgHnSlIJTOtb7munxmgLZXxy1bLmQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "971354937445-069lmm2u0u2sn8819f4oebotnait2b1m.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
