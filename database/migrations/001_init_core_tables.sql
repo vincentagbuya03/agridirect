@@ -111,3 +111,25 @@ CREATE TRIGGER user_addresses_updated_at_trigger
 BEFORE UPDATE ON user_addresses
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- AUTO-CREATE USER PROFILE FUNCTION
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (user_id, email, name)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email)
+  )
+  ON CONFLICT (user_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create trigger to automatically create user profile when auth user signs up
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

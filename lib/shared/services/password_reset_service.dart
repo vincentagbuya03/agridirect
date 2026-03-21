@@ -32,6 +32,12 @@ class PasswordResetService {
         throw 'User not found with this email address';
       }
 
+      final userId = user['user_id'] as String?;
+      if (userId == null || userId.isEmpty) {
+        debugPrint('❌ User found but user_id is null for email: $email');
+        throw 'User account is not properly configured. Please contact support.';
+      }
+
       // Generate code
       final code = _generateCode();
       debugPrint('🔐 Generated code: $code');
@@ -40,11 +46,11 @@ class PasswordResetService {
       await _client
           .from('password_reset_codes')
           .delete()
-          .eq('user_id', user['user_id']);
+          .eq('user_id', userId);
 
       // Store code in database
       await _client.from('password_reset_codes').insert({
-        'user_id': user['user_id'],
+        'user_id': userId,
         'email': email,
         'code': code,
         'created_at': DateTime.now().toIso8601String(),
