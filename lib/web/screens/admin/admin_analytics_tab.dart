@@ -2,302 +2,296 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/admin_service.dart';
 
-/// Admin Analytics Tab - Enterprise Dashboard Overview matching reference design
+/// Admin Analytics Tab - Enterprise Dashboard Overview
 class AdminAnalyticsTab extends StatefulWidget {
   final AdminService adminService;
 
-  const AdminAnalyticsTab({
-    super.key,
-    required this.adminService,
-  });
+  const AdminAnalyticsTab({super.key, required this.adminService});
 
   @override
   State<AdminAnalyticsTab> createState() => _AdminAnalyticsTabState();
 }
 
 class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
-  late Future<Map<String, dynamic>?> _statsFuture;
+  late Future<Map<String, int>> _countsFuture;
+  late Future<Map<String, dynamic>> _revenueFuture;
 
-  // Enterprise dark theme colors
-  static const Color _primary = Color(0xFF16A34A);
-  static const Color _secondary = Color(0xFF06B6D4);
-  static const Color _warning = Color(0xFFFFA500);
+  // Modern dark theme colors
+  static const Color _primary = Color(0xFF10B981);
+  static const Color _primaryLight = Color(0xFF34D399);
+  static const Color _secondary = Color(0xFF3B82F6);
+  static const Color _warning = Color(0xFFF59E0B);
   static const Color _danger = Color(0xFFEF4444);
-  static const Color _darker = Color(0xFF111827);
-  static const Color _surface = Color(0xFF334155);
-  static const Color _muted = Color(0xFF6B7280);
-  static const Color _cardBg = Color(0xFF1E293B);
+  static const Color _purple = Color(0xFF8B5CF6);
+  static const Color _dark = Color(0xFF0F172A);
+  static const Color _card = Color(0xFF1E293B);
+  static const Color _cardHover = Color(0xFF334155);
   static const Color _border = Color(0xFF334155);
+  static const Color _muted = Color(0xFF64748B);
+  static const Color _text = Color(0xFFF1F5F9);
 
   @override
   void initState() {
     super.initState();
-    _statsFuture = widget.adminService.getDashboardStats();
+    _loadData();
+  }
+
+  void _loadData() {
+    _countsFuture = widget.adminService.getDashboardCounts();
+    _revenueFuture = widget.adminService.getRevenueAnalytics();
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 768;
+    final isTablet = screenWidth >= 768 && screenWidth < 1200;
 
     return Container(
-      color: _darker,
-      child: SingleChildScrollView(
-        padding: EdgeInsets.all(isMobile ? 16 : 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTopBar(isMobile),
-            const SizedBox(height: 24),
-            FutureBuilder<Map<String, dynamic>?>(
-              future: _statsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return _buildLoadingCards(isMobile);
-                }
-                if (snapshot.hasError || snapshot.data == null) {
-                  return _buildErrorState();
-                }
-                final stats = snapshot.data!;
-                return Column(
+      color: _dark,
+      child: RefreshIndicator(
+        onRefresh: () async {
+          setState(() => _loadData());
+        },
+        color: _primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.all(isMobile ? 16 : 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Quick Stats
+              FutureBuilder<Map<String, int>>(
+                future: _countsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return _buildLoadingStats(isMobile);
+                  }
+                  final counts = snapshot.data ?? {};
+                  return _buildStatsGrid(counts, isMobile, isTablet);
+                },
+              ),
+              const SizedBox(height: 24),
+              // Revenue & Activity Row
+              if (isMobile)
+                Column(
                   children: [
-                    _buildStatCardsRow(stats, isMobile),
+                    _buildRevenueCard(),
                     const SizedBox(height: 24),
-                    if (isMobile)
-                      Column(
+                    _buildQuickActionsCard(),
+                    const SizedBox(height: 24),
+                    _buildRecentActivityCard(),
+                  ],
+                )
+              else
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 3, child: _buildRevenueCard()),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
                         children: [
-                          _buildFinancialPerformance(),
+                          _buildQuickActionsCard(),
                           const SizedBox(height: 24),
-                          _buildSystemEvents(),
-                        ],
-                      )
-                    else
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(flex: 3, child: _buildFinancialPerformance()),
-                          const SizedBox(width: 24),
-                          Expanded(flex: 2, child: _buildSystemEvents()),
+                          _buildRecentActivityCard(),
                         ],
                       ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTopBar(bool isMobile) {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 44,
-            decoration: BoxDecoration(
-              color: _cardBg,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _border),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Icon(Icons.search, color: _muted, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: 'Global search for farmers, orders, or SKUs...',
-                      hintStyle: GoogleFonts.plusJakartaSans(color: _muted, fontSize: 13),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
                     ),
-                  ),
+                  ],
                 ),
-              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingStats(bool isMobile) {
+    return GridView.count(
+      crossAxisCount: isMobile ? 2 : 4,
+      mainAxisSpacing: 16,
+      crossAxisSpacing: 16,
+      childAspectRatio: isMobile ? 1.3 : 1.8,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: List.generate(
+        4,
+        (_) => Container(
+          decoration: BoxDecoration(
+            color: _card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _border),
+          ),
+          child: const Center(
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(color: _primary, strokeWidth: 2),
             ),
           ),
         ),
-        if (!isMobile) ...[
-          const SizedBox(width: 16),
-          _buildIconButton(Icons.thumb_up_outlined),
-          const SizedBox(width: 8),
-          _buildIconButton(Icons.help_outline),
-          const SizedBox(width: 16),
-          Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(
-              color: _primary,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.add, color: Color(0xFF111827), size: 18),
-                const SizedBox(width: 8),
-                Text('Quick Action',
-                    style: GoogleFonts.plusJakartaSans(
-                        color: const Color(0xFF111827),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 
-  Widget _buildIconButton(IconData icon) {
-    return Container(
-      height: 44,
-      width: 44,
-      decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _border),
+  Widget _buildStatsGrid(
+    Map<String, int> counts,
+    bool isMobile,
+    bool isTablet,
+  ) {
+    final stats = [
+      _StatData(
+        icon: Icons.people_rounded,
+        title: 'Total Users',
+        value: '${counts['total_users'] ?? 0}',
+        subtitle: '+12% this month',
+        color: _secondary,
+        trend: 12,
       ),
-      child: Icon(icon, color: _muted, size: 20),
-    );
-  }
-
-  Widget _buildStatCardsRow(Map<String, dynamic> stats, bool isMobile) {
-    final totalRevenue = stats['total_orders'] != null
-        ? (stats['total_orders'] as num) * 33.4
-        : 0.0;
-    final completedOrders = stats['total_orders'] ?? 0;
-    final verifiedFarmers = stats['total_farmers'] ?? 0;
-    final pendingReports = stats['pending_reports'] ?? 0;
-
-    final cards = [
-      _EnterpriseStatCard(
-        icon: Icons.account_balance_wallet_outlined,
-        iconColor: _primary,
-        title: 'GROSS REVENUE',
-        value: '₱${_formatNumber(totalRevenue)}',
-        badge: '↗ 12.5%',
-        badgeColor: _primary,
+      _StatData(
+        icon: Icons.agriculture_rounded,
+        title: 'Active Farmers',
+        value: '${counts['verified_farmers'] ?? 0}',
+        subtitle: '${counts['total_farmers'] ?? 0} total',
+        color: _primary,
+        trend: 8,
       ),
-      _EnterpriseStatCard(
-        icon: Icons.shopping_cart_outlined,
-        iconColor: _secondary,
-        title: 'COMPLETED ORDERS',
-        value: _formatWholeNumber(completedOrders),
-        badge: '↗ 8.2%',
-        badgeColor: _secondary,
+      _StatData(
+        icon: Icons.inventory_2_rounded,
+        title: 'Products',
+        value: '${counts['total_products'] ?? 0}',
+        subtitle: 'Listed items',
+        color: _purple,
+        trend: 15,
       ),
-      _EnterpriseStatCard(
-        icon: Icons.groups_outlined,
-        iconColor: _primary,
-        title: 'VERIFIED FARMERS',
-        value: _formatWholeNumber(verifiedFarmers),
-        badgeText: 'Live',
-        badgeColor: _primary,
-      ),
-      _EnterpriseStatCard(
-        icon: Icons.assignment_outlined,
-        iconColor: _warning,
-        title: 'AUDIT QUEUE',
-        value: '$pendingReports',
-        badgeText: 'Action',
-        badgeColor: _danger,
+      _StatData(
+        icon: Icons.shopping_bag_rounded,
+        title: 'Total Orders',
+        value: '${counts['total_orders'] ?? 0}',
+        subtitle: 'All time orders',
+        color: _warning,
+        trend: 23,
       ),
     ];
 
-    if (isMobile) {
-      return GridView.count(
-        crossAxisCount: 2,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 1.4,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        children: cards,
-      );
-    }
-
-    return Row(
-      children: cards
-          .map((card) => Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: card,
-                ),
-              ))
-          .toList(),
+    return GridView.count(
+      crossAxisCount: isMobile ? 2 : (isTablet ? 2 : 4),
+      mainAxisSpacing: 16,
+      crossAxisSpacing: 16,
+      childAspectRatio: isMobile ? 1.3 : (isTablet ? 1.8 : 1.6),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: stats.map((stat) => _StatCard(stat: stat)).toList(),
     );
   }
 
-  Widget _buildFinancialPerformance() {
+  Widget _buildRevenueCard() {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(16),
+        color: _card,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Financial Performance',
-                  style: GoogleFonts.plusJakartaSans(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Revenue Overview',
+                    style: GoogleFonts.inter(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white)),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: _border),
-                      borderRadius: BorderRadius.circular(8),
+                      color: _text,
                     ),
-                    child: Text('Year 2024',
-                        style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _muted)),
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: _border),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(Icons.download, color: _muted, size: 16),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Monthly performance',
+                    style: GoogleFonts.inter(fontSize: 13, color: _muted),
                   ),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Container(width: 8, height: 8, decoration: const BoxDecoration(color: _primary, shape: BoxShape.circle)),
-              const SizedBox(width: 6),
-              Text('Monthly Revenue', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: _muted)),
-              const SizedBox(width: 16),
-              Container(width: 8, height: 8, decoration: BoxDecoration(color: _muted.withOpacity(0.5), shape: BoxShape.circle)),
-              const SizedBox(width: 6),
-              Text('Previous Period', style: GoogleFonts.plusJakartaSans(fontSize: 11, color: _muted)),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: _dark,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _border),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      'This Year',
+                      style: GoogleFonts.inter(fontSize: 13, color: _text),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: _muted,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 24),
-          SizedBox(height: 220, child: _buildBarChart()),
+          // Revenue Stats
+          FutureBuilder<Map<String, dynamic>>(
+            future: _revenueFuture,
+            builder: (context, snapshot) {
+              final data = snapshot.data ?? {};
+              final totalRevenue = (data['total_revenue'] ?? 0.0) as double;
+              final completedRevenue =
+                  (data['completed_revenue'] ?? 0.0) as double;
+
+              return Column(
+                children: [
+                  Row(
+                    children: [
+                      _MiniStatCard(
+                        label: 'Total Revenue',
+                        value: '₱${_formatNumber(totalRevenue)}',
+                        icon: Icons.account_balance_wallet_rounded,
+                        color: _primary,
+                      ),
+                      const SizedBox(width: 16),
+                      _MiniStatCard(
+                        label: 'Completed',
+                        value: '₱${_formatNumber(completedRevenue)}',
+                        icon: Icons.check_circle_rounded,
+                        color: _secondary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Chart placeholder
+                  SizedBox(height: 200, child: _buildBarChart()),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
   }
 
   Widget _buildBarChart() {
-    final months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG'];
-    final values = [15.0, 25.0, 84.2, 40.0, 30.0, 45.0, 35.0, 20.0];
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+    final values = [35.0, 52.0, 78.0, 45.0, 89.0, 67.0];
     final maxVal = 100.0;
-    final yLabels = ['₱100k', '₱75k', '₱50k', '₱25k', '0'];
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -305,63 +299,85 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
           children: [
             Expanded(
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    width: 50,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: yLabels
-                          .map((label) => Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 10, color: _muted)))
-                          .toList(),
-                    ),
-                  ),
-                  Expanded(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: List.generate(months.length, (i) {
-                        final ratio = values[i] / maxVal;
-                        final isHighlighted = i == 2;
-                        return Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            if (isHighlighted)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(color: _primary, borderRadius: BorderRadius.circular(6)),
-                                child: Text('₱${values[i]}k',
-                                    style: GoogleFonts.plusJakartaSans(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF111827))),
-                              ),
-                            if (isHighlighted) const SizedBox(height: 4),
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(months.length, (i) {
+                  final ratio = values[i] / maxVal;
+                  final isHighlighted = i == 4;
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (isHighlighted)
                             Container(
-                              width: 24,
-                              height: (constraints.maxHeight - 30) * ratio,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
-                                color: isHighlighted ? _primary : _surface.withOpacity(0.6),
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                color: _primary,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '₱${values[i].toInt()}k',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
-                          ],
-                        );
-                      }),
+                          if (isHighlighted) const SizedBox(height: 6),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 500),
+                            width: double.infinity,
+                            height: (constraints.maxHeight - 40) * ratio,
+                            decoration: BoxDecoration(
+                              gradient: isHighlighted
+                                  ? const LinearGradient(
+                                      colors: [_primary, _primaryLight],
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                    )
+                                  : null,
+                              color: isHighlighted ? null : _cardHover,
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  );
+                }),
               ),
             ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.only(left: 50),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: months.asMap().entries.map((e) => Text(e.value,
-                    style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        color: e.key == 2 ? Colors.white : _muted,
-                        fontWeight: e.key == 2 ? FontWeight.w600 : FontWeight.normal))).toList(),
-              ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: months
+                  .asMap()
+                  .entries
+                  .map(
+                    (e) => Expanded(
+                      child: Center(
+                        child: Text(
+                          e.value,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: e.key == 4
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: e.key == 4 ? _text : _muted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
           ],
         );
@@ -369,12 +385,64 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
     );
   }
 
-  Widget _buildSystemEvents() {
+  Widget _buildQuickActionsCard() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(16),
+        color: _card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Quick Actions',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: _text,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _QuickActionTile(
+            icon: Icons.person_add_rounded,
+            title: 'Add User',
+            color: _secondary,
+            onTap: () {},
+          ),
+          const SizedBox(height: 10),
+          _QuickActionTile(
+            icon: Icons.category_rounded,
+            title: 'New Category',
+            color: _purple,
+            onTap: () {},
+          ),
+          const SizedBox(height: 10),
+          _QuickActionTile(
+            icon: Icons.announcement_rounded,
+            title: 'Send Notification',
+            color: _warning,
+            onTap: () {},
+          ),
+          const SizedBox(height: 10),
+          _QuickActionTile(
+            icon: Icons.download_rounded,
+            title: 'Export Report',
+            color: _primary,
+            onTap: () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentActivityCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _border),
       ),
       child: Column(
@@ -383,214 +451,116 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('System Events',
-                  style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-              Icon(Icons.filter_list, color: _muted, size: 20),
+              Text(
+                'Recent Activity',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: _text,
+                ),
+              ),
+              Icon(Icons.more_horiz_rounded, color: _muted, size: 20),
             ],
           ),
-          const SizedBox(height: 24),
-          _buildEventItem(
-            icon: Icons.person_add,
+          const SizedBox(height: 16),
+          _ActivityItem(
+            icon: Icons.person_add_rounded,
             iconBg: _primary.withOpacity(0.15),
             iconColor: _primary,
             title: 'New Farmer Signup',
+            subtitle: 'Highland Organics registered',
             time: '2m ago',
-            description: 'Highland Organics submitted credentials for review.',
-            dotColor: _primary,
           ),
-          const SizedBox(height: 20),
-          _buildEventItem(
+          const SizedBox(height: 14),
+          _ActivityItem(
+            icon: Icons.shopping_bag_rounded,
+            iconBg: _secondary.withOpacity(0.15),
+            iconColor: _secondary,
+            title: 'New Order #8842',
+            subtitle: '2.5 Tons of Sweet Potato',
+            time: '15m ago',
+          ),
+          const SizedBox(height: 14),
+          _ActivityItem(
             icon: Icons.warning_rounded,
             iconBg: _danger.withOpacity(0.15),
             iconColor: _danger,
-            title: 'Violation Detected',
-            time: '15m ago',
-            description: 'Price anomaly detected on "Premium Arabica" listing.',
-            dotColor: _danger,
-            showActions: true,
+            title: 'Content Reported',
+            subtitle: 'Product listing flagged',
+            time: '1h ago',
           ),
-          const SizedBox(height: 20),
-          _buildEventItem(
-            icon: Icons.inventory_2,
-            iconBg: _secondary.withOpacity(0.15),
-            iconColor: _secondary,
-            title: 'Bulk Order Placed',
-            time: '45m ago',
-            description: 'Order #8842: 2.5 Tons of Sweet Potato confirmed.',
-            dotColor: _secondary,
+          const SizedBox(height: 14),
+          _ActivityItem(
+            icon: Icons.verified_rounded,
+            iconBg: _primary.withOpacity(0.15),
+            iconColor: _primary,
+            title: 'Farmer Verified',
+            subtitle: 'Green Valley Farm approved',
+            time: '2h ago',
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           Center(
-            child: Text('VIEW FULL ACTIVITY LOGS',
-                style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: _muted, letterSpacing: 1)),
+            child: TextButton(
+              onPressed: () {},
+              child: Text(
+                'View All Activity',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _primary,
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEventItem({
-    required IconData icon,
-    required Color iconBg,
-    required Color iconColor,
-    required String title,
-    required String time,
-    required String description,
-    required Color dotColor,
-    bool showActions = false,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
-          child: Icon(icon, color: iconColor, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(title, style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
-                  Text(time, style: GoogleFonts.plusJakartaSans(fontSize: 11, color: _muted)),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(description, style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _muted)),
-              if (showActions) ...[
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    _buildActionBtn('Action', _primary, const Color(0xFF111827)),
-                    const SizedBox(width: 8),
-                    _buildActionBtn('Dismiss', _surface, _muted),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          width: 8,
-          height: 8,
-          margin: const EdgeInsets.only(top: 6),
-          decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionBtn(String text, Color bg, Color textColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-      child: Text(text, style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: textColor)),
-    );
-  }
-
-  Widget _buildLoadingCards(bool isMobile) {
-    return GridView.count(
-      crossAxisCount: isMobile ? 2 : 4,
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      childAspectRatio: isMobile ? 1.4 : 2.0,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      children: List.generate(
-        4,
-        (_) => Container(
-          decoration: BoxDecoration(
-            color: _cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _border),
-          ),
-          child: const Center(child: CircularProgressIndicator(color: _primary)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Container(
-      padding: const EdgeInsets.all(40),
-      decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border),
-      ),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(Icons.error_outline, color: _danger, size: 48),
-            const SizedBox(height: 16),
-            Text('Failed to load statistics', style: GoogleFonts.plusJakartaSans(color: _danger, fontSize: 14)),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _statsFuture = widget.adminService.getDashboardStats();
-                });
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: const Color(0xFF111827)),
-              child: Text('Retry', style: GoogleFonts.plusJakartaSans()),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatNumber(num value) {
+  String _formatNumber(double value) {
     if (value >= 1000000) {
       return '${(value / 1000000).toStringAsFixed(1)}M';
     } else if (value >= 1000) {
-      return value.toStringAsFixed(2).replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+      return '${(value / 1000).toStringAsFixed(1)}K';
     }
-    return value.toStringAsFixed(2);
-  }
-
-  String _formatWholeNumber(num value) {
-    return value.toString().replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+    return value.toStringAsFixed(0);
   }
 }
 
-class _EnterpriseStatCard extends StatefulWidget {
+class _StatData {
   final IconData icon;
-  final Color iconColor;
   final String title;
   final String value;
-  final String? badge;
-  final String? badgeText;
-  final Color badgeColor;
+  final String subtitle;
+  final Color color;
+  final int trend;
 
-  const _EnterpriseStatCard({
+  _StatData({
     required this.icon,
-    required this.iconColor,
     required this.title,
     required this.value,
-    this.badge,
-    this.badgeText,
-    required this.badgeColor,
+    required this.subtitle,
+    required this.color,
+    required this.trend,
   });
-
-  @override
-  State<_EnterpriseStatCard> createState() => _EnterpriseStatCardState();
 }
 
-class _EnterpriseStatCardState extends State<_EnterpriseStatCard> {
+class _StatCard extends StatefulWidget {
+  final _StatData stat;
+
+  const _StatCard({required this.stat});
+
+  @override
+  State<_StatCard> createState() => _StatCardState();
+}
+
+class _StatCardState extends State<_StatCard> {
   bool _isHovered = false;
 
-  static const Color _cardBg = Color(0xFF1E293B);
+  static const Color _card = Color(0xFF1E293B);
   static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF6B7280);
+  static const Color _muted = Color(0xFF64748B);
+  static const Color _text = Color(0xFFF1F5F9);
 
   @override
   Widget build(BuildContext context) {
@@ -601,62 +571,275 @@ class _EnterpriseStatCardState extends State<_EnterpriseStatCard> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: _cardBg,
-          borderRadius: BorderRadius.circular(16),
+          color: _card,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: _isHovered ? widget.badgeColor.withOpacity(0.5) : _border,
+            color: _isHovered ? widget.stat.color.withOpacity(0.5) : _border,
           ),
           boxShadow: _isHovered
-              ? [BoxShadow(color: widget.badgeColor.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 4))]
+              ? [
+                  BoxShadow(
+                    color: widget.stat.color.withOpacity(0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
               : [],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: widget.iconColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: widget.stat.color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(widget.icon, color: widget.iconColor, size: 24),
+                  child: Icon(
+                    widget.stat.icon,
+                    color: widget.stat.color,
+                    size: 24,
+                  ),
                 ),
-                if (widget.badge != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: widget.badgeColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(widget.badge!,
-                        style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: widget.badgeColor)),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
                   ),
-                if (widget.badgeText != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: widget.badgeColor.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: widget.badgeColor.withOpacity(0.3)),
-                    ),
-                    child: Text(widget.badgeText!,
-                        style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: widget.badgeColor)),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
                   ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.trending_up_rounded,
+                        size: 14,
+                        color: const Color(0xFF10B981),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '+${widget.stat.trend}%',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF10B981),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 16),
-            Text(widget.title,
-                style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: _muted, letterSpacing: 0.5)),
+            const Spacer(),
+            Text(
+              widget.stat.value,
+              style: GoogleFonts.inter(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: _text,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(widget.value, style: GoogleFonts.plusJakartaSans(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(
+              widget.stat.title,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: _muted,
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _MiniStatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _MiniStatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  static const Color _dark = Color(0xFF0F172A);
+  static const Color _muted = Color(0xFF64748B);
+  static const Color _text = Color(0xFFF1F5F9);
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _dark,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.inter(fontSize: 11, color: _muted),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _text,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickActionTile({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.onTap,
+  });
+
+  static const Color _dark = Color(0xFF0F172A);
+  static const Color _text = Color(0xFFF1F5F9);
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: _dark,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 18),
+              ),
+              const SizedBox(width: 14),
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: _text,
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: color.withOpacity(0.5),
+                size: 14,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityItem extends StatelessWidget {
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final String time;
+
+  const _ActivityItem({
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.time,
+  });
+
+  static const Color _muted = Color(0xFF64748B);
+  static const Color _text = Color(0xFFF1F5F9);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: iconBg,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor, size: 18),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _text,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: GoogleFonts.inter(fontSize: 12, color: _muted),
+              ),
+            ],
+          ),
+        ),
+        Text(time, style: GoogleFonts.inter(fontSize: 11, color: _muted)),
+      ],
     );
   }
 }
