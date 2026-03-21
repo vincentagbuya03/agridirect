@@ -117,11 +117,15 @@ class PasswordResetService {
         throw 'User not found';
       }
 
-      // Update password using admin API
-      await Supabase.instance.client.auth.admin.updateUserById(
-        user['user_id'] as String,
-        attributes: AdminUserAttributes(password: newPassword),
-      );
+      // Update password using secure database function
+      final result = await _client.rpc('reset_user_password', params: {
+        'user_email': email,
+        'new_password': newPassword,
+      });
+
+      if (result == false) {
+        throw 'Failed to update password';
+      }
 
       // Mark code as used
       await _client
