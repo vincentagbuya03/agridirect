@@ -118,13 +118,14 @@ class PasswordResetService {
       }
 
       // Update password using secure database function
-      final result = await _client.rpc('reset_user_password', params: {
-        'user_email': email,
-        'new_password': newPassword,
-      });
-
-      if (result == false) {
-        throw 'Failed to update password';
+      try {
+        await _client.rpc('reset_user_password', params: {
+          'user_email': email,
+          'new_password': newPassword,
+        });
+      } catch (e) {
+        debugPrint('❌ RPC error updating password: $e');
+        throw 'Failed to update password: ${e.toString()}';
       }
 
       // Mark code as used
