@@ -347,10 +347,12 @@ class SupabaseDB {
       debugPrint('🔵 getUserRoles called for userId: $userId');
 
       // Use stored function that bypasses RLS
-      final response = await _client.rpc(
-        'get_user_roles',
-        params: {'checked_user_id': userId},
-      ) as List<dynamic>;
+      final response =
+          await _client.rpc(
+                'get_user_roles',
+                params: {'checked_user_id': userId},
+              )
+              as List<dynamic>;
 
       final roles = response
           .map((item) => (item as Map<String, dynamic>)['role_name'] as String)
@@ -363,9 +365,13 @@ class SupabaseDB {
       debugPrint('❌ Stack trace: $stackTrace');
       debugPrint('');
       debugPrint('🔧 TROUBLESHOOTING:');
-      debugPrint('   1. Make sure get_user_roles() function exists in database');
+      debugPrint(
+        '   1. Make sure get_user_roles() function exists in database',
+      );
       debugPrint('   2. Run GET_USER_ROLES_FUNCTION.sql from lib/shared/data/');
-      debugPrint('   3. Check function definition: SELECT * FROM information_schema.routines WHERE routine_name=\'get_user_roles\'');
+      debugPrint(
+        '   3. Check function definition: SELECT * FROM information_schema.routines WHERE routine_name=\'get_user_roles\'',
+      );
       return ['consumer']; // Default to consumer role if any error
     }
   }

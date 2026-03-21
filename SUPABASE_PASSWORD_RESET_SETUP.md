@@ -43,15 +43,18 @@ Replace `yourdomain.vercel.app` with your actual Vercel domain.
 ## Common Issues
 
 ### "Auth session missing" error
+
 - Make sure you clicked the link from the email
 - Check that Site URL and Redirect URLs are configured correctly
 - The reset link expires after 1 hour by default
 
 ### Link redirects to wrong URL
+
 - Verify Site URL in Supabase dashboard matches your app URL
 - Clear browser cache and try again
 
 ### Email not received
+
 - Check spam folder
 - Verify email provider settings in Supabase
 - Check Supabase logs for email delivery errors
@@ -59,6 +62,7 @@ Replace `yourdomain.vercel.app` with your actual Vercel domain.
 ## Production Deployment
 
 When deploying to production:
+
 1. Update Site URL to your production domain
 2. Add production domain to Redirect URLs
 3. Test the full flow on production
