@@ -927,10 +927,12 @@ class AuthService extends ChangeNotifier {
   /// Reset password - sends reset link to email
   Future<void> resetPassword({required String email}) async {
     try {
-      await _client.auth.resetPasswordForEmail(
-        email,
-        redirectTo: 'com.agridirect://reset-password',
-      );
+      // For web, use the web URL; for mobile, use deep link
+      final redirectUrl = kIsWeb
+          ? '${Uri.base.origin}/reset-password'
+          : 'com.agridirect://reset-password';
+
+      await _client.auth.resetPasswordForEmail(email, redirectTo: redirectUrl);
     } catch (e) {
       _errorMessage = _extractErrorMessage(e);
       notifyListeners();

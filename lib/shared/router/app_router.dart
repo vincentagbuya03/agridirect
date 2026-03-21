@@ -13,6 +13,8 @@ import '../../web/web_navigation.dart';
 import '../../web/screens/auth/web_login_screen.dart';
 import '../../web/screens/auth/web_registration_screen.dart';
 import '../../web/screens/auth/web_farmer_registration_screen.dart';
+import '../../web/screens/auth/web_auth_callback_screen.dart';
+import '../../web/screens/auth/web_password_reset_screen.dart';
 import '../../web/screens/consumer/web_preorder_details.dart';
 import '../../web/screens/admin/admin_dashboard_redesigned.dart';
 import '../../web/screens/common/web_welcome_screen.dart';
@@ -29,6 +31,7 @@ class AppRoutes {
   static const String admin = '/admin';
   static const String preorderDetails = '/preorder-details';
   static const String authCallback = '/auth/callback';
+  static const String resetPassword = '/reset-password';
 
   // ── Mobile-specific ──
   static const String farmerRegister = '/farmer-register';
@@ -123,6 +126,9 @@ GoRouter createAppRouter() {
       }
 
       // ── Web redirect logic ─────────────────────────────────────────────────
+
+      // Allow password reset without auth
+      if (location == AppRoutes.resetPassword) return null;
 
       // ⚠️ NEW: If user needs profile completion (mobile or web), redirect them there!
       if (auth.needsProfileCompletion &&
@@ -351,6 +357,12 @@ GoRouter createAppRouter() {
       GoRoute(
         path: AppRoutes.authCallback,
         builder: (context, state) => const WebAuthCallbackScreen(),
+      ),
+
+      // ── Password Reset ────────────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.resetPassword,
+        builder: (context, state) => const WebPasswordResetScreen(),
       ),
     ],
 
