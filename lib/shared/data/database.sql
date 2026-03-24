@@ -166,10 +166,13 @@ CREATE INDEX IF NOT EXISTS idx_farmer_ratings_customer_id ON farmer_ratings(cust
 
 CREATE TABLE IF NOT EXISTS farmer_registrations (
   registration_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  farmer_id uuid UNIQUE NOT NULL REFERENCES farmers(farmer_id) ON DELETE CASCADE,
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  farmer_id uuid UNIQUE REFERENCES farmers(farmer_id) ON DELETE CASCADE,
   birth_date text,
   years_of_experience integer,
   residential_address text,
+  farm_name text,
+  specialty text,
   face_photo_path text,
   valid_id_path text,
   farming_history text,
@@ -183,6 +186,7 @@ CREATE TABLE IF NOT EXISTS farmer_registrations (
 
 CREATE INDEX IF NOT EXISTS idx_farmer_registrations_farmer_id ON farmer_registrations(farmer_id);
 CREATE INDEX IF NOT EXISTS idx_farmer_registrations_status ON farmer_registrations(status);
+CREATE INDEX IF NOT EXISTS idx_farmer_registrations_user_id ON farmer_registrations(user_id);
 
 CREATE TABLE IF NOT EXISTS farmer_education (
   education_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -530,3 +534,320 @@ CREATE TABLE IF NOT EXISTS wishlist_items (
 
 CREATE INDEX IF NOT EXISTS idx_wishlist_items_customer_id ON wishlist_items(customer_id);
 CREATE INDEX IF NOT EXISTS idx_wishlist_items_product_id ON wishlist_items(product_id);
+
+-- ========================================================================
+-- PASSWORD RESET
+-- ========================================================================
+
+CREATE TABLE IF NOT EXISTS password_reset_codes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  email text NOT NULL,
+  code text NOT NULL,
+  expires_at timestamptz NOT NULL,
+  used boolean DEFAULT false,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_reset_codes_user_id ON password_reset_codes(user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_codes_email ON password_reset_codes(email);
+CREATE INDEX IF NOT EXISTS idx_password_reset_codes_code ON password_reset_codes(code);
+
+-- ========================================================================
+-- FARMER WALLETS & TRANSACTIONS
+-- ========================================================================
+
+CREATE TABLE IF NOT EXISTS farmer_wallets (
+  wallet_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  farmer_id uuid NOT NULL REFERENCES farmers(farmer_id) ON DELETE CASCADE,
+  balance numeric NOT NULL DEFAULT 0,
+  total_credited numeric NOT NULL DEFAULT 0,
+  total_withdrawn numeric NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_farmer_wallets_farmer_id ON farmer_wallets(farmer_id);
+
+CREATE TABLE IF NOT EXISTS wallet_transactions (
+  transaction_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  wallet_id uuid NOT NULL REFERENCES farmer_wallets(wallet_id) ON DELETE CASCADE,
+  order_id uuid REFERENCES orders(order_id) ON DELETE SET NULL,
+  payment_id uuid REFERENCES payments(payment_id) ON DELETE SET NULL,
+  transaction_type text NOT NULL,
+  amount numeric NOT NULL,
+  description text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_wallet_id ON wallet_transactions(wallet_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_order_id ON wallet_transactions(order_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_payment_id ON wallet_transactions(payment_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_created_at ON wallet_transactions(created_at);
+
+-- ========================================================================
+-- VIEWS
+-- ========================================================================
+
+-- Active sessions view
+CREATE OR REPLACE VIEW v_active_sessions AS
+SELECT
+  s.session_id,
+  s.user_id,
+  u.email,
+  u.name,
+  s.start_time,
+  s.platform,
+  s.clicks_count,
+  s.keystrokes_count,
+  EXTRACT(EPOCH FROM (now() - s.start_time))::integer as current_duration_seconds,
+  (EXTRACT(EPOCH FROM (now() - s.start_time)) / 3600)::numeric as current_duration_hours
+FROM app_sessions s
+JOIN users u ON s.user_id = u.user_id
+WHERE s.end_time IS NULL;
+
+-- Daily user activity view
+CREATE OR REPLACE VIEW v_daily_user_activity AS
+SELECT
+  ual.user_id,
+  u.email,
+  u.name,
+  ual.date,
+  ual.total_clicks,
+  ual.total_keystrokes,
+  ual.total_sessions,
+  (ual.total_time_seconds / 3600.0)::numeric as hours_used,
+  ual.most_visited_screen,
+  ual.updated_at
+FROM user_activity_logs ual
+JOIN users u ON ual.user_id = u.user_id;
+
+-- Farmer profiles view
+CREATE OR REPLACE VIEW v_farmer_profiles AS
+SELECT
+  f.user_id,
+  u.name as farmer_name,
+  u.email as farmer_email,
+  f.farm_name,
+  f.farmer_id
+FROM farmers f
+JOIN users u ON f.user_id = u.user_id;
+
+-- Monthly user activity view
+CREATE OR REPLACE VIEW v_monthly_user_activity AS
+SELECT
+  ual.user_id,
+  date_trunc('month', ual.date)::timestamptz as month_start,
+  SUM(ual.total_clicks)::bigint as total_clicks,
+  SUM(ual.total_keystrokes)::bigint as total_keystrokes,
+  SUM(ual.total_sessions)::bigint as total_sessions,
+  SUM(ual.total_time_seconds / 3600.0)::numeric as total_hours,
+  COUNT(DISTINCT ual.date)::bigint as active_days
+FROM user_activity_logs ual
+GROUP BY ual.user_id, date_trunc('month', ual.date);
+
+-- Products view with farmer details
+CREATE OR REPLACE VIEW v_products AS
+SELECT
+  p.product_id,
+  p.name,
+  p.description,
+  p.price,
+  p.harvest_days,
+  p.is_preorder,
+  p.is_featured,
+  p.is_active,
+  p.farmer_id,
+  p.category_id,
+  p.unit_id,
+  p.total_sold,
+  p.view_count,
+  p.created_at,
+  p.updated_at,
+  f.farm_name as farmer_name,
+  f.farm_name
+FROM products p
+JOIN farmers f ON p.farmer_id = f.farmer_id;
+
+-- User engagement 30-day view
+CREATE OR REPLACE VIEW v_user_engagement_30d AS
+SELECT
+  ual.user_id,
+  u.email,
+  u.name,
+  COUNT(DISTINCT ual.date)::bigint as active_days,
+  SUM(ual.total_clicks)::bigint as total_clicks,
+  SUM(ual.total_keystrokes)::bigint as total_keystrokes,
+  SUM(ual.total_sessions)::bigint as total_sessions,
+  SUM(ual.total_time_seconds / 3600.0)::numeric as total_hours,
+  (SUM(ual.total_time_seconds / 3600.0) / NULLIF(COUNT(DISTINCT ual.date), 0))::numeric as avg_hours_per_day
+FROM user_activity_logs ual
+JOIN users u ON ual.user_id = u.user_id
+WHERE ual.date >= (CURRENT_DATE - INTERVAL '30 days')
+GROUP BY ual.user_id, u.email, u.name;
+
+-- Weekly user activity view
+CREATE OR REPLACE VIEW v_weekly_user_activity AS
+SELECT
+  ual.user_id,
+  date_trunc('week', ual.date)::timestamptz as week_start,
+  SUM(ual.total_clicks)::bigint as total_clicks,
+  SUM(ual.total_keystrokes)::bigint as total_keystrokes,
+  SUM(ual.total_sessions)::bigint as total_sessions,
+  SUM(ual.total_time_seconds / 3600.0)::numeric as total_hours,
+  COUNT(DISTINCT ual.date)::bigint as active_days
+FROM user_activity_logs ual
+GROUP BY ual.user_id, date_trunc('week', ual.date);
+
+-- RPC: Submit complete farmer registration
+DROP FUNCTION IF EXISTS submit_complete_farmer_registration(uuid,text,integer,text,text,text,text,text,text,jsonb,jsonb,jsonb);
+CREATE OR REPLACE FUNCTION submit_complete_farmer_registration(
+  p_user_id uuid,
+  p_birth_date text,
+  p_years_of_experience integer,
+  p_residential_address text,
+  p_farm_name text,
+  p_specialty text,
+  p_face_photo_path text,
+  p_valid_id_path text,
+  p_farming_history text,
+  p_education_rows jsonb,
+  p_crop_rows jsonb,
+  p_livestock_rows jsonb
+) RETURNS jsonb AS $$
+DECLARE
+  v_registration_id uuid;
+  v_edu_row record;
+  v_crop_row record;
+  v_livestock_row record;
+BEGIN
+  -- 1. Insert into farmer_registrations
+  INSERT INTO farmer_registrations (
+    user_id,
+    birth_date,
+    years_of_experience,
+    residential_address,
+    farm_name,
+    specialty,
+    face_photo_path,
+    valid_id_path,
+    farming_history,
+    certification_accepted
+  ) VALUES (
+    p_user_id,
+    p_birth_date,
+    p_years_of_experience,
+    p_residential_address,
+    p_farm_name,
+    p_specialty,
+    p_face_photo_path,
+    p_valid_id_path,
+    p_farming_history,
+    true
+  ) RETURNING registration_id INTO v_registration_id;
+
+  -- 2. Insert education
+  IF p_education_rows IS NOT NULL AND jsonb_array_length(p_education_rows) > 0 THEN
+    FOR v_edu_row IN SELECT * FROM jsonb_to_recordset(p_education_rows) AS (level text, school_name text) LOOP
+      INSERT INTO farmer_education (registration_id, level, school_name)
+      VALUES (v_registration_id, v_edu_row.level, v_edu_row.school_name);
+    END LOOP;
+  END IF;
+
+  -- 3. Insert crop types
+  IF p_crop_rows IS NOT NULL AND jsonb_array_length(p_crop_rows) > 0 THEN
+    FOR v_crop_row IN SELECT * FROM jsonb_to_recordset(p_crop_rows) AS (crop_type text) LOOP
+      INSERT INTO farmer_crop_types (registration_id, crop_type)
+      VALUES (v_registration_id, v_crop_row.crop_type);
+    END LOOP;
+  END IF;
+
+  -- 4. Insert livestock
+  IF p_livestock_rows IS NOT NULL AND jsonb_array_length(p_livestock_rows) > 0 THEN
+    FOR v_livestock_row IN SELECT * FROM jsonb_to_recordset(p_livestock_rows) AS (livestock_type text) LOOP
+      INSERT INTO farmer_livestock (registration_id, livestock_type)
+      VALUES (v_registration_id, v_livestock_row.livestock_type);
+    END LOOP;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'message', 'Registration submitted successfully',
+    'registration_id', v_registration_id
+  );
+EXCEPTION WHEN OTHERS THEN
+  RETURN jsonb_build_object(
+    'success', false,
+    'message', SQLERRM
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- RPC: Approve Farmer Registration
+DROP FUNCTION IF EXISTS approve_farmer_registration(uuid,uuid,text);
+CREATE OR REPLACE FUNCTION approve_farmer_registration(
+  p_registration_id uuid,
+  p_admin_id uuid,
+  p_notes text DEFAULT NULL
+) RETURNS jsonb AS $$
+DECLARE
+  v_user_id uuid;
+  v_farm_name text;
+  v_specialty text;
+  v_farmer_id uuid;
+  v_role_id uuid;
+BEGIN
+  -- 1. Get registration info
+  SELECT user_id, farm_name, specialty 
+  INTO v_user_id, v_farm_name, v_specialty
+  FROM farmer_registrations 
+  WHERE registration_id = p_registration_id AND status = 'pending';
+
+  IF v_user_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Pending registration not found');
+  END IF;
+
+  -- 2. Create Farmer record
+  INSERT INTO farmers (
+    user_id,
+    farm_name,
+    specialty,
+    is_verified,
+    is_active
+  ) VALUES (
+    v_user_id,
+    v_farm_name,
+    v_specialty,
+    true,
+    true
+  ) RETURNING farmer_id INTO v_farmer_id;
+
+  -- 3. Update Registration
+  UPDATE farmer_registrations SET
+    status = 'approved',
+    farmer_id = v_farmer_id,
+    reviewed_by = p_admin_id,
+    review_notes = p_notes,
+    updated_at = now()
+  WHERE registration_id = p_registration_id;
+
+  -- 4. Assign Farmer Role (if it exists)
+  SELECT role_id INTO v_role_id FROM roles WHERE name = 'farmer';
+  IF v_role_id IS NOT NULL THEN
+    INSERT INTO user_roles (user_id, role_id)
+    VALUES (v_user_id, v_role_id)
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'message', 'Farmer approved and profile created successfully',
+    'farmer_id', v_farmer_id
+  );
+EXCEPTION WHEN OTHERS THEN
+  RETURN jsonb_build_object(
+    'success', false,
+    'message', SQLERRM
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

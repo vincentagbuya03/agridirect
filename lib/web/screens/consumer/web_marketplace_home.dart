@@ -96,12 +96,12 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
       margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
+        color: Colors.white.withOpacity(0.9),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _border.withValues(alpha: 0.5)),
+        border: Border.all(color: _border.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -158,9 +158,9 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: isActive
-                          ? _primary.withValues(alpha: 0.08)
+                          ? _primary.withOpacity(0.08)
                           : isHovered
-                              ? _border.withValues(alpha: 0.5)
+                              ? _border.withOpacity(0.5)
                               : Colors.transparent,
                     ),
                     child: Text(
@@ -244,7 +244,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 return CustomPaint(
                   painter: RibbonPainter(
                     animationValue: _waveController.value,
-                    color: Colors.white.withValues(alpha: 0.04),
+                    color: Colors.white.withOpacity(0.04),
                     strokeWidth: 1.0,
                   ),
                 );
@@ -260,7 +260,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 return CustomPaint(
                   painter: BlobPainter(
                     animationValue: _waveController.value,
-                    color: AgriColors.emerald400.withValues(alpha: 0.08),
+                    color: AgriColors.emerald400.withOpacity(0.08),
                     center: const Offset(0.8, 0.3),
                     radius: 280,
                   ),
@@ -277,7 +277,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 return CustomPaint(
                   painter: BlobPainter(
                     animationValue: 1 - _waveController.value,
-                    color: AgriColors.teal400.withValues(alpha: 0.06),
+                    color: AgriColors.teal400.withOpacity(0.06),
                     center: const Offset(0.2, 0.7),
                     radius: 220,
                   ),
@@ -294,7 +294,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 return CustomPaint(
                   painter: BlobPainter(
                     animationValue: _waveController.value * 0.7,
-                    color: AgriColors.gold400.withValues(alpha: 0.03),
+                    color: AgriColors.gold400.withOpacity(0.03),
                     center: const Offset(0.9, 0.15),
                     radius: 120,
                   ),
@@ -333,7 +333,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 return CustomPaint(
                   painter: WavePainter(
                     animationValue: _waveController.value,
-                    color: Colors.white.withValues(alpha: 0.06),
+                    color: Colors.white.withOpacity(0.06),
                     amplitude: 25,
                   ),
                 );
@@ -351,7 +351,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 return CustomPaint(
                   painter: WavePainter(
                     animationValue: 1 - _waveController.value,
-                    color: Colors.white.withValues(alpha: 0.04),
+                    color: Colors.white.withOpacity(0.04),
                     amplitude: 15,
                   ),
                 );
@@ -377,12 +377,12 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AgriColors.gold400.withValues(alpha: 0.15),
-                        AgriColors.emerald400.withValues(alpha: 0.1),
+                        AgriColors.gold400.withOpacity(0.15),
+                        AgriColors.emerald400.withOpacity(0.1),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: AgriColors.gold300.withValues(alpha: 0.25)),
+                    border: Border.all(color: AgriColors.gold300.withOpacity(0.25)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -395,7 +395,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: AgriColors.gold400.withValues(alpha: 0.5),
+                              color: AgriColors.gold400.withOpacity(0.5),
                               blurRadius: 6,
                             ),
                           ],
@@ -443,7 +443,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     'Experience the true taste of nature with direct-from-farm produce delivered to your doorstep within 24 hours.',
                     style: GoogleFonts.inter(
                       fontSize: 15,
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: Colors.white.withOpacity(0.6),
                       height: 1.7,
                     ),
                   ),
@@ -459,7 +459,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     border: Border.all(color: _border),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
+                        color: Colors.black.withOpacity(0.04),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -530,7 +530,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                           begin: Alignment.topRight,
                           end: Alignment.bottomLeft,
                           colors: [
-                            _primary.withValues(alpha: 0.06),
+                            _primary.withOpacity(0.06),
                             Colors.transparent,
                           ],
                         ),
@@ -570,7 +570,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                             builder: (context, _) => CustomPaint(
                               painter: BlobPainter(
                                 animationValue: _waveController.value,
-                                color: _primary.withValues(alpha: 0.10),
+                                color: _primary.withOpacity(0.10),
                                 center: const Offset(0.8, 0.2),
                                 radius: 180,
                               ),
@@ -581,7 +581,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                             builder: (context, _) => CustomPaint(
                               painter: BlobPainter(
                                 animationValue: 1 - _waveController.value,
-                                color: const Color(0xFF34D399).withValues(alpha: 0.08),
+                                color: const Color(0xFF34D399).withOpacity(0.08),
                                 center: const Offset(0.2, 0.8),
                                 radius: 140,
                               ),
@@ -592,7 +592,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                             builder: (context, _) => CustomPaint(
                               painter: RibbonPainter(
                                 animationValue: _waveController.value,
-                                color: _primary.withValues(alpha: 0.05),
+                                color: _primary.withOpacity(0.05),
                                 strokeWidth: 1.0,
                               ),
                             ),
@@ -614,7 +614,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                               builder: (context, _) => CustomPaint(
                                 painter: WavePainter(
                                   animationValue: _waveController.value,
-                                  color: Colors.white.withValues(alpha: 0.10),
+                                  color: Colors.white.withOpacity(0.10),
                                   amplitude: 16,
                                 ),
                               ),
@@ -641,7 +641,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                                 end: Alignment.bottomCenter,
                                 colors: [
                                   Colors.transparent,
-                                  _primary.withValues(alpha: 0.15),
+                                  _primary.withOpacity(0.15),
                                 ],
                               ),
                             ),
@@ -800,13 +800,13 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: isHovered
-                              ? _primary.withValues(alpha: 0.25)
+                              ? _primary.withOpacity(0.25)
                               : _border,
                         ),
                         boxShadow: isHovered
                             ? [
                                 BoxShadow(
-                                  color: _primary.withValues(alpha: 0.07),
+                                  color: _primary.withOpacity(0.07),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 )
@@ -1002,7 +1002,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                                   width: 30,
                                   height: 30,
                                   decoration: BoxDecoration(
-                                    color: _white.withValues(alpha: 0.9),
+                                    color: _white.withOpacity(0.9),
                                     borderRadius: BorderRadius.circular(8),
                                     boxShadow: [
                                       BoxShadow(
@@ -1117,7 +1117,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                         width: 130,
                         height: 130,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
+                          color: Colors.white.withOpacity(0.15),
                           shape: BoxShape.circle,
                         ),
                         child: ClipOval(
@@ -1147,7 +1147,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: _primary.withValues(alpha: 0.4),
+                              color: _primary.withOpacity(0.4),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             )
@@ -1166,7 +1166,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: Colors.white.withOpacity(0.9),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Center(

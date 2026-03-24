@@ -39,10 +39,11 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
   final _registration = FarmerRegistration();
 
   // Step 1 controllers
-  final _nameController = TextEditingController();
   final _birthDateController = TextEditingController();
   final _yearsController = TextEditingController();
   final _addressController = TextEditingController();
+  final _farmNameController = TextEditingController();
+  final _specialtyController = TextEditingController();
   final _livestockController = TextEditingController();
   final Set<String> _selectedCrops = {};
 
@@ -51,7 +52,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
   final _highSchoolController = TextEditingController();
   final _collegeController = TextEditingController();
   final _farmingHistoryController = TextEditingController();
-  final _experienceYearsController = TextEditingController();
   bool _certificationAccepted = false;
 
   // Step 2 state
@@ -66,16 +66,16 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
     _birthDateController.dispose();
     _yearsController.dispose();
     _addressController.dispose();
+    _farmNameController.dispose();
+    _specialtyController.dispose();
     _livestockController.dispose();
     _elementaryController.dispose();
     _highSchoolController.dispose();
     _collegeController.dispose();
     _farmingHistoryController.dispose();
-    _experienceYearsController.dispose();
     super.dispose();
   }
 
@@ -104,13 +104,22 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
   // ─── App Bar ───
   Widget _buildAppBar() {
     final titles = [
-      'Farmer Registration',
-      'Identity Verification',
-      'Final Submission',
+      'Registration',
+      'Verification',
+      'Final Review',
     ];
-    final subtitles = ['', 'STEP 2 OF 3', 'STEP 3 OF 3'];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 24, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Row(
         children: [
           IconButton(
@@ -121,34 +130,49 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 Navigator.of(context).pop();
               }
             },
-            icon: const Icon(Icons.arrow_back, color: _dark),
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _surface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.chevron_left_rounded, color: _dark, size: 24),
+            ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   titles[_currentStep],
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 20,
+                    fontSize: 22,
                     fontWeight: FontWeight.w800,
                     color: _dark,
-                    letterSpacing: -0.3,
+                    letterSpacing: -0.5,
                   ),
                 ),
-                if (subtitles[_currentStep].isNotEmpty)
-                  Text(
-                    subtitles[_currentStep],
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: _muted,
-                      letterSpacing: 1,
-                    ),
+                Text(
+                  'STEP ${_currentStep + 1} OF 3',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: _primary,
+                    letterSpacing: 1.5,
                   ),
+                ),
               ],
             ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.help_outline_rounded, size: 20, color: _primary),
           ),
         ],
       ),
@@ -157,56 +181,82 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
 
   // ─── Step Indicator ───
   Widget _buildStepIndicator() {
-    final labels = ['Personal', 'Business', 'Review'];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+    final labels = ['Info', 'Identity', 'Submit'];
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border.withOpacity(0.5)),
+      ),
       child: Row(
         children: List.generate(3, (i) {
-          final isActive = i <= _currentStep;
+          final isCompleted = i < _currentStep;
           final isCurrent = i == _currentStep;
+          final isActive = i <= _currentStep;
+          
           return Expanded(
             child: Row(
               children: [
                 if (i > 0)
                   Expanded(
                     child: Container(
-                      height: 3,
-                      color: i <= _currentStep ? _primary : _border,
+                      height: 2,
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            i <= _currentStep ? _primary : _border,
+                            (i + 1) <= _currentStep ? _primary : _border,
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 32,
-                      height: 32,
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: 28,
+                      height: 28,
                       decoration: BoxDecoration(
-                        color: isActive ? _primary : Colors.white,
+                        color: isCurrent ? _primary : (isCompleted ? _primary.withOpacity(0.2) : Colors.white),
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: isActive ? _primary : _border,
                           width: 2,
                         ),
+                        boxShadow: isCurrent ? [
+                          BoxShadow(
+                            color: _primary.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          )
+                        ] : null,
                       ),
                       child: Center(
-                        child: Text(
-                          '${i + 1}',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: isActive ? Colors.white : _muted,
-                          ),
-                        ),
+                        child: isCompleted 
+                          ? const Icon(Icons.check, size: 14, color: _primary)
+                          : Text(
+                              '${i + 1}',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: isCurrent ? Colors.white : _muted,
+                              ),
+                            ),
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       labels[i],
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
-                        fontWeight: isCurrent
-                            ? FontWeight.w700
-                            : FontWeight.w500,
+                        fontSize: 10,
+                        fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
                         color: isCurrent ? _primary : _muted,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ],
@@ -220,6 +270,30 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
   }
 
   Widget _buildCurrentStep() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.05, 0),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: KeyedSubtree(
+        key: ValueKey<int>(_currentStep),
+        child: _getStepWidget(),
+      ),
+    );
+  }
+
+  Widget _getStepWidget() {
     switch (_currentStep) {
       case 0:
         return _buildStep1();
@@ -239,31 +313,10 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 16),
-        // Personal Data Section
-        Row(
-          children: [
-            Icon(Icons.person, color: _primary, size: 22),
-            const SizedBox(width: 10),
-            Text(
-              'Personal Data',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: _dark,
-              ),
-            ),
-          ],
-        ),
+        const SizedBox(height: 12),
+        _buildSectionTitle('Personal Identity', Icons.person_rounded),
         const SizedBox(height: 20),
-
-        // Full Name
-        _buildLabel('Full Name'),
-        const SizedBox(height: 8),
-        _buildTextField(_nameController, 'Enter your full name'),
-        const SizedBox(height: 18),
-
-        // Birth Date + Years in Farming
+        
         Row(
           children: [
             Expanded(
@@ -278,7 +331,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                       child: _buildTextField(
                         _birthDateController,
                         'mm/dd/yyyy',
-                        suffixIcon: Icons.calendar_today,
+                        prefixIcon: Icons.calendar_month_outlined,
                       ),
                     ),
                   ),
@@ -296,6 +349,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                     _yearsController,
                     'e.g. 5',
                     keyboardType: TextInputType.number,
+                    prefixIcon: Icons.timer_outlined,
                   ),
                 ],
               ),
@@ -304,51 +358,125 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         ),
         const SizedBox(height: 18),
 
-        // Residential Address
         _buildLabel('Residential Address'),
         const SizedBox(height: 8),
         _buildTextField(
           _addressController,
           'Street, Barangay, City, Province',
-          maxLines: 3,
+          maxLines: 2,
+          prefixIcon: Icons.location_on_outlined,
         ),
+        
         const SizedBox(height: 32),
+        _buildSectionTitle('Farm Portfolio', Icons.agriculture_rounded),
+        const SizedBox(height: 20),
 
-        // Farm Details Section
-        Row(
+        _buildLabel('Farm Name'),
+        const SizedBox(height: 8),
+        _buildTextField(_farmNameController, 'Give your farm a branding name', prefixIcon: Icons.business_outlined),
+        const SizedBox(height: 18),
+
+        _buildLabel('Farmer Specialty'),
+        const SizedBox(height: 8),
+        _buildTextField(_specialtyController, 'e.g. Organic, High-Yield, Hydroponics', prefixIcon: Icons.star_outline_rounded),
+        const SizedBox(height: 18),
+
+        _buildLabel('Farming Area (Crop Types)'),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
           children: [
-            Icon(Icons.agriculture_rounded, color: _primary, size: 22),
-            const SizedBox(width: 10),
+            _buildCropChip('Rice', '🌾'),
+            _buildCropChip('Corn', '🌽'),
+            _buildCropChip('Vegetables', '🌶️'),
+            _buildCropChip('Fruits', '🍎'),
+            _buildCropChip('Root Crops', '🥔'),
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        _buildLabel('Livestock Inventory'),
+        const SizedBox(height: 8),
+        _buildTextField(
+          _livestockController,
+          'e.g. Swine, Chicken, Cattle',
+          prefixIcon: Icons.pets_outlined,
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: _primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: _primary, size: 20),
+          const SizedBox(width: 10),
+          Text(
+            title.toUpperCase(),
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: _primary,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCropChip(String label, String emoji) {
+    final selected = _selectedCrops.contains(label);
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (selected) {
+            _selectedCrops.remove(label);
+          } else {
+            _selectedCrops.add(label);
+          }
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? _primary : Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: selected ? _primary : _border),
+          boxShadow: selected ? [
+            BoxShadow(
+              color: _primary.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            )
+          ] : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 8),
             Text(
-              'Farm Details',
+              label,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: _dark,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : _dark,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 20),
-
-        _buildLabel('Farming Area (Crop Types)'),
-        const SizedBox(height: 12),
-        _buildCropCheckbox('Rice', '🌾'),
-        const SizedBox(height: 10),
-        _buildCropCheckbox('Corn', '🌽'),
-        const SizedBox(height: 10),
-        _buildCropCheckbox('Vegetables', '🌶️'),
-        const SizedBox(height: 20),
-
-        _buildLabel('Livestock'),
-        const SizedBox(height: 8),
-        _buildTextField(
-          _livestockController,
-          'e.g. Swine, Chicken, Cow',
-          prefixIcon: Icons.pets,
-        ),
-        const SizedBox(height: 24),
-      ],
+      ),
     );
   }
 
@@ -359,279 +487,266 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 16),
-
-        // Face Scan
-        Center(
-          child: Text(
-            'Face Scan',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: _dark,
-            ),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Center(
-          child: Text(
-            'Position your face in the circle for biometric scanning',
-            style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _muted),
-            textAlign: TextAlign.center,
-          ),
-        ),
+        const SizedBox(height: 12),
+        _buildSectionTitle('Biometric Scan', Icons.face_unlock_rounded),
         const SizedBox(height: 24),
 
         // Face circle
         Center(
-          child: GestureDetector(
-            onTap: _handleFaceScan,
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFE8F5E9),
-                border: Border.all(
-                  color: _faceScanned ? _primary : _border,
-                  width: 3,
-                  strokeAlign: BorderSide.strokeAlignOutside,
-                ),
-              ),
-              child: _faceScanned && _faceImagePath != null
-                  ? ClipOval(
-                      child: Image.file(
-                        File(_faceImagePath!),
-                        width: 200,
-                        height: 200,
-                        fit: BoxFit.cover,
-                      ),
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.face_retouching_natural,
-                          size: 64,
-                          color: _muted.withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Tap to Scan',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            color: _muted,
-                          ),
-                        ),
-                      ],
+          child: Column(
+            children: [
+              GestureDetector(
+                onTap: _handleFaceScan,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(
+                      color: _faceScanned ? _primary : _border,
+                      width: 4,
                     ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        if (_faceScanned)
-          Center(
-            child: TextButton.icon(
-              onPressed: () => setState(() {
-                _faceScanned = false;
-                _faceImagePath = null;
-              }),
-              icon: Icon(Icons.camera_alt, color: _primary, size: 18),
-              label: Text(
-                'Retake Photo',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _primary,
+                    boxShadow: [
+                      BoxShadow(
+                        color: (_faceScanned ? _primary : _muted).withOpacity(0.1),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                      )
+                    ],
+                  ),
+                  child: _faceScanned && _faceImagePath != null
+                      ? ClipOval(
+                          child: Image.file(
+                            File(_faceImagePath!),
+                            width: 220,
+                            height: 220,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.face_retouching_natural,
+                              size: 72,
+                              color: _primary.withOpacity(0.4),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Tap to Scan Face',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                color: _muted,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
               ),
-            ),
-          ),
-
-        const SizedBox(height: 32),
-
-        // Upload Valid ID
-        Text(
-          'Upload Valid ID',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: _dark,
+              if (_faceScanned)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: TextButton.icon(
+                    onPressed: () => setState(() {
+                      _faceScanned = false;
+                      _faceImagePath = null;
+                    }),
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: Text(
+                      'Retake Face Photo',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(foregroundColor: _primary),
+                  ),
+                ),
+            ],
           ),
         ),
-        const SizedBox(height: 4),
+
+        const SizedBox(height: 40),
+        _buildSectionTitle('Identity Proof', Icons.badge_rounded),
+        const SizedBox(height: 16),
+        
         Text(
           'Upload a clear photo of your government-issued ID',
-          style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _muted),
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13, 
+            color: _muted,
+            fontWeight: FontWeight.w500,
+          ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
 
         // Upload box
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _border, style: BorderStyle.solid),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              )
+            ]
           ),
           child: _idUploaded
               ? Column(
                   children: [
                     if (_idImagePath != null)
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
                         child: Image.file(
                           File(_idImagePath!),
-                          height: 140,
+                          height: 160,
                           width: double.infinity,
                           fit: BoxFit.cover,
                         ),
                       )
                     else
-                      Icon(Icons.check_circle, color: _primary, size: 48),
-                    const SizedBox(height: 12),
+                      const Icon(Icons.check_circle_rounded, color: _primary, size: 64),
+                    const SizedBox(height: 16),
                     Text(
-                      'ID Uploaded Successfully',
+                      'ID Document Captured',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
                         color: _primary,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    TextButton(
+                    const SizedBox(height: 12),
+                    OutlinedButton(
                       onPressed: () => setState(() {
                         _idUploaded = false;
                         _idImagePath = null;
                       }),
-                      child: Text(
-                        'Upload Again',
-                        style: TextStyle(color: _muted),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: _border),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
+                      child: Text('REPLACE ID', style: GoogleFonts.plusJakartaSans(color: _muted, fontWeight: FontWeight.w700)),
                     ),
                   ],
                 )
               : Column(
                   children: [
-                    Icon(
-                      Icons.badge_outlined,
-                      size: 40,
-                      color: _muted.withValues(alpha: 0.5),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: _surface,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.cloud_upload_outlined,
+                        size: 32,
+                        color: _primary.withOpacity(0.6),
+                      ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     Text(
-                      'Capture or Upload ID',
+                      'Attach Document',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
                         color: _dark,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Ensure all text and your photo are\nclearly visible on the ID',
+                      'JPG, PNG or PDF formats accepted',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         color: _muted,
+                        fontWeight: FontWeight.w500,
                       ),
-                      textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildUploadButton(
-                          Icons.camera_alt,
-                          'Camera',
-                          filled: true,
-                          onTap: () => _handleIdUpload('camera'),
+                        Expanded(
+                          child: _buildUploadOption(
+                            Icons.camera_alt_rounded,
+                            'Camera',
+                            onTap: () => _handleIdUpload('camera'),
+                            isActive: true,
+                          ),
                         ),
                         const SizedBox(width: 12),
-                        _buildUploadButton(
-                          Icons.folder_open,
-                          'Files',
-                          filled: false,
-                          onTap: () => _handleIdUpload('files'),
+                        Expanded(
+                          child: _buildUploadOption(
+                            Icons.photo_library_rounded,
+                            'Gallery',
+                            onTap: () => _handleIdUpload('files'),
+                            isActive: false,
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
         ),
-        const SizedBox(height: 16),
-
-        // Accepted Documents
+        
+        const SizedBox(height: 24),
         Container(
-          width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFEFF6FF),
-            borderRadius: BorderRadius.circular(12),
+            color: Colors.blue.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.blue.withOpacity(0.1)),
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline, color: Colors.blue[400], size: 20),
-              const SizedBox(width: 10),
+              Icon(Icons.info_rounded, color: Colors.blue[600], size: 20),
+              const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Accepted Documents:',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: _dark,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      "Farmer's ID, Driver's License, National ID, or Passport.",
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        color: _muted,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'Accepted IDs: National ID, Driver\'s License, Passport, or Barangay ID.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: Colors.blue[900],
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
       ],
     );
   }
 
-  Widget _buildUploadButton(
-    IconData icon,
-    String label, {
-    required bool filled,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
+  Widget _buildUploadOption(IconData icon, String label, {required VoidCallback onTap, required bool isActive}) {
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: filled ? _primary : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: filled ? null : Border.all(color: _border),
+          color: isActive ? _primary : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: isActive ? _primary : _border),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 18, color: filled ? Colors.white : _dark),
+            Icon(icon, size: 18, color: isActive ? Colors.white : _dark),
             const SizedBox(width: 8),
             Text(
               label,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: filled ? Colors.white : _dark,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: isActive ? Colors.white : _dark,
               ),
             ),
           ],
@@ -640,6 +755,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     );
   }
 
+
   // ═══════════════════════════════════════════
   // STEP 3: Final Submission
   // ═══════════════════════════════════════════
@@ -647,46 +763,107 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 8),
-
-        // Certification banner
+        const SizedBox(height: 12),
+        _buildSectionTitle('Academic Background', Icons.school_rounded),
+        const SizedBox(height: 20),
+        
         Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: const Color(0xFFECFDF5),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _primary.withValues(alpha: 0.2)),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _border),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: _primary,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check, size: 16, color: Colors.white),
+              _buildSmallLabel('ELEMENTARY EDUCATION'),
+              _buildUnderlineField(_elementaryController, 'School Name / Year'),
+              const SizedBox(height: 20),
+              _buildSmallLabel('SECONDARY EDUCATION'),
+              _buildUnderlineField(_highSchoolController, 'School Name / Year'),
+              const SizedBox(height: 20),
+              _buildSmallLabel('TERTIARY EDUCATION'),
+              _buildUnderlineField(_collegeController, 'Degree / University'),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 32),
+        _buildSectionTitle('Farming Expertise', Icons.history_edu_rounded),
+        const SizedBox(height: 16),
+        
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSmallLabel('PREVIOUS EXPERIENCE'),
+              _buildUnderlineField(
+                _farmingHistoryController,
+                'Briefly describe your farming journey...',
+                maxLines: 3,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 32),
+        _buildSectionTitle('E-Signature', Icons.draw_rounded),
+        const SizedBox(height: 16),
+        
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _border),
+          ),
+          child: Column(
+            children: [
+              SizedBox(
+                height: 180,
+                child: Stack(
                   children: [
-                    Text(
-                      'Certification & Review',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: _dark,
+                    if (_signaturePoints.isEmpty)
+                      Center(
+                        child: Text(
+                          'Draw your signature here',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: _muted.withOpacity(0.3),
+                            fontWeight: FontWeight.w600,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    GestureDetector(
+                      onPanUpdate: (details) {
+                        setState(() => _signaturePoints.add(details.localPosition));
+                      },
+                      onPanEnd: (_) => _signaturePoints.add(null),
+                      child: CustomPaint(
+                        size: const Size(double.infinity, 180),
+                        painter: _SignaturePainter(_signaturePoints),
                       ),
                     ),
-                    Text(
-                      'Please verify your educational and professional details before final submission.',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        color: _muted,
-                      ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: _border),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => setState(() => _signaturePoints.clear()),
+                      icon: const Icon(Icons.cleaning_services_rounded, size: 16),
+                      label: Text('CLEAR', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 12)),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red[400]),
                     ),
                   ],
                 ),
@@ -694,166 +871,52 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 28),
-
-        // Educational Background
-        _buildSectionHeader('EDUCATIONAL BACKGROUND'),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSmallLabel('ELEMENTARY'),
-              _buildUnderlineField(
-                _elementaryController,
-                'Name of School / Year Graduated',
-              ),
-              const SizedBox(height: 16),
-              _buildSmallLabel('HIGH SCHOOL'),
-              _buildUnderlineField(
-                _highSchoolController,
-                'Name of School / Year Graduated',
-              ),
-              const SizedBox(height: 16),
-              _buildSmallLabel('COLLEGE'),
-              _buildUnderlineField(_collegeController, 'Degree / University'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 28),
-
-        // Work Experience
-        _buildSectionHeader('WORK EXPERIENCE'),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSmallLabel('PREVIOUS EMPLOYMENT / FARMING HISTORY'),
-              _buildUnderlineField(
-                _farmingHistoryController,
-                'Describe your relevant experience...',
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              _buildSmallLabel('NO. OF YEARS IN FARMING'),
-              _buildUnderlineField(_experienceYearsController, 'e.g. 10'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 28),
-
-        // Electronic signature
-        _buildSectionHeader('ELECTRONIC SIGNATURE'),
-        const SizedBox(height: 16),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _border),
-          ),
-          child: Column(
-            children: [
-              SizedBox(
-                height: 160,
-                child: GestureDetector(
-                  onPanUpdate: (details) {
-                    setState(() {
-                      _signaturePoints.add(details.localPosition);
-                    });
-                  },
-                  onPanEnd: (_) {
-                    _signaturePoints.add(null);
-                  },
-                  child: CustomPaint(
-                    size: const Size(double.infinity, 160),
-                    painter: _SignaturePainter(_signaturePoints),
-                  ),
-                ),
-              ),
-              if (_signaturePoints.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    'Sign inside the box',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontStyle: FontStyle.italic,
-                      color: _muted.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () => setState(() => _signaturePoints.clear()),
-                  icon: Icon(Icons.refresh, size: 16, color: _muted),
-                  label: Text(
-                    'CLEAR',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _muted,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Certification checkbox
-        GestureDetector(
-          onTap: () =>
-              setState(() => _certificationAccepted = !_certificationAccepted),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 22,
-                height: 22,
-                margin: const EdgeInsets.only(top: 2),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _certificationAccepted ? _primary : Colors.white,
-                  border: Border.all(
-                    color: _certificationAccepted ? _primary : _border,
-                    width: 2,
-                  ),
-                ),
-                child: _certificationAccepted
-                    ? const Icon(Icons.check, size: 14, color: Colors.white)
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'I hereby certify that the information provided above is true and correct to the best of my knowledge and belief.',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    color: _muted,
-                    height: 1.5,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        
+        const SizedBox(height: 32),
+        _buildCertificationCheckbox(),
         const SizedBox(height: 24),
       ],
+    );
+  }
+
+  Widget _buildCertificationCheckbox() {
+    return GestureDetector(
+      onTap: () => setState(() => _certificationAccepted = !_certificationAccepted),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _certificationAccepted ? _primary.withOpacity(0.05) : _surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _certificationAccepted ? _primary : _border),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _certificationAccepted ? _primary : Colors.white,
+                border: Border.all(color: _certificationAccepted ? _primary : _border, width: 2),
+              ),
+              child: _certificationAccepted ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'I certify that all information provided is accurate. I understand that misrepresentation may lead to rejection.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  color: _dark.withOpacity(0.8),
+                  height: 1.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -883,7 +946,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: _primary.withValues(alpha: 0.3),
+                  color: _primary.withOpacity(0.3),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -937,27 +1000,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String text) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: _primary, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          text,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: _muted,
-            letterSpacing: 2,
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildSmallLabel(String text) {
     return Padding(
@@ -985,30 +1027,42 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _border),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border.withOpacity(0.8)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: TextField(
         controller: controller,
         maxLines: maxLines,
         keyboardType: keyboardType,
-        style: GoogleFonts.plusJakartaSans(fontSize: 14, color: _dark),
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 14, 
+          color: _dark,
+          fontWeight: FontWeight.w600,
+        ),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.plusJakartaSans(
             fontSize: 14,
-            color: _muted.withValues(alpha: 0.5),
+            color: _muted.withOpacity(0.4),
+            fontWeight: FontWeight.w500,
           ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
-            vertical: 14,
+            vertical: 16,
           ),
           suffixIcon: suffixIcon != null
-              ? Icon(suffixIcon, size: 18, color: _muted)
+              ? Icon(suffixIcon, size: 20, color: _muted.withOpacity(0.6))
               : null,
           prefixIcon: prefixIcon != null
-              ? Icon(prefixIcon, size: 20, color: _muted)
+              ? Icon(prefixIcon, size: 22, color: _primary.withOpacity(0.7))
               : null,
         ),
       ),
@@ -1028,7 +1082,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         hintText: hint,
         hintStyle: GoogleFonts.plusJakartaSans(
           fontSize: 14,
-          color: _muted.withValues(alpha: 0.5),
+          color: _muted.withOpacity(0.5),
         ),
         enabledBorder: UnderlineInputBorder(
           borderSide: BorderSide(color: _border),
@@ -1041,59 +1095,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     );
   }
 
-  Widget _buildCropCheckbox(String label, String emoji) {
-    final selected = _selectedCrops.contains(label);
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          if (selected) {
-            _selectedCrops.remove(label);
-          } else {
-            _selectedCrops.add(label);
-          }
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: selected ? _primary.withValues(alpha: 0.06) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? _primary : _border),
-        ),
-        child: Row(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 22)),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                label,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: _dark,
-                ),
-              ),
-            ),
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: selected ? _primary : Colors.white,
-                border: Border.all(
-                  color: selected ? _primary : _border,
-                  width: 2,
-                ),
-              ),
-              child: selected
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
-                  : null,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   // ─── Actions ───
   Future<void> _pickBirthDate() async {
@@ -1178,12 +1179,12 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
   void _handleNext() {
     // Validate current step
     if (_currentStep == 0) {
-      if (_nameController.text.trim().isEmpty) {
-        _showError('Please enter your full name');
-        return;
-      }
       if (_addressController.text.trim().isEmpty) {
         _showError('Please enter your residential address');
+        return;
+      }
+      if (_farmNameController.text.trim().isEmpty) {
+        _showError('Please enter your farm name');
         return;
       }
     } else if (_currentStep == 1) {
@@ -1213,10 +1214,10 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     setState(() => _isSubmitting = true);
 
     // Populate the registration model
-    _registration.fullName = _nameController.text.trim();
     _registration.birthDate = _birthDateController.text.trim();
-    _registration.yearsInFarming = _yearsController.text.trim();
     _registration.residentialAddress = _addressController.text.trim();
+    _registration.farmName = _farmNameController.text.trim();
+    _registration.specialty = _specialtyController.text.trim();
     _registration.cropTypes = _selectedCrops.toList();
     _registration.livestock = _livestockController.text.trim();
     _registration.facePhotoPath = _faceImagePath;
@@ -1225,7 +1226,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     _registration.highSchool = _highSchoolController.text.trim();
     _registration.college = _collegeController.text.trim();
     _registration.farmingHistory = _farmingHistoryController.text.trim();
-    _registration.yearsOfExperience = _experienceYearsController.text.trim();
+    _registration.yearsOfExperience = _yearsController.text.trim();
     _registration.hasSigned = _signaturePoints.isNotEmpty;
     _registration.certificationAccepted = _certificationAccepted;
 
@@ -1238,8 +1239,8 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         registration: _registration,
       );
 
-      // Activate seller mode
-      await auth.startSelling();
+      // DON'T activate seller mode yet - wait for admin approval
+      // await auth.startSelling();
 
       if (mounted) {
         // Show success dialog
@@ -1256,7 +1257,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: _primary.withValues(alpha: 0.1),
+                    color: _primary.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(Icons.check_circle, size: 56, color: _primary),
@@ -1272,7 +1273,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Your farmer registration has been submitted for approval. You can now access the Farmer Dashboard.',
+                  'Your farmer registration has been submitted for admin review. You will be notified once approved.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,

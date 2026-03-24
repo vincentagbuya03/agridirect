@@ -1,12 +1,12 @@
 /// Model for farmer registration data
 class FarmerRegistration {
   // Step 1: Personal Data
-  String fullName;
   String birthDate;
-  String yearsInFarming;
   String residentialAddress;
 
   // Step 1: Farm Details
+  String farmName;
+  String specialty;
   List<String> cropTypes; // Rice, Corn, Vegetables, etc.
   String livestock;
 
@@ -24,10 +24,10 @@ class FarmerRegistration {
   bool certificationAccepted;
 
   FarmerRegistration({
-    this.fullName = '',
     this.birthDate = '',
-    this.yearsInFarming = '',
     this.residentialAddress = '',
+    this.farmName = '',
+    this.specialty = '',
     this.cropTypes = const [],
     this.livestock = '',
     this.facePhotoPath,
@@ -45,8 +45,10 @@ class FarmerRegistration {
   /// Education, crop types, and livestock are stored in separate tables
   Map<String, dynamic> toJson() => {
         'birth_date': birthDate,
-        'years_of_experience': int.tryParse(yearsOfExperience) ?? int.tryParse(yearsInFarming) ?? 0,
+        'years_of_experience': int.tryParse(yearsOfExperience) ?? 0,
         'residential_address': residentialAddress,
+        'farm_name': farmName,
+        'specialty': specialty,
         'face_photo_path': facePhotoPath,
         'valid_id_path': validIdPath,
         'farming_history': farmingHistory,

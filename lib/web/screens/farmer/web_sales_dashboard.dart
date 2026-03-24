@@ -296,9 +296,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: _success.withValues(alpha: 0.1),
+            color: _success.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _success.withValues(alpha: 0.2)),
+            border: Border.all(color: _success.withOpacity(0.2)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -412,7 +412,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         boxShadow: isHovered
             ? [
                 BoxShadow(
-                  color: color.withValues(alpha: 0.1),
+                  color: color.withOpacity(0.1),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -431,12 +431,12 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                   gradient: color == _warning || color == Colors.amber
                       ? AgriColors.goldGradient
                       : LinearGradient(
-                          colors: [color, color.withValues(alpha: 0.7)],
+                          colors: [color, color.withOpacity(0.7)],
                         ),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: color.withValues(alpha: 0.25),
+                      color: color.withOpacity(0.25),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),
@@ -538,7 +538,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: _primary.withValues(alpha: 0.1),
+                          color: _primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
@@ -815,7 +815,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: o.$5.withValues(alpha: 0.1),
+                                color: o.$5.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(

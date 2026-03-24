@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/auth_service.dart';
 import '../services/onboarding_service.dart';
+import '../screens/wallet_screen.dart';
 import '../../mobile/mobile_navigation.dart';
 import '../../mobile/screens/auth/login_screen.dart';
 import '../../mobile/screens/auth/registration_screen.dart';
@@ -33,6 +34,7 @@ class AppRoutes {
   static const String authCallback = '/auth/callback';
   static const String resetPassword = '/reset-password';
   static const String resetPasswordWithCode = '/reset-password-code';
+  static const String wallet = '/wallet';
 
   // ── Mobile-specific ──
   static const String farmerRegister = '/farmer-register';
@@ -163,6 +165,9 @@ GoRouter createAppRouter() {
       // Profile requires login on web
       if (location == AppRoutes.profile && !isLoggedIn) return AppRoutes.login;
 
+      // Wallet requires login on web
+      if (location == AppRoutes.wallet && !isLoggedIn) return AppRoutes.login;
+
       // Farmer dashboard requires login
       if (location == AppRoutes.farmerDashboard && !isLoggedIn)
         return AppRoutes.marketplace;
@@ -246,6 +251,12 @@ GoRouter createAppRouter() {
             context.go(AppRoutes.home);
           },
         ),
+      ),
+
+      // ── Wallet (shared) ──────────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.wallet,
+        builder: (context, state) => const WalletScreen(),
       ),
 
       // ── Web Welcome (landing page for first-time visitors) ────────────────

@@ -134,9 +134,9 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                 margin: const EdgeInsets.only(bottom: 20),
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.12),
+                  color: primary.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: primary.withValues(alpha: 0.2)),
+                  border: Border.all(color: primary.withOpacity(0.2)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -294,7 +294,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -359,7 +359,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: order['statusColor'].withValues(alpha: 0.15),
+                  color: order['statusColor'].withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(

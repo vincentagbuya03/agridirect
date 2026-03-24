@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/auth_service.dart';
+import '../../../shared/services/supabase_config.dart';
 import '../../../shared/router/app_router.dart';
 
 /// Mobile Profile screen for customers.
@@ -25,6 +26,117 @@ class MobileProfileScreen extends StatefulWidget {
 
 class _MobileProfileScreenState extends State<MobileProfileScreen> {
   static const Color primary = Color(0xFF13EC5B);
+  String? _registrationStatus; // 'pending', 'approved', 'rejected', or null
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRegistrationStatus();
+  }
+
+  Future<void> _loadRegistrationStatus() async {
+    try {
+      final auth = AuthService();
+      final reg = await SupabaseDB.getFarmerRegistration(auth.userId);
+      if (mounted) {
+        setState(() {
+          _registrationStatus = reg?['status'] as String?;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading registration status: $e');
+    }
+  }
+
+  void _handleStartSelling() {
+    final auth = AuthService();
+    // If already registered as seller, just switch to farmer mode
+    if (auth.isSeller) {
+      _handleSwitchToFarmer();
+    } else if (_registrationStatus == 'pending') {
+      // Show pending approval dialog
+      _showPendingDialog();
+    } else {
+      // Show registration screen for new sellers
+      context.push(
+        AppRoutes.farmerRegister,
+        extra: () {
+          widget.onModeChanged();
+          setState(() {
+            _loadRegistrationStatus();
+          });
+        },
+      );
+    }
+  }
+
+  void _showPendingDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.hourglass_bottom_rounded,
+                size: 56,
+                color: primary,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Pending Admin Approval',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Your farmer registration is under review. We will notify you once it\'s approved.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                color: Colors.grey[600],
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: GestureDetector(
+                onTap: () => Navigator.of(ctx).pop(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Got it',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,20 +168,6 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
         );
       },
     );
-  }
-
-  void _handleStartSelling() {
-    final auth = AuthService();
-    // If already registered as seller, just switch to farmer mode
-    if (auth.isSeller) {
-      _handleSwitchToFarmer();
-    } else {
-      // Show registration screen for new sellers
-      context.push(AppRoutes.farmerRegister, extra: () {
-        widget.onModeChanged();
-        setState(() {});
-      });
-    }
   }
 
   void _handleSwitchToFarmer() {
@@ -167,6 +265,39 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                     ),
                   ),
                 )
+              else if (_registrationStatus == 'pending')
+                GestureDetector(
+                  onTap: _handleStartSelling,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange[400],
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.hourglass_bottom_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Pending Review',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               else
                 GestureDetector(
                   onTap: _handleStartSelling,
@@ -215,7 +346,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                   border: Border.all(color: primary, width: 2),
                   boxShadow: [
                     BoxShadow(
-                      color: primary.withValues(alpha: 0.15),
+                      color: primary.withOpacity(0.15),
                       blurRadius: 12,
                       offset: const Offset(0, 2),
                     ),
@@ -238,9 +369,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      auth.userName.isNotEmpty
-                          ? auth.userName
-                          : 'User',
+                      auth.userName.isNotEmpty ? auth.userName : 'User',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -281,6 +410,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
   }
 
   Widget _buildMenuSection(BuildContext context) {
+    final auth = AuthService();
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -288,7 +418,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -307,12 +437,16 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
             'Address Book',
             const Color(0xFFFF9500),
           ),
-          _buildDivider(),
-          _buildMenuItem(
-            Icons.credit_card_rounded,
-            'Payment Methods',
-            const Color(0xFF10B981),
-          ),
+          // Only show wallet for farmers
+          if (auth.isSeller) ...[
+            _buildDivider(),
+            _buildMenuItem(
+              Icons.account_balance_wallet_rounded,
+              'My Wallet',
+              const Color(0xFF10B981),
+              onTap: () => context.push(AppRoutes.wallet),
+            ),
+          ],
           _buildDivider(),
           _buildMenuItem(
             Icons.favorite_rounded,
@@ -336,32 +470,45 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, Color iconBgColor) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: iconBgColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
+  Widget _buildMenuItem(
+    IconData icon,
+    String title,
+    Color iconBgColor, {
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: iconBgColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 20, color: iconBgColor),
             ),
-            child: Icon(icon, size: 20, color: iconBgColor),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF0F172A),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0F172A),
+                ),
               ),
             ),
-          ),
-          Icon(Icons.chevron_right_rounded, color: Colors.grey[300], size: 22),
-        ],
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.grey[300],
+              size: 22,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -386,7 +533,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+            border: Border.all(color: Colors.red.withOpacity(0.2)),
           ),
           child: const Row(
             mainAxisAlignment: MainAxisAlignment.center,

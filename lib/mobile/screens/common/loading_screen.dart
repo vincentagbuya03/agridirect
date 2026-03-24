@@ -162,13 +162,13 @@ class _LoadingScreenState extends State<LoadingScreen>
                     top: -60,
                     right: -40,
                     size: 220,
-                    color: const Color(0xFF13EC5B).withValues(alpha: 0.08),
+                    color: const Color(0xFF13EC5B).withOpacity(0.08),
                   ),
                   _buildDecoCircle(
                     bottom: -80,
                     left: -50,
                     size: 260,
-                    color: const Color(0xFF13EC5B).withValues(alpha: 0.06),
+                    color: const Color(0xFF13EC5B).withOpacity(0.06),
                   ),
 
                   // ---- Main content ----
@@ -307,7 +307,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                   spreadRadius: 2,
                 ),
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.20),
+                  color: Colors.black.withOpacity(0.20),
                   blurRadius: 30,
                   offset: const Offset(0, 12),
                 ),
@@ -382,7 +382,7 @@ class _LoadingScreenState extends State<LoadingScreen>
         style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w500,
-          color: Colors.white.withValues(alpha: 0.65),
+          color: Colors.white.withOpacity(0.65),
           letterSpacing: 1.5,
         ),
       ),
@@ -404,7 +404,7 @@ class _LoadingScreenState extends State<LoadingScreen>
               child: Stack(
                 children: [
                   // Track
-                  Container(color: Colors.white.withValues(alpha: 0.12)),
+                  Container(color: Colors.white.withOpacity(0.12)),
                   // Animated fill
                   LayoutBuilder(
                     builder: (context, constraints) {
@@ -425,7 +425,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                               BoxShadow(
                                 color: const Color(
                                   0xFF13EC5B,
-                                ).withValues(alpha: 0.5),
+                                ).withOpacity(0.5),
                                 blurRadius: 8,
                               ),
                             ],
@@ -451,7 +451,7 @@ class _LoadingScreenState extends State<LoadingScreen>
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w400,
-          color: Colors.white.withValues(alpha: 0.40),
+          color: Colors.white.withOpacity(0.40),
           letterSpacing: 0.5,
         ),
       ),

@@ -12,15 +12,20 @@ class AdminCategoriesTab extends StatefulWidget {
   State<AdminCategoriesTab> createState() => _AdminCategoriesTabState();
 }
 
+// Modern light theme colors
+const Color _primary = Color(0xFF10B981);
+const Color _danger = Color(0xFFEF4444);
+const Color _warning = Color(0xFFF59E0B);
+const Color _info = Color(0xFF3B82F6);
+const Color _muted = Color(0xFF64748B);
+const Color _background = Color(0xFFFAFAFA);
+const Color _card = Colors.white;
+const Color _border = Color(0xFFE2E8F0);
+const Color _text = Color(0xFF1E293B);
+
 class _AdminCategoriesTabState extends State<AdminCategoriesTab>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _card = Color(0xFF1E293B);
-  static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _dark = Color(0xFF0F172A);
 
   @override
   void initState() {
@@ -39,7 +44,7 @@ class _AdminCategoriesTabState extends State<AdminCategoriesTab>
     final isMobile = MediaQuery.of(context).size.width < 768;
 
     return Container(
-      color: _dark,
+      color: _background,
       child: Column(
         children: [
           // Tab Bar
@@ -123,14 +128,15 @@ class _CategoriesList extends StatefulWidget {
 class _CategoriesListState extends State<_CategoriesList> {
   late Future<List<Map<String, dynamic>>> _categoriesFuture;
 
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _danger = Color(0xFFEF4444);
+
+
   static const Color _info = Color(0xFF3B82F6);
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _card = Color(0xFF1E293B);
-  static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFFF1F5F9);
+
+  static const Color _background = Color(0xFFFAFAFA);
+
+
+
+  
 
   @override
   void initState() {
@@ -387,7 +393,7 @@ class _CategoriesListState extends State<_CategoriesList> {
         labelStyle: GoogleFonts.inter(color: _muted, fontSize: 13),
         prefixIcon: Icon(icon, color: _muted, size: 20),
         filled: true,
-        fillColor: _dark,
+        fillColor: _background,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: _border),
@@ -416,12 +422,12 @@ class _CategoryCard extends StatelessWidget {
     required this.onAction,
   });
 
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _danger = Color(0xFFEF4444);
-  static const Color _card = Color(0xFF1E293B);
-  static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFFF1F5F9);
+
+
+  
+  
+
+  
 
   @override
   Widget build(BuildContext context) {
@@ -654,13 +660,14 @@ class _UnitsList extends StatefulWidget {
 class _UnitsListState extends State<_UnitsList> {
   late Future<List<Map<String, dynamic>>> _unitsFuture;
 
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _danger = Color(0xFFEF4444);
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _card = Color(0xFF1E293B);
-  static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFFF1F5F9);
+
+
+
+  static const Color _background = Color(0xFFFAFAFA);
+
+
+
+  
 
   @override
   void initState() {
@@ -746,7 +753,7 @@ class _UnitsListState extends State<_UnitsList> {
                         vertical: 14,
                       ),
                       decoration: BoxDecoration(
-                        color: _dark,
+                        color: const Color(0xFFF1F5F9),
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(16),
                           topRight: Radius.circular(16),
@@ -951,7 +958,7 @@ class _UnitsListState extends State<_UnitsList> {
         labelStyle: GoogleFonts.inter(color: _muted, fontSize: 13),
         prefixIcon: Icon(icon, color: _muted, size: 20),
         filled: true,
-        fillColor: _dark,
+        fillColor: _background,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: _border),
@@ -980,12 +987,13 @@ class _UnitRow extends StatelessWidget {
     required this.onAction,
   });
 
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _danger = Color(0xFFEF4444);
-  static const Color _card = Color(0xFF1E293B);
-  static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFFF1F5F9);
+
+
+
+
+
+
+  
 
   @override
   Widget build(BuildContext context) {

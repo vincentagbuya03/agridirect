@@ -169,7 +169,7 @@ class BlobPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..shader = RadialGradient(
-        colors: [color, color.withValues(alpha: 0)],
+        colors: [color, color.withOpacity(0)],
       ).createShader(
         Rect.fromCircle(
           center: Offset(size.width * center.dx, size.height * center.dy),
@@ -358,8 +358,8 @@ class AuroraGlowPainter extends CustomPainter {
     final p1 = Paint()
       ..shader = RadialGradient(
         colors: [
-          AgriColors.emerald500.withValues(alpha: 0.08),
-          AgriColors.emerald500.withValues(alpha: 0),
+          AgriColors.emerald500.withOpacity(0.08),
+          AgriColors.emerald500.withOpacity(0),
         ],
       ).createShader(Rect.fromCircle(
         center: Offset(
@@ -374,8 +374,8 @@ class AuroraGlowPainter extends CustomPainter {
     final p2 = Paint()
       ..shader = RadialGradient(
         colors: [
-          AgriColors.teal400.withValues(alpha: 0.06),
-          AgriColors.teal400.withValues(alpha: 0),
+          AgriColors.teal400.withOpacity(0.06),
+          AgriColors.teal400.withOpacity(0),
         ],
       ).createShader(Rect.fromCircle(
         center: Offset(
@@ -390,8 +390,8 @@ class AuroraGlowPainter extends CustomPainter {
     final p3 = Paint()
       ..shader = RadialGradient(
         colors: [
-          AgriColors.gold400.withValues(alpha: 0.04),
-          AgriColors.gold400.withValues(alpha: 0),
+          AgriColors.gold400.withOpacity(0.04),
+          AgriColors.gold400.withOpacity(0),
         ],
       ).createShader(Rect.fromCircle(
         center: Offset(
@@ -705,7 +705,7 @@ class GlassCard extends StatelessWidget {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: blur,
             offset: const Offset(0, 4),
           ),
@@ -905,14 +905,14 @@ class _HoverCardState extends State<HoverCard> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(widget.borderRadius),
             border: Border.all(
-              color: _hovered ? hoverColor.withValues(alpha: 0.4) : AgriColors.border,
+              color: _hovered ? hoverColor.withOpacity(0.4) : AgriColors.border,
               width: _hovered ? 1.5 : 1,
             ),
             boxShadow: [
               BoxShadow(
                 color: _hovered
-                    ? hoverColor.withValues(alpha: 0.12)
-                    : Colors.black.withValues(alpha: 0.04),
+                    ? hoverColor.withOpacity(0.12)
+                    : Colors.black.withOpacity(0.04),
                 blurRadius: _hovered ? 24 : 8,
                 offset: Offset(0, _hovered ? 12 : 4),
               ),
@@ -1000,7 +1000,7 @@ class _LeafPainter extends CustomPainter {
 
     // Stem
     final stemPaint = Paint()
-      ..color = color.withValues(alpha: 0.6)
+      ..color = color.withOpacity(0.6)
       ..strokeWidth = 1.2
       ..style = PaintingStyle.stroke;
 
@@ -1011,7 +1011,7 @@ class _LeafPainter extends CustomPainter {
 
     // Veins
     final veinPaint = Paint()
-      ..color = color.withValues(alpha: 0.3)
+      ..color = color.withOpacity(0.3)
       ..strokeWidth = 0.6
       ..style = PaintingStyle.stroke;
 
@@ -1241,14 +1241,14 @@ class _GradientBorderCardState extends State<GradientBorderCard>
                 boxShadow: _hovered
                     ? [
                         BoxShadow(
-                          color: AgriColors.emerald500.withValues(alpha: 0.15),
+                          color: AgriColors.emerald500.withOpacity(0.15),
                           blurRadius: 24,
                           offset: const Offset(0, 8),
                         ),
                       ]
                     : [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
+                          color: Colors.black.withOpacity(0.04),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
@@ -1345,7 +1345,7 @@ class _MiniBarChartState extends State<MiniBarChart>
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
                         colors: [
-                          widget.barColor.withValues(alpha: 0.4),
+                          widget.barColor.withOpacity(0.4),
                           widget.barColor,
                         ],
                       ),
@@ -1521,12 +1521,12 @@ class TrustBadge extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [color, color.withValues(alpha: 0.85)],
+          colors: [color, color.withOpacity(0.85)],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.35),
+            color: color.withOpacity(0.35),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),

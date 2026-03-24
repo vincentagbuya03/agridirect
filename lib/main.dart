@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'shared/services/auth_service.dart';
 import 'shared/services/supabase_config.dart';
 import 'shared/router/app_router.dart';
@@ -12,11 +13,19 @@ void main() async {
   configureUrlStrategy();
 
   try {
+    // Try to load .env file (fails gracefully on web)
+    try {
+      await dotenv.load(fileName: ".env");
+    } catch (e) {
+      debugPrint('⚠️ Could not load .env file (OK on web): $e');
+    }
+
+    // Initialize Supabase with or without .env
     await SupabaseConfig.initialize();
     await AuthService().initialize();
   } catch (e) {
-    debugPrint('Initialization error: $e');
-    // Continue anyway - app will show error screen if needed
+    debugPrint('❌ Initialization error: $e');
+    rethrow;
   }
 
   runApp(AgriDirectApp());

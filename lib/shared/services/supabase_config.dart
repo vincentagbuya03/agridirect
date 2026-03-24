@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/farmer_registration.dart';
@@ -376,65 +377,93 @@ class SupabaseDB {
     }
   }
 
-  /// Submit farmer registration (inserts into farmer_registrations + decomposed tables)
+  /// Submit farmer registration using comprehensive RPC function
+  /// Includes registration, education, crops, and livestock in single atomic transaction
   static Future<void> submitFarmerRegistration({
     required String userId,
     required FarmerRegistration registration,
+    Uint8List? faceImageBytes, // For Web
+    Uint8List? idImageBytes,   // For Web
   }) async {
     try {
-      // Get farmer_id for this user
-      final farmerRecord = await _client
-          .from('farmers')
-          .select('farmer_id')
-          .eq('user_id', userId)
-          .single();
+      final yearsOfExp = int.tryParse(registration.yearsOfExperience) ?? 0;
 
-      final farmerId = farmerRecord['farmer_id'];
+      // 1. Upload Images to Storage (if present)
+      String? faceUrl = registration.facePhotoPath;
+      String? idUrl = registration.validIdPath;
 
-      final data = registration.toJson();
-      data['farmer_id'] = farmerId;
-      final response = await _client
-          .from('farmer_registrations')
-          .insert(data)
-          .select('registration_id')
-          .single();
-      final registrationId = response['registration_id'];
-
-      // Insert education rows
-      final educationRows = registration.toEducationRows();
-      if (educationRows.isNotEmpty) {
-        await _client
-            .from('farmer_education')
-            .insert(
-              educationRows
-                  .map((e) => {...e, 'registration_id': registrationId})
-                  .toList(),
-            );
+      if (registration.facePhotoPath != null || faceImageBytes != null) {
+        faceUrl = await _uploadImage(
+          bucket: 'registrations',
+          path: 'face_scans/${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          localPath: registration.facePhotoPath,
+          bytes: faceImageBytes,
+        );
       }
 
-      // Insert crop type rows
-      final cropRows = registration.toCropTypeRows();
-      if (cropRows.isNotEmpty) {
-        await _client
-            .from('farmer_crop_types')
-            .insert(
-              cropRows
-                  .map((c) => {...c, 'registration_id': registrationId})
-                  .toList(),
-            );
+      if (registration.validIdPath != null || idImageBytes != null) {
+        idUrl = await _uploadImage(
+          bucket: 'registrations',
+          path: 'valid_ids/${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          localPath: registration.validIdPath,
+          bytes: idImageBytes,
+        );
       }
 
-      // Insert livestock rows
-      final livestockRows = registration.toLivestockRows();
-      if (livestockRows.isNotEmpty) {
-        await _client
-            .from('farmer_livestock')
-            .insert(
-              livestockRows
-                  .map((l) => {...l, 'registration_id': registrationId})
-                  .toList(),
-            );
+      // Prepare education rows as JSONB
+      final educationList = registration.toEducationRows();
+      final educationJsonb = educationList.isEmpty ? <Map<String, dynamic>>[] : educationList.cast<Map<String, dynamic>>();
+
+      // Prepare crop rows as JSONB
+      final cropList = registration.toCropTypeRows();
+      final cropJsonb = cropList.isEmpty ? <Map<String, dynamic>>[] : cropList.cast<Map<String, dynamic>>();
+
+      // Prepare livestock rows as JSONB
+      final livestockList = registration.toLivestockRows();
+      final livestockJsonb = livestockList.isEmpty ? <Map<String, dynamic>>[] : livestockList.cast<Map<String, dynamic>>();
+
+      // Call comprehensive RPC function that does EVERYTHING
+      final response = await _client.rpc(
+        'submit_complete_farmer_registration',
+        params: {
+          'p_user_id': userId,
+          'p_birth_date': registration.birthDate,
+          'p_years_of_experience': yearsOfExp,
+          'p_residential_address': registration.residentialAddress,
+          'p_farm_name': registration.farmName,
+          'p_specialty': registration.specialty,
+          'p_face_photo_path': faceUrl,
+          'p_valid_id_path': idUrl,
+          'p_farming_history': registration.farmingHistory,
+          'p_education_rows': educationJsonb,
+          'p_crop_rows': cropJsonb,
+          'p_livestock_rows': livestockJsonb,
+        },
+      );
+
+      // Handle RPC response - it might be a list or a map
+      dynamic result = response;
+      if (result is List && result.isNotEmpty) {
+        result = result[0];
       }
+
+      if (result is! Map<String, dynamic>) {
+        throw Exception('Invalid response from RPC: $response');
+      }
+
+      final success = result['success'] as bool? ?? false;
+      final message = result['message'] as String? ?? 'Unknown error';
+
+      if (!success) {
+        throw Exception('Failed to submit registration: $message');
+      }
+
+      final registrationId = result['registration_id'];
+      if (registrationId == null) {
+        throw Exception('No registration ID returned');
+      }
+
+      print('✅ Farmer registration submitted successfully: $registrationId');
     } catch (e) {
       print('Error submitting farmer registration: $e');
       rethrow;
@@ -446,28 +475,51 @@ class SupabaseDB {
     String userId,
   ) async {
     try {
-      // First get farmer_id for this user
-      final farmerRecord = await _client
-          .from('farmers')
-          .select('farmer_id')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-      if (farmerRecord == null) return null;
-
-      final farmerId = farmerRecord['farmer_id'];
-
-      // Now get the registration
+      // Get registration by user_id (works even if farmer record doesn't exist yet)
       final response = await _client
           .from('farmer_registrations')
           .select()
-          .eq('farmer_id', farmerId)
+          .eq('user_id', userId)
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
       return response;
     } catch (e) {
       print('Error fetching farmer registration: $e');
+      return null;
+    }
+  }
+
+  /// Private helper for storage uploads (Handles Mobile & Web)
+  static Future<String?> _uploadImage({
+    required String bucket,
+    required String path,
+    String? localPath,
+    Uint8List? bytes,
+  }) async {
+    try {
+      if (kIsWeb) {
+        if (bytes == null) return null;
+        await _client.storage.from(bucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+        );
+      } else {
+        if (localPath == null) return null;
+        final file = File(localPath);
+        if (!await file.exists()) return null;
+        await _client.storage.from(bucket).upload(
+          path,
+          file,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+        );
+      }
+
+      // Get Public URL
+      return _client.storage.from(bucket).getPublicUrl(path);
+    } catch (e) {
+      debugPrint('🔴 Storage Upload Error: $e');
       return null;
     }
   }

@@ -1,3 +1,4 @@
+// ignore_for_file: uri_does_not_exist, creation_with_non_type
 import 'package:flutter/material.dart';
 import '../shared/services/auth_service.dart';
 import 'screens/consumer/home_screen.dart';

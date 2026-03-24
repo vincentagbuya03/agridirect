@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'supabase_config.dart';
 
 /// Admin Service - Handles all admin operations
@@ -131,7 +131,7 @@ class AdminService extends ChangeNotifier {
 
       final response = await _client
           .from('v_orders')
-          .select('order_id, order_number, total, status, created_at')
+          .select('order_id, order_number, total, status, created_at, users:customer_id (name)')
           .order('created_at', ascending: false)
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
@@ -427,11 +427,9 @@ class AdminService extends ChangeNotifier {
           .select('''
             registration_id, status, created_at, updated_at,
             birth_date, years_of_experience, residential_address,
+            farm_name, specialty,
             face_photo_path, valid_id_path, farming_history,
-            farmers (
-              farmer_id, farm_name, specialty, location,
-              users (user_id, name, email, phone, avatar_url)
-            )
+            users:user_id (user_id, name, email, phone, avatar_url)
           ''')
           .eq('status', 'pending')
           .order('created_at', ascending: false)
@@ -461,11 +459,9 @@ class AdminService extends ChangeNotifier {
       var query = _client.from('farmer_registrations').select('''
             registration_id, status, created_at, updated_at,
             birth_date, years_of_experience, residential_address,
+            farm_name, specialty,
             face_photo_path, valid_id_path, farming_history, review_notes,
-            farmers (
-              farmer_id, farm_name, specialty, location, is_verified,
-              users (user_id, name, email, phone, avatar_url)
-            )
+            users:user_id (user_id, name, email, phone, avatar_url)
           ''');
 
       if (status != null) {
@@ -487,32 +483,32 @@ class AdminService extends ChangeNotifier {
     }
   }
 
-  /// Approve farmer registration
+  /// Approve farmer registration (Atomic RPC)
   Future<bool> approveFarmerRegistration({
     required String registrationId,
-    required String farmerId,
     String? reviewNotes,
   }) async {
     try {
-      final adminId = _client.auth.currentUser?.id;
+      final response = await _client.rpc(
+        'approve_farmer_registration',
+        params: {
+          'p_registration_id': registrationId,
+          'p_review_notes': reviewNotes ?? 'Application approved',
+        },
+      );
 
-      // Update registration status
-      await _client.from('farmer_registrations').update({
-        'status': 'approved',
-        'reviewed_by': adminId,
-        'review_notes': reviewNotes ?? 'Application approved',
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('registration_id', registrationId);
+      // Handle RPC response
+      final Map<String, dynamic> result = (response is List && response.isNotEmpty) 
+          ? response[0] 
+          : response as Map<String, dynamic>;
 
-      // Mark farmer as verified
-      await _client.from('farmers').update({
-        'is_verified': true,
-        'badge': 'verified',
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('farmer_id', farmerId);
+      if (!(result['success'] as bool? ?? false)) {
+        _errorMessage = result['message'] ?? 'Failed to approve registration';
+        notifyListeners();
+        return false;
+      }
 
-      await _logAdminAction(
-          'approve_farmer', 'Approved farmer registration', null);
+      await _logAdminAction('approve_farmer', 'Approved farmer: $registrationId', null);
       notifyListeners();
       return true;
     } catch (e) {
@@ -972,18 +968,70 @@ class AdminService extends ChangeNotifier {
     }
   }
 
-  /// Get recent notifications
-  Future<List<Map<String, dynamic>>> getRecentNotifications({
-    int limit = 10,
-  }) async {
+  /// Get recent dashboard activity (combined feed)
+  Future<List<Map<String, dynamic>>> getDashboardActivity() async {
     try {
-      final response = await _client
-          .from('notifications')
-          .select('notification_id, type, title, message, is_read, created_at')
-          .order('created_at', ascending: false)
-          .limit(limit);
-      return List<Map<String, dynamic>>.from(response);
+      final results = await Future.wait([
+        // Recent 3 registrations
+        _client.from('farmer_registrations')
+            .select('registration_id, status, created_at, users:user_id(name)')
+            .order('created_at', ascending: false)
+            .limit(3),
+        // Recent 3 orders
+        _client.from('v_orders')
+            .select('order_id, order_number, total, status, created_at, users:customer_id(name)')
+            .order('created_at', ascending: false)
+            .limit(3),
+        // Recent 3 reports
+        _client.from('reported_content')
+            .select('report_id, content_type, reason, created_at')
+            .order('created_at', ascending: false)
+            .limit(3),
+      ]);
+
+      final List<Map<String, dynamic>> activity = [];
+      
+      // Add registrations
+      for (var reg in (results[0] as List)) {
+        activity.add({
+          'type': 'registration',
+          'title': 'New Farmer Signup',
+          'subtitle': '${reg['users']?['name'] ?? 'Someone'} applied',
+          'time': reg['created_at'],
+          'color': const Color(0xFF10B981),
+          'icon': Icons.person_add_rounded,
+        });
+      }
+
+      // Add orders
+      for (var order in (results[1] as List)) {
+        activity.add({
+          'type': 'order',
+          'title': 'New Order #${order['order_number']}',
+          'subtitle': 'Total: ₱${order['total']} by ${order['users']?['name'] ?? 'Customer'}',
+          'time': order['created_at'],
+          'color': const Color(0xFF3B82F6),
+          'icon': Icons.shopping_bag_rounded,
+        });
+      }
+
+      // Add reports
+      for (var report in (results[2] as List)) {
+        activity.add({
+          'type': 'report',
+          'title': 'Content Reported',
+          'subtitle': 'Reason: ${report['reason']}',
+          'time': report['created_at'],
+          'color': const Color(0xFFEF4444),
+          'icon': Icons.warning_rounded,
+        });
+      }
+
+      // Sort by time descending
+      activity.sort((a, b) => (b['time'] as String).compareTo(a['time'] as String));
+      return activity;
     } catch (e) {
+      debugPrint('Error fetching activity: $e');
       return [];
     }
   }

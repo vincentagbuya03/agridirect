@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 /// Mobile-only Community Hub.
@@ -78,7 +78,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                   borderRadius: BorderRadius.circular(50),
                   boxShadow: [
                     BoxShadow(
-                      color: primary.withValues(alpha: 0.3),
+                      color: primary.withOpacity(0.3),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),
@@ -111,7 +111,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F8F6).withValues(alpha: 0.8),
+        color: const Color(0xFFF6F8F6).withOpacity(0.8),
         border: const Border(
           bottom: BorderSide(color: Color(0xFFE0E7E0), width: 1),
         ),
@@ -124,8 +124,8 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
             height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: primary.withValues(alpha: 0.2),
-              border: Border.all(color: primary.withValues(alpha: 0.3)),
+              color: primary.withOpacity(0.2),
+              border: Border.all(color: primary.withOpacity(0.3)),
             ),
             child: Icon(Icons.account_circle, color: primary),
           ),
@@ -146,7 +146,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
+                      color: Colors.black.withOpacity(0.05),
                       blurRadius: 6,
                     ),
                   ],
@@ -261,7 +261,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
         border: Border.all(color: const Color(0xFFE0E7E0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -403,7 +403,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
         border: Border.all(color: const Color(0xFFE0E7E0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),

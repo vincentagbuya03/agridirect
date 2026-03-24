@@ -422,7 +422,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: primary.withValues(alpha: 0.3),
+              color: primary.withOpacity(0.3),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),

@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/admin_service.dart';
 import '../../../shared/services/auth_service.dart';
 
-/// Admin Settings Tab - System configuration and preferences
+/// Admin Settings Tab - System configuration and preferences (Modern White)
 class AdminSettingsTab extends StatefulWidget {
   final AdminService adminService;
 
@@ -22,32 +22,45 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
   bool _orderAlerts = true;
   bool _farmerRegistrationAlerts = true;
   bool _reportAlerts = true;
-  bool _lowStockAlerts = false;
   bool _maintenanceMode = false;
   bool _newUserRegistration = true;
   bool _farmerRegistration = true;
 
+  // Modern light theme colors
   static const Color _primary = Color(0xFF10B981);
+  static const Color _secondary = Color(0xFF3B82F6);
   static const Color _warning = Color(0xFFF59E0B);
   static const Color _danger = Color(0xFFEF4444);
-  static const Color _info = Color(0xFF3B82F6);
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _card = Color(0xFF1E293B);
-  static const Color _border = Color(0xFF334155);
+  static const Color _background = Color(0xFFFAFAFA);
+  static const Color _card = Colors.white;
+  static const Color _border = Color(0xFFE2E8F0);
   static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFFF1F5F9);
+  static const Color _text = Color(0xFF1E293B);
 
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 768;
 
     return Container(
-      color: _dark,
+      color: _background,
       child: SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+             Text(
+              'Settings',
+              style: GoogleFonts.inter(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: _text,
+              ),
+            ),
+            Text(
+              'Manage your profile and platform configurations',
+              style: GoogleFonts.inter(fontSize: 13, color: _muted),
+            ),
+            const SizedBox(height: 32),
             // Profile Section
             _buildSection(
               title: 'Admin Profile',
@@ -100,6 +113,9 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
         color: _card,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _border),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 5)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,7 +167,7 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
           ),
           child: Center(
             child: Text(
@@ -229,15 +245,15 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
         _buildToggleRow(
           title: 'Email Notifications',
           subtitle: 'Receive important updates via email',
-          icon: Icons.email_rounded,
+          icon: Icons.email_outlined,
           value: _emailNotifications,
           onChanged: (v) => setState(() => _emailNotifications = v),
         ),
-        const SizedBox(height: 16),
+        const Divider(height: 32),
         _buildToggleRow(
           title: 'Push Notifications',
           subtitle: 'Get instant notifications in browser',
-          icon: Icons.notifications_active_rounded,
+          icon: Icons.notifications_active_outlined,
           value: _pushNotifications,
           onChanged: (v) => setState(() => _pushNotifications = v),
         ),
@@ -251,33 +267,25 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
         _buildToggleRow(
           title: 'New Order Alerts',
           subtitle: 'Get notified when new orders are placed',
-          icon: Icons.shopping_bag_rounded,
+          icon: Icons.shopping_bag_outlined,
           value: _orderAlerts,
           onChanged: (v) => setState(() => _orderAlerts = v),
         ),
-        const SizedBox(height: 16),
+        const Divider(height: 32),
         _buildToggleRow(
           title: 'Farmer Registration Alerts',
           subtitle: 'Notify when farmers apply for verification',
-          icon: Icons.agriculture_rounded,
+          icon: Icons.agriculture_outlined,
           value: _farmerRegistrationAlerts,
           onChanged: (v) => setState(() => _farmerRegistrationAlerts = v),
         ),
-        const SizedBox(height: 16),
+        const Divider(height: 32),
         _buildToggleRow(
           title: 'Content Report Alerts',
           subtitle: 'Alert when content is reported',
-          icon: Icons.flag_rounded,
+          icon: Icons.flag_outlined,
           value: _reportAlerts,
           onChanged: (v) => setState(() => _reportAlerts = v),
-        ),
-        const SizedBox(height: 16),
-        _buildToggleRow(
-          title: 'Low Stock Alerts',
-          subtitle: 'Notify when products are running low',
-          icon: Icons.inventory_rounded,
-          value: _lowStockAlerts,
-          onChanged: (v) => setState(() => _lowStockAlerts = v),
         ),
       ],
     );
@@ -289,20 +297,20 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
         _buildToggleRow(
           title: 'Allow New User Registration',
           subtitle: 'Enable/disable new customer sign-ups',
-          icon: Icons.person_add_rounded,
+          icon: Icons.person_add_outlined,
           value: _newUserRegistration,
           onChanged: (v) => setState(() => _newUserRegistration = v),
-          activeColor: _info,
+          activeColor: _secondary,
         ),
-        const SizedBox(height: 16),
+        const Divider(height: 32),
         _buildToggleRow(
           title: 'Allow Farmer Registration',
           subtitle: 'Enable/disable new farmer applications',
-          icon: Icons.eco_rounded,
+          icon: Icons.eco_outlined,
           value: _farmerRegistration,
           onChanged: (v) => setState(() => _farmerRegistration = v),
-          activeColor: _info,
-        ),
+          activeColor: _secondary,
+        )
       ],
     );
   }
@@ -313,42 +321,38 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
         _buildToggleRow(
           title: 'Maintenance Mode',
           subtitle: 'Temporarily disable platform access for users',
-          icon: Icons.build_rounded,
+          icon: Icons.build_circle_outlined,
           value: _maintenanceMode,
           onChanged: (v) => _confirmMaintenanceMode(v),
           activeColor: _danger,
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         Row(
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _showClearCacheDialog(),
+                onPressed: () {},
                 icon: const Icon(Icons.cleaning_services_rounded, size: 18),
                 label: const Text('Clear Cache'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: _warning,
                   side: BorderSide(color: _warning.withOpacity(0.5)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _showExportDataDialog(),
+                onPressed: () {},
                 icon: const Icon(Icons.download_rounded, size: 18),
-                label: const Text('Export Data'),
+                label: const Text('Export System Data'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: _info,
-                  side: BorderSide(color: _info.withOpacity(0.5)),
+                  foregroundColor: _secondary,
+                  side: BorderSide(color: _secondary.withOpacity(0.5)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
@@ -371,7 +375,7 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: _dark,
+            color: _background,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: _muted, size: 20),
@@ -402,8 +406,6 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
           onChanged: onChanged,
           activeColor: activeColor ?? _primary,
           activeTrackColor: (activeColor ?? _primary).withOpacity(0.3),
-          inactiveThumbColor: _muted,
-          inactiveTrackColor: _border,
         ),
       ],
     );
@@ -413,232 +415,24 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: _card,
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: _danger.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(Icons.warning_rounded, color: _danger, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Text(
-              enable ? 'Enable Maintenance?' : 'Disable Maintenance?',
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.bold,
-                color: _text,
-              ),
-            ),
-          ],
-        ),
+        title: Text(enable ? 'Enable Maintenance Mode?' : 'Disable Maintenance Mode?', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
         content: Text(
-          enable
-              ? 'This will prevent all users from accessing the platform. Only administrators will have access.'
-              : 'This will restore normal access for all users.',
-          style: GoogleFonts.inter(color: _muted, fontSize: 14),
+          enable ? 'This will prevent all users from accessing the platform until disabled.' : 'This will restore normal platform access for everyone.',
+          style: GoogleFonts.inter(fontSize: 14, color: _muted),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.inter(color: _muted)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
               setState(() => _maintenanceMode = enable);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  backgroundColor: enable ? _danger : _primary,
-                  content: Text(
-                    enable
-                        ? 'Maintenance mode enabled'
-                        : 'Maintenance mode disabled',
-                    style: GoogleFonts.inter(color: Colors.white),
-                  ),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: enable ? _danger : _primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: Text(
-              enable ? 'Enable' : 'Disable',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showClearCacheDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: _card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Clear Cache?',
-          style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: _text),
-        ),
-        content: Text(
-          'This will clear all cached data. The system will reload fresh data from the server.',
-          style: GoogleFonts.inter(color: _muted, fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.inter(color: _muted)),
-          ),
-          ElevatedButton(
-            onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  backgroundColor: _primary,
-                  content: Text(
-                    'Cache cleared successfully',
-                    style: GoogleFonts.inter(color: Colors.white),
-                  ),
-                ),
-              );
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _warning,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(
-              'Clear',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: enable ? _danger : _primary, foregroundColor: Colors.white),
+            child: Text(enable ? 'Enable' : 'Disable'),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showExportDataDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: _card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Export Data',
-          style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: _text),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Select data to export:',
-              style: GoogleFonts.inter(color: _muted, fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            _ExportOption(title: 'Users', icon: Icons.people_rounded),
-            _ExportOption(title: 'Orders', icon: Icons.shopping_bag_rounded),
-            _ExportOption(title: 'Products', icon: Icons.inventory_2_rounded),
-            _ExportOption(title: 'Farmers', icon: Icons.agriculture_rounded),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.inter(color: _muted)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  backgroundColor: _primary,
-                  content: Text(
-                    'Export started. You will be notified when ready.',
-                    style: GoogleFonts.inter(color: Colors.white),
-                  ),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _info,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(
-              'Export',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ExportOption extends StatefulWidget {
-  final String title;
-  final IconData icon;
-
-  const _ExportOption({required this.title, required this.icon});
-
-  @override
-  State<_ExportOption> createState() => _ExportOptionState();
-}
-
-class _ExportOptionState extends State<_ExportOption> {
-  bool _selected = true;
-
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFFF1F5F9);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: () => setState(() => _selected = !_selected),
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: _selected ? _primary.withOpacity(0.1) : _dark,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: _selected ? _primary.withOpacity(0.3) : _border,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(widget.icon, color: _selected ? _primary : _muted, size: 20),
-              const SizedBox(width: 12),
-              Text(
-                widget.title,
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: _selected ? _text : _muted,
-                ),
-              ),
-              const Spacer(),
-              Icon(
-                _selected ? Icons.check_circle_rounded : Icons.circle_outlined,
-                color: _selected ? _primary : _muted,
-                size: 20,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/auth_service.dart';
+import '../../../shared/services/supabase_config.dart';
 import '../../../shared/router/app_router.dart';
 import '../../widgets/animated_components.dart';
 
@@ -26,7 +27,8 @@ class WebProfileScreen extends StatefulWidget {
   State<WebProfileScreen> createState() => _WebProfileScreenState();
 }
 
-class _WebProfileScreenState extends State<WebProfileScreen> with TickerProviderStateMixin {
+class _WebProfileScreenState extends State<WebProfileScreen>
+    with TickerProviderStateMixin {
   static const Color primary = Color(0xFF16A34A);
   static const Color _accent = Color(0xFF22C55E);
   static const Color _dark = Color(0xFF111827);
@@ -38,6 +40,8 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
   final Set<int> _hoveredButtons = {};
   int _hoveredNav = -1;
 
+  String? _registrationStatus; // 'pending', 'approved', 'rejected', or null
+
   @override
   void initState() {
     super.initState();
@@ -45,6 +49,21 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
       duration: const Duration(milliseconds: 800),
       vsync: this,
     )..forward();
+    _loadRegistrationStatus();
+  }
+
+  Future<void> _loadRegistrationStatus() async {
+    try {
+      final auth = AuthService();
+      final reg = await SupabaseDB.getFarmerRegistration(auth.userId);
+      if (mounted) {
+        setState(() {
+          _registrationStatus = reg?['status'] as String?;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading registration status: $e');
+    }
   }
 
   @override
@@ -54,9 +73,88 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
   }
 
   void _handleStartSelling() {
-    context.push(AppRoutes.webFarmerRegister, extra: () {
-      widget.onModeChanged();
-    });
+    if (_registrationStatus == 'pending') {
+      _showPendingDialog();
+    } else {
+      context.push(
+        AppRoutes.webFarmerRegister,
+        extra: () {
+          widget.onModeChanged();
+          _loadRegistrationStatus();
+        },
+      );
+    }
+  }
+
+  void _showPendingDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.hourglass_bottom_rounded,
+                size: 56,
+                color: Colors.orange[400],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Pending Admin Approval',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: _dark,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Your farmer registration is under review. We will notify you as soon as it\'s approved.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                color: _muted,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => Navigator.of(ctx).pop(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.orange[400],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Got it',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _handleSwitchToFarmer() {
@@ -86,90 +184,90 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                // Page title
-                const Text(
-                  'Profile',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Manage your account and preferences',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                ),
-                const SizedBox(height: 32),
-
-                // Top row: profile card + seller card
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Profile card
-                    Expanded(flex: 3, child: _buildProfileCard(auth)),
-                    const SizedBox(width: 24),
-                    // Seller card
-                    Expanded(flex: 4, child: _buildSellerCard(auth)),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Settings grid
-                _buildSettingsGrid(),
-
-                const SizedBox(height: 24),
-
-                // Logout
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    child: GestureDetector(
-                      onTap: widget.onLogout,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: Colors.red.withValues(alpha: 0.2),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.logout_rounded,
-                              color: Colors.red,
-                              size: 20,
-                            ),
-                            SizedBox(width: 10),
-                            Text(
-                              'Log Out',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.red,
-                              ),
-                            ),
-                          ],
+                      // Page title
+                      const Text(
+                        'Profile',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Manage your account and preferences',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Top row: profile card + seller card
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Profile card
+                          Expanded(flex: 3, child: _buildProfileCard(auth)),
+                          const SizedBox(width: 24),
+                          // Seller card
+                          Expanded(flex: 4, child: _buildSellerCard(auth)),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Settings grid
+                      _buildSettingsGrid(),
+
+                      const SizedBox(height: 24),
+
+                      // Logout
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: widget.onLogout,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: Colors.red.withOpacity(0.2),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.logout_rounded,
+                                    color: Colors.red,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'Log Out',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
-    ),
-    ],
-    ),
     );
   }
 
@@ -180,12 +278,12 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
       margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
+        color: Colors.white.withOpacity(0.9),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _border.withValues(alpha: 0.5)),
+        border: Border.all(color: _border.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -238,21 +336,30 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
                   onTap: () => widget.onNavigate(i),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: isActive
-                          ? primary.withValues(alpha: 0.08)
+                          ? primary.withOpacity(0.08)
                           : isHovered
-                              ? _border.withValues(alpha: 0.5)
-                              : Colors.transparent,
+                          ? _border.withOpacity(0.5)
+                          : Colors.transparent,
                     ),
                     child: Text(
                       navItems[i],
                       style: GoogleFonts.inter(
                         fontSize: 14,
-                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                        color: isActive ? primary : isHovered ? _dark : _muted,
+                        fontWeight: isActive
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: isActive
+                            ? primary
+                            : isHovered
+                            ? _dark
+                            : _muted,
                       ),
                     ),
                   ),
@@ -268,16 +375,9 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
             decoration: BoxDecoration(
               color: const Color(0xFFDCFCE7),
               shape: BoxShape.circle,
-              border: Border.all(
-                color: primary,
-                width: 1.5,
-              ),
+              border: Border.all(color: primary, width: 1.5),
             ),
-            child: Icon(
-              Icons.person_rounded,
-              color: primary,
-              size: 22,
-            ),
+            child: Icon(Icons.person_rounded, color: primary, size: 22),
           ),
         ],
       ),
@@ -292,7 +392,7 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -308,7 +408,7 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
               border: Border.all(color: primary, width: 3),
               boxShadow: [
                 BoxShadow(
-                  color: primary.withValues(alpha: 0.2),
+                  color: primary.withOpacity(0.2),
                   blurRadius: 16,
                 ),
               ],
@@ -319,7 +419,8 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
                     'https://lh3.googleusercontent.com/aida-public/AB6AXuA7SO8J3CebwmP_4K0nwWhDkMsWISrTpnfbOkYJ79_ZiTCLVxdvX_FJArJ1xwYsLAJx8gW_Wtk3xValGb9mDShlpRvdPIMoD9UGWJ9LwNRlF0vvmsKesjK6liNaDGy7C5HGWdOAE1hEPvF3UTq81_QK7QkgKAAMQgeICa4pykDXTF8JYtnrFYPiavyC7N-wkK4pGMGQJcdoyKpRglzbFXWGqTdoa3xP-Bm86BGxFKlWg21Mbw-FylTfHiJeJMKgLbfSJr8MhPFg1zqB',
                 fit: BoxFit.cover,
                 placeholder: (ctx, url) => Container(color: Colors.grey[200]),
-                errorWidget: (ctx, url, err) => const Icon(Icons.person, size: 36),
+                errorWidget: (ctx, url, err) =>
+                    const Icon(Icons.person, size: 36),
               ),
             ),
           ),
@@ -342,7 +443,7 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: primary.withValues(alpha: 0.12),
+                color: primary.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
@@ -396,10 +497,10 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: primary.withValues(alpha: 0.2)),
+          border: Border.all(color: primary.withOpacity(0.2)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: Colors.black.withOpacity(0.03),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -413,7 +514,7 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: primary.withValues(alpha: 0.12),
+                    color: primary.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
@@ -482,20 +583,22 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
                     boxShadow: _hoveredButtons.contains(0)
                         ? [
                             BoxShadow(
-                              color: (isViewingAsFarmer
-                                      ? const Color(0xFF3B82F6)
-                                      : primary)
-                                  .withValues(alpha: 0.5),
+                              color:
+                                  (isViewingAsFarmer
+                                          ? const Color(0xFF3B82F6)
+                                          : primary)
+                                      .withOpacity(0.5),
                               blurRadius: 16,
                               offset: const Offset(0, 8),
                             ),
                           ]
                         : [
                             BoxShadow(
-                              color: (isViewingAsFarmer
-                                      ? const Color(0xFF3B82F6)
-                                      : primary)
-                                  .withValues(alpha: 0.3),
+                              color:
+                                  (isViewingAsFarmer
+                                          ? const Color(0xFF3B82F6)
+                                          : primary)
+                                      .withOpacity(0.3),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -543,12 +646,21 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            primary.withValues(alpha: 0.1),
-            primary.withValues(alpha: 0.03),
-          ],
+          colors: _registrationStatus == 'pending'
+              ? [
+                  Colors.orange.withOpacity(0.1),
+                  Colors.orange.withOpacity(0.03),
+                ]
+              : [
+                  primary.withOpacity(0.1),
+                  primary.withOpacity(0.03),
+                ],
         ),
-        border: Border.all(color: primary.withValues(alpha: 0.2)),
+        border: Border.all(
+          color: _registrationStatus == 'pending'
+              ? Colors.orange.withOpacity(0.2)
+              : primary.withOpacity(0.2),
+        ),
       ),
       child: Stack(
         children: [
@@ -556,9 +668,13 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
             right: -20,
             bottom: -20,
             child: Icon(
-              Icons.agriculture_rounded,
+              _registrationStatus == 'pending'
+                  ? Icons.hourglass_bottom_rounded
+                  : Icons.agriculture_rounded,
               size: 140,
-              color: primary.withValues(alpha: 0.08),
+              color: _registrationStatus == 'pending'
+                  ? Colors.orange.withOpacity(0.08)
+                  : primary.withOpacity(0.08),
             ),
           ),
           Column(
@@ -569,105 +685,156 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: primary.withValues(alpha: 0.15),
+                      color: _registrationStatus == 'pending'
+                          ? Colors.orange.withOpacity(0.15)
+                          : primary.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(
-                      Icons.rocket_launch_rounded,
-                      color: primary,
+                      _registrationStatus == 'pending'
+                          ? Icons.hourglass_bottom_rounded
+                          : Icons.rocket_launch_rounded,
+                      color: _registrationStatus == 'pending'
+                          ? Colors.orange[400]
+                          : primary,
                       size: 28,
                     ),
                   ),
                   const SizedBox(width: 16),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Become a Seller',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _registrationStatus == 'pending'
+                              ? 'Registration Under Review'
+                              : 'Become a Seller',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Sell your farm produce directly to customers',
-                        style: TextStyle(fontSize: 13, color: Colors.grey),
-                      ),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          _registrationStatus == 'pending'
+                              ? 'Your farmer registration is being reviewed'
+                              : 'Sell your farm produce directly to customers',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 20),
-              const Text(
-                'Activate Seller Mode to unlock the Farmer Dashboard. '
-                'Manage your products, track sales analytics, get AI-powered suggestions, '
-                'and connect directly with buyers across the platform.',
-                style: TextStyle(
+              Text(
+                _registrationStatus == 'pending'
+                    ? 'We appreciate your interest in becoming a seller. Your farmer registration is currently under admin review. '
+                          'We will notify you as soon as it\'s approved so you can start selling.'
+                    : 'Activate Seller Mode to unlock the Farmer Dashboard. '
+                          'Manage your products, track sales analytics, get AI-powered suggestions, '
+                          'and connect directly with buyers across the platform.',
+                style: const TextStyle(
                   fontSize: 14,
                   color: Color(0xFF6B7280),
                   height: 1.6,
                 ),
               ),
-              const SizedBox(height: 24),
-              MouseRegion(
-                cursor: SystemMouseCursors.click,
-                onEnter: (_) => setState(() => _hoveredButtons.add(1)),
-                onExit: (_) => setState(() => _hoveredButtons.remove(1)),
-                child: GestureDetector(
-                  onTap: _handleStartSelling,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                      vertical: 14,
+              if (_registrationStatus == 'pending') ...[
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.orange.withOpacity(0.3),
                     ),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: [_accent, primary]),
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: _hoveredButtons.contains(1)
-                          ? [
-                              BoxShadow(
-                                color: primary.withValues(alpha: 0.5),
-                                blurRadius: 20,
-                                offset: const Offset(0, 10),
-                              ),
-                            ]
-                          : [
-                              BoxShadow(
-                                color: primary.withValues(alpha: 0.3),
-                                blurRadius: 16,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                    ),
-                    child: AnimatedScale(
-                      scale: _hoveredButtons.contains(1) ? 1.05 : 1.0,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_rounded,
+                        size: 20,
+                        color: Colors.orange[400],
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Check back later or we\'ll send you an email notification once approved.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.orange[700],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(height: 24),
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  onEnter: (_) => setState(() => _hoveredButtons.add(1)),
+                  onExit: (_) => setState(() => _hoveredButtons.remove(1)),
+                  child: GestureDetector(
+                    onTap: _handleStartSelling,
+                    child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.storefront_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                          SizedBox(width: 10),
-                          Text(
-                            'Start Selling',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 28,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [_accent, primary]),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: _hoveredButtons.contains(1)
+                            ? [
+                                BoxShadow(
+                                  color: primary.withOpacity(0.5),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ]
+                            : [
+                                BoxShadow(
+                                  color: primary.withOpacity(0.3),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                      ),
+                      child: AnimatedScale(
+                        scale: _hoveredButtons.contains(1) ? 1.05 : 1.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.storefront_rounded,
                               color: Colors.white,
+                              size: 20,
                             ),
-                          ),
-                        ],
+                            SizedBox(width: 10),
+                            Text(
+                              'Start Selling',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         ],
@@ -676,6 +843,7 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
   }
 
   Widget _buildSettingsGrid() {
+    final auth = AuthService();
     final items = [
       _SettingsItem(
         Icons.shopping_bag_outlined,
@@ -688,7 +856,14 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
         'Addresses',
         'Delivery locations',
       ),
-      _SettingsItem(Icons.payment_outlined, 'Payments', 'Cards & wallets'),
+      // Only show wallet for farmers
+      if (auth.isSeller)
+        _SettingsItem(
+          Icons.account_balance_wallet_outlined,
+          'My Wallet',
+          'Earnings & withdrawals',
+          onTap: () => context.push(AppRoutes.wallet),
+        ),
       _SettingsItem(
         Icons.notifications_outlined,
         'Notifications',
@@ -705,61 +880,64 @@ class _WebProfileScreenState extends State<WebProfileScreen> with TickerProvider
           width: 260,
           child: MouseRegion(
             cursor: SystemMouseCursors.click,
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(12),
+            child: GestureDetector(
+              onTap: item.onTap,
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
-                    child: Icon(
-                      item.icon,
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        item.icon,
+                        size: 20,
+                        color: const Color(0xFF475569),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.title,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            item.subtitle,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.grey[300],
                       size: 20,
-                      color: const Color(0xFF475569),
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.title,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          item.subtitle,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[400],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: Colors.grey[300],
-                    size: 20,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -773,5 +951,6 @@ class _SettingsItem {
   final IconData icon;
   final String title;
   final String subtitle;
-  const _SettingsItem(this.icon, this.title, this.subtitle);
+  final VoidCallback? onTap;
+  const _SettingsItem(this.icon, this.title, this.subtitle, {this.onTap});
 }

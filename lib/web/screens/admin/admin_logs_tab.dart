@@ -12,20 +12,21 @@ class AdminLogsTab extends StatefulWidget {
   State<AdminLogsTab> createState() => _AdminLogsTabState();
 }
 
+// Modern light theme colors
+const Color _primary = Color(0xFF10B981);
+const Color _danger = Color(0xFFEF4444);
+const Color _info = Color(0xFF3B82F6);
+const Color _warning = Color(0xFFF59E0B);
+const Color _background = Color(0xFFFAFAFA);
+const Color _card = Colors.white;
+const Color _border = Color(0xFFE2E8F0);
+const Color _text = Color(0xFF1E293B);
+const Color _muted = Color(0xFF64748B);
+
 class _AdminLogsTabState extends State<AdminLogsTab> {
   late Future<List<Map<String, dynamic>>> _logsFuture;
   int _currentPage = 0;
   String _selectedFilter = 'all';
-
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _warning = Color(0xFFF59E0B);
-  static const Color _danger = Color(0xFFEF4444);
-  static const Color _info = Color(0xFF3B82F6);
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _card = Color(0xFF1E293B);
-  static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFFF1F5F9);
 
   final List<String> _filters = [
     'all',
@@ -51,7 +52,7 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
     final isMobile = MediaQuery.of(context).size.width < 768;
 
     return Container(
-      color: _dark,
+      color: _background,
       child: Column(
         children: [
           // Header with Filters
@@ -308,11 +309,6 @@ class _PaginationButton extends StatelessWidget {
 
   const _PaginationButton({required this.icon, this.onPressed});
 
-  static const Color _card = Color(0xFF1E293B);
-  static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFFF1F5F9);
-
   @override
   Widget build(BuildContext context) {
     final enabled = onPressed != null;
@@ -339,15 +335,6 @@ class _LogItem extends StatelessWidget {
   final Map<String, dynamic> log;
 
   const _LogItem({required this.log});
-
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _warning = Color(0xFFF59E0B);
-  static const Color _danger = Color(0xFFEF4444);
-  static const Color _info = Color(0xFF3B82F6);
-  static const Color _card = Color(0xFF1E293B);
-  static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFFF1F5F9);
 
   @override
   Widget build(BuildContext context) {

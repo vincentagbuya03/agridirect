@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/weather_service.dart';
@@ -156,7 +156,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           latitude: position.latitude,
           longitude: position.longitude,
         );
-        debugPrint('Weather data received: ${weatherData?.temperature}°C at ${weatherData?.location}');
+        debugPrint('Weather data received: ${weatherData?.temperature}�C at ${weatherData?.location}');
         
         // Also fetch 5-day forecast
         forecast = await WeatherService().getForecastByCoordinates(
@@ -169,7 +169,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         debugPrint('No position available, fetching weather by city...');
         weatherData = await WeatherService().getWeatherByCity('Farm Location');
         forecast = await WeatherService().getForecastByCity('Farm Location');
-        debugPrint('Fallback weather data: ${weatherData?.temperature}°C');
+        debugPrint('Fallback weather data: ${weatherData?.temperature}�C');
       }
 
       if (mounted) {
@@ -337,7 +337,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withOpacity(0.05),
                   blurRadius: 12,
                   offset: const Offset(0, 2),
                 ),
@@ -364,7 +364,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: primary.withValues(alpha: 0.15),
+                        color: primary.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -410,7 +410,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withOpacity(0.05),
                   blurRadius: 12,
                   offset: const Offset(0, 2),
                 ),
@@ -476,7 +476,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -500,7 +500,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.15),
+                  color: primary.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -683,7 +683,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${_weatherData!.temperature.toStringAsFixed(1)}°C - ${_weatherData!.description}. Humidity: ${_weatherData!.humidity.toStringAsFixed(0)}%',
+                    '${_weatherData!.temperature.toStringAsFixed(1)}�C - ${_weatherData!.description}. Humidity: ${_weatherData!.humidity.toStringAsFixed(0)}%',
                     style: TextStyle(
                       fontSize: 12,
                       color: const Color(0xFF0D6B4D),
@@ -736,7 +736,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                     'Weather at ${_weatherData!.location}',
                     style: TextStyle(
                       fontSize: 10,
-                      color: textColor.withValues(alpha: 0.7),
+                      color: textColor.withOpacity(0.7),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -793,11 +793,11 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: Colors.white.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                '💡 ${alert.recommendation}',
+                '?? ${alert.recommendation}',
                 style: TextStyle(
                   fontSize: 11,
                   color: textColor,
@@ -903,7 +903,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -975,7 +975,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: isRainy ? Colors.blue[100] : primary.withValues(alpha: 0.1),
+              color: isRainy ? Colors.blue[100] : primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
@@ -988,7 +988,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           const SizedBox(height: 8),
           // Temperature
           Text(
-            '${forecast.temperature.toStringAsFixed(0)}°C',
+            '${forecast.temperature.toStringAsFixed(0)}�C',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -1047,15 +1047,15 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   String _getWeatherEmoji(String description, bool isRainy) {
     final desc = description.toLowerCase();
     
-    if (desc.contains('rain') || isRainy) return '🌧️';
-    if (desc.contains('cloud') || desc.contains('overcast')) return '☁️';
-    if (desc.contains('clear') || desc.contains('sunny')) return '☀️';
-    if (desc.contains('snow')) return '❄️';
-    if (desc.contains('wind')) return '💨';
-    if (desc.contains('fog') || desc.contains('mist')) return '🌫️';
-    if (desc.contains('thunder') || desc.contains('storm')) return '⛈️';
+    if (desc.contains('rain') || isRainy) return '???';
+    if (desc.contains('cloud') || desc.contains('overcast')) return '??';
+    if (desc.contains('clear') || desc.contains('sunny')) return '??';
+    if (desc.contains('snow')) return '??';
+    if (desc.contains('wind')) return '??';
+    if (desc.contains('fog') || desc.contains('mist')) return '???';
+    if (desc.contains('thunder') || desc.contains('storm')) return '??';
     
-    return '🌤️'; // Default partly cloudy
+    return '???'; // Default partly cloudy
   }
 
   Widget _buildAICropInsights() {
@@ -1076,7 +1076,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: primary.withValues(alpha: 0.12),
+                color: primary.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -1123,7 +1123,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -1135,7 +1135,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.15),
+              color: iconColor.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: iconColor, size: 24),
@@ -1217,7 +1217,7 @@ class _AnalyticsChartPainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [color.withValues(alpha: 0.2), color.withValues(alpha: 0.0)],
+        colors: [color.withOpacity(0.2), color.withOpacity(0.0)],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
     canvas.drawPath(fillPath, fillPaint);
 

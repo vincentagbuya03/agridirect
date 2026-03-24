@@ -300,7 +300,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
+            color: Colors.black.withOpacity(0.15),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -331,7 +331,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -368,7 +368,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: primary.withValues(alpha: 0.85),
+                    color: primary.withOpacity(0.85),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(

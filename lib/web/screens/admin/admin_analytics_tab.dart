@@ -12,24 +12,24 @@ class AdminAnalyticsTab extends StatefulWidget {
   State<AdminAnalyticsTab> createState() => _AdminAnalyticsTabState();
 }
 
+// Modern plain white theme colors
+const Color _primary = Color(0xFF10B981);
+const Color _primaryLight = Color(0xFF34D399);
+const Color _secondary = Color(0xFF3B82F6);
+const Color _warning = Color(0xFFF59E0B);
+const Color _purple = Color(0xFF8B5CF6);
+const Color _background = Color(0xFFFAFAFA); // Lighter background
+const Color _card = Colors.white;
+const Color _border = Color(0xFFE2E8F0);
+const Color _text = Color(0xFF1E293B); // Darker text for white theme
+const Color _muted = Color(0xFF64748B);
+
 class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
   late Future<Map<String, int>> _countsFuture;
   late Future<Map<String, dynamic>> _revenueFuture;
+  late Future<List<Map<String, dynamic>>> _activityFuture;
 
-  // Modern dark theme colors
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _primaryLight = Color(0xFF34D399);
-  static const Color _secondary = Color(0xFF3B82F6);
-  static const Color _warning = Color(0xFFF59E0B);
-  static const Color _danger = Color(0xFFEF4444);
-  static const Color _purple = Color(0xFF8B5CF6);
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _card = Color(0xFF1E293B);
-  static const Color _cardHover = Color(0xFF334155);
-  static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFFF1F5F9);
-
+  @override
   @override
   void initState() {
     super.initState();
@@ -39,6 +39,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
   void _loadData() {
     _countsFuture = widget.adminService.getDashboardCounts();
     _revenueFuture = widget.adminService.getRevenueAnalytics();
+    _activityFuture = widget.adminService.getDashboardActivity();
   }
 
   @override
@@ -48,7 +49,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
     final isTablet = screenWidth >= 768 && screenWidth < 1200;
 
     return Container(
-      color: _dark,
+      color: _background,
       child: RefreshIndicator(
         onRefresh: () async {
           setState(() => _loadData());
@@ -56,10 +57,20 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
         color: _primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.all(isMobile ? 16 : 24),
+          padding: EdgeInsets.all(isMobile ? 12 : 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header
+              Text(
+                'Dashboard Overview',
+                style: GoogleFonts.inter(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: _text,
+                ),
+              ),
+              const SizedBox(height: 20),
               // Quick Stats
               FutureBuilder<Map<String, int>>(
                 future: _countsFuture,
@@ -71,15 +82,15 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
                   return _buildStatsGrid(counts, isMobile, isTablet);
                 },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               // Revenue & Activity Row
               if (isMobile)
                 Column(
                   children: [
                     _buildRevenueCard(),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     _buildQuickActionsCard(),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     _buildRecentActivityCard(),
                   ],
                 )
@@ -88,13 +99,13 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(flex: 3, child: _buildRevenueCard()),
-                    const SizedBox(width: 24),
+                    const SizedBox(width: 20),
                     Expanded(
                       flex: 2,
                       child: Column(
                         children: [
                           _buildQuickActionsCard(),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 20),
                           _buildRecentActivityCard(),
                         ],
                       ),
@@ -177,10 +188,10 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
     ];
 
     return GridView.count(
-      crossAxisCount: isMobile ? 2 : (isTablet ? 2 : 4),
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      childAspectRatio: isMobile ? 1.3 : (isTablet ? 1.8 : 1.6),
+      crossAxisCount: isMobile ? 1 : (isTablet ? 3 : 5),
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: isMobile ? 2.8 : (isTablet ? 2.0 : 2.4),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: stats.map((stat) => _StatCard(stat: stat)).toList(),
@@ -189,11 +200,18 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
 
   Widget _buildRevenueCard() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: _card,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -215,7 +233,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Monthly performance',
+                    'Platform sales performance',
                     style: GoogleFonts.inter(fontSize: 13, color: _muted),
                   ),
                 ],
@@ -226,7 +244,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: _dark,
+                  color: _background,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: _border),
                 ),
@@ -342,7 +360,7 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
                                       end: Alignment.topCenter,
                                     )
                                   : null,
-                              color: isHighlighted ? null : _cardHover,
+                              color: isHighlighted ? null : Color(0xFFF1F5F9),
                               borderRadius: const BorderRadius.vertical(
                                 top: Radius.circular(8),
                               ),
@@ -390,8 +408,15 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: _card,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,8 +467,15 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: _card,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -463,40 +495,52 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
             ],
           ),
           const SizedBox(height: 16),
-          _ActivityItem(
-            icon: Icons.person_add_rounded,
-            iconBg: _primary.withOpacity(0.15),
-            iconColor: _primary,
-            title: 'New Farmer Signup',
-            subtitle: 'Highland Organics registered',
-            time: '2m ago',
-          ),
-          const SizedBox(height: 14),
-          _ActivityItem(
-            icon: Icons.shopping_bag_rounded,
-            iconBg: _secondary.withOpacity(0.15),
-            iconColor: _secondary,
-            title: 'New Order #8842',
-            subtitle: '2.5 Tons of Sweet Potato',
-            time: '15m ago',
-          ),
-          const SizedBox(height: 14),
-          _ActivityItem(
-            icon: Icons.warning_rounded,
-            iconBg: _danger.withOpacity(0.15),
-            iconColor: _danger,
-            title: 'Content Reported',
-            subtitle: 'Product listing flagged',
-            time: '1h ago',
-          ),
-          const SizedBox(height: 14),
-          _ActivityItem(
-            icon: Icons.verified_rounded,
-            iconBg: _primary.withOpacity(0.15),
-            iconColor: _primary,
-            title: 'Farmer Verified',
-            subtitle: 'Green Valley Farm approved',
-            time: '2h ago',
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _activityFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _primary,
+                    ),
+                  ),
+                );
+              }
+              final activities = snapshot.data ?? [];
+              if (activities.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Text(
+                      'No recent activity',
+                      style: GoogleFonts.inter(color: _muted, fontSize: 13),
+                    ),
+                  ),
+                );
+              }
+              return Column(
+                children: activities
+                    .map(
+                      (activity) => Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: _ActivityItem(
+                          icon: activity['icon'] as IconData,
+                          iconBg: (activity['color'] as Color).withOpacity(
+                            0.12,
+                          ),
+                          iconColor: activity['color'] as Color,
+                          title: activity['title'] as String,
+                          subtitle: activity['subtitle'] as String,
+                          time: _getTimeAgo(activity['time'] as String),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              );
+            },
           ),
           const SizedBox(height: 16),
           Center(
@@ -515,6 +559,19 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab> {
         ],
       ),
     );
+  }
+
+  String _getTimeAgo(String timeStr) {
+    try {
+      final date = DateTime.parse(timeStr);
+      final diff = DateTime.now().difference(date);
+      if (diff.inDays > 0) return '${diff.inDays}d ago';
+      if (diff.inHours > 0) return '${diff.inHours}h ago';
+      if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+      return 'Just now';
+    } catch (e) {
+      return 'Recent';
+    }
   }
 
   String _formatNumber(double value) {
@@ -557,11 +614,6 @@ class _StatCard extends StatefulWidget {
 class _StatCardState extends State<_StatCard> {
   bool _isHovered = false;
 
-  static const Color _card = Color(0xFF1E293B);
-  static const Color _border = Color(0xFF334155);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFFF1F5F9);
-
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
@@ -569,22 +621,22 @@ class _StatCardState extends State<_StatCard> {
       onExit: (_) => setState(() => _isHovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: _card,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: _isHovered ? widget.stat.color.withOpacity(0.5) : _border,
           ),
-          boxShadow: _isHovered
-              ? [
-                  BoxShadow(
-                    color: widget.stat.color.withOpacity(0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : [],
+          boxShadow: [
+            BoxShadow(
+              color: _isHovered
+                  ? widget.stat.color.withOpacity(0.1)
+                  : Colors.black.withOpacity(0.04),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -594,15 +646,15 @@ class _StatCardState extends State<_StatCard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: widget.stat.color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     widget.stat.icon,
                     color: widget.stat.color,
-                    size: 24,
+                    size: 20,
                   ),
                 ),
                 Container(
@@ -640,16 +692,16 @@ class _StatCardState extends State<_StatCard> {
             Text(
               widget.stat.value,
               style: GoogleFonts.inter(
-                fontSize: 28,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: _text,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               widget.stat.title,
               style: GoogleFonts.inter(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: _muted,
               ),
@@ -674,17 +726,13 @@ class _MiniStatCard extends StatelessWidget {
     required this.color,
   });
 
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFFF1F5F9);
-
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _dark,
+          color: Color(0xFFFAFAFA),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
@@ -703,7 +751,10 @@ class _MiniStatCard extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.inter(fontSize: 11, color: _muted),
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: Color(0xFF64748B),
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -711,7 +762,7 @@ class _MiniStatCard extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: _text,
+                    color: Color(0xFF1E293B),
                   ),
                 ),
               ],
@@ -736,9 +787,6 @@ class _QuickActionTile extends StatelessWidget {
     required this.onTap,
   });
 
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _text = Color(0xFFF1F5F9);
-
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -749,7 +797,7 @@ class _QuickActionTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: _dark,
+            color: Color(0xFFFAFAFA),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -768,7 +816,7 @@ class _QuickActionTile extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: _text,
+                  color: Color(0xFF1E293B),
                 ),
               ),
               const Spacer(),
@@ -802,9 +850,6 @@ class _ActivityItem extends StatelessWidget {
     required this.time,
   });
 
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFFF1F5F9);
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -827,18 +872,23 @@ class _ActivityItem extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: _text,
+                  color: Color(0xFF1E293B),
                 ),
               ),
-              const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: Color(0xFF64748B),
+                ),
               ),
             ],
           ),
         ),
-        Text(time, style: GoogleFonts.inter(fontSize: 11, color: _muted)),
+        Text(
+          time,
+          style: GoogleFonts.inter(fontSize: 11, color: Color(0xFF64748B)),
+        ),
       ],
     );
   }

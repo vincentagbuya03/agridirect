@@ -286,7 +286,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: Colors.black.withOpacity(0.06),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -334,7 +334,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
+                        color: Colors.black.withOpacity(0.1),
                         blurRadius: 8,
                       ),
                     ],
@@ -376,7 +376,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
                         color: Colors.white,
                         shadows: [
                           Shadow(
-                            color: Colors.black.withValues(alpha: 0.5),
+                            color: Colors.black.withOpacity(0.5),
                             blurRadius: 10,
                           ),
                         ],

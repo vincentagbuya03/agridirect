@@ -127,7 +127,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           gradient: AgriColors.primaryGradient,
           boxShadow: [
             BoxShadow(
-              color: AgriColors.emerald500.withValues(alpha: 0.4),
+              color: AgriColors.emerald500.withOpacity(0.4),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
@@ -153,12 +153,12 @@ class _WebCommunityHubState extends State<WebCommunityHub>
       margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
+        color: Colors.white.withOpacity(0.9),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _border.withValues(alpha: 0.5)),
+        border: Border.all(color: _border.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -215,9 +215,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: isActive
-                          ? _primary.withValues(alpha: 0.08)
+                          ? _primary.withOpacity(0.08)
                           : isHovered
-                              ? _border.withValues(alpha: 0.5)
+                              ? _border.withOpacity(0.5)
                               : Colors.transparent,
                     ),
                     child: Text(
@@ -412,7 +412,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
         boxShadow: isHovered
             ? [
                 BoxShadow(
-                  color: _primary.withValues(alpha: 0.1),
+                  color: _primary.withOpacity(0.1),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -429,7 +429,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: _primary.withValues(alpha: 0.1),
+                  color: _primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
@@ -576,7 +576,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _primary.withValues(alpha: 0.08),
+                      color: _primary.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -659,7 +659,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
+              color: const Color(0xFF3B82F6).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.cloud_rounded, color: Color(0xFF3B82F6), size: 22),
@@ -727,7 +727,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: _primary.withValues(alpha: 0.08),
+                        color: _primary.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text('${t.$2}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _primary)),
@@ -803,7 +803,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: c.$3.withValues(alpha: 0.1),
+                        color: c.$3.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Center(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/data/app_data.dart';
+import '../../../shared/services/order_service.dart';
 import '../../../shared/services/supabase_data_service.dart';
 
 /// Web-only Pre-order Product Details — two-column layout.
@@ -22,6 +23,15 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
 
   bool _downpaymentEnabled = true;
   int _quantity = 10;
+  bool _isProcessingPayment = false;
+
+  static const List<String> _paymentChannels = [
+    'GCash',
+    'PayMaya',
+    'Online Bank Transfer',
+    'Credit/Debit Card',
+    'GrabPay',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -75,14 +85,22 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: _border),
                 ),
-                child: const Icon(Icons.arrow_back_rounded, size: 18, color: _dark),
+                child: const Icon(
+                  Icons.arrow_back_rounded,
+                  size: 18,
+                  color: _dark,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 16),
           const Text(
             'Product Details',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _dark),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: _dark,
+            ),
           ),
           const Spacer(),
           _buildHeaderButton(Icons.share_rounded, 'Share'),
@@ -108,7 +126,14 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
           children: [
             Icon(icon, size: 16, color: _dark),
             const SizedBox(width: 8),
-            Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _dark)),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _dark,
+              ),
+            ),
           ],
         ),
       ),
@@ -123,7 +148,14 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         Icon(Icons.chevron_right_rounded, size: 18, color: _muted),
         Text('Pre-Order', style: TextStyle(fontSize: 13, color: _muted)),
         Icon(Icons.chevron_right_rounded, size: 18, color: _muted),
-        const Text('Organic Carrots', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _dark)),
+        const Text(
+          'Organic Carrots',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: _dark,
+          ),
+        ),
       ],
     );
   }
@@ -134,16 +166,10 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Image column
-        Expanded(
-          flex: 5,
-          child: _buildImageSection(),
-        ),
+        Expanded(flex: 5, child: _buildImageSection()),
         const SizedBox(width: 40),
         // Details column
-        Expanded(
-          flex: 4,
-          child: _buildDetailsSection(),
-        ),
+        Expanded(flex: 4, child: _buildDetailsSection()),
       ],
     );
   }
@@ -163,21 +189,32 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                   fit: BoxFit.cover,
                   width: double.infinity,
                   placeholder: (ctx, url) => Container(color: Colors.grey[100]),
-                  errorWidget: (ctx, url, err) => Container(color: Colors.grey[100], child: const Icon(Icons.image, size: 48)),
+                  errorWidget: (ctx, url, err) => Container(
+                    color: Colors.grey[100],
+                    child: const Icon(Icons.image, size: 48),
+                  ),
                 ),
                 // Pre-order badge
                 Positioned(
                   bottom: 16,
                   left: 16,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: _accent,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Text(
                       'PRE-ORDER ACTIVE',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF064E3B), letterSpacing: 0.8),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF064E3B),
+                        letterSpacing: 0.8,
+                      ),
                     ),
                   ),
                 ),
@@ -198,7 +235,9 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                     aspectRatio: 1,
                     child: Container(
                       decoration: BoxDecoration(
-                        border: i == 0 ? Border.all(color: _primary, width: 2) : null,
+                        border: i == 0
+                            ? Border.all(color: _primary, width: 2)
+                            : null,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: ClipRRect(
@@ -206,8 +245,10 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                         child: CachedNetworkImage(
                           imageUrl: AppData.carrotsHeroImageUrl,
                           fit: BoxFit.cover,
-                          placeholder: (ctx, url) => Container(color: Colors.grey[100]),
-                          errorWidget: (ctx, url, err) => Container(color: Colors.grey[100]),
+                          placeholder: (ctx, url) =>
+                              Container(color: Colors.grey[100]),
+                          errorWidget: (ctx, url, err) =>
+                              Container(color: Colors.grey[100]),
                         ),
                       ),
                     ),
@@ -229,7 +270,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: _primary.withValues(alpha: 0.08),
+            color: _primary.withOpacity(0.08),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
@@ -237,7 +278,14 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
             children: [
               Icon(Icons.verified_rounded, size: 14, color: _primary),
               const SizedBox(width: 6),
-              Text('Green Valley Organic Farm', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _primary)),
+              Text(
+                'Green Valley Organic Farm',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _primary,
+                ),
+              ),
             ],
           ),
         ),
@@ -245,7 +293,12 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         // Title
         const Text(
           'Organic Carrots',
-          style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: _dark, letterSpacing: -0.5),
+          style: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.w800,
+            color: _dark,
+            letterSpacing: -0.5,
+          ),
         ),
         const SizedBox(height: 12),
         // Price
@@ -254,12 +307,19 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
           children: [
             const Text(
               '\$4.50',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: _dark),
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                color: _dark,
+              ),
             ),
             const SizedBox(width: 8),
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: Text('per kg', style: TextStyle(fontSize: 15, color: _muted)),
+              child: Text(
+                'per kg',
+                style: TextStyle(fontSize: 15, color: _muted),
+              ),
             ),
           ],
         ),
@@ -267,9 +327,21 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         // Info cards
         Row(
           children: [
-            Expanded(child: _buildInfoChip(Icons.calendar_today_rounded, 'Harvest', 'Oct 25')),
+            Expanded(
+              child: _buildInfoChip(
+                Icons.calendar_today_rounded,
+                'Harvest',
+                'Oct 25',
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _buildInfoChip(Icons.inventory_2_rounded, 'Stock Left', '50kg')),
+            Expanded(
+              child: _buildInfoChip(
+                Icons.inventory_2_rounded,
+                'Stock Left',
+                '50kg',
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 24),
@@ -292,10 +364,17 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Total Price', style: TextStyle(fontSize: 14, color: _muted)),
+                  Text(
+                    'Total Price',
+                    style: TextStyle(fontSize: 14, color: _muted),
+                  ),
                   Text(
                     '\$${(_quantity * 4.5).toStringAsFixed(2)}',
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: _dark),
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                    ),
                   ),
                 ],
               ),
@@ -304,10 +383,17 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Downpayment (25%)', style: TextStyle(fontSize: 13, color: _muted)),
+                    Text(
+                      'Downpayment (25%)',
+                      style: TextStyle(fontSize: 13, color: _muted),
+                    ),
                     Text(
                       '\$${(_quantity * 4.5 * 0.25).toStringAsFixed(2)}',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _primary),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: _primary,
+                      ),
                     ),
                   ],
                 ),
@@ -316,20 +402,34 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: _isProcessingPayment
+                      ? null
+                      : _showOnlinePaymentDialog,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _primary,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('Pre-order Now', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                      SizedBox(width: 8),
-                      Icon(Icons.arrow_forward_rounded, size: 18),
+                      Text(
+                        _isProcessingPayment
+                            ? 'Processing Payment...'
+                            : 'Pre-order Now',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (!_isProcessingPayment) ...[
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_forward_rounded, size: 18),
+                      ],
                     ],
                   ),
                 ),
@@ -339,12 +439,24 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () {},
-                  icon: Icon(Icons.notifications_active_rounded, size: 18, color: _primary),
-                  label: Text('Notify me on harvest', style: TextStyle(fontWeight: FontWeight.w600, color: _primary)),
+                  icon: Icon(
+                    Icons.notifications_active_rounded,
+                    size: 18,
+                    color: _primary,
+                  ),
+                  label: Text(
+                    'Notify me on harvest',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: _primary,
+                    ),
+                  ),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: _border),
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                 ),
               ),
@@ -355,13 +467,165 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
     );
   }
 
+  Future<void> _showOnlinePaymentDialog() async {
+    String selectedChannel = _paymentChannels.first;
+    final referenceController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Pay Online'),
+          content: StatefulBuilder(
+            builder: (context, setDialogState) {
+              final total = _quantity * 4.5;
+              final payable = _downpaymentEnabled ? total * 0.25 : total;
+
+              return SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Choose a payment channel:',
+                      style: TextStyle(fontSize: 13, color: _muted),
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: selectedChannel,
+                      items: _paymentChannels
+                          .map(
+                            (channel) => DropdownMenuItem<String>(
+                              value: channel,
+                              child: Text(channel),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() => selectedChannel = value);
+                      },
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: referenceController,
+                      decoration: const InputDecoration(
+                        labelText: 'Reference Number (optional)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'Amount to pay now: USD ${payable.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Pay Now'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      referenceController.dispose();
+      return;
+    }
+
+    await _processOnlinePayment(
+      paymentMethod: selectedChannel,
+      transactionReference: referenceController.text.trim(),
+    );
+    referenceController.dispose();
+  }
+
+  Future<void> _processOnlinePayment({
+    required String paymentMethod,
+    required String transactionReference,
+  }) async {
+    setState(() => _isProcessingPayment = true);
+
+    try {
+      final quantity = _quantity.toDouble();
+      final fullAmount = quantity * 4.5;
+      final payableNow = _downpaymentEnabled ? fullAmount * 0.25 : fullAmount;
+      final orderService = OrderService();
+
+      final result = await orderService.createPaidPreOrderByProductName(
+        productName: 'Organic Carrots',
+        quantity: quantity,
+        paymentMethod: paymentMethod,
+        paymentAmount: payableNow,
+        transactionReference: transactionReference.isEmpty
+            ? null
+            : transactionReference,
+        notes: _downpaymentEnabled
+            ? 'Downpayment (25%) initiated via web pre-order flow.'
+            : 'Full payment initiated via web pre-order flow.',
+      );
+
+      if (!mounted) return;
+      final orderId = (result['order'] as Map<String, dynamic>)['orderId'];
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Payment successful via $paymentMethod. Order $orderId was paid and credited to farmer wallet.',
+          ),
+          backgroundColor: const Color(0xFF15803D),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment failed: $e'),
+          backgroundColor: const Color(0xFFB91C1C),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessingPayment = false);
+      }
+    }
+  }
+
   Widget _buildInfoChip(IconData icon, String label, String value) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _primary.withValues(alpha: 0.05),
+        color: _primary.withOpacity(0.05),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _primary.withValues(alpha: 0.15)),
+        border: Border.all(color: _primary.withOpacity(0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -370,11 +634,25 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
             children: [
               Icon(icon, size: 16, color: _primary),
               const SizedBox(width: 8),
-              Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _primary)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: _primary,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _dark)),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: _dark,
+            ),
+          ),
         ],
       ),
     );
@@ -396,8 +674,18 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Quantity', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _dark)),
-                Text('Min order: 1 kg', style: TextStyle(fontSize: 12, color: _muted)),
+                const Text(
+                  'Quantity',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: _dark,
+                  ),
+                ),
+                Text(
+                  'Min order: 1 kg',
+                  style: TextStyle(fontSize: 12, color: _muted),
+                ),
               ],
             ),
           ),
@@ -415,7 +703,14 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                 Container(
                   width: 50,
                   alignment: Alignment.center,
-                  child: Text('$_quantity', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _dark)),
+                  child: Text(
+                    '$_quantity',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: _dark,
+                    ),
+                  ),
                 ),
                 _buildQtyButton(Icons.add_rounded, () {
                   if (_quantity < 50) setState(() => _quantity++);
@@ -424,7 +719,14 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
             ),
           ),
           const SizedBox(width: 8),
-          Text('kg', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _muted)),
+          Text(
+            'kg',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: _muted,
+            ),
+          ),
         ],
       ),
     );
@@ -438,9 +740,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         child: Container(
           width: 36,
           height: 36,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
           child: Icon(icon, size: 18, color: _dark),
         ),
       ),
@@ -460,7 +760,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: _primary.withValues(alpha: 0.1),
+              color: _primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(Icons.payments_rounded, color: _primary, size: 20),
@@ -470,8 +770,18 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('25% Downpayment', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _dark)),
-                Text('Secure price, pay the rest on delivery', style: TextStyle(fontSize: 12, color: _muted)),
+                const Text(
+                  '25% Downpayment',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: _dark,
+                  ),
+                ),
+                Text(
+                  'Secure price, pay the rest on delivery',
+                  style: TextStyle(fontSize: 12, color: _muted),
+                ),
               ],
             ),
           ),
@@ -507,7 +817,14 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                   children: [
                     Icon(Icons.yard_rounded, color: _primary, size: 22),
                     const SizedBox(width: 10),
-                    const Text('Farm Story', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _dark)),
+                    const Text(
+                      'Farm Story',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: _dark,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -518,14 +835,19 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                       height: 56,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: _primary.withValues(alpha: 0.3), width: 2),
+                        border: Border.all(
+                          color: _primary.withOpacity(0.3),
+                          width: 2,
+                        ),
                       ),
                       child: ClipOval(
                         child: CachedNetworkImage(
                           imageUrl: AppData.farmStoryAvatarUrl,
                           fit: BoxFit.cover,
-                          placeholder: (ctx, url) => Container(color: Colors.grey[100]),
-                          errorWidget: (ctx, url, err) => const Icon(Icons.person),
+                          placeholder: (ctx, url) =>
+                              Container(color: Colors.grey[100]),
+                          errorWidget: (ctx, url, err) =>
+                              const Icon(Icons.person),
                         ),
                       ),
                     ),
@@ -533,8 +855,22 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Farmer John Doe', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _dark)),
-                        Text('"Grown with love since 1994"', style: TextStyle(fontSize: 13, color: _muted, fontStyle: FontStyle.italic)),
+                        const Text(
+                          'Farmer John Doe',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: _dark,
+                          ),
+                        ),
+                        Text(
+                          '"Grown with love since 1994"',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: _muted,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -558,7 +894,14 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                   children: [
                     Icon(Icons.location_on_rounded, color: _primary, size: 22),
                     const SizedBox(width: 10),
-                    const Text('Farm Location', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _dark)),
+                    const Text(
+                      'Farm Location',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: _dark,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -572,28 +915,41 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                           imageUrl: AppData.farmMapImageUrl,
                           fit: BoxFit.cover,
                           width: double.infinity,
-                          placeholder: (ctx, url) => Container(color: Colors.grey[100], height: 180),
-                          errorWidget: (ctx, url, err) => Container(color: Colors.grey[100], height: 180),
+                          placeholder: (ctx, url) =>
+                              Container(color: Colors.grey[100], height: 180),
+                          errorWidget: (ctx, url, err) =>
+                              Container(color: Colors.grey[100], height: 180),
                         ),
                       ),
                       Positioned.fill(
                         child: Container(
-                          color: Colors.black.withValues(alpha: 0.15),
+                          color: Colors.black.withOpacity(0.15),
                           child: Center(
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.9),
+                                color: Colors.white.withOpacity(0.9),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.location_on_rounded, color: _primary, size: 16),
+                                  Icon(
+                                    Icons.location_on_rounded,
+                                    color: _primary,
+                                    size: 16,
+                                  ),
                                   const SizedBox(width: 6),
                                   const Text(
                                     'Highland Valley Farm',
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _dark),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: _dark,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -633,7 +989,11 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
           children: [
             const Text(
               'You might also like',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _dark),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: _dark,
+              ),
             ),
             const SizedBox(height: 20),
             GridView.builder(
@@ -661,13 +1021,17 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                       children: [
                         Expanded(
                           child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(14),
+                            ),
                             child: CachedNetworkImage(
                               imageUrl: p.imageUrl,
                               width: double.infinity,
                               fit: BoxFit.cover,
-                              placeholder: (ctx, url) => Container(color: Colors.grey[100]),
-                              errorWidget: (ctx, url, err) => Container(color: Colors.grey[100]),
+                              placeholder: (ctx, url) =>
+                                  Container(color: Colors.grey[100]),
+                              errorWidget: (ctx, url, err) =>
+                                  Container(color: Colors.grey[100]),
                             ),
                           ),
                         ),
@@ -676,9 +1040,25 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(p.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _dark), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              Text(
+                                p.name,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: _dark,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                               const SizedBox(height: 4),
-                              Text('${p.price}${p.unit}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _primary)),
+                              Text(
+                                '${p.price}${p.unit}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: _primary,
+                                ),
+                              ),
                             ],
                           ),
                         ),
