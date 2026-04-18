@@ -1,6 +1,6 @@
 {
   "installCommand": "git clone https://github.com/flutter/flutter.git --depth 1 -b stable ./flutter-sdk && ./flutter-sdk/bin/flutter config --no-analytics && ./flutter-sdk/bin/flutter --version",
-  "buildCommand": "if [ -f .env.local ]; then cp .env.local .env; elif [ ! -f .env ]; then touch .env; fi && ./flutter-sdk/bin/flutter pub get && ./flutter-sdk/bin/flutter build web --release",
+  "buildCommand": "if [ ! -f .env ]; then touch .env; fi && ./flutter-sdk/bin/flutter pub get && ./flutter-sdk/bin/flutter build web --release",
   "outputDirectory": "build/web",
   "cleanUrls": true,
   "trailingSlash": false,

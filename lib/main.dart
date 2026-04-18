@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -60,42 +61,135 @@ void main() async {
   // Applies web URL strategy only on web, no-op on mobile/desktop.
   configureUrlStrategy();
 
-  try {
-    // Initialize Hive for offline storage
-    await Hive.initFlutter();
-    debugPrint('✅ Hive initialized');
+  runApp(const _BootstrapApp());
+}
 
-    // Initialize offline cache service for marketplace browsing
-    final cacheService = OfflineCacheService();
-    await cacheService.init();
-    debugPrint('✅ Offline cache service initialized');
+class _BootstrapApp extends StatefulWidget {
+  const _BootstrapApp();
 
-    // Try to load .env file (fails gracefully on web)
+  @override
+  State<_BootstrapApp> createState() => _BootstrapAppState();
+}
+
+class _BootstrapAppState extends State<_BootstrapApp> {
+  late final Future<void> _initializationFuture = _initializeApp();
+
+  Future<void> _initializeApp() async {
+    // Keep each step non-fatal where possible so web never stays blank.
     try {
-      await dotenv.load(fileName: ".env");
+      await Hive.initFlutter();
+      debugPrint('✅ Hive initialized');
     } catch (e) {
-      debugPrint('⚠️ Could not load .env file (OK on web): $e');
+      debugPrint('⚠️ Hive initialization error: $e');
     }
 
-    // Initialize Firebase
+    try {
+      final cacheService = OfflineCacheService();
+      await cacheService.init();
+      debugPrint('✅ Offline cache service initialized');
+    } catch (e) {
+      debugPrint('⚠️ Offline cache initialization error: $e');
+    }
+
+    try {
+      await dotenv.load(fileName: kIsWeb ? '.env.web' : '.env');
+    } catch (e) {
+      try {
+        await dotenv.load(fileName: '.env');
+      } catch (fallbackError) {
+        debugPrint('⚠️ Could not load env file: $e / $fallbackError');
+      }
+    }
+
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint('✅ Firebase initialized');
 
-    // Set background message handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // Initialize Supabase with or without .env
     await SupabaseConfig.initialize();
-    await BootstrapCacheService().primeProductMetadataCache();
-    await AuthService().initialize();
-  } catch (e) {
-    debugPrint('❌ Initialization error: $e');
-    rethrow;
+
+    try {
+      await BootstrapCacheService().primeProductMetadataCache();
+    } catch (e) {
+      debugPrint('⚠️ Bootstrap cache initialization error: $e');
+    }
+
+    try {
+      await AuthService().initialize();
+    } catch (e) {
+      debugPrint('⚠️ Auth initialization error: $e');
+    }
   }
 
-  runApp(AgriDirectApp());
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _initializationFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const _StartupLoadingScreen();
+        }
+
+        if (snapshot.hasError) {
+          return _StartupErrorScreen(error: snapshot.error.toString());
+        }
+
+        return const AgriDirectApp();
+      },
+    );
+  }
+}
+
+class _StartupLoadingScreen extends StatelessWidget {
+  const _StartupLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: AppColors.primary),
+              const SizedBox(height: 16),
+              Text('Starting AgriDirect...', style: AppTextStyles.headline3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StartupErrorScreen extends StatelessWidget {
+  final String error;
+
+  const _StartupErrorScreen({required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'App failed to start.\n\n$error',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodyLarge.copyWith(color: AppColors.error),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class AgriDirectApp extends StatefulWidget {

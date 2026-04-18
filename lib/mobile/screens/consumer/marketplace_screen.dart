@@ -663,28 +663,14 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   }
 
   Future<UserAddress?> _openAddressEditor([UserAddress? initialAddress]) async {
-    final streetController = TextEditingController(
-      text: initialAddress?.street ?? '',
-    );
-    final barangayController = TextEditingController(
-      text: initialAddress?.barangay ?? '',
-    );
+    final streetController = TextEditingController(text: initialAddress?.street ?? '');
+    final barangayController = TextEditingController(text: initialAddress?.barangay ?? '');
     final cityController = TextEditingController(text: initialAddress?.city ?? '');
-    final provinceController = TextEditingController(
-      text: initialAddress?.province ?? '',
-    );
-    final zipCodeController = TextEditingController(
-      text: initialAddress?.zipCode ?? '',
-    );
-    final labelController = TextEditingController(
-      text: initialAddress?.label ?? 'Home',
-    );
-    final recipientNameController = TextEditingController(
-      text: initialAddress?.recipientName ?? '',
-    );
-    final recipientPhoneController = TextEditingController(
-      text: initialAddress?.recipientPhone ?? '',
-    );
+    final provinceController = TextEditingController(text: initialAddress?.province ?? '');
+    final zipCodeController = TextEditingController(text: initialAddress?.zipCode ?? '');
+    final labelController = TextEditingController(text: initialAddress?.label ?? 'Home');
+    final recipientNameController = TextEditingController(text: initialAddress?.recipientName ?? '');
+    final recipientPhoneController = TextEditingController(text: initialAddress?.recipientPhone ?? '');
 
     bool isPinningLocation = false;
     bool isSavingAddress = false;
@@ -702,243 +688,330 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         builder: (dialogContext, setAddressState) => Container(
           height: MediaQuery.of(dialogContext).size.height * 0.9,
           decoration: const BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
           ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 12),
-                Text(
-                  initialAddress == null
-                      ? 'Add Shipping Address'
-                      : 'Edit Shipping Address',
-                  style: AppTextStyles.headline1.copyWith(fontSize: 22),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Fill in the details for accurate delivery',
-                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
-                ),
-                const SizedBox(height: 16),
-                _buildAddressInputField(
-                  controller: labelController,
-                  label: 'Label',
-                  hint: 'Home, Office, etc.',
-                ),
-                const SizedBox(height: 12),
-                Row(
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              // Handle and Close
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                      child: _buildAddressInputField(
-                        controller: recipientNameController,
-                        label: 'Recipient Name',
-                        hint: 'Full name',
+                    const SizedBox(width: 40),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.textHeadline.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildAddressInputField(
-                        controller: recipientPhoneController,
-                        label: 'Recipient Phone',
-                        hint: 'Mobile number',
-                        keyboardType: TextInputType.phone,
+                    IconButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      icon: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close_rounded, size: 20, color: AppColors.textHeadline),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                _buildAddressInputField(
-                  controller: streetController,
-                  label: 'Street',
-                  hint: 'House no. and street',
-                ),
-                const SizedBox(height: 12),
-                _buildAddressInputField(
-                  controller: barangayController,
-                  label: 'Barangay',
-                  hint: 'Barangay',
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildAddressInputField(
-                        controller: cityController,
-                        label: 'City/Municipality',
-                        hint: 'City/town',
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        initialAddress == null ? 'Add New Address' : 'Edit Address',
+                        style: AppTextStyles.headline1.copyWith(fontSize: 24),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildAddressInputField(
-                        controller: provinceController,
-                        label: 'Province',
-                        hint: 'Province',
+                      const SizedBox(height: 4),
+                      Text(
+                        'Where should we deliver your orders?',
+                        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
                       ),
+                      const SizedBox(height: 28),
+
+                      // Section: Recipient
+                      _buildSectionHeader('Recipient Information'),
+                      const SizedBox(height: 16),
+                      _buildAddressInputField(
+                        controller: labelController,
+                        label: 'Address Label',
+                        hint: 'e.g. Home, Office, Farm',
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildAddressInputField(
+                              controller: recipientNameController,
+                              label: 'Full Name',
+                              hint: 'Enter name',
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildAddressInputField(
+                              controller: recipientPhoneController,
+                              label: 'Mobile Number',
+                              hint: '09xx xxx xxxx',
+                              keyboardType: TextInputType.phone,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Section: Address
+                      _buildSectionHeader('Delivery Address'),
+                      const SizedBox(height: 16),
+                      _buildAddressInputField(
+                        controller: streetController,
+                        label: 'Street / Building',
+                        hint: 'House no., street name',
+                      ),
+                      const SizedBox(height: 16),
+                      _buildAddressInputField(
+                        controller: barangayController,
+                        label: 'Barangay',
+                        hint: 'Search barangay',
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildAddressInputField(
+                              controller: cityController,
+                              label: 'City / Town',
+                              hint: 'Enter city',
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildAddressInputField(
+                              controller: provinceController,
+                              label: 'Province',
+                              hint: 'Enter province',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: 140,
+                        child: _buildAddressInputField(
+                          controller: zipCodeController,
+                          label: 'ZIP Code',
+                          hint: 'Optional',
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Settings
+                      _buildSectionHeader('Settings'),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Default Address', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                                    const SizedBox(height: 2),
+                                    Text('Use this for future checkouts', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontSize: 11)),
+                                  ],
+                                ),
+                                Switch.adaptive(
+                                  value: isDefault,
+                                  activeColor: AppColors.primary,
+                                  onChanged: (val) => setAddressState(() => isDefault = val),
+                                ),
+                              ],
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: Divider(height: 1),
+                            ),
+                            InkWell(
+                              onTap: isPinningLocation
+                                  ? null
+                                  : () async {
+                                      setAddressState(() {
+                                        isPinningLocation = true;
+                                        pinError = null;
+                                      });
+
+                                      try {
+                                        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+                                        if (!serviceEnabled) {
+                                          setAddressState(() {
+                                            pinError = 'GPS is disabled.';
+                                            isPinningLocation = false;
+                                          });
+                                          return;
+                                        }
+
+                                        var permission = await Geolocator.checkPermission();
+                                        if (permission == LocationPermission.denied) {
+                                          permission = await Geolocator.requestPermission();
+                                        }
+
+                                        if (permission == LocationPermission.denied ||
+                                            permission == LocationPermission.deniedForever) {
+                                          setAddressState(() {
+                                            pinError = 'Location access denied.';
+                                            isPinningLocation = false;
+                                          });
+                                          return;
+                                        }
+
+                                        final position = await Geolocator.getCurrentPosition(
+                                          desiredAccuracy: LocationAccuracy.high,
+                                        );
+
+                                        final resolved = await ReverseGeocodingService.resolveFromCoordinates(
+                                          latitude: position.latitude,
+                                          longitude: position.longitude,
+                                        );
+
+                                        setAddressState(() {
+                                          if (resolved.street.isNotEmpty) streetController.text = resolved.street;
+                                          if (resolved.barangay.isNotEmpty) barangayController.text = resolved.barangay;
+                                          if (resolved.city.isNotEmpty) cityController.text = resolved.city;
+                                          if (resolved.province.isNotEmpty) provinceController.text = resolved.province;
+                                          latitude = position.latitude;
+                                          longitude = position.longitude;
+                                          isPinningLocation = false;
+                                        });
+                                      } catch (_) {
+                                        setAddressState(() {
+                                          pinError = 'Failed to locate you.';
+                                          isPinningLocation = false;
+                                        });
+                                      }
+                                    },
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(alpha: 0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.my_location_rounded, size: 18, color: AppColors.primary),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          isPinningLocation ? 'Locating...' : 'Auto-fill from GPS',
+                                          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600, color: AppColors.primary),
+                                        ),
+                                        Text(
+                                          'Use current location to fill form',
+                                          style: AppTextStyles.bodySmall.copyWith(fontSize: 11, color: AppColors.textSubtle),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (isPinningLocation)
+                                    const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                  else
+                                    const Icon(Icons.chevron_right_rounded, color: AppColors.textSubtle),
+                                ],
+                              ),
+                            ),
+                            if (pinError != null) ...[
+                              const SizedBox(height: 8),
+                              Text(pinError!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.error, fontSize: 11)),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+              ),
+              // Footer Button
+              Container(
+                padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + MediaQuery.of(dialogContext).viewInsets.bottom),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 20,
+                      offset: const Offset(0, -5),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: 120,
-                  child: _buildAddressInputField(
-                    controller: zipCodeController,
-                    label: 'ZIP Code',
-                    hint: 'Optional',
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                CheckboxListTile(
-                  value: isDefault,
-                  onChanged: (val) => setAddressState(() => isDefault = val ?? false),
-                  title: Text('Set as default address', style: AppTextStyles.bodyMedium),
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  activeColor: AppColors.primary,
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: isPinningLocation
-                      ? null
-                      : () async {
-                          setAddressState(() {
-                            isPinningLocation = true;
-                            pinError = null;
-                          });
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (saveError != null) ...[
+                      Text(saveError!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.error)),
+                      const SizedBox(height: 12),
+                    ],
+                    Container(
+                      width: double.infinity,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.primaryGradient,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: isSavingAddress
+                            ? null
+                            : () async {
+                                final street = streetController.text.trim();
+                                final barangay = barangayController.text.trim();
+                                final city = cityController.text.trim();
+                                final province = provinceController.text.trim();
+                                final zipCode = zipCodeController.text.trim();
+                                final label = labelController.text.trim();
+                                final recipientName = recipientNameController.text.trim();
+                                final recipientPhone = recipientPhoneController.text.trim();
 
-                          try {
-                            final serviceEnabled =
-                                await Geolocator.isLocationServiceEnabled();
-                            if (!serviceEnabled) {
-                              setAddressState(() {
-                                pinError =
-                                    'Location services are disabled. Please enable GPS.';
-                                isPinningLocation = false;
-                              });
-                              return;
-                            }
+                                if (street.isEmpty || barangay.isEmpty || city.isEmpty || province.isEmpty) {
+                                  setAddressState(() => saveError = 'Please fill all required fields');
+                                  return;
+                                }
 
-                            var permission = await Geolocator.checkPermission();
-                            if (permission == LocationPermission.denied) {
-                              permission = await Geolocator.requestPermission();
-                            }
-
-                            if (permission == LocationPermission.denied ||
-                                permission ==
-                                    LocationPermission.deniedForever) {
-                              setAddressState(() {
-                                pinError =
-                                    'Location permission denied. Allow it to pin your address.';
-                                isPinningLocation = false;
-                              });
-                              return;
-                            }
-
-                            final position =
-                                await Geolocator.getCurrentPosition(
-                                  desiredAccuracy: LocationAccuracy.high,
-                                );
-
-                            final resolved =
-                                await ReverseGeocodingService.resolveFromCoordinates(
-                                  latitude: position.latitude,
-                                  longitude: position.longitude,
-                                );
-
-                            setAddressState(() {
-                              if (resolved.street.isNotEmpty) {
-                                streetController.text = resolved.street;
-                              } else if (resolved.fullAddress.isNotEmpty &&
-                                  streetController.text.trim().isEmpty) {
-                                streetController.text = resolved.fullAddress;
-                              }
-                              if (resolved.barangay.isNotEmpty) {
-                                barangayController.text = resolved.barangay;
-                              }
-                              if (resolved.city.isNotEmpty) {
-                                cityController.text = resolved.city;
-                              }
-                              if (resolved.province.isNotEmpty) {
-                                provinceController.text = resolved.province;
-                              }
-                              latitude = position.latitude;
-                              longitude = position.longitude;
-                              isPinningLocation = false;
-                            });
-                          } catch (_) {
-                            setAddressState(() {
-                              pinError =
-                                  'Failed to pin current location. Please try again.';
-                              isPinningLocation = false;
-                            });
-                          }
-                        },
-                  icon: isPinningLocation
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.my_location_rounded),
-                  label: Text(
-                    isPinningLocation
-                        ? 'Pinning current location...'
-                        : 'Pin Current Location',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                if (pinError != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    pinError!,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.error,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: isSavingAddress
-                        ? null
-                        : () async {
-                            final street = streetController.text.trim();
-                            final barangay = barangayController.text.trim();
-                            final city = cityController.text.trim();
-                            final province = provinceController.text.trim();
-                            final zipCode = zipCodeController.text.trim();
-                            final label = labelController.text.trim();
-                            final recipientName = recipientNameController.text.trim();
-                            final recipientPhone = recipientPhoneController.text.trim();
-
-                            if (street.isEmpty ||
-                                barangay.isEmpty ||
-                                city.isEmpty ||
-                                province.isEmpty) {
-                              setAddressState(() {
-                                saveError =
-                                    'Street, barangay, city, and province are required.';
-                              });
-                              return;
-                            }
-
-                            setAddressState(() {
-                              isSavingAddress = true;
-                              saveError = null;
-                            });
-                            final savedAddress = await UserService()
-                                .upsertAddress(
+                                setAddressState(() {
+                                  isSavingAddress = true;
+                                  saveError = null;
+                                });
+                                
+                                final savedAddress = await UserService().upsertAddress(
                                   addressId: initialAddress?.addressId,
                                   street: street,
                                   barangay: barangay,
@@ -953,57 +1026,33 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                                   longitude: longitude,
                                 );
 
-                            if (!mounted) return;
-
-                            if (savedAddress == null) {
-                              setAddressState(() {
-                                isSavingAddress = false;
-                                saveError =
-                                    'Failed to save address. Please try again.';
-                              });
-                              return;
-                            }
-
-                            if (!dialogContext.mounted) return;
-                            Navigator.of(dialogContext).pop(savedAddress);
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                                if (!mounted) return;
+                                if (savedAddress == null) {
+                                  setAddressState(() {
+                                    isSavingAddress = false;
+                                    saveError = 'Service error. Try again.';
+                                  });
+                                  return;
+                                }
+                                Navigator.pop(dialogContext, savedAddress);
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                        ),
+                        child: isSavingAddress
+                            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : Text(
+                                initialAddress == null ? 'Save Address' : 'Update Details',
+                                style: AppTextStyles.headline3.copyWith(color: Colors.white, fontSize: 16),
+                              ),
                       ),
                     ),
-                    child: isSavingAddress
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : Text(
-                            'Save Address',
-                            style: AppTextStyles.headline3.copyWith(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
-                          ),
-                  ),
+                  ],
                 ),
-                if (saveError != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    saveError!,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.error,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 8),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1019,6 +1068,17 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     zipCodeController.dispose();
 
     return savedAddress;
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Text(
+      title.toUpperCase(),
+      style: AppTextStyles.labelSmall.copyWith(
+        letterSpacing: 1.2,
+        fontWeight: FontWeight.w800,
+        color: AppColors.textHeadline.withValues(alpha: 0.4),
+      ),
+    );
   }
 
   Future<UserAddress?> _openAddressSelector() async {
@@ -1571,22 +1631,26 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
           decoration: InputDecoration(
             hintText: hint,
+            hintStyle: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSubtle.withValues(alpha: 0.3),
+            ),
             filled: true,
             fillColor: AppColors.background,
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 12,
+              horizontal: 16,
+              vertical: 14,
             ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(
-                color: AppColors.textHeadline.withValues(alpha: 0.07),
+                color: AppColors.textHeadline.withValues(alpha: 0.05),
               ),
             ),
             focusedBorder: OutlineInputBorder(
