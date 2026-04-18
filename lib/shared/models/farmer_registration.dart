@@ -1,8 +1,17 @@
 /// Model for farmer registration data
 class FarmerRegistration {
+  // Personal Data from ID
+  String idType; // "national_id" or "local_id"
+  String fullName;
+  String sex;
+  String placeOfBirth;
+  String pcn; // PhilSys Card Number
+
   // Step 1: Personal Data
   String birthDate;
   String residentialAddress;
+  double? farmLatitude;
+  double? farmLongitude;
 
   // Step 1: Farm Details
   String farmName;
@@ -13,6 +22,7 @@ class FarmerRegistration {
   // Step 2: Identity Verification
   String? facePhotoPath;
   String? validIdPath;
+  String? validIdBackPath;
 
   // Step 3: Final Submission
   String elementary;
@@ -24,14 +34,22 @@ class FarmerRegistration {
   bool certificationAccepted;
 
   FarmerRegistration({
+    this.idType = '',
+    this.fullName = '',
+    this.sex = '',
+    this.placeOfBirth = '',
+    this.pcn = '',
     this.birthDate = '',
     this.residentialAddress = '',
+    this.farmLatitude,
+    this.farmLongitude,
     this.farmName = '',
     this.specialty = '',
     this.cropTypes = const [],
     this.livestock = '',
     this.facePhotoPath,
     this.validIdPath,
+    this.validIdBackPath,
     this.elementary = '',
     this.highSchool = '',
     this.college = '',
@@ -44,36 +62,57 @@ class FarmerRegistration {
   /// Convert to JSON for farmer_registrations table (3NF)
   /// Education, crop types, and livestock are stored in separate tables
   Map<String, dynamic> toJson() => {
-        'birth_date': birthDate,
-        'years_of_experience': int.tryParse(yearsOfExperience) ?? 0,
-        'residential_address': residentialAddress,
-        'farm_name': farmName,
-        'specialty': specialty,
-        'face_photo_path': facePhotoPath,
-        'valid_id_path': validIdPath,
-        'farming_history': farmingHistory,
-        'certification_accepted': certificationAccepted,
-        'status': 'pending',
-        'created_at': DateTime.now().toIso8601String(),
-      };
+    'id_type': idType,
+    'full_name': fullName,
+    'sex': sex,
+    'place_of_birth': placeOfBirth,
+    'pcn': pcn,
+    'birth_date': birthDate,
+    'years_of_experience': int.tryParse(yearsOfExperience) ?? 0,
+    'residential_address': residentialAddress,
+    'farm_latitude': farmLatitude,
+    'farm_longitude': farmLongitude,
+    'farm_name': farmName,
+    'specialty': specialty,
+    'face_photo_path': facePhotoPath,
+    'valid_id_path': validIdPath,
+    'valid_id_back_path': validIdBackPath,
+    'farming_history': farmingHistory,
+    'certification_accepted': certificationAccepted,
+    'status': 'pending',
+    'created_at': DateTime.now().toIso8601String(),
+  };
 
   /// Education levels for farmer_education table
   List<Map<String, String>> toEducationRows() {
     final rows = <Map<String, String>>[];
-    if (elementary.isNotEmpty) rows.add({'level': 'elementary', 'school_name': elementary});
-    if (highSchool.isNotEmpty) rows.add({'level': 'high_school', 'school_name': highSchool});
-    if (college.isNotEmpty) rows.add({'level': 'college', 'school_name': college});
+    if (elementary.isNotEmpty) {
+      rows.add({'degree': 'Elementary', 'institution': elementary});
+    }
+    if (highSchool.isNotEmpty) {
+      rows.add({'degree': 'High School', 'institution': highSchool});
+    }
+    if (college.isNotEmpty) {
+      rows.add({'degree': 'College', 'institution': college});
+    }
     return rows;
   }
 
   /// Crop types for farmer_crop_types table
   List<Map<String, String>> toCropTypeRows() {
-    return cropTypes.where((c) => c.isNotEmpty).map((c) => {'crop_type': c}).toList();
+    return cropTypes
+        .where((c) => c.isNotEmpty)
+        .map((c) => {'crop_type': c})
+        .toList();
   }
 
   /// Livestock for farmer_livestock table
   List<Map<String, String>> toLivestockRows() {
     if (livestock.isEmpty) return [];
-    return livestock.split(',').map((l) => {'livestock_type': l.trim()}).where((m) => m['livestock_type']!.isNotEmpty).toList();
+    return livestock
+        .split(',')
+        .map((l) => {'livestock_type': l.trim()})
+        .where((m) => m['livestock_type']!.isNotEmpty)
+        .toList();
   }
 }

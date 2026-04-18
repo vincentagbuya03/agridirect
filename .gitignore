@@ -72,3 +72,9 @@ ios/Flutter/Flutter.podspec
 *.swp
 .vercel
 .env*.local
+
+# Node / JS dependencies
+node_modules/
+
+# Service account keys / credentials
+*firebase-adminsdk*.json

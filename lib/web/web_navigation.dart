@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import '../shared/services/auth_service.dart';
+import '../shared/services/auth/auth_service.dart';
 import 'screens/consumer/web_marketplace_home.dart';
 import 'screens/consumer/web_shop_screen.dart';
 import 'screens/farmer/web_sales_dashboard.dart';

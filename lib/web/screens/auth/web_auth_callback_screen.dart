@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/auth_service.dart';
+import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/router/app_router.dart';
 
 /// Web OAuth callback handler screen.
@@ -95,8 +96,8 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFF16A34A).withOpacity(0.1),
-                    const Color(0xFF16A34A).withOpacity(0.08),
+                    const Color(0xFF16A34A).withValues(alpha: 0.1),
+                    const Color(0xFF16A34A).withValues(alpha: 0.08),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(20),
@@ -114,7 +115,7 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
               const SizedBox(
                 width: 32,
                 height: 32,
-                child: CircularProgressIndicator(
+                child: AppShimmerLoader(
                   strokeWidth: 3,
                   valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
                 ),
@@ -124,7 +125,7 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444).withOpacity(0.1),
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -166,3 +167,4 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
     );
   }
 }
+

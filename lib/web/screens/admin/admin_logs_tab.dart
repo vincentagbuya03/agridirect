@@ -1,41 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/admin_service.dart';
+import 'package:intl/intl.dart';
+import '../../../shared/services/admin/admin_service.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
+import 'admin_ui.dart';
 
-/// Admin Logs Tab - View all admin activity logs
 class AdminLogsTab extends StatefulWidget {
   final AdminService adminService;
-
   const AdminLogsTab({super.key, required this.adminService});
 
   @override
   State<AdminLogsTab> createState() => _AdminLogsTabState();
 }
 
-// Modern light theme colors
-const Color _primary = Color(0xFF10B981);
-const Color _danger = Color(0xFFEF4444);
-const Color _info = Color(0xFF3B82F6);
-const Color _warning = Color(0xFFF59E0B);
-const Color _background = Color(0xFFFAFAFA);
-const Color _card = Colors.white;
-const Color _border = Color(0xFFE2E8F0);
-const Color _text = Color(0xFF1E293B);
-const Color _muted = Color(0xFF64748B);
-
 class _AdminLogsTabState extends State<AdminLogsTab> {
   late Future<List<Map<String, dynamic>>> _logsFuture;
-  int _currentPage = 0;
-  String _selectedFilter = 'all';
-
-  final List<String> _filters = [
-    'all',
-    'user',
-    'farmer',
-    'product',
-    'order',
-    'category',
-  ];
+  String _searchQuery = '';
+  String _filterAction = 'all';
 
   @override
   void initState() {
@@ -44,434 +24,301 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
   }
 
   void _loadData() {
-    _logsFuture = widget.adminService.getAdminLogs(page: _currentPage);
+    setState(() {
+      _logsFuture = widget.adminService.getAdminLogs();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 768;
-
-    return Container(
-      color: _background,
-      child: Column(
-        children: [
-          // Header with Filters
-          Container(
-            padding: EdgeInsets.all(isMobile ? 16 : 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+    return AdminPageFrame(
+      child: SingleChildScrollView(
+        padding: AdminUi.pagePadding(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AdminHeroCard(
+              useGradient: true,
+              eyebrow: 'System Integrity',
+              title: 'Activity Logs',
+              description: 'Comprehensive audit trail of all administrative actions and system updates.',
+              metrics: [
+                FutureBuilder<Map<String, dynamic>>(
+                  future: widget.adminService.getDashboardCounts(),
+                  builder: (context, snapshot) {
+                    final data = snapshot.data;
+                    return Row(
                       children: [
-                        Text(
-                          'Activity Logs',
-                          style: GoogleFonts.inter(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: _text,
-                          ),
+                        AdminMiniMetric(
+                          label: 'Critical Actions', 
+                          value: '${(data?['pending_verifications'] ?? 0)}', 
+                          icon: Icons.security_rounded, 
+                          color: AdminUi.danger,
+                          light: true
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Track all administrative actions',
-                          style: GoogleFonts.inter(fontSize: 13, color: _muted),
+                        const SizedBox(width: 24),
+                        AdminMiniMetric(
+                          label: 'Reports Filed', 
+                          value: '${data?['pending_reports'] ?? 0}', 
+                          icon: Icons.flag_rounded, 
+                          color: AdminUi.warning,
+                          light: true
+                        ),
+                        const SizedBox(width: 24),
+                        AdminMiniMetric(
+                          label: 'Active Admins', 
+                          value: '3', 
+                          icon: Icons.admin_panel_settings_rounded, 
+                          light: true
                         ),
                       ],
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () => setState(() => _loadData()),
-                      icon: const Icon(Icons.refresh_rounded, size: 18),
-                      label: const Text('Refresh'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _card,
-                        foregroundColor: _text,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          side: BorderSide(color: _border),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // Filter Chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: _filters.map((filter) {
-                      final isSelected = _selectedFilter == filter;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          selected: isSelected,
-                          label: Text(
-                            filter == 'all'
-                                ? 'All Actions'
-                                : '${filter[0].toUpperCase()}${filter.substring(1)} Actions',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                              color: isSelected ? _primary : _muted,
-                            ),
-                          ),
-                          backgroundColor: _card,
-                          selectedColor: _primary.withOpacity(0.15),
-                          checkmarkColor: _primary,
-                          side: BorderSide(
-                            color: isSelected
-                                ? _primary.withOpacity(0.5)
-                                : _border,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          onSelected: (_) =>
-                              setState(() => _selectedFilter = filter),
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                    );
+                  }
                 ),
               ],
             ),
-          ),
-          // Logs List
-          Expanded(
-            child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: _logsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: _primary),
-                  );
-                }
-
-                if (snapshot.hasError) {
-                  return _buildErrorState();
-                }
-
-                var logs = snapshot.data ?? [];
-
-                // Filter logs
-                if (_selectedFilter != 'all') {
-                  logs = logs.where((log) {
-                    final action = (log['action'] ?? '')
-                        .toString()
-                        .toLowerCase();
-                    return action.contains(_selectedFilter);
-                  }).toList();
-                }
-
-                if (logs.isEmpty) {
-                  return _buildEmptyState();
-                }
-
-                return ListView.builder(
-                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 24),
-                  itemCount: logs.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == logs.length) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24),
-                        child: _buildPagination(logs.length),
-                      );
-                    }
-                    return _LogItem(log: logs[index]);
-                  },
-                );
-              },
+            const SizedBox(height: 24),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: AdminUi.radiusLg,
+                border: Border.all(color: AdminUi.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  _buildToolbar(),
+                  const Divider(height: 1, color: AdminUi.border),
+                  _buildTableHeader(),
+                  const Divider(height: 1, color: AdminUi.border),
+                  _buildTableBody(),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: _card,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(Icons.history_rounded, color: _muted, size: 56),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'No activity logs',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: _text,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Admin actions will appear here',
-            style: GoogleFonts.inter(fontSize: 13, color: _muted),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.error_outline_rounded, color: _danger, size: 48),
-          const SizedBox(height: 16),
-          Text(
-            'Failed to load logs',
-            style: GoogleFonts.inter(
-              color: _danger,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () => setState(() => _loadData()),
-            icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('Retry'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _primary,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPagination(int count) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _PaginationButton(
-          icon: Icons.chevron_left_rounded,
-          onPressed: _currentPage > 0
-              ? () {
-                  setState(() {
-                    _currentPage--;
-                    _loadData();
-                  });
-                }
-              : null,
-        ),
-        const SizedBox(width: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          decoration: BoxDecoration(
-            color: _card,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: _border),
-          ),
-          child: Text(
-            'Page ${_currentPage + 1}',
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w600,
-              color: _text,
-              fontSize: 13,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        _PaginationButton(
-          icon: Icons.chevron_right_rounded,
-          onPressed: count >= 50
-              ? () {
-                  setState(() {
-                    _currentPage++;
-                    _loadData();
-                  });
-                }
-              : null,
-        ),
-      ],
-    );
-  }
-}
-
-class _PaginationButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback? onPressed;
-
-  const _PaginationButton({required this.icon, this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onPressed != null;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: enabled ? _card : _card.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: _border),
-          ),
-          child: Icon(icon, color: enabled ? _text : _muted, size: 20),
+          ],
         ),
       ),
     );
   }
-}
 
-class _LogItem extends StatelessWidget {
-  final Map<String, dynamic> log;
-
-  const _LogItem({required this.log});
-
-  @override
-  Widget build(BuildContext context) {
-    final action = log['action'] ?? 'unknown';
-    final actionInfo = _getActionInfo(action);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _border),
-      ),
+  Widget _buildToolbar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Action Icon
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: actionInfo.color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: AdminUi.background,
+                borderRadius: AdminUi.radiusMd,
+              ),
+              child: TextField(
+                decoration: AdminUi.inputDecoration(
+                  hintText: 'Search logs by details or action...',
+                  prefixIcon: const Icon(Icons.search_rounded, color: AdminUi.textMuted, size: 20),
+                ).copyWith(
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                ),
+                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+              ),
             ),
-            child: Icon(actionInfo.icon, color: actionInfo.color, size: 22),
           ),
           const SizedBox(width: 16),
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: actionInfo.color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        actionInfo.label,
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: actionInfo.color,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      _formatDate(log['created_at']),
-                      style: GoogleFonts.inter(fontSize: 11, color: _muted),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  log['details'] ?? 'No details available',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: _text,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.person_outline_rounded, size: 14, color: _muted),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Admin ID: ${log['admin_id']?.toString().substring(0, 8) ?? 'Unknown'}...',
-                      style: GoogleFonts.inter(fontSize: 11, color: _muted),
-                    ),
-                  ],
-                ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: AdminUi.background,
+              borderRadius: AdminUi.radiusMd,
+            ),
+            child: DropdownButton<String>(
+              value: _filterAction,
+              underline: const SizedBox(),
+              icon: const Icon(Icons.filter_list_rounded, size: 18, color: AdminUi.textSecondary),
+              style: AdminUi.label(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w700),
+              onChanged: (v) => setState(() => _filterAction = v ?? 'all'),
+              items: const [
+                DropdownMenuItem(value: 'all', child: Text('All Actions')),
+                DropdownMenuItem(value: 'verify_user', child: Text('Verifications')),
+                DropdownMenuItem(value: 'update_user_role', child: Text('Role Updates')),
+                DropdownMenuItem(value: 'delete_user', child: Text('Deletions')),
+                DropdownMenuItem(value: 'approve_product', child: Text('Product Approval')),
               ],
             ),
+          ),
+          const SizedBox(width: 16),
+          ElevatedButton.icon(
+            onPressed: _loadData,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('REFRESH'),
+            style: AdminUi.secondaryButton,
           ),
         ],
       ),
     );
   }
 
-  _ActionInfo _getActionInfo(String action) {
-    if (action.contains('approve') || action.contains('verify')) {
-      return _ActionInfo(Icons.check_circle_rounded, _primary, 'Approved');
-    } else if (action.contains('reject') ||
-        action.contains('suspend') ||
-        action.contains('delete')) {
-      return _ActionInfo(Icons.cancel_rounded, _danger, 'Restricted');
-    } else if (action.contains('create') || action.contains('add')) {
-      return _ActionInfo(Icons.add_circle_rounded, _info, 'Created');
-    } else if (action.contains('update') || action.contains('edit')) {
-      return _ActionInfo(Icons.edit_rounded, _warning, 'Updated');
-    } else if (action.contains('promote')) {
-      return _ActionInfo(Icons.arrow_upward_rounded, _primary, 'Promoted');
-    } else if (action.contains('remove')) {
-      return _ActionInfo(Icons.remove_circle_rounded, _warning, 'Removed');
-    } else if (action.contains('resolve')) {
-      return _ActionInfo(Icons.done_all_rounded, _primary, 'Resolved');
+  Widget _buildTableHeader() {
+    return Container(
+      color: AdminUi.panelAlt,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Row(
+        children: [
+          _headerCell('Timestamp', flex: 2),
+          _headerCell('Action', flex: 2),
+          _headerCell('Details', flex: 4),
+          _headerCell('Admin ID', flex: 2),
+          _headerCell('IP Address', flex: 2),
+        ],
+      ),
+    );
+  }
+
+  Widget _headerCell(String text, {int flex = 1, TextAlign align = TextAlign.left}) {
+    return Expanded(
+      flex: flex,
+      child: Text(
+        text.toUpperCase(),
+        textAlign: align,
+        style: AdminUi.label(size: 11, color: AdminUi.textMuted, weight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Widget _buildTableBody() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _logsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(100),
+            child: Center(child: AppShimmerLoader(color: AdminUi.brand)),
+          );
+        }
+
+        var logs = snapshot.data ?? [];
+        
+        // Filtering
+        if (_searchQuery.isNotEmpty) {
+          logs = logs.where((l) {
+            final action = (l['action'] ?? '').toString().toLowerCase();
+            final details = (l['details'] ?? '').toString().toLowerCase();
+            return action.contains(_searchQuery) || details.contains(_searchQuery);
+          }).toList();
+        }
+        if (_filterAction != 'all') {
+          logs = logs.where((l) => l['action'] == _filterAction).toList();
+        }
+
+        if (logs.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(80),
+            child: Column(
+              children: [
+                Icon(Icons.history_rounded, size: 48, color: AdminUi.textMuted.withValues(alpha: 0.3)),
+                const SizedBox(height: 16),
+                Text('No activity logs found matching your criteria.', style: AdminUi.body(color: AdminUi.textMuted)),
+              ],
+            ),
+          );
+        }
+
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          itemCount: logs.length,
+          separatorBuilder: (context, index) => const Divider(height: 1, color: AdminUi.border),
+          itemBuilder: (context, index) => _buildRow(logs[index]),
+        );
+      },
+    );
+  }
+
+  Widget _buildRow(Map<String, dynamic> log) {
+    final action = (log['action'] ?? 'system_event').toString();
+    final details = (log['details'] ?? 'No additional details provided').toString();
+    final adminId = (log['admin_id'] ?? 'System').toString();
+    final ipAddress = (log['ip_address'] ?? 'Internal').toString();
+    final createdAt = log['created_at'] != null 
+        ? DateFormat('MMM d, HH:mm:ss').format(DateTime.parse(log['created_at']).toLocal())
+        : 'Unknown';
+
+    Color actionColor;
+    IconData actionIcon;
+    
+    if (action.contains('delete') || action.contains('suspend')) {
+      actionColor = AdminUi.danger;
+      actionIcon = Icons.delete_forever_rounded;
+    } else if (action.contains('approve') || action.contains('verify') || action.contains('create')) {
+      actionColor = AdminUi.success;
+      actionIcon = Icons.check_circle_rounded;
+    } else if (action.contains('update')) {
+      actionColor = AdminUi.info;
+      actionIcon = Icons.edit_rounded;
     } else {
-      return _ActionInfo(Icons.info_rounded, _muted, 'Action');
+      actionColor = AdminUi.textSecondary;
+      actionIcon = Icons.event_note_rounded;
     }
+
+    return Material(
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Text(createdAt, style: AdminUi.label(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w500)),
+            ),
+            Expanded(
+              flex: 2,
+              child: Row(
+                children: [
+                  Icon(actionIcon, size: 14, color: actionColor),
+                  const SizedBox(width: 8),
+                  Text(
+                    action.replaceAll('_', ' ').toUpperCase(),
+                    style: AdminUi.label(size: 11, color: actionColor, weight: FontWeight.w800),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              flex: 4,
+              child: Text(
+                details,
+                style: AdminUi.body(size: 13, color: AdminUi.textSecondary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                adminId,
+                style: AdminUi.label(size: 12, color: AdminUi.textMuted, weight: FontWeight.w600),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                ipAddress,
+                style: AdminUi.label(size: 12, color: AdminUi.textMuted),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
-
-  String _formatDate(String? dateString) {
-    if (dateString == null) return 'Unknown';
-    try {
-      final date = DateTime.parse(dateString);
-      final now = DateTime.now();
-      final diff = now.difference(date);
-
-      if (diff.inMinutes < 1) {
-        return 'Just now';
-      } else if (diff.inMinutes < 60) {
-        return '${diff.inMinutes}m ago';
-      } else if (diff.inHours < 24) {
-        return '${diff.inHours}h ago';
-      } else if (diff.inDays < 7) {
-        return '${diff.inDays}d ago';
-      } else {
-        return '${date.month}/${date.day}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-      }
-    } catch (e) {
-      return 'Unknown';
-    }
-  }
-}
-
-class _ActionInfo {
-  final IconData icon;
-  final Color color;
-  final String label;
-
-  _ActionInfo(this.icon, this.color, this.label);
 }

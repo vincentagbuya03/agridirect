@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/data/app_data.dart';
-import '../../../shared/services/order_service.dart';
-import '../../../shared/services/supabase_data_service.dart';
+import '../../../shared/router/app_router.dart';
+import '../../../shared/services/commerce/order_service.dart';
+import '../../../shared/services/core/supabase_data_service.dart';
 
 /// Web-only Pre-order Product Details — two-column layout.
 /// Completely separate UI from the mobile product details.
 class WebPreorderDetails extends StatefulWidget {
-  const WebPreorderDetails({super.key});
+  const WebPreorderDetails({super.key, this.initialProduct});
+
+  final ProductItem? initialProduct;
 
   @override
   State<WebPreorderDetails> createState() => _WebPreorderDetailsState();
@@ -21,52 +26,75 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
   static const Color _border = Color(0xFFE5E7EB);
   static const Color _surface = Color(0xFFFAFAFA);
 
-  bool _downpaymentEnabled = true;
   int _quantity = 10;
-  bool _isProcessingPayment = false;
+  bool _isSubmittingOrder = false;
+  String _selectedPaymentMethod = 'COD';
+  ProductItem? _activeProduct;
 
-  static const List<String> _paymentChannels = [
-    'GCash',
-    'PayMaya',
-    'Online Bank Transfer',
-    'Credit/Debit Card',
-    'GrabPay',
-  ];
+  static const List<String> _paymentOptions = ['COD', 'COP'];
+
+  @override
+  void initState() {
+    super.initState();
+    _activeProduct = widget.initialProduct;
+    if (_activeProduct == null) {
+      _loadDefaultProduct();
+    }
+  }
+
+  Future<void> _loadDefaultProduct() async {
+    try {
+      final products = await SupabaseDataService().getPreOrderProducts();
+      if (!mounted || products.isEmpty) return;
+      setState(() {
+        _activeProduct = products.first;
+      });
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _surface,
-      body: Column(
-        children: [
-          _buildTopBar(context),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildBreadcrumbs(),
-                  const SizedBox(height: 24),
-                  _buildMainContent(),
-                  const SizedBox(height: 48),
-                  _buildFarmSection(),
-                  const SizedBox(height: 48),
-                  _buildRelatedProducts(),
-                  const SizedBox(height: 40),
-                ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 900;
+
+          return Column(
+            children: [
+              _buildTopBar(context, isCompact: isCompact),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(isCompact ? 20 : 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildBreadcrumbs(),
+                      SizedBox(height: isCompact ? 18 : 24),
+                      _buildMainContent(isCompact: isCompact),
+                      SizedBox(height: isCompact ? 36 : 48),
+                      _buildFarmSection(),
+                      SizedBox(height: isCompact ? 36 : 48),
+                      _buildRelatedProducts(),
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
 
   // ─── Top Bar ───
-  Widget _buildTopBar(BuildContext context) {
+  Widget _buildTopBar(BuildContext context, {required bool isCompact}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 16 : 32,
+        vertical: 16,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: _border)),
@@ -94,20 +122,43 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
             ),
           ),
           const SizedBox(width: 16),
-          const Text(
-            'Product Details',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: _dark,
+          const Expanded(
+            child: Text(
+              'Product Details',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: _dark,
+              ),
             ),
           ),
           const Spacer(),
-          _buildHeaderButton(Icons.share_rounded, 'Share'),
-          const SizedBox(width: 12),
-          _buildHeaderButton(Icons.favorite_border_rounded, 'Save'),
+          if (!isCompact) ...[
+            _buildHeaderButton(Icons.share_rounded, 'Share'),
+            const SizedBox(width: 12),
+            _buildHeaderButton(Icons.favorite_border_rounded, 'Save'),
+          ] else ...[
+            _buildHeaderIcon(Icons.share_rounded),
+            const SizedBox(width: 8),
+            _buildHeaderIcon(Icons.favorite_border_rounded),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildHeaderIcon(IconData icon) {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _border),
+      ),
+      child: Icon(icon, size: 16, color: _dark),
     );
   }
 
@@ -142,18 +193,25 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
 
   // ─── Breadcrumbs ───
   Widget _buildBreadcrumbs() {
+    final productName = _activeProduct?.name.trim().isNotEmpty == true
+        ? _activeProduct!.name
+        : 'Pre-order product';
     return Row(
       children: [
         Text('Marketplace', style: TextStyle(fontSize: 13, color: _muted)),
         Icon(Icons.chevron_right_rounded, size: 18, color: _muted),
         Text('Pre-Order', style: TextStyle(fontSize: 13, color: _muted)),
         Icon(Icons.chevron_right_rounded, size: 18, color: _muted),
-        const Text(
-          'Organic Carrots',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: _dark,
+        Expanded(
+          child: Text(
+            productName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: _dark,
+            ),
           ),
         ),
       ],
@@ -161,20 +219,30 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
   }
 
   // ─── Two-column Main Content ───
-  Widget _buildMainContent() {
+  Widget _buildMainContent({required bool isCompact}) {
+    if (isCompact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildImageSection(),
+          const SizedBox(height: 24),
+          _buildDetailsSection(isCompact: true),
+        ],
+      );
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Image column
         Expanded(flex: 5, child: _buildImageSection()),
         const SizedBox(width: 40),
-        // Details column
-        Expanded(flex: 4, child: _buildDetailsSection()),
+        Expanded(flex: 4, child: _buildDetailsSection(isCompact: false)),
       ],
     );
   }
 
   Widget _buildImageSection() {
+    final imageUrl = _activeProduct?.imageUrl.trim() ?? '';
     return Column(
       children: [
         // Main image
@@ -184,16 +252,17 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
             aspectRatio: 4 / 3,
             child: Stack(
               children: [
-                CachedNetworkImage(
-                  imageUrl: AppData.carrotsHeroImageUrl,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  placeholder: (ctx, url) => Container(color: Colors.grey[100]),
-                  errorWidget: (ctx, url, err) => Container(
-                    color: Colors.grey[100],
-                    child: const Icon(Icons.image, size: 48),
-                  ),
-                ),
+                if (imageUrl.isNotEmpty)
+                  CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    placeholder: (ctx, url) =>
+                        Container(color: Colors.grey[100]),
+                    errorWidget: (ctx, url, err) => _buildImageFallback(),
+                  )
+                else
+                  _buildImageFallback(),
                 // Pre-order badge
                 Positioned(
                   bottom: 16,
@@ -224,45 +293,46 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         ),
         const SizedBox(height: 16),
         // Thumbnail row
-        Row(
-          children: List.generate(4, (i) {
-            return Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(right: i < 3 ? 12 : 0),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: i == 0
-                            ? Border.all(color: _primary, width: 2)
-                            : null,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(i == 0 ? 10 : 12),
-                        child: CachedNetworkImage(
-                          imageUrl: AppData.carrotsHeroImageUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (ctx, url) =>
-                              Container(color: Colors.grey[100]),
-                          errorWidget: (ctx, url, err) =>
-                              Container(color: Colors.grey[100]),
-                        ),
+        if (imageUrl.isNotEmpty) ...[
+          Row(
+            children: List.generate(3, (i) {
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: i < 2 ? 12 : 0),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: AspectRatio(
+                      aspectRatio: 1,
+                      child: CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (ctx, url) =>
+                            Container(color: Colors.grey[100]),
+                        errorWidget: (ctx, url, err) =>
+                            Container(color: Colors.grey[100]),
                       ),
                     ),
                   ),
                 ),
-              ),
-            );
-          }),
-        ),
+              );
+            }),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _buildDetailsSection() {
+  Widget _buildImageFallback() {
+    return Container(
+      color: Colors.grey[100],
+      width: double.infinity,
+      child: const Center(
+        child: Icon(Icons.image_rounded, size: 48, color: Color(0xFF9CA3AF)),
+      ),
+    );
+  }
+
+  Widget _buildDetailsSection({required bool isCompact}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -270,7 +340,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: _primary.withOpacity(0.08),
+            color: _primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
@@ -279,7 +349,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
               Icon(Icons.verified_rounded, size: 14, color: _primary),
               const SizedBox(width: 6),
               Text(
-                'Green Valley Organic Farm',
+                _activeProduct?.farm ?? 'Farm',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -291,9 +361,9 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         ),
         const SizedBox(height: 16),
         // Title
-        const Text(
-          'Organic Carrots',
-          style: TextStyle(
+        Text(
+          _activeProduct?.name ?? 'Pre-order Product',
+          style: const TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.w800,
             color: _dark,
@@ -305,9 +375,9 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            const Text(
-              '\$4.50',
-              style: TextStyle(
+            Text(
+              _activeProduct?.price ?? '₱0',
+              style: const TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w800,
                 color: _dark,
@@ -317,7 +387,9 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Text(
-                'per kg',
+                _activeProduct?.unit.isNotEmpty == true
+                    ? 'per ${_activeProduct!.unit}'
+                    : 'per unit',
                 style: TextStyle(fontSize: 15, color: _muted),
               ),
             ),
@@ -325,31 +397,54 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         ),
         const SizedBox(height: 24),
         // Info cards
-        Row(
-          children: [
-            Expanded(
-              child: _buildInfoChip(
-                Icons.calendar_today_rounded,
-                'Harvest',
-                'Oct 25',
+        isCompact
+            ? Column(
+                children: [
+                  _buildInfoChip(
+                    Icons.calendar_today_rounded,
+                    'Harvest',
+                    _activeProduct?.harvestDays != null
+                        ? 'In ${_activeProduct!.harvestDays} days'
+                        : 'TBD',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildInfoChip(
+                    Icons.inventory_2_rounded,
+                    'Stock Left',
+                    _activeProduct?.targetQuantity != null
+                        ? _activeProduct!.targetQuantity!.toStringAsFixed(0)
+                        : 'TBD',
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(
+                    child: _buildInfoChip(
+                      Icons.calendar_today_rounded,
+                      'Harvest',
+                      _activeProduct?.harvestDays != null
+                          ? 'In ${_activeProduct!.harvestDays} days'
+                          : 'TBD',
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildInfoChip(
+                      Icons.inventory_2_rounded,
+                      'Stock Left',
+                      _activeProduct?.targetQuantity != null
+                          ? _activeProduct!.targetQuantity!.toStringAsFixed(0)
+                          : 'TBD',
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildInfoChip(
-                Icons.inventory_2_rounded,
-                'Stock Left',
-                '50kg',
-              ),
-            ),
-          ],
-        ),
         const SizedBox(height: 24),
         // Quantity selector
-        _buildQuantitySelector(),
+        _buildQuantitySelector(isCompact: isCompact),
         const SizedBox(height: 20),
-        // Downpayment toggle
-        _buildDownpaymentToggle(),
+        _buildPaymentMethodSelector(isCompact: isCompact),
         const SizedBox(height: 28),
         // Total & CTA
         Container(
@@ -369,7 +464,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                     style: TextStyle(fontSize: 14, color: _muted),
                   ),
                   Text(
-                    '\$${(_quantity * 4.5).toStringAsFixed(2)}',
+                    _computeTotalLabel(),
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
@@ -378,33 +473,11 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                   ),
                 ],
               ),
-              if (_downpaymentEnabled) ...[
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Downpayment (25%)',
-                      style: TextStyle(fontSize: 13, color: _muted),
-                    ),
-                    Text(
-                      '\$${(_quantity * 4.5 * 0.25).toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: _primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isProcessingPayment
-                      ? null
-                      : _showOnlinePaymentDialog,
+                  onPressed: _isSubmittingOrder ? null : _submitOfflinePreOrder,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _primary,
                     foregroundColor: Colors.white,
@@ -418,15 +491,15 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        _isProcessingPayment
-                            ? 'Processing Payment...'
+                        _isSubmittingOrder
+                            ? 'Submitting Order...'
                             : 'Pre-order Now',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      if (!_isProcessingPayment) ...[
+                      if (!_isSubmittingOrder) ...[
                         const SizedBox(width: 8),
                         const Icon(Icons.arrow_forward_rounded, size: 18),
                       ],
@@ -467,165 +540,77 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
     );
   }
 
-  Future<void> _showOnlinePaymentDialog() async {
-    String selectedChannel = _paymentChannels.first;
-    final referenceController = TextEditingController();
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Pay Online'),
-          content: StatefulBuilder(
-            builder: (context, setDialogState) {
-              final total = _quantity * 4.5;
-              final payable = _downpaymentEnabled ? total * 0.25 : total;
-
-              return SizedBox(
-                width: 420,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Choose a payment channel:',
-                      style: TextStyle(fontSize: 13, color: _muted),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: selectedChannel,
-                      items: _paymentChannels
-                          .map(
-                            (channel) => DropdownMenuItem<String>(
-                              value: channel,
-                              child: Text(channel),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setDialogState(() => selectedChannel = value);
-                      },
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: referenceController,
-                      decoration: const InputDecoration(
-                        labelText: 'Reference Number (optional)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        'Amount to pay now: USD ${payable.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Pay Now'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true) {
-      referenceController.dispose();
-      return;
-    }
-
-    await _processOnlinePayment(
-      paymentMethod: selectedChannel,
-      transactionReference: referenceController.text.trim(),
-    );
-    referenceController.dispose();
-  }
-
-  Future<void> _processOnlinePayment({
-    required String paymentMethod,
-    required String transactionReference,
-  }) async {
-    setState(() => _isProcessingPayment = true);
+  Future<void> _submitOfflinePreOrder() async {
+    setState(() => _isSubmittingOrder = true);
 
     try {
+      final active = _activeProduct;
+      final productId = active?.productId;
+      if (active == null || productId == null || productId.isEmpty) {
+        throw Exception('No pre-order product selected.');
+      }
+
       final quantity = _quantity.toDouble();
-      final fullAmount = quantity * 4.5;
-      final payableNow = _downpaymentEnabled ? fullAmount * 0.25 : fullAmount;
       final orderService = OrderService();
 
-      final result = await orderService.createPaidPreOrderByProductName(
-        productName: 'Organic Carrots',
+      final result = await orderService.createOfflinePreOrderByProductId(
+        productId: productId,
         quantity: quantity,
-        paymentMethod: paymentMethod,
-        paymentAmount: payableNow,
-        transactionReference: transactionReference.isEmpty
-            ? null
-            : transactionReference,
-        notes: _downpaymentEnabled
-            ? 'Downpayment (25%) initiated via web pre-order flow.'
-            : 'Full payment initiated via web pre-order flow.',
+        paymentMethod: _selectedPaymentMethod,
+        notes: _selectedPaymentMethod == 'COD'
+            ? 'Customer selected Cash on Delivery for this pre-order.'
+            : 'Customer selected Cash on Pickup for this pre-order.',
       );
 
       if (!mounted) return;
       final orderId = (result['order'] as Map<String, dynamic>)['orderId'];
+      final farmerUserId = result['farmer_user_id']?.toString();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Payment successful via $paymentMethod. Order $orderId was paid and credited to farmer wallet.',
+            'Pre-order placed successfully. Order $orderId will be paid via $_selectedPaymentMethod.',
           ),
           backgroundColor: const Color(0xFF15803D),
         ),
       );
+
+      if (farmerUserId != null && farmerUserId.isNotEmpty) {
+        context.push(
+          AppRoutes.messages,
+          extra: {'farmerUserId': farmerUserId, 'asFarmer': false},
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Payment failed: $e'),
+          content: Text('Failed to place pre-order: $e'),
           backgroundColor: const Color(0xFFB91C1C),
         ),
       );
     } finally {
       if (mounted) {
-        setState(() => _isProcessingPayment = false);
+        setState(() => _isSubmittingOrder = false);
       }
     }
+  }
+
+  String _computeTotalLabel() {
+    final rawPrice = (_activeProduct?.price ?? '₱0').replaceAll(
+      RegExp(r'[^0-9.]'),
+      '',
+    );
+    final unitPrice = double.tryParse(rawPrice) ?? 0;
+    return '₱${(_quantity * unitPrice).toStringAsFixed(2)}';
   }
 
   Widget _buildInfoChip(IconData icon, String label, String value) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _primary.withOpacity(0.05),
+        color: _primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _primary.withOpacity(0.15)),
+        border: Border.all(color: _primary.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -658,7 +643,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
     );
   }
 
-  Widget _buildQuantitySelector() {
+  Widget _buildQuantitySelector({required bool isCompact}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -666,69 +651,137 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _border),
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.scale_rounded, size: 20, color: _dark),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+      child: isCompact
+          ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Quantity',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: _dark,
-                  ),
+                const Row(
+                  children: [
+                    Icon(Icons.scale_rounded, size: 20, color: _dark),
+                    SizedBox(width: 12),
+                    Text(
+                      'Quantity',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _dark,
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: _surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _border),
+                      ),
+                      child: Row(
+                        children: [
+                          _buildQtyButton(Icons.remove_rounded, () {
+                            if (_quantity > 1) setState(() => _quantity--);
+                          }),
+                          Container(
+                            width: 50,
+                            alignment: Alignment.center,
+                            child: Text(
+                              '$_quantity',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: _dark,
+                              ),
+                            ),
+                          ),
+                          _buildQtyButton(Icons.add_rounded, () {
+                            if (_quantity < 50) setState(() => _quantity++);
+                          }),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'kg',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _muted,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Text(
                   'Min order: 1 kg',
                   style: TextStyle(fontSize: 12, color: _muted),
                 ),
               ],
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _border),
-            ),
-            child: Row(
+            )
+          : Row(
               children: [
-                _buildQtyButton(Icons.remove_rounded, () {
-                  if (_quantity > 1) setState(() => _quantity--);
-                }),
-                Container(
-                  width: 50,
-                  alignment: Alignment.center,
-                  child: Text(
-                    '$_quantity',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: _dark,
-                    ),
+                const Icon(Icons.scale_rounded, size: 20, color: _dark),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Quantity',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _dark,
+                        ),
+                      ),
+                      Text(
+                        'Min order: 1 kg',
+                        style: TextStyle(fontSize: 12, color: _muted),
+                      ),
+                    ],
                   ),
                 ),
-                _buildQtyButton(Icons.add_rounded, () {
-                  if (_quantity < 50) setState(() => _quantity++);
-                }),
+                Container(
+                  decoration: BoxDecoration(
+                    color: _surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _border),
+                  ),
+                  child: Row(
+                    children: [
+                      _buildQtyButton(Icons.remove_rounded, () {
+                        if (_quantity > 1) setState(() => _quantity--);
+                      }),
+                      Container(
+                        width: 50,
+                        alignment: Alignment.center,
+                        child: Text(
+                          '$_quantity',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: _dark,
+                          ),
+                        ),
+                      ),
+                      _buildQtyButton(Icons.add_rounded, () {
+                        if (_quantity < 50) setState(() => _quantity++);
+                      }),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'kg',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _muted,
+                  ),
+                ),
               ],
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'kg',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: _muted,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -747,51 +800,132 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
     );
   }
 
-  Widget _buildDownpaymentToggle() {
+  Widget _buildPaymentMethodSelector({required bool isCompact}) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: _primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.payments_rounded, color: _primary, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
+      child: isCompact
+          ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '25% Downpayment',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: _dark,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.local_atm_rounded,
+                        color: _primary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Text(
+                        'Payment Method',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _dark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Choose Cash on Delivery or Cash on Pickup only',
+                  style: TextStyle(fontSize: 12, color: _muted),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedPaymentMethod,
+                  items: _paymentOptions
+                      .map(
+                        (option) => DropdownMenuItem<String>(
+                          value: option,
+                          child: Text(option),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _selectedPaymentMethod = value);
+                  },
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                   ),
                 ),
-                Text(
-                  'Secure price, pay the rest on delivery',
-                  style: TextStyle(fontSize: 12, color: _muted),
+              ],
+            )
+          : Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.local_atm_rounded,
+                    color: _primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Payment Method',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _dark,
+                        ),
+                      ),
+                      Text(
+                        'Choose Cash on Delivery or Cash on Pickup only',
+                        style: TextStyle(fontSize: 12, color: _muted),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: 170,
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _selectedPaymentMethod,
+                    items: _paymentOptions
+                        .map(
+                          (option) => DropdownMenuItem<String>(
+                            value: option,
+                            child: Text(option),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _selectedPaymentMethod = value);
+                    },
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-          Switch(
-            value: _downpaymentEnabled,
-            onChanged: (v) => setState(() => _downpaymentEnabled = v),
-            activeThumbColor: _primary,
-          ),
-        ],
-      ),
     );
   }
 
@@ -836,7 +970,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: _primary.withOpacity(0.3),
+                          color: _primary.withValues(alpha: 0.3),
                           width: 2,
                         ),
                       ),
@@ -923,7 +1057,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                       ),
                       Positioned.fill(
                         child: Container(
-                          color: Colors.black.withOpacity(0.15),
+                          color: Colors.black.withValues(alpha: 0.15),
                           child: Center(
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -931,7 +1065,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                                 vertical: 10,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white.withValues(alpha: 0.9),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
@@ -974,7 +1108,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
       future: SupabaseDataService().getPreOrderProducts(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: AppShimmerLoader());
         }
 
         final allProducts = snapshot.data ?? [];
@@ -1074,3 +1208,4 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
     );
   }
 }
+

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../shared/styles/app_theme.dart';
+import '../../../shared/services/commerce/order_service.dart';
+import '../../../shared/models/order/order_model.dart';
+import 'package:agridirect/shared/widgets/image_widgets.dart';
+import 'dart:async';
 
-/// Orders Screen showing order history with tabs.
-/// Active, Completed, and Cancelled orders.
+/// Orders Screen - Professional Order Management
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
 
@@ -12,191 +14,283 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
-  static const Color primary = Color(0xFF13EC5B);
   int _selectedTab = 0;
-
   final _tabs = ['Active', 'Completed', 'Cancelled'];
+
+  List<Order>? _orders;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrders();
+  }
+
+  Future<void> _loadOrders() async {
+    setState(() => _isLoading = true);
+    try {
+      final orders = await OrderService().getMyOrders();
+      if (mounted) {
+        setState(() {
+          _orders = orders;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _orders = [];
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAF7),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildSearchBar(),
-            _buildTabBar(),
-            Expanded(child: _buildOrdersList()),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-      child: Row(
+      backgroundColor: AppColors.background,
+      body: Column(
         children: [
-          Icon(Icons.receipt_long_rounded, color: primary, size: 26),
-          const SizedBox(width: 8),
-          Text(
-            'Order History',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-          const Spacer(),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.notifications_outlined,
-              size: 20,
-              color: Colors.grey[600],
-            ),
-          ),
+          _buildPremiumHeader(),
+          _buildSleekTabs(),
+          Expanded(child: _buildOrdersList()),
         ],
       ),
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildPremiumHeader() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      child: Container(
-        height: 48,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(12),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
         ),
-        child: Row(
-          children: [
-            const SizedBox(width: 14),
-            Icon(Icons.search, color: Colors.grey[400], size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Search your orders...',
-                style: TextStyle(fontSize: 14, color: Colors.grey[400]),
-              ),
-            ),
-          ],
-        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.textHeadline.withValues(alpha: 0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: List.generate(_tabs.length, (i) {
-              final isSelected = _selectedTab == i;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _selectedTab = i),
-                  child: Column(
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          _tabs[i],
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: isSelected ? primary : Colors.grey[400],
-                          ),
-                        ),
+                      const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 28),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Orders',
+                        style: AppTextStyles.headline1.copyWith(fontSize: 22),
                       ),
-                      if (isSelected)
-                        Container(
-                          height: 3,
-                          decoration: BoxDecoration(
-                            color: primary,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        )
-                      else
-                        const SizedBox(height: 3),
                     ],
                   ),
+                  _buildHeaderNotification(),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Container(
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
                 ),
-              );
-            }),
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search your orders...',
+                    hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
+                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textSubtle, size: 22),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderNotification() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+      ),
+      child: Stack(
+        children: [
+          const Icon(Icons.notifications_none_rounded, color: AppColors.textHeadline, size: 24),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: AppColors.error,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSleekTabs() {
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+      child: Row(
+        children: List.generate(_tabs.length, (i) {
+          final isSelected = _selectedTab == i;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedTab = i),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary : AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: isSelected ? [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    )
+                  ] : [],
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _tabs[i],
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: isSelected ? Colors.white : AppColors.textSubtle,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
 
   Widget _buildOrdersList() {
-    if (_selectedTab == 0) {
-      // Active orders
-      return ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-        children: [
-          _buildOrderCard(
-            farmImage:
-                'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=400',
-            farmName: 'Green Valley Organic',
-            orderId: 'AD-82910',
-            itemCount: 3,
-            price: '\$34.50',
-            status: 'Out for Delivery',
-            statusColor: primary,
-            estimatedTime: '2:45 PM',
-            progress: 0.75,
-          ),
-          const SizedBox(height: 16),
-          _buildOrderCard(
-            farmImage:
-                'https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=400',
-            farmName: 'Blue Ridge Valley',
-            orderId: 'AD-82855',
-            itemCount: 1,
-            price: '\$12.20',
-            status: 'Preparing',
-            statusColor: const Color(0xFFFF9500),
-            estimatedTime: 'FARMER IS PACKING',
-            progress: 0.45,
-          ),
-        ],
-      );
-    } else if (_selectedTab == 1) {
-      // Completed orders
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+    }
+
+    if (_orders == null || _orders!.isEmpty) {
       return Center(
-        child: Text(
-          'No completed orders',
-          style: TextStyle(color: Colors.grey[500]),
-        ),
-      );
-    } else {
-      // Cancelled orders
-      return Center(
-        child: Text(
-          'No cancelled orders',
-          style: TextStyle(color: Colors.grey[500]),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history_rounded, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.2)),
+            const SizedBox(height: 16),
+            Text(
+              'No orders found',
+              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
+            ),
+          ],
         ),
       );
     }
+
+    List<Order> filteredOrders;
+    if (_selectedTab == 0) {
+      // Active
+      filteredOrders = _orders!.where((o) => o.isPending || o.isConfirmed || o.isShipped).toList();
+    } else if (_selectedTab == 1) {
+      // Completed
+      filteredOrders = _orders!.where((o) => o.isDelivered).toList();
+    } else {
+      // Cancelled
+      filteredOrders = _orders!.where((o) => o.isCancelled).toList();
+    }
+
+    if (filteredOrders.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history_rounded, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.2)),
+            const SizedBox(height: 16),
+            Text(
+              'No ${_tabs[_selectedTab].toLowerCase()} orders',
+              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      physics: const BouncingScrollPhysics(),
+      itemCount: filteredOrders.length,
+      itemBuilder: (context, index) {
+        final order = filteredOrders[index];
+        
+        // Map status to color and progress
+        Color statusColor = AppColors.primary;
+        double progress = 0.5;
+        String statusText = order.status;
+        
+        if (order.isPending) {
+          statusColor = AppColors.warning;
+          progress = 0.2;
+        } else if (order.isConfirmed) {
+          statusColor = const Color(0xFF0EA5E9); // Info color
+          progress = 0.4;
+        } else if (order.isShipped) {
+          statusColor = AppColors.primary;
+          progress = 0.8;
+        } else if (order.isDelivered) {
+          statusColor = AppColors.success;
+          progress = 1.0;
+        } else if (order.isCancelled) {
+          statusColor = AppColors.error;
+          progress = 0.0;
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: _buildOrderCard(
+            farmImage: order.farmerAvatarUrl,
+            farmName: order.farmName ?? 'AgriDirect Farm',
+            orderId: order.orderNumber,
+            itemCount: order.itemCount ?? 1,
+            price: '₱${(order.total ?? 0).toStringAsFixed(2)}',
+            status: statusText,
+            statusColor: statusColor,
+            estimatedTime: order.isDelivered ? 'Delivered' : 'Pending Update',
+            progress: progress,
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildOrderCard({
-    required String farmImage,
+    required String? farmImage,
     required String farmName,
     required String orderId,
     required int itemCount,
@@ -207,238 +301,108 @@ class _OrdersScreenState extends State<OrdersScreen> {
     required double progress,
   }) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
+      decoration: AppDecorations.cardDecoration.copyWith(
+        borderRadius: BorderRadius.circular(24),
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top row with image, farm name, and price
           Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: CachedNetworkImage(
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: SafeCircleAvatar(
                   imageUrl: farmImage,
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.cover,
-                  placeholder: (_, _) =>
-                      Container(width: 80, height: 80, color: Colors.grey[200]),
-                  errorWidget: (_, _, _) => Container(
-                    width: 80,
-                    height: 80,
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.image),
+                  radius: 28,
+                  backgroundColor: Colors.transparent,
+                  child: Icon(
+                    Icons.agriculture_rounded,
+                    color: AppColors.primary,
+                    size: 24,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      farmName,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Order #$orderId · $itemCount items',
-                      style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-                    ),
+                    Text(farmName, style: AppTextStyles.headline3.copyWith(fontSize: 16)),
+                    Text('Order #$orderId • $itemCount items', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
                   ],
                 ),
               ),
-              Text(
-                price,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
+              Text(price, style: AppTextStyles.headline3.copyWith(fontSize: 17, color: AppColors.primary)),
             ],
           ),
-          const SizedBox(height: 12),
-          // Status badge
+          const SizedBox(height: 20),
           Row(
             children: [
               Container(
-                width: 8,
-                height: 8,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: statusColor,
-                  shape: BoxShape.circle,
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                status,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: statusColor,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                estimatedTime,
-                style: TextStyle(fontSize: 12, color: Colors.grey[400]),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Progress bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 6,
-              backgroundColor: const Color(0xFFE2E8F0),
-              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-            ),
-          ),
-          const SizedBox(height: 14),
-          // Action buttons
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: primary.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Track Order',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Help',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF475569),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Recently ordered section (only for first order)
-          if (farmName == 'Green Valley Organic')
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                Text(
-                  'RECENTLY ORDERED',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.grey[400],
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
+                child: Row(
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'S',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.grey[400],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Summer Strawberries',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF0F172A),
-                            ),
-                          ),
-                          Text(
-                            "John's Organic Acres",
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: primary,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Order Again',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
+                    Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
+                    const SizedBox(width: 8),
+                    Text(
+                      status.toUpperCase(),
+                      style: AppTextStyles.labelSmall.copyWith(color: statusColor, fontWeight: FontWeight.w800, fontSize: 10),
                     ),
                   ],
                 ),
-              ],
+              ),
+              const Spacer(),
+              Text(estimatedTime, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+              backgroundColor: statusColor.withValues(alpha: 0.05),
+              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
             ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+                    foregroundColor: AppColors.primary,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: Text('Track Order', style: AppTextStyles.labelSmall.copyWith(fontWeight: FontWeight.w800)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+                ),
+                child: const Icon(Icons.messenger_outline_rounded, size: 20, color: AppColors.textHeadline),
+              ),
+            ],
+          ),
         ],
       ),
     );

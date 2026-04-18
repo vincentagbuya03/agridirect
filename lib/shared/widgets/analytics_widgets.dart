@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../services/analytics_service.dart';
-import '../services/auth_service.dart';
 
 /// Wrapper widget that automatically tracks clicks/taps
 /// Usage: AnalyticsButton(onTap: () {}, child: YourWidget())
@@ -11,28 +9,18 @@ class AnalyticsButton extends StatelessWidget {
   final String? elementType;
 
   const AnalyticsButton({
-    Key? key,
+    super.key,
     required this.onTap,
     required this.child,
     this.elementId,
     this.elementType,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // Track the click
-        final userId = AuthService().userId;
-        if (userId.isNotEmpty) {
-          AnalyticsService().trackClick(
-            userId: userId,
-            elementId: elementId,
-            elementType: elementType ?? 'button',
-          );
-        }
-
-        // Execute the callback
+        // Execute the callback (no longer tracking clicks)
         onTap?.call();
       },
       child: child,
@@ -53,7 +41,7 @@ class AnalyticsTextField extends StatefulWidget {
   final InputDecoration? decoration;
 
   const AnalyticsTextField({
-    Key? key,
+    super.key,
     this.controller,
     this.labelText,
     this.hintText,
@@ -63,15 +51,13 @@ class AnalyticsTextField extends StatefulWidget {
     this.onChanged,
     this.maxLines = 1,
     this.decoration,
-  }) : super(key: key);
+  });
 
   @override
   State<AnalyticsTextField> createState() => _AnalyticsTextFieldState();
 }
 
 class _AnalyticsTextFieldState extends State<AnalyticsTextField> {
-  int _previousLength = 0;
-
   @override
   Widget build(BuildContext context) {
     return TextField(
@@ -86,22 +72,7 @@ class _AnalyticsTextFieldState extends State<AnalyticsTextField> {
             hintText: widget.hintText,
           ),
       onChanged: (value) {
-        // Track keystrokes (difference in length)
-        final currentLength = value.length;
-        final keystrokeCount = (currentLength - _previousLength).abs();
-
-        if (keystrokeCount > 0) {
-          final userId = AuthService().userId;
-          if (userId.isNotEmpty) {
-            AnalyticsService().trackKeystrokes(
-              userId: userId,
-              count: keystrokeCount,
-              elementId: widget.fieldId,
-            );
-          }
-        }
-
-        _previousLength = currentLength;
+        // Keystrokes no longer tracked
         widget.onChanged?.call(value);
       },
     );
@@ -114,10 +85,10 @@ class AnalyticsScreen extends StatefulWidget {
   final Widget child;
 
   const AnalyticsScreen({
-    Key? key,
+    super.key,
     required this.screenName,
     required this.child,
-  }) : super(key: key);
+  });
 
   @override
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
@@ -127,17 +98,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   @override
   void initState() {
     super.initState();
-    _trackScreen();
-  }
-
-  void _trackScreen() {
-    final userId = AuthService().userId;
-    if (userId.isNotEmpty) {
-      AnalyticsService().trackScreen(
-        userId: userId,
-        screenName: widget.screenName,
-      );
-    }
+    // Screen views no longer tracked
   }
 
   @override
@@ -146,7 +107,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 }
 
-/// Mixin to automatically track screen in StatefulWidget
+/// Mixin to track screen in StatefulWidget (no longer tracks interactions)
 /// Usage: class MyScreen extends StatefulWidget with AnalyticsScreenMixin
 mixin AnalyticsScreenMixin<T extends StatefulWidget> on State<T> {
   String get screenName;
@@ -154,12 +115,7 @@ mixin AnalyticsScreenMixin<T extends StatefulWidget> on State<T> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final userId = AuthService().userId;
-      if (userId.isNotEmpty) {
-        AnalyticsService().trackScreen(userId: userId, screenName: screenName);
-      }
-    });
+    // Screen tracking disabled
   }
 }
 
@@ -170,11 +126,11 @@ class TrackedElevatedButton extends StatelessWidget {
   final String? buttonId;
 
   const TrackedElevatedButton({
-    Key? key,
+    super.key,
     required this.onPressed,
     required this.child,
     this.buttonId,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -182,15 +138,7 @@ class TrackedElevatedButton extends StatelessWidget {
       onPressed: onPressed == null
           ? null
           : () {
-              // Track click
-              final userId = AuthService().userId;
-              if (userId.isNotEmpty) {
-                AnalyticsService().trackClick(
-                  userId: userId,
-                  elementId: buttonId,
-                  elementType: 'elevated_button',
-                );
-              }
+              // No longer tracking clicks
               onPressed!();
             },
       child: child,
@@ -205,11 +153,11 @@ class TrackedTextButton extends StatelessWidget {
   final String? buttonId;
 
   const TrackedTextButton({
-    Key? key,
+    super.key,
     required this.onPressed,
     required this.child,
     this.buttonId,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -217,15 +165,7 @@ class TrackedTextButton extends StatelessWidget {
       onPressed: onPressed == null
           ? null
           : () {
-              // Track click
-              final userId = AuthService().userId;
-              if (userId.isNotEmpty) {
-                AnalyticsService().trackClick(
-                  userId: userId,
-                  elementId: buttonId,
-                  elementType: 'text_button',
-                );
-              }
+              // No longer tracking clicks
               onPressed!();
             },
       child: child,
@@ -240,11 +180,11 @@ class TrackedIconButton extends StatelessWidget {
   final String? buttonId;
 
   const TrackedIconButton({
-    Key? key,
+    super.key,
     required this.onPressed,
     required this.icon,
     this.buttonId,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -252,15 +192,7 @@ class TrackedIconButton extends StatelessWidget {
       onPressed: onPressed == null
           ? null
           : () {
-              // Track click
-              final userId = AuthService().userId;
-              if (userId.isNotEmpty) {
-                AnalyticsService().trackClick(
-                  userId: userId,
-                  elementId: buttonId,
-                  elementType: 'icon_button',
-                );
-              }
+              // No longer tracking clicks
               onPressed!();
             },
       icon: icon,

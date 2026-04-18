@@ -1,9 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../shared/models/farmer_registration.dart';
-import '../../../shared/services/auth_service.dart';
-import '../../../shared/services/supabase_config.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/core/supabase_config.dart';
 
 /// Web Farmer Registration — Modern 3-step wizard with desktop optimization.
 class WebFarmerRegistrationScreen extends StatefulWidget {
@@ -33,6 +36,12 @@ class _WebFarmerRegistrationScreenState
   final _registration = FarmerRegistration();
 
   // Step 1 controllers
+  final _fullNameController = TextEditingController();
+  final _sexController = TextEditingController();
+  final _placeOfBirthController = TextEditingController();
+  final _pcnController = TextEditingController();
+  String _idType = 'national_id';
+
   final _birthDateController = TextEditingController();
   final _yearsController = TextEditingController();
   final _addressController = TextEditingController();
@@ -40,6 +49,8 @@ class _WebFarmerRegistrationScreenState
   final _specialtyController = TextEditingController();
   final _livestockController = TextEditingController();
   final Set<String> _selectedCrops = {};
+  double? _farmLatitude;
+  double? _farmLongitude;
 
   // Step 3 controllers
   final _elementaryController = TextEditingController();
@@ -59,6 +70,10 @@ class _WebFarmerRegistrationScreenState
 
   @override
   void dispose() {
+    _fullNameController.dispose();
+    _sexController.dispose();
+    _placeOfBirthController.dispose();
+    _pcnController.dispose();
     _birthDateController.dispose();
     _yearsController.dispose();
     _addressController.dispose();
@@ -85,7 +100,7 @@ class _WebFarmerRegistrationScreenState
             borderRadius: BorderRadius.circular(32),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 40,
                 offset: const Offset(0, 20),
               ),
@@ -103,7 +118,11 @@ class _WebFarmerRegistrationScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.agriculture_rounded, size: 48, color: Colors.white),
+                      const Icon(
+                        Icons.agriculture_rounded,
+                        size: 48,
+                        color: Colors.white,
+                      ),
                       const SizedBox(height: 24),
                       Text(
                         'Farmer\nOnboarding',
@@ -119,14 +138,22 @@ class _WebFarmerRegistrationScreenState
                         'Join our community of verified sellers and grow your business.',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                           height: 1.5,
                         ),
                       ),
                       const Spacer(),
-                      _buildDesktopStep(0, 'Information', 'Farm & Personal data'),
+                      _buildDesktopStep(
+                        0,
+                        'Information',
+                        'Farm & Personal data',
+                      ),
                       const SizedBox(height: 24),
-                      _buildDesktopStep(1, 'Verification', 'Identity & Security'),
+                      _buildDesktopStep(
+                        1,
+                        'Verification',
+                        'Identity & Security',
+                      ),
                       const SizedBox(height: 24),
                       _buildDesktopStep(2, 'Submission', 'Review & Signature'),
                     ],
@@ -165,8 +192,10 @@ class _WebFarmerRegistrationScreenState
           height: 32,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isActive ? Colors.white : (isDone ? Colors.white.withOpacity(0.2) : Colors.transparent),
-            border: Border.all(color: Colors.white.withOpacity(0.4), width: 2),
+            color: isActive
+                ? Colors.white
+                : (isDone ? Colors.white.withValues(alpha: 0.2) : Colors.transparent),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
           ),
           child: Center(
             child: isDone
@@ -197,7 +226,7 @@ class _WebFarmerRegistrationScreenState
               subtitle,
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 11,
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -223,36 +252,193 @@ class _WebFarmerRegistrationScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildHeader('Personal & Farm Info', 'Tell us about yourself and your agricultural background.'),
+        _buildHeader(
+          'Personal & Farm Info',
+          'Tell us about yourself and your agricultural background.',
+        ),
         const SizedBox(height: 32),
+        _buildSectionTitle('Identity Details'),
+        const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _buildField('Birth Date', _birthDateController, 'mm/dd/yyyy', icon: Icons.calendar_today_rounded)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ID Type',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _dark,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: _surface,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _idType,
+                        isExpanded: true,
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'national_id',
+                            child: Text('National ID (PhilSys)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'local_id',
+                            child: Text('Local ID / Others'),
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _idType = v!),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(width: 24),
-            Expanded(child: _buildField('Years in Farming', _yearsController, 'e.g. 5+', icon: Icons.history_rounded)),
+            Expanded(
+              child: _buildField(
+                'PCN / ID Number',
+                _pcnController,
+                'Enter ID number',
+                icon: Icons.numbers_rounded,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 24),
-        _buildField('Residential Address', _addressController, 'Full home address', icon: Icons.location_on_rounded, maxLines: 2),
+        _buildField(
+          'Full Legal Name',
+          _fullNameController,
+          'As shown on your ID',
+          icon: Icons.person_rounded,
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: _buildField(
+                'Sex',
+                _sexController,
+                'Male / Female',
+                icon: Icons.wc_rounded,
+              ),
+            ),
+            const SizedBox(width: 24),
+            Expanded(
+              child: _buildField(
+                'Place of Birth',
+                _placeOfBirthController,
+                'City, Province',
+                icon: Icons.location_city_rounded,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 32),
+        const Divider(),
+        const SizedBox(height: 32),
+        _buildSectionTitle('Farm & Contact'),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildField(
+                'Birth Date',
+                _birthDateController,
+                'YYYY-MM-DD',
+                icon: Icons.calendar_today_rounded,
+              ),
+            ),
+            const SizedBox(width: 24),
+            Expanded(
+              child: _buildField(
+                'Years in Farming',
+                _yearsController,
+                'e.g. 5+',
+                icon: Icons.history_rounded,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        _buildField(
+          'Residential Address',
+          _addressController,
+          'Full home address',
+          icon: Icons.location_on_rounded,
+          maxLines: 2,
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _openFarmPinPicker,
+            icon: const Icon(Icons.place_rounded),
+            label: Text(
+              _farmLatitude != null && _farmLongitude != null
+                  ? 'Pinned: ${_farmLatitude!.toStringAsFixed(5)}, ${_farmLongitude!.toStringAsFixed(5)}'
+                  : 'Pin Farm Location on Map',
+            ),
+          ),
+        ),
         const SizedBox(height: 32),
         const Divider(),
         const SizedBox(height: 32),
         Row(
           children: [
-            Expanded(child: _buildField('Farm Name', _farmNameController, 'Branding name for your farm', icon: Icons.branding_watermark_rounded)),
+            Expanded(
+              child: _buildField(
+                'Farm Name',
+                _farmNameController,
+                'Branding name for your farm',
+                icon: Icons.branding_watermark_rounded,
+              ),
+            ),
             const SizedBox(width: 24),
-            Expanded(child: _buildField('Specialty', _specialtyController, 'e.g. Organic, Grains', icon: Icons.star_rounded)),
+            Expanded(
+              child: _buildField(
+                'Specialty',
+                _specialtyController,
+                'e.g. Organic, Grains',
+                icon: Icons.star_rounded,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 24),
-        _buildField('Livestock', _livestockController, 'e.g. Cattle, Poultry', icon: Icons.pets_rounded),
+        _buildField(
+          'Livestock',
+          _livestockController,
+          'e.g. Cattle, Poultry',
+          icon: Icons.pets_rounded,
+        ),
         const SizedBox(height: 32),
-        Text('Primary Crops', style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w700, color: _dark)),
+        Text(
+          'Primary Crops',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: _dark,
+          ),
+        ),
         const SizedBox(height: 16),
         Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: ['Rice', 'Corn', 'Vegetables', 'Fruits', 'Root Crops'].map((crop) => _buildCropChip(crop)).toList(),
+          children: [
+            'Rice',
+            'Corn',
+            'Vegetables',
+            'Fruits',
+            'Root Crops',
+          ].map((crop) => _buildCropChip(crop)).toList(),
         ),
       ],
     );
@@ -262,7 +448,10 @@ class _WebFarmerRegistrationScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildHeader('Identity Verification', 'We need to verify your identity to ensure a safe marketplace.'),
+        _buildHeader(
+          'Identity Verification',
+          'We need to verify your identity to ensure a safe marketplace.',
+        ),
         const SizedBox(height: 48),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,21 +485,47 @@ class _WebFarmerRegistrationScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildHeader('Review & Sign', 'Almost there! Provide your education and farming history.'),
+        _buildHeader(
+          'Review & Sign',
+          'Almost there! Provide your education and farming history.',
+        ),
         const SizedBox(height: 32),
         _buildSectionTitle('Education'),
         const SizedBox(height: 16),
         Row(
           children: [
-            Expanded(child: _buildField('Elementary', _elementaryController, 'School Name')),
+            Expanded(
+              child: _buildField(
+                'Elementary',
+                _elementaryController,
+                'School Name',
+              ),
+            ),
             const SizedBox(width: 16),
-            Expanded(child: _buildField('High School', _highSchoolController, 'School Name')),
+            Expanded(
+              child: _buildField(
+                'High School',
+                _highSchoolController,
+                'School Name',
+              ),
+            ),
             const SizedBox(width: 16),
-            Expanded(child: _buildField('College', _collegeController, 'Degree / University')),
+            Expanded(
+              child: _buildField(
+                'College',
+                _collegeController,
+                'Degree / University',
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 32),
-        _buildField('Farming History', _farmingHistoryController, 'Describe your experience...', maxLines: 3),
+        _buildField(
+          'Farming History',
+          _farmingHistoryController,
+          'Describe your experience...',
+          maxLines: 3,
+        ),
         const SizedBox(height: 32),
         _buildSectionTitle('E-Signature'),
         const SizedBox(height: 16),
@@ -324,11 +539,20 @@ class _WebFarmerRegistrationScreenState
           child: Stack(
             children: [
               if (_signaturePoints.isEmpty)
-                Center(child: Text('Draw your signature here', style: TextStyle(color: _muted.withOpacity(0.4)))),
+                Center(
+                  child: Text(
+                    'Draw your signature here',
+                    style: TextStyle(color: _muted.withValues(alpha: 0.4)),
+                  ),
+                ),
               GestureDetector(
-                onPanUpdate: (d) => setState(() => _signaturePoints.add(d.localPosition)),
+                onPanUpdate: (d) =>
+                    setState(() => _signaturePoints.add(d.localPosition)),
                 onPanEnd: (_) => _signaturePoints.add(null),
-                child: CustomPaint(painter: _SignaturePainter(_signaturePoints), size: Size.infinite),
+                child: CustomPaint(
+                  painter: _SignaturePainter(_signaturePoints),
+                  size: Size.infinite,
+                ),
               ),
               Positioned(
                 top: 10,
@@ -351,32 +575,68 @@ class _WebFarmerRegistrationScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: GoogleFonts.plusJakartaSans(fontSize: 24, fontWeight: FontWeight.w800, color: _dark)),
+        Text(
+          title,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: _dark,
+          ),
+        ),
         const SizedBox(height: 8),
-        Text(subtitle, style: GoogleFonts.plusJakartaSans(fontSize: 14, color: _muted)),
+        Text(
+          subtitle,
+          style: GoogleFonts.plusJakartaSans(fontSize: 14, color: _muted),
+        ),
       ],
     );
   }
 
   Widget _buildSectionTitle(String title) {
-    return Text(title.toUpperCase(), style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w800, color: _primary, letterSpacing: 1.2));
+    return Text(
+      title.toUpperCase(),
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+        color: _primary,
+        letterSpacing: 1.2,
+      ),
+    );
   }
 
-  Widget _buildField(String label, TextEditingController controller, String hint, {IconData? icon, int maxLines = 1}) {
+  Widget _buildField(
+    String label,
+    TextEditingController controller,
+    String hint, {
+    IconData? icon,
+    int maxLines = 1,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: _dark)),
+        Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: _dark,
+          ),
+        ),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
           maxLines: maxLines,
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: icon != null ? Icon(icon, size: 20, color: _primary) : null,
+            prefixIcon: icon != null
+                ? Icon(icon, size: 20, color: _primary)
+                : null,
             filled: true,
             fillColor: _surface,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
             contentPadding: const EdgeInsets.all(16),
           ),
         ),
@@ -389,29 +649,55 @@ class _WebFarmerRegistrationScreenState
     return ChoiceChip(
       label: Text(crop),
       selected: selected,
-      onSelected: (val) => setState(() => val ? _selectedCrops.add(crop) : _selectedCrops.remove(crop)),
+      onSelected: (val) => setState(
+        () => val ? _selectedCrops.add(crop) : _selectedCrops.remove(crop),
+      ),
       selectedColor: _primary,
-      labelStyle: TextStyle(color: selected ? Colors.white : _dark, fontWeight: FontWeight.w600),
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : _dark,
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 
-  Widget _buildUploadCard(String title, String subtitle, IconData icon, bool done, VoidCallback onTap) {
+  Widget _buildUploadCard(
+    String title,
+    String subtitle,
+    IconData icon,
+    bool done,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: done ? _primary.withOpacity(0.05) : _surface,
+          color: done ? _primary.withValues(alpha: 0.05) : _surface,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: done ? _primary : _border, width: 2),
         ),
         child: Column(
           children: [
-            Icon(done ? Icons.check_circle_rounded : icon, size: 48, color: done ? _primary : _muted),
+            Icon(
+              done ? Icons.check_circle_rounded : icon,
+              size: 48,
+              color: done ? _primary : _muted,
+            ),
             const SizedBox(height: 16),
-            Text(title, style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w800, color: _dark)),
+            Text(
+              title,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: _dark,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text(subtitle, textAlign: TextAlign.center, style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _muted)),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _muted),
+            ),
           ],
         ),
       ),
@@ -421,8 +707,16 @@ class _WebFarmerRegistrationScreenState
   Widget _buildCertificationCheckbox() {
     return Row(
       children: [
-        Checkbox(value: _certificationAccepted, activeColor: _primary, onChanged: (v) => setState(() => _certificationAccepted = v!)),
-        const Expanded(child: Text('I certify that all information is accurate and correct.')),
+        Checkbox(
+          value: _certificationAccepted,
+          activeColor: _primary,
+          onChanged: (v) => setState(() => _certificationAccepted = v!),
+        ),
+        const Expanded(
+          child: Text(
+            'I certify that all information is accurate and correct.',
+          ),
+        ),
       ],
     );
   }
@@ -431,7 +725,10 @@ class _WebFarmerRegistrationScreenState
     final isLast = _currentStep == 2;
     return Container(
       padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: _border))),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: _border)),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -443,7 +740,11 @@ class _WebFarmerRegistrationScreenState
           else
             const SizedBox.shrink(),
           GestureDetector(
-            onTap: _isSubmitting ? null : (isLast ? _handleSubmit : () => setState(() => _currentStep++)),
+            onTap: _isSubmitting
+                ? null
+                : (isLast
+                      ? _handleSubmit
+                      : () => setState(() => _currentStep++)),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 20),
               decoration: BoxDecoration(
@@ -451,22 +752,29 @@ class _WebFarmerRegistrationScreenState
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: _primary.withOpacity(0.3),
+                    color: _primary.withValues(alpha: 0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: _isSubmitting 
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : Text(
-                    isLast ? 'Submit Application' : 'Next Step',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: AppShimmerLoader(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Text(
+                      isLast ? 'Submit Application' : 'Next Step',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
             ),
           ),
         ],
@@ -485,19 +793,27 @@ class _WebFarmerRegistrationScreenState
   Future<void> _handleSubmit() async {
     if (!_certificationAccepted) return;
     setState(() => _isSubmitting = true);
-    
+
+    _registration.idType = _idType;
+    _registration.fullName = _fullNameController.text.trim();
+    _registration.sex = _sexController.text.trim();
+    _registration.placeOfBirth = _placeOfBirthController.text.trim();
+    _registration.pcn = _pcnController.text.trim();
+
     _registration.farmName = _farmNameController.text.trim();
     _registration.specialty = _specialtyController.text.trim();
     _registration.birthDate = _birthDateController.text.trim();
     _registration.yearsOfExperience = _yearsController.text.trim();
     _registration.residentialAddress = _addressController.text.trim();
+    _registration.farmLatitude = _farmLatitude;
+    _registration.farmLongitude = _farmLongitude;
     _registration.farmingHistory = _farmingHistoryController.text.trim();
     _registration.cropTypes = _selectedCrops.toList();
     _registration.livestock = _livestockController.text.trim();
     _registration.elementary = _elementaryController.text.trim();
     _registration.highSchool = _highSchoolController.text.trim();
     _registration.college = _collegeController.text.trim();
-    
+
     try {
       final auth = AuthService();
       await SupabaseDB.submitFarmerRegistration(
@@ -508,10 +824,134 @@ class _WebFarmerRegistrationScreenState
       );
       widget.onRegistrationComplete();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       setState(() => _isSubmitting = false);
     }
+  }
+
+  LatLng _defaultPin() {
+    if (_farmLatitude != null && _farmLongitude != null) {
+      return LatLng(_farmLatitude!, _farmLongitude!);
+    }
+    return const LatLng(10.3157, 123.8854);
+  }
+
+  Future<void> _openFarmPinPicker() async {
+    final mapController = MapController();
+    var selectedPin = _defaultPin();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Dialog(
+              insetPadding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: 760,
+                height: 560,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Pin Farm Location',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: _dark,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: FlutterMap(
+                            mapController: mapController,
+                            options: MapOptions(
+                              initialCenter: selectedPin,
+                              initialZoom: 14,
+                              onTap: (_, point) {
+                                setModalState(() => selectedPin = point);
+                              },
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate:
+                                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                userAgentPackageName: 'com.agridirect.app',
+                              ),
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    width: 48,
+                                    height: 48,
+                                    point: selectedPin,
+                                    child: const Icon(
+                                      Icons.location_on,
+                                      color: _primary,
+                                      size: 40,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () =>
+                                  Navigator.of(dialogContext).pop(),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _farmLatitude = selectedPin.latitude;
+                                  _farmLongitude = selectedPin.longitude;
+                                });
+                                Navigator.of(dialogContext).pop();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _primary,
+                              ),
+                              child: const Text('Use This Pin'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }
 
@@ -520,11 +960,18 @@ class _SignaturePainter extends CustomPainter {
   _SignaturePainter(this.points);
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.black..strokeWidth = 3..strokeCap = StrokeCap.round;
+    final paint = Paint()
+      ..color = Colors.black
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
     for (int i = 0; i < points.length - 1; i++) {
-      if (points[i] != null && points[i + 1] != null) canvas.drawLine(points[i]!, points[i + 1]!, paint);
+      if (points[i] != null && points[i + 1] != null) {
+        canvas.drawLine(points[i]!, points[i + 1]!, paint);
+      }
     }
   }
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
+

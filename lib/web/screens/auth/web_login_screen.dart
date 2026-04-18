@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:go_router/go_router.dart';
-import '../../../shared/services/auth_service.dart';
-import '../../../shared/services/email_service.dart';
-import '../../../shared/services/otp_service.dart';
-import '../../../shared/services/supabase_config.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/integration/email_service.dart';
+import '../../../shared/services/auth/otp_service.dart';
+import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/router/app_router.dart';
 import 'web_otp_verification_screen.dart';
 
@@ -148,8 +149,8 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        const Color(0xFFEF4444).withOpacity(0.1),
-                        const Color(0xFFFCA5A5).withOpacity(0.15),
+                        const Color(0xFFEF4444).withValues(alpha: 0.1),
+                        const Color(0xFFFCA5A5).withValues(alpha: 0.15),
                       ],
                     ),
                     shape: BoxShape.circle,
@@ -222,7 +223,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      backgroundColor: _primary.withOpacity(0.08),
+                      backgroundColor: _primary.withValues(alpha: 0.08),
                     ),
                     child: Text(
                       'Reset Password',
@@ -265,6 +266,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
     setState(() => _registerLoading = true);
 
     try {
+      // Step 0: Check if email is already registered
       final emailTaken = await SupabaseDB.isEmailAlreadyRegistered(email);
       if (emailTaken) {
         if (mounted) {
@@ -276,82 +278,65 @@ class _WebLoginScreenState extends State<WebLoginScreen>
         return;
       }
 
-      if (phone.isNotEmpty) {
-        final phoneTaken = await SupabaseDB.isPhoneAlreadyRegistered(phone);
-        if (phoneTaken) {
-          if (mounted) {
-            setState(() => _registerLoading = false);
-            _showSnackBar(
-              'This phone number is already associated with an account.',
-            );
-          }
-          return;
-        }
-      }
-
-      final timeRemaining = await OTPService().getOTPTimeRemaining(
+      // Step 1: Create user via AuthService
+      final String? userId = await AuthService().register(
+        name: name,
         email: email,
+        password: password,
+        phoneNumber: phone.isNotEmpty ? phone : null,
       );
-      final hasExistingOTP = timeRemaining != null && timeRemaining > 0;
 
-      if (!hasExistingOTP) {
-        final otpCode = OTPService.generateOTP();
-
-        final otpStored = await OTPService().storeOTP(
-          email: email,
-          code: otpCode,
-        );
-
-        if (!otpStored) {
-          if (mounted) {
-            setState(() => _registerLoading = false);
-            _showSnackBar('Failed to prepare verification. Please try again.');
-          }
-          return;
+      if (userId == null) {
+        if (mounted) {
+          setState(() => _registerLoading = false);
+          _showSnackBar(AuthService().errorMessage ?? 'Registration failed');
         }
-
-        final emailSent = await EmailService.sendOTPEmail(
-          email: email,
-          otpCode: otpCode,
-        );
-
-        if (!emailSent) {
-          if (mounted) {
-            setState(() => _registerLoading = false);
-            _showSnackBar(
-              'Failed to send verification code. Please try again.',
-            );
-          }
-          return;
-        }
+        return;
       }
 
+      // Step 2: Generate secure OTP code in the database
+      final otpCode = await OTPService().generateAndStoreOTP(
+        userId: userId,
+        type: 'signup',
+      );
+
+      if (otpCode == null) {
+        if (mounted) {
+          setState(() => _registerLoading = false);
+          _showSnackBar('Preparation failed. Please try again.');
+        }
+        return;
+      }
+
+      // Step 3: Send the premium verification email
+      final emailSent = await EmailService.sendOTPEmail(
+        email: email,
+        otpCode: otpCode,
+      );
+
+      if (!emailSent) {
+        if (mounted) {
+          setState(() => _registerLoading = false);
+          _showSnackBar('Failed to send code. Check your connection.');
+        }
+        return;
+      }
+
+      // Success! Navigate to verification
       if (mounted) {
         setState(() => _registerLoading = false);
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => WebOTPVerificationScreen(
+              userId: userId, // Pass the new userId!
               email: email,
               name: name,
               password: password,
               phoneNumber: phone.isNotEmpty ? phone : null,
-              initialSecondsRemaining: hasExistingOTP ? timeRemaining : 600,
               onVerificationSuccess: () {
-                _showSnackBar(
-                  'Account created successfully! Redirecting to login...',
-                );
-                Future.delayed(const Duration(seconds: 2), () {
-                  if (mounted) {
-                    Navigator.pop(context);
-                    _registerNameController.clear();
-                    _registerEmailController.clear();
-                    _registerPhoneController.clear();
-                    _registerPasswordController.clear();
-                    _registerConfirmController.clear();
-                    setState(() => _isRegister = false);
-                  }
-                });
+                _showSnackBar('Verified! Welcome to AgriDirect.');
+                setState(() => _isRegister = false);
               },
             ),
           ),
@@ -403,7 +388,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                           shape: BoxShape.circle,
                           gradient: RadialGradient(
                             colors: [
-                              _primary.withOpacity(0.15),
+                              _primary.withValues(alpha: 0.15),
                               Colors.transparent,
                             ],
                           ),
@@ -420,7 +405,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                           shape: BoxShape.circle,
                           gradient: RadialGradient(
                             colors: [
-                              const Color(0xFF34D399).withOpacity(0.12),
+                              const Color(0xFF34D399).withValues(alpha: 0.12),
                               Colors.transparent,
                             ],
                           ),
@@ -473,10 +458,14 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                                     width: 48,
                                     height: 48,
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.15),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.15,
+                                      ),
                                       borderRadius: BorderRadius.circular(14),
                                       border: Border.all(
-                                        color: Colors.white.withOpacity(0.2),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.2,
+                                        ),
                                       ),
                                     ),
                                     child: const Icon(
@@ -503,10 +492,10 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                               Container(
                                 padding: const EdgeInsets.all(20),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.07),
+                                  color: Colors.white.withValues(alpha: 0.07),
                                   borderRadius: BorderRadius.circular(28),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.1),
+                                    color: Colors.white.withValues(alpha: 0.1),
                                   ),
                                 ),
                                 child: SizedBox(
@@ -535,8 +524,8 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                                                         .shopping_basket_rounded
                                                   : Icons.eco_rounded,
                                               size: 120,
-                                              color: Colors.white.withOpacity(
-                                                0.4,
+                                              color: Colors.white.withValues(
+                                                alpha: 0.4,
                                               ),
                                             ),
                                           ),
@@ -568,7 +557,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.inter(
                                   fontSize: 15,
-                                  color: Colors.white.withOpacity(0.65),
+                                  color: Colors.white.withValues(alpha: 0.65),
                                   height: 1.7,
                                 ),
                               ),
@@ -654,9 +643,9 @@ class _WebLoginScreenState extends State<WebLoginScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -668,7 +657,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
             style: GoogleFonts.inter(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
             ),
           ),
         ],
@@ -687,7 +676,10 @@ class _WebLoginScreenState extends State<WebLoginScreen>
           height: 52,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [_primary.withOpacity(0.1), _primary.withOpacity(0.08)],
+              colors: [
+                _primary.withValues(alpha: 0.1),
+                _primary.withValues(alpha: 0.08),
+              ],
             ),
             borderRadius: BorderRadius.circular(16),
           ),
@@ -787,7 +779,10 @@ class _WebLoginScreenState extends State<WebLoginScreen>
           height: 52,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [_primary.withOpacity(0.1), _primary.withOpacity(0.08)],
+              colors: [
+                _primary.withValues(alpha: 0.1),
+                _primary.withValues(alpha: 0.08),
+              ],
             ),
             borderRadius: BorderRadius.circular(16),
           ),
@@ -947,7 +942,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
         style: ElevatedButton.styleFrom(
           backgroundColor: _primary,
           foregroundColor: Colors.white,
-          disabledBackgroundColor: _primary.withOpacity(0.6),
+          disabledBackgroundColor: _primary.withValues(alpha: 0.6),
           elevation: 0,
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(
@@ -958,7 +953,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
             ? const SizedBox(
                 width: 22,
                 height: 22,
-                child: CircularProgressIndicator(
+                child: AppShimmerLoader(
                   strokeWidth: 2.5,
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
@@ -1074,7 +1069,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
           side: BorderSide(
             color: onPressed != null
                 ? const Color(0xFFE5E7EB)
-                : const Color(0xFFE5E7EB).withOpacity(0.5),
+                : const Color(0xFFE5E7EB).withValues(alpha: 0.5),
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),

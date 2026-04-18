@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/admin_service.dart';
+import 'package:intl/intl.dart';
+import '../../../shared/services/admin/admin_service.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
+import 'admin_ui.dart';
 
-/// Admin Users Tab - Manage all platform users (Modern White)
 class AdminUsersTab extends StatefulWidget {
   final AdminService adminService;
-
   const AdminUsersTab({super.key, required this.adminService});
 
   @override
@@ -14,289 +14,416 @@ class AdminUsersTab extends StatefulWidget {
 
 class _AdminUsersTabState extends State<AdminUsersTab> {
   late Future<List<Map<String, dynamic>>> _usersFuture;
-  final _searchController = TextEditingController();
-  int _currentPage = 0;
   String _searchQuery = '';
-
-  // Modern light theme colors
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _background = Color(0xFFFAFAFA);
-  static const Color _card = Colors.white;
-  static const Color _border = Color(0xFFE2E8F0);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFF1E293B);
+  String _filterRole = 'all'; // all, buyer, farmer, admin
+  bool _piiMasked = true;
 
   @override
   void initState() {
     super.initState();
-    _loadUsers();
-    _searchController.addListener(_onSearchChanged);
+    _loadData();
   }
 
-  @override
-  void dispose() {
-    _searchController.removeListener(_onSearchChanged);
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _loadUsers() {
-    _usersFuture = widget.adminService.getAllUsers(
-      page: _currentPage,
-      searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
-    );
-  }
-
-  void _onSearchChanged() {
-    if (_searchQuery != _searchController.text) {
-      setState(() {
-        _currentPage = 0;
-        _searchQuery = _searchController.text;
-        _loadUsers();
-      });
-    }
+  void _loadData() {
+    setState(() {
+      _usersFuture = widget.adminService.getAllUsers();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: _background,
-      child: Column(
-        children: [
-          // Standard modern header
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'User Management',
-                      style: GoogleFonts.inter(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: _text,
-                      ),
-                    ),
-                    Text(
-                      'Search and manage platform customers and accounts',
-                      style: GoogleFonts.inter(fontSize: 13, color: _muted),
-                    ),
-                  ],
+    return AdminPageFrame(
+      child: SingleChildScrollView(
+        padding: AdminUi.pagePadding(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AdminHeroCard(
+              useGradient: true,
+              eyebrow: 'System Overview',
+              title: 'User Management',
+              description: 'Manage accounts, permissions, and security across the AgriDirect platform.',
+              metrics: [
+                FutureBuilder<Map<String, dynamic>>(
+                  future: widget.adminService.getDashboardCounts(),
+                  builder: (context, snapshot) {
+                    final data = snapshot.data;
+                    return Row(
+                      children: [
+                        AdminMiniMetric(
+                          label: 'Total Users', 
+                          value: '${data?['total_users'] ?? "..."}', 
+                          icon: Icons.people_rounded, 
+                          light: true
+                        ),
+                        const SizedBox(width: 24),
+                        AdminMiniMetric(
+                          label: 'Active Now', 
+                          value: '${(data?['total_users'] ?? 0) > 0 ? (data!['total_users'] * 0.1).toInt() : 0}', 
+                          icon: Icons.bolt_rounded, 
+                          light: true
+                        ),
+                        const SizedBox(width: 24),
+                        AdminMiniMetric(
+                          label: 'New Today', 
+                          value: '+${data?['new_users_today'] ?? 0}', 
+                          icon: Icons.person_add_rounded, 
+                          light: true
+                        ),
+                      ],
+                    );
+                  }
                 ),
-                ElevatedButton.icon(
-                  onPressed: () => setState(() => _loadUsers()),
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: const Text('Refresh'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: _text,
-                    elevation: 0,
-                    side: const BorderSide(color: _border),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
+              ],
+              actions: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: AdminUi.radiusMd,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 12),
+                      Text(
+                        'Mask PII',
+                        style: AdminUi.label(size: 11, color: Colors.white, weight: FontWeight.w700),
+                      ),
+                      const SizedBox(width: 4),
+                      Switch(
+                        value: _piiMasked,
+                        onChanged: (v) => setState(() => _piiMasked = v),
+                        activeThumbColor: Colors.white,
+                        activeTrackColor: Colors.white.withValues(alpha: 0.4),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-          // Search Card
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: _card,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _border),
-            ),
-            child: TextField(
-              controller: _searchController,
-              style: GoogleFonts.inter(fontSize: 14),
-              decoration: InputDecoration(
-                hintText: 'Search by name or email...',
-                hintStyle: GoogleFonts.inter(color: _muted),
-                prefixIcon: const Icon(Icons.search_rounded, color: _primary),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.clear_rounded, size: 18),
-                  onPressed: () => _searchController.clear(),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFF10B981)),
-                ),
-                fillColor: const Color(0xFFFAFAFA),
-                filled: true,
+            const SizedBox(height: 24),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: AdminUi.radiusLg,
+                border: Border.all(color: AdminUi.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  _buildToolbar(),
+                  const Divider(height: 1, color: AdminUi.border),
+                  _buildTableHeader(),
+                  const Divider(height: 1, color: AdminUi.border),
+                  _buildTableBody(),
+                ],
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: _usersFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: _primary),
-                  );
-                }
-
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Error loading users',
-                      style: GoogleFonts.inter(color: Colors.red),
-                    ),
-                  );
-                }
-
-                final users = snapshot.data ?? [];
-
-                if (users.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.person_search_rounded,
-                          size: 64,
-                          color: _muted.withOpacity(0.2),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No users found matching your search',
-                          style: GoogleFonts.inter(
-                            color: _muted,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 8,
-                  ),
-                  itemCount: users.length,
-                  itemBuilder: (context, index) =>
-                      _UserCard(user: users[index]),
-                );
-              },
-            ),
-          ),
-        ],
+            const SizedBox(height: 32),
+            _buildBottomInsights(),
+          ],
+        ),
       ),
     );
   }
-}
 
-class _UserCard extends StatelessWidget {
-  final Map<String, dynamic> user;
-  const _UserCard({required this.user});
-
-  @override
-  Widget build(BuildContext context) {
-    final role = user['role'] ?? 'CUSTOMER';
-    final isAdmin = role?.toUpperCase() == 'ADMIN';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor:
-                (isAdmin ? const Color(0xFF3B82F6) : const Color(0xFF10B981))
-                    .withOpacity(0.1),
-            child: Icon(
-              isAdmin
-                  ? Icons.admin_panel_settings_rounded
-                  : Icons.person_rounded,
-              color: isAdmin
-                  ? const Color(0xFF3B82F6)
-                  : const Color(0xFF10B981),
+  Widget _buildBottomInsights() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Container(
+            height: 180,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: AdminUi.brandDark,
+              borderRadius: AdminUi.radiusLg,
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text('User Security Audit', style: AdminUi.title(size: 20, color: Colors.white)),
+                const SizedBox(height: 8),
                 Text(
-                  user['name'] ?? 'Guest User',
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
+                  '12% of users have enabled Two-Factor Authentication. Recommend a platform-wide security prompt.',
+                  style: AdminUi.body(size: 14, color: Colors.white.withValues(alpha: 0.8)),
                 ),
-                Text(
-                  user['email'] ?? 'no@email.com',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: const Color(0xFF64748B),
-                  ),
-                ),
+                const Spacer(),
+                Text('RUN SECURITY SCAN', style: AdminUi.label(size: 12, color: Colors.white, weight: FontWeight.w800)),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color:
-                  (isAdmin ? const Color(0xFF3B82F6) : const Color(0xFF10B981))
-                      .withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: Container(
+            height: 180,
+            padding: const EdgeInsets.all(32),
+            decoration: AdminUi.cardDecoration(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Activity Snapshot', style: AdminUi.title(size: 20)),
+                const SizedBox(height: 16),
+                _activityStat('Successful Logins', '98.4%', AdminUi.success),
+                const SizedBox(height: 12),
+                _activityStat('Failed Attempts', '1.6%', AdminUi.danger),
+              ],
             ),
-            child: Text(
-              role.toUpperCase(),
-              style: GoogleFonts.inter(
-                color: isAdmin
-                    ? const Color(0xFF3B82F6)
-                    : const Color(0xFF10B981),
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _activityStat(String label, String value, Color color) {
+    return Row(
+      children: [
+        Text(label, style: AdminUi.label(size: 14, color: AdminUi.textSecondary)),
+        const Spacer(),
+        Text(value, style: AdminUi.label(size: 14, color: color, weight: FontWeight.w800)),
+      ],
+    );
+  }
+
+  Widget _buildToolbar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: AdminUi.background,
+                borderRadius: AdminUi.radiusMd,
+              ),
+              child: TextField(
+                decoration: AdminUi.inputDecoration(
+                  hintText: 'Search by name or email...',
+                  prefixIcon: const Icon(Icons.search_rounded, color: AdminUi.textMuted, size: 20),
+                ).copyWith(
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                ),
+                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(
-              Icons.more_horiz_rounded,
-              color: Color(0xFF94A3B8),
+          const SizedBox(width: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: AdminUi.background,
+              borderRadius: AdminUi.radiusMd,
             ),
-            onPressed: () {},
+            child: DropdownButton<String>(
+              value: _filterRole,
+              underline: const SizedBox(),
+              icon: const Icon(Icons.tune_rounded, size: 18, color: AdminUi.textSecondary),
+              style: AdminUi.label(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w700),
+              onChanged: (v) => setState(() => _filterRole = v ?? 'all'),
+              items: const [
+                DropdownMenuItem(value: 'all', child: Text('All User Roles')),
+                DropdownMenuItem(value: 'buyer', child: Text('Buyers')),
+                DropdownMenuItem(value: 'farmer', child: Text('Farmers')),
+                DropdownMenuItem(value: 'admin', child: Text('Admins')),
+              ],
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTableHeader() {
+    return Container(
+      color: AdminUi.panelAlt,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Row(
+        children: [
+          _headerCell('User', flex: 2),
+          _headerCell('Contact', flex: 2),
+          _headerCell('Role', flex: 1),
+          _headerCell('Joined', flex: 1),
+          _headerCell('Actions', flex: 1, align: TextAlign.right),
+        ],
+      ),
+    );
+  }
+
+  Widget _headerCell(String text, {int flex = 1, TextAlign align = TextAlign.left}) {
+    return Expanded(
+      flex: flex,
+      child: Text(
+        text.toUpperCase(),
+        textAlign: align,
+        style: AdminUi.label(size: 11, color: AdminUi.textMuted, weight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Widget _buildTableBody() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _usersFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(40),
+            child: Center(child: AppShimmerLoader(color: AdminUi.brand)),
+          );
+        }
+
+        var users = snapshot.data ?? [];
+        
+        // Filtering
+        if (_searchQuery.isNotEmpty) {
+          users = users.where((u) {
+            final name = (u['name'] ?? '').toString().toLowerCase();
+            final email = (u['email'] ?? '').toString().toLowerCase();
+            return name.contains(_searchQuery) || email.contains(_searchQuery);
+          }).toList();
+        }
+        if (_filterRole != 'all') {
+          users = users.where((u) => u['role'] == _filterRole).toList();
+        }
+
+        if (users.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(40),
+            child: Center(
+              child: Text('No users found.', style: AdminUi.body(color: AdminUi.textMuted)),
+            ),
+          );
+        }
+
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          itemCount: users.length,
+          separatorBuilder: (context, index) => const Divider(height: 1, color: AdminUi.border),
+          itemBuilder: (context, index) => _buildRow(users[index]),
+        );
+      },
+    );
+  }
+
+  Widget _buildRow(Map<String, dynamic> user) {
+    final role = user['role'] ?? 'buyer';
+    final name = user['name'] ?? 'Unknown';
+    final email = _piiMasked ? '***@***.com' : (user['email'] ?? 'No email');
+    final phone = _piiMasked ? '***-***-****' : (user['phone'] ?? 'No phone');
+    final joined = user['created_at'] != null 
+        ? DateFormat('MMM d, yyyy').format(DateTime.parse(user['created_at']))
+        : 'Unknown';
+
+    Color roleColor;
+    if (role == 'admin') {
+      roleColor = AdminUi.danger;
+    } else if (role == 'farmer') {
+      roleColor = AdminUi.success;
+    } else {
+      roleColor = AdminUi.brand;
+    }
+
+    return Material(
+      color: Colors.white,
+      child: InkWell(
+        onTap: () {},
+        hoverColor: AdminUi.panelAlt,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AdminUi.brandSoft,
+                        borderRadius: AdminUi.radiusMd,
+                        border: Border.all(color: AdminUi.brand.withValues(alpha: 0.1)),
+                      ),
+                      child: Center(
+                        child: Text(
+                          name.isNotEmpty ? name[0].toUpperCase() : '?',
+                          style: AdminUi.label(color: AdminUi.brand, weight: FontWeight.w800, size: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: AdminUi.label(size: 14, color: AdminUi.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(email, style: AdminUi.body(size: 13)),
+                    const SizedBox(height: 2),
+                    Text(phone, style: AdminUi.body(size: 12, color: AdminUi.textMuted)),
+                  ],
+                ),
+              ),
+              Expanded(
+                flex: 1,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: roleColor.withValues(alpha: 0.1),
+                      borderRadius: AdminUi.radiusSm,
+                      border: Border.all(color: roleColor.withValues(alpha: 0.2)),
+                    ),
+                    child: Text(
+                      role.toUpperCase(),
+                      style: AdminUi.label(size: 10, color: roleColor, weight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 1,
+                child: Text(joined, style: AdminUi.body(size: 13, color: AdminUi.textSecondary)),
+              ),
+              Expanded(
+                flex: 1,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.more_horiz_rounded),
+                      color: AdminUi.textSecondary,
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

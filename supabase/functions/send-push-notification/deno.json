@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2.39.3"
+  },
+  "tasks": {
+    "dev": "deno run --allow-all --watch --unstable-kv=true index.ts"
+  }
+}

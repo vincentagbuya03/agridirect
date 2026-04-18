@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
-import '../../../shared/services/onboarding_service.dart';
+import '../../../shared/services/auth/onboarding_service.dart';
 
 /// Onboarding screen shown once for first-time users.
 /// Uses Lottie animations for a beautiful, modern experience.
@@ -210,7 +210,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 20,
                       offset: const Offset(0, -5),
                     ),
@@ -321,7 +321,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: _primary.withOpacity(0.2),
+                    color: _primary.withValues(alpha: 0.2),
                     blurRadius: 40,
                     spreadRadius: 10,
                   ),

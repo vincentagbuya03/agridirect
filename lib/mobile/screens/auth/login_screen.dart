@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import '../../../shared/services/auth_service.dart';
+import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/router/app_router.dart';
+import '../../../shared/styles/app_theme.dart';
 import 'dart:async';
 
-/// Mobile Login screen with clean design.
+/// Mobile Login screen with premium design.
 class MobileLoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
 
@@ -29,56 +30,39 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
   final Connectivity _connectivity = Connectivity();
   Timer? _internetWaitTimer;
 
-  static const Color primary = Color(0xFF13EC5B);
-
   @override
   void initState() {
     super.initState();
-    _checkInternetConnectivity();
-    // Listen to connectivity changes in real-time
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
-      result,
+      List<ConnectivityResult> results,
     ) {
-      if (mounted) {
+      if (results.contains(ConnectivityResult.none)) {
         setState(() {
-              result != [ConnectivityResult.none] &&
-              !result.contains(ConnectivityResult.none);
+          _hasInternet = false;
+          if (!_isWaitingForInternet) _startWaitingForInternet();
         });
-        // If internet is restored while waiting, cancel the timer
-        if (_hasInternet && _isWaitingForInternet) {
-          _internetWaitTimer?.cancel();
-          if (mounted) {
-            setState(() => _isWaitingForInternet = false);
-          }
-        }
+      } else {
+        setState(() {
+          _hasInternet = true;
+          _isWaitingForInternet = false;
+        });
       }
     });
   }
 
   Future<void> _checkInternetConnectivity() async {
     try {
-      final connectivityResult = await _connectivity.checkConnectivity();
+      final results = await _connectivity.checkConnectivity();
       if (mounted) {
         setState(() {
-          _hasInternet =
-              connectivityResult != [ConnectivityResult.none] &&
-              !connectivityResult.contains(ConnectivityResult.none);
-          debugPrint(
-            'Internet Status: $_hasInternet, Result: $connectivityResult',
-          );
+          _hasInternet = !results.contains(ConnectivityResult.none);
+          if (!_hasInternet && !_isWaitingForInternet) {
+            _startWaitingForInternet();
+          }
         });
-        
-        // If no internet, start waiting mode
-        if (!_hasInternet && !_isWaitingForInternet) {
-          _startWaitingForInternet();
-        }
       }
     } catch (e) {
       debugPrint('Error checking connectivity: $e');
-      // Assume internet is available if check fails
-      if (mounted) {
-        setState(() => _hasInternet = true);
-      }
     }
   }
 
@@ -86,11 +70,9 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
     if (mounted) {
       setState(() => _isWaitingForInternet = true);
     }
-    
-    // Wait for 10 seconds for internet to connect
+
     _internetWaitTimer = Timer(const Duration(seconds: 10), () {
       if (mounted && _isWaitingForInternet) {
-        // Check one more time if internet is available
         _checkInternetStatus();
       }
     });
@@ -98,34 +80,20 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
 
   Future<void> _checkInternetStatus() async {
     try {
-      final connectivityResult = await _connectivity.checkConnectivity();
-      final hasInternet =
-          connectivityResult != [ConnectivityResult.none] &&
-          !connectivityResult.contains(ConnectivityResult.none);
-      
+      final results = await _connectivity.checkConnectivity();
+      final hasInternet = !results.contains(ConnectivityResult.none);
+
       if (mounted) {
-        if (hasInternet) {
-          setState(() => _isWaitingForInternet = false);
-        } else {
-          setState(() => _isWaitingForInternet = false);
-          _showNoInternetDialogWithQuit();
-        }
+        setState(() {
+          _isWaitingForInternet = false;
+          if (!hasInternet) {
+            _showNoInternetDialogWithQuit();
+          }
+        });
       }
     } catch (e) {
-      debugPrint('Error checking internet status: $e');
-      if (mounted) {
-        setState(() => _isWaitingForInternet = false);
-      }
+      if (mounted) setState(() => _isWaitingForInternet = false);
     }
-  }
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _connectivitySubscription.cancel();
-    _internetWaitTimer?.cancel();
-    super.dispose();
   }
 
   void _handleLogin() async {
@@ -137,7 +105,6 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
       return;
     }
 
-    // Check internet connectivity first
     await _checkInternetConnectivity();
     if (!_hasInternet) {
       _showNoInternetDialog();
@@ -145,7 +112,6 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
     }
 
     setState(() => _isLoading = true);
-
     final success = await AuthService().login(email: email, password: password);
 
     if (mounted) {
@@ -153,14 +119,10 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
       if (success) {
         widget.onLoginSuccess();
       } else {
-        final errorMessage = AuthService().errorMessage ?? 'Login failed';
-        // Check if it's an invalid credentials error
-        if (errorMessage.toLowerCase().contains('invalid') ||
-            errorMessage.toLowerCase().contains('password')) {
-          _showErrorModal('Login Failed', errorMessage);
-        } else {
-          _showSnackBar(errorMessage);
-        }
+        _showErrorModal(
+          'Login Failed',
+          AuthService().errorMessage ?? 'Invalid credentials',
+        );
       }
     }
   }
@@ -173,67 +135,40 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
     }
 
     setState(() => _isGoogleLoading = true);
-
     final success = await AuthService().signInWithGoogle();
 
     if (mounted) {
       setState(() => _isGoogleLoading = false);
       if (success) {
         if (AuthService().needsProfileCompletion) {
-          // New Google user — send to profile completion screen
           context.push(AppRoutes.googleCompleteProfile);
         } else {
           widget.onLoginSuccess();
         }
       } else {
-        final errorMessage =
-            AuthService().errorMessage ?? 'Google sign-in failed';
-        _showSnackBar(errorMessage);
+        _showErrorModal(
+          'Google Sign-In Failed',
+          AuthService().errorMessage ?? 'Failed to sign in',
+        );
       }
     }
-  }
-
-  void _showSnackBar(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
   }
 
   void _showErrorModal(String title, String message) {
     showDialog(
       context: context,
-      barrierDismissible: true,
-      builder: (BuildContext context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        backgroundColor: Colors.white,
-        title: Text(
-          title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF0F172A),
-          ),
-        ),
-        content: Text(
-          message,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
-            color: Colors.grey[700],
-          ),
-        ),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(title, style: AppTextStyles.headline2),
+        content: Text(message, style: AppTextStyles.bodyMedium),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
               'OK',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: primary,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
@@ -246,39 +181,27 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        backgroundColor: Colors.white,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Icon(Icons.wifi_off_rounded, color: Colors.orange[700], size: 24),
+            const Icon(Icons.wifi_off_rounded, color: AppColors.warning),
             const SizedBox(width: 12),
-            Text(
-              'No Internet',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF0F172A),
-              ),
-            ),
+            Text('No Internet', style: AppTextStyles.headline2),
           ],
         ),
         content: Text(
-          'Please check your internet connection and try again.',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
-            color: Colors.grey[700],
-          ),
+          'Please check your connection and try again.',
+          style: AppTextStyles.bodyMedium,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
-              'OK',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: primary,
+              'Retry',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
@@ -291,61 +214,24 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        backgroundColor: Colors.white,
-        title: Row(
-          children: [
-            Icon(Icons.wifi_off_rounded, color: Colors.orange[700], size: 24),
-            const SizedBox(width: 12),
-            Text(
-              'No Internet',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF0F172A),
-              ),
-            ),
-          ],
-        ),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('No Internet Connection', style: AppTextStyles.headline2),
         content: Text(
-          'Unable to establish internet connection. Please check your connection and try again.',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
-            color: Colors.grey[700],
-          ),
+          'Unable to connect after multiple attempts.',
+          style: AppTextStyles.bodyMedium,
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Exit the app
-              Future.delayed(const Duration(milliseconds: 100), () {
-                SystemNavigator.pop();
-              });
-            },
-            child: Text(
-              'Quit',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.red,
-              ),
-            ),
+            onPressed: () => SystemNavigator.pop(),
+            child: const Text('Quit', style: TextStyle(color: AppColors.error)),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               _checkInternetConnectivity();
             },
-            child: Text(
-              'Retry',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: primary,
-              ),
-            ),
+            child: Text('Retry', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
@@ -353,395 +239,403 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
   }
 
   @override
+  void dispose() {
+    _connectivitySubscription.cancel();
+    _internetWaitTimer?.cancel();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: Colors.white,
-          body: SafeArea(
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Stack(
+        children: [
+          // Subtle background decoration
+          Positioned(
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+
+          SafeArea(
             child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 40),
-
-                    // Logo
-                    Center(
-                      child: Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE0F7F3),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.eco_rounded,
-                          color: Color(0xFF13EC5B),
-                          size: 42,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Welcome text
-                    Center(
-                      child: Text(
-                        'AgriDirect',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Center(
-                      child: Text(
-                        'Welcome Back!',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF0F172A),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Center(
-                      child: Text(
-                        'Bridging the gap between farmers and consumers.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Colors.grey[600],
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Email field
-                    _buildLabel('Email or Mobile Number'),
-                    const SizedBox(height: 8),
-                    _buildTextField(
-                      controller: _emailController,
-                      hint: 'Enter your email or phone',
-                      icon: Icons.person_outline,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Password field
-                    _buildLabel('Password'),
-                    const SizedBox(height: 8),
-                    _buildTextField(
-                      controller: _passwordController,
-                      hint: 'Enter your password',
-                      icon: Icons.lock_outline,
-                      obscure: _obscurePassword,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                          color: Colors.grey[400],
-                          size: 20,
-                        ),
-                        onPressed: () => setState(
-                          () => _obscurePassword = !_obscurePassword,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Forgot password
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: GestureDetector(
-                        onTap: () {
-                        },
-                        child: Text(
-                          'Forgot Password?',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: primary,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-
-                    // Login button
-                    _buildPrimaryButton(
-                      'Login',
-                      _handleLogin,
-                      isLoading: _isLoading,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Divider
-                    Row(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24.0,
+                vertical: 32.0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 48),
+                  // Premium Brand Header
+                  Center(
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: Divider(color: Colors.grey[300], thickness: 1),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            'OR CONTINUE WITH',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey[400],
-                              letterSpacing: 0.5,
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                blurRadius: 24,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.eco_rounded,
+                              color: Colors.white,
+                              size: 32,
                             ),
                           ),
                         ),
-                        Expanded(
-                          child: Divider(color: Colors.grey[300], thickness: 1),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Social buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildSocialButton(
-                            'Google',
-                            Icons.g_mobiledata_rounded,
-                            onTap: _handleGoogleSignIn,
-                            isLoading: _isGoogleLoading,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildSocialButton(
-                            'Facebook',
-                            Icons.facebook_rounded,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Sign up link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
+                        const SizedBox(height: 20),
                         Text(
-                          "Don't have an account? ",
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
+                          'AgriDirect',
+                          style: AppTextStyles.headline1.copyWith(
+                            fontSize: 32,
+                            letterSpacing: -0.5,
+                            color: AppColors.primary,
                           ),
                         ),
-                        GestureDetector(
-                          onTap: () {
-                            context.push(AppRoutes.register);
-                          },
-                          child: Text(
-                            'Sign Up',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: primary,
-                            ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Direct from farm to your table',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSubtle,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
-                  ],
-                ),
+                  ),
+
+                  const SizedBox(height: 48),
+                  Text(
+                    'Welcome Back',
+                    style: AppTextStyles.headline1.copyWith(fontSize: 28),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Sign in to access fresh local produce directly from farmers.',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textSubtle,
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+
+                  // Login Form Section
+                  _buildInputLabel('Email Address'),
+                  const SizedBox(height: 8),
+                  _buildTextField(
+                    controller: _emailController,
+                    hintText: 'name@example.com',
+                    prefixIcon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 24),
+
+                  _buildInputLabel('Password'),
+                  const SizedBox(height: 8),
+                  _buildTextField(
+                    controller: _passwordController,
+                    hintText: 'Enter your password',
+                    prefixIcon: Icons.lock_outline_rounded,
+                    obscureText: _obscurePassword,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 20,
+                        color: AppColors.textSubtle,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () => context.push(AppRoutes.resetPasswordWithCode),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'Forgot Password?',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Sign In Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 58,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _handleLogin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: AppShimmerLoader(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              'Sign In',
+                              style: AppTextStyles.bodyLarge.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                              ),
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+                  // Divider
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Divider(color: Colors.grey[200], thickness: 1),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'OR CONTINUE WITH',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.textSubtle,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Divider(color: Colors.grey[200], thickness: 1),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Google Sign In
+                  SizedBox(
+                    width: double.infinity,
+                    height: 58,
+                    child: OutlinedButton(
+                      onPressed: _isGoogleLoading ? null : _handleGoogleSignIn,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.grey[200]!),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        backgroundColor: Colors.white,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_isGoogleLoading)
+                            const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: AppShimmerLoader(strokeWidth: 2),
+                            )
+                          else ...[
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                'G',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF4285F4),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Flexible(
+                              child: Text(
+                                'Sign in with Google',
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textHeadline,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+                  Center(
+                    child: RichText(
+                      text: TextSpan(
+                        style: AppTextStyles.bodyMedium,
+                        children: [
+                          const TextSpan(text: "Don't have an account? "),
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: GestureDetector(
+                              onTap: () => context.push(AppRoutes.register),
+                              child: Text(
+                                'Sign Up',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
               ),
             ),
           ),
-        ),
-        // Waiting for internet connection overlay
-        if (_isWaitingForInternet)
-          Container(
-            color: Colors.black.withOpacity(0.5),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(
-                      height: 48,
-                      width: 48,
-                      child: CircularProgressIndicator(
+
+          // Waiting for internet connection overlay
+          if (_isWaitingForInternet)
+            Container(
+              color: Colors.black.withAlpha(150),
+              child: Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 40),
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 30,
+                        offset: const Offset(0, 15),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const AppShimmerLoader(
                         strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(primary),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.primary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Connecting to Internet',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF0F172A),
+                      const SizedBox(height: 24),
+                      Text('Connecting', style: AppTextStyles.headline2),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Establishing connection to AgriDirect servers...',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textSubtle,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Please wait while we establish your connection...',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildLabel(String text) {
+  Widget _buildInputLabel(String text) {
     return Text(
       text,
-      style: const TextStyle(
-        fontSize: 13,
+      style: AppTextStyles.labelSmall.copyWith(
+        color: AppColors.textHeadline,
         fontWeight: FontWeight.w600,
-        color: Color(0xFF1F2937),
       ),
     );
   }
 
   Widget _buildTextField({
     required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool obscure = false,
+    required String hintText,
+    required IconData prefixIcon,
+    bool obscureText = false,
     Widget? suffixIcon,
     TextInputType keyboardType = TextInputType.text,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: TextField(
-        controller: controller,
-        obscureText: obscure,
-        keyboardType: keyboardType,
-        style: const TextStyle(fontSize: 15),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
-          prefixIcon: Icon(icon, color: Colors.grey[400], size: 20),
-          suffixIcon: suffixIcon,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      style: AppTextStyles.bodyMedium,
+      decoration: InputDecoration(
+        hintText: hintText,
+        prefixIcon: Icon(prefixIcon, size: 20, color: AppColors.textSubtle),
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
         ),
-      ),
-    );
-  }
-
-  Widget _buildPrimaryButton(
-    String text,
-    VoidCallback onPressed, {
-    bool isLoading = false,
-  }) {
-    return GestureDetector(
-      onTap: isLoading ? null : onPressed,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: primary,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: primary.withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.grey[200]!),
         ),
-        child: Center(
-          child: isLoading
-              ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : Text(
-                  text,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.grey[200]!),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSocialButton(
-    String label,
-    IconData icon, {
-    VoidCallback? onTap,
-    bool isLoading = false,
-  }) {
-    return GestureDetector(
-      onTap: isLoading ? null : onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Color(0xFF334155)),
-                    ),
-                  )
-                : Icon(icon, size: 20, color: const Color(0xFF334155)),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF334155),
-              ),
-            ),
-          ],
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
       ),
     );
   }
 }
+

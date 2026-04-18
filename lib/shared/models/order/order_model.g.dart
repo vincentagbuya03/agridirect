@@ -7,25 +7,27 @@ part of 'order_model.dart';
 // **************************************************************************
 
 Order _$OrderFromJson(Map<String, dynamic> json) => Order(
-  orderId: json['orderId'] as String,
-  orderNumber: json['orderNumber'] as String,
-  customerId: json['customerId'] as String,
-  farmerId: json['farmerId'] as String,
-  status: json['status'] as String,
-  createdAt: DateTime.parse(json['createdAt'] as String),
-  updatedAt: DateTime.parse(json['updatedAt'] as String),
-  total: (json['total'] as num?)?.toDouble(),
+  orderId: json['order_id'] as String,
+  orderNumber: json['order_number'] as String,
+  customerId: json['customer_id'] as String,
+  farmerId: json['farmer_id'] as String,
+  status: json['status_code'] as String,
+  deliveryAddressId: json['delivery_address_id'] as String?,
+  createdAt: DateTime.parse(json['created_at'] as String),
+  updatedAt: DateTime.parse(json['updated_at'] as String),
+  total: (json['total_amount'] as num?)?.toDouble(),
   itemCount: (json['itemCount'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$OrderToJson(Order instance) => <String, dynamic>{
-  'orderId': instance.orderId,
-  'orderNumber': instance.orderNumber,
-  'customerId': instance.customerId,
-  'farmerId': instance.farmerId,
-  'status': instance.status,
-  'createdAt': instance.createdAt.toIso8601String(),
-  'updatedAt': instance.updatedAt.toIso8601String(),
-  'total': instance.total,
+  'order_id': instance.orderId,
+  'order_number': instance.orderNumber,
+  'customer_id': instance.customerId,
+  'farmer_id': instance.farmerId,
+  'status_code': instance.status,
+  'delivery_address_id': instance.deliveryAddressId,
+  'created_at': instance.createdAt.toIso8601String(),
+  'updated_at': instance.updatedAt.toIso8601String(),
+  'total_amount': instance.total,
   'itemCount': instance.itemCount,
 };

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../shared/services/supabase_config.dart';
+import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/services/integration/email_service.dart';
 
 /// Web Password Reset Screen
 /// Handles the password reset flow when user clicks the email link
@@ -24,7 +26,6 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
 
   static const Color _primary = Color(0xFF16A34A);
   static const Color _dark = Color(0xFF111827);
-  static const Color _darkSecondary = Color(0xFF1F2937);
   static const Color _muted = Color(0xFF9CA3AF);
   static const Color _mutedDark = Color(0xFF6B7280);
   static const Color _border = Color(0xFFE5E7EB);
@@ -42,7 +43,8 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
     setState(() {
       _hasValidSession = session != null;
       if (session == null) {
-        _errorMessage = 'Invalid or expired reset link. Please request a new one.';
+        _errorMessage =
+            'Invalid or expired reset link. Please request a new one.';
       }
     });
   }
@@ -79,6 +81,11 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
       await SupabaseConfig.client.auth.updateUser(
         UserAttributes(password: password),
       );
+
+      final userEmail = SupabaseConfig.client.auth.currentUser?.email;
+      if (userEmail != null && userEmail.trim().isNotEmpty) {
+        await EmailService.sendPasswordChangedAlert(email: userEmail.trim());
+      }
 
       setState(() {
         _isLoading = false;
@@ -125,8 +132,8 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
             child: _resetSuccess
                 ? _buildSuccessView()
                 : !_hasValidSession
-                    ? _buildErrorView()
-                    : _buildResetForm(),
+                ? _buildErrorView()
+                : _buildResetForm(),
           ),
         ),
       ),
@@ -141,7 +148,7 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
           width: 80,
           height: 80,
           decoration: BoxDecoration(
-            color: _danger.withOpacity(0.08),
+            color: _danger.withValues(alpha: 0.08),
             shape: BoxShape.circle,
           ),
           child: const Icon(
@@ -161,7 +168,8 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
         ),
         const SizedBox(height: 12),
         Text(
-          _errorMessage ?? 'This password reset link is invalid or has expired.',
+          _errorMessage ??
+              'This password reset link is invalid or has expired.',
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(
             fontSize: 15,
@@ -174,7 +182,8 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
           width: double.infinity,
           height: 54,
           child: ElevatedButton(
-            onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
+            onPressed: () =>
+                Navigator.of(context).pushReplacementNamed('/login'),
             style: ElevatedButton.styleFrom(
               backgroundColor: _primary,
               foregroundColor: Colors.white,
@@ -206,7 +215,7 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
           width: 64,
           height: 64,
           decoration: BoxDecoration(
-            color: _primary.withOpacity(0.08),
+            color: _primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(20),
           ),
           child: const Icon(
@@ -272,7 +281,7 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
                 ? const SizedBox(
                     height: 20,
                     width: 20,
-                    child: CircularProgressIndicator(
+                    child: AppShimmerLoader(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
@@ -314,7 +323,7 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
           width: 80,
           height: 80,
           decoration: BoxDecoration(
-            color: _primary.withOpacity(0.08),
+            color: _primary.withValues(alpha: 0.08),
             shape: BoxShape.circle,
           ),
           child: const Icon(
@@ -403,3 +412,4 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
     );
   }
 }
+

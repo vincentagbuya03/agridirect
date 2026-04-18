@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../../shared/services/supabase_data_service.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
+import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
+import '../../../shared/router/app_router.dart';
+import '../../../shared/styles/app_theme.dart';
+import '../../../shared/models/cached_product.dart';
+import '../../../shared/services/offline/offline_cache_service.dart';
+import '../../widgets/offline_browse_widget.dart';
+import '../../widgets/skeleton_loaders.dart';
 
-/// Pre-Order Hub Screen matching the design mockup.
-/// Pre-order cards with countdown days, progress bars, reserve buttons.
+/// Pre-Order Hub - Premium Reservation Interface
 class PreOrderHubScreen extends StatefulWidget {
   const PreOrderHubScreen({super.key});
 
@@ -14,196 +22,206 @@ class PreOrderHubScreen extends StatefulWidget {
 }
 
 class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
-  static const Color primary = Color(0xFF13EC5B);
   int _selectedFilter = 0;
-
   final _filters = ['All Crops', 'Vegetables', 'Fruits', 'Organic', 'Grains'];
+  bool _isOnline = true;
+  late OfflineCacheService _cacheService;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeCacheService();
+    _setupConnectivityListener();
+  }
+
+  void _initializeCacheService() {
+    _cacheService = OfflineCacheService();
+  }
+
+  void _setupConnectivityListener() {
+    Connectivity().checkConnectivity().then((result) {
+      final isOnline =
+          result.isNotEmpty && result.first != ConnectivityResult.none;
+      if (mounted) {
+        setState(() {
+          _isOnline = isOnline;
+        });
+      }
+    });
+
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      result,
+    ) {
+      final isOnline =
+          result.isNotEmpty && result.first != ConnectivityResult.none;
+      if (mounted) {
+        setState(() {
+          _isOnline = isOnline;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAF7),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildFilterChips(),
-            _buildSectionTitle(),
-            Expanded(child: _buildPreOrderList()),
-          ],
-        ),
+      backgroundColor: AppColors.background,
+      body: Column(
+        children: [
+          _buildPremiumHeader(),
+          _buildSleekFilterChips(),
+          Expanded(child: _buildPreOrderList()),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {},
-        backgroundColor: const Color(0xFF0F172A),
-        child: const Icon(Icons.bookmark_outline, color: Colors.white),
+        backgroundColor: AppColors.textHeadline,
+        elevation: 12,
+        icon: const Icon(
+          Icons.bookmark_outline_rounded,
+          color: Colors.white,
+          size: 20,
+        ),
+        label: Text(
+          'SAVED SEEDS',
+          style: AppTextStyles.labelSmall.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1,
+          ),
+        ),
       ),
     );
   }
 
-  // ── Header ──
-  Widget _buildHeader() {
+  Widget _buildPremiumHeader() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Icon(Icons.eco_rounded, color: primary, size: 26),
-              const SizedBox(width: 8),
-              Text(
-                'Pre-Order Hub',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.location_on, color: primary, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      'San Francisco, CA',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF475569),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.textHeadline.withValues(alpha: 0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
-          const SizedBox(height: 14),
-          // Search bar
-          Row(
+        ],
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
             children: [
-              Expanded(
-                child: Container(
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
                     children: [
-                      const SizedBox(width: 14),
-                      Icon(Icons.search, color: Colors.grey[400], size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Search crops...',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[400],
-                          ),
-                        ),
+                      const Icon(
+                        Icons.hub_rounded,
+                        color: AppColors.primary,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Pre-Order Hub',
+                        style: AppTextStyles.headline1.copyWith(fontSize: 22),
                       ),
                     ],
                   ),
-                ),
+                  _buildLocationBadge(),
+                ],
               ),
-              const SizedBox(width: 10),
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.tune,
-                  size: 20,
-                  color: Color(0xFF475569),
-                ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.textHeadline.withValues(alpha: 0.05),
+                        ),
+                      ),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search upcoming harvests...',
+                          hintStyle: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textSubtle,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: AppColors.textSubtle,
+                            size: 22,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    height: 52,
+                    width: 52,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.textHeadline.withValues(alpha: 0.05),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.tune_rounded,
+                      color: AppColors.textHeadline,
+                      size: 22,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  // ── Filter Chips ──
-  Widget _buildFilterChips() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.only(bottom: 12),
-      child: SizedBox(
-        height: 38,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          itemCount: _filters.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 8),
-          itemBuilder: (_, i) {
-            final isSelected = _selectedFilter == i;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedFilter = i),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected ? primary : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected ? primary : Colors.grey[300]!,
-                  ),
-                ),
-                child: Text(
-                  _filters[i],
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : const Color(0xFF475569),
-                  ),
-                ),
-              ),
-            );
-          },
         ),
       ),
     );
   }
 
-  // ── Section title ──
-  Widget _buildSectionTitle() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+  Widget _buildLocationBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
         children: [
-          Icon(Icons.bolt, color: primary, size: 20),
+          const Icon(
+            Icons.location_on_rounded,
+            color: AppColors.primary,
+            size: 14,
+          ),
           const SizedBox(width: 6),
           Text(
-            'Ending Soon',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 20,
+            'San Carlos',
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.primary,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-          const Spacer(),
-          Text(
-            'See all',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: primary,
             ),
           ),
         ],
@@ -211,150 +229,289 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
     );
   }
 
-  // ── Pre-Order List ──
+  Widget _buildSleekFilterChips() {
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.only(top: 16),
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        itemCount: _filters.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (_, i) {
+          final isSelected = _selectedFilter == i;
+          return GestureDetector(
+            onTap: () => setState(() => _selectedFilter = i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.textHeadline : AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isSelected
+                      ? AppColors.textHeadline
+                      : AppColors.textHeadline.withValues(alpha: 0.05),
+                ),
+              ),
+              child: Text(
+                _filters[i],
+                style: AppTextStyles.labelSmall.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? Colors.white : AppColors.textSubtle,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildPreOrderList() {
+    if (!_isOnline) {
+      // Offline mode with cached preorder products
+      final cachedPreorders = _cacheService
+          .getAllCachedProducts()
+          .where((p) => p.isPreorder)
+          .map(_cachedToProductItem)
+          .toList();
+
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: OfflineModeIndicator(cacheService: _cacheService),
+          ),
+          Expanded(
+            child: cachedPreorders.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.offline_bolt_rounded,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No Cached Pre-orders',
+                          style: AppTextStyles.headline3.copyWith(
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Load pre-orders while online to view them offline.',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: Colors.grey[500],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: cachedPreorders.length + 1,
+                    separatorBuilder: (_, i) => const SizedBox(height: 24),
+                    itemBuilder: (_, i) {
+                      if (i == 0) return _buildPreOrderSectionHeader();
+                      return _buildPremiumPreOrderCard(cachedPreorders[i - 1]);
+                    },
+                  ),
+          ),
+        ],
+      );
+    }
+
     return FutureBuilder<List<ProductItem>>(
       future: SupabaseDataService().getPreOrderProducts(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              'Error loading pre-orders',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+            child: PreOrderListSkeleton(itemCount: 5, enabled: true),
           );
         }
 
         final preOrders = snapshot.data ?? [];
 
-        if (preOrders.isEmpty) {
-          return Center(
-            child: Text(
-              'No pre-orders available',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
-          );
+        // Auto-cache preorder products
+        if (preOrders.isNotEmpty) {
+          for (final product in preOrders) {
+            final cachedProduct = CachedProduct(
+              id: product.productId ?? 'unknown_${product.name}',
+              farmerId: product.farmerId ?? '',
+              name: product.name,
+              price: _parsePrice(product.price),
+              description: product.description,
+              imageUrl: product.imageUrl,
+              unit: product.unit,
+              isPreorder: true,
+              harvestDays: int.tryParse(product.harvestDays ?? '0') ?? 0,
+              farmName: product.farm,
+              rating: double.tryParse(product.rating ?? '0') ?? 0.0,
+              farmerAvatarUrl: product.farmerAvatarUrl,
+            );
+            _cacheService.autoCacheProduct(cachedProduct);
+          }
         }
 
         return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-          itemCount: preOrders.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 20),
-          itemBuilder: (_, i) => _buildPreOrderCard(preOrders[i]),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+          physics: const BouncingScrollPhysics(),
+          itemCount: preOrders.length + 1,
+          separatorBuilder: (_, i) => const SizedBox(height: 24),
+          itemBuilder: (_, i) {
+            if (i == 0) return _buildPreOrderSectionHeader();
+            return _buildPremiumPreOrderCard(preOrders[i - 1]);
+          },
         );
       },
     );
   }
 
-  Widget _buildPreOrderCard(ProductItem product) {
-    // Compute pre-order specific fields from ProductItem
-    final daysLeft = int.tryParse(product.harvestDays ?? '7') ?? 7;
-    final discount = '15% OFF PRE-ORDER';
-    final reviewCount = int.tryParse(product.reviews ?? '0') ?? 0;
-    final reserved = (reviewCount * 10).clamp(0, 100);
-    final target = '100 lbs pre-order';
-    final isAlmostGone = reserved > 80;
-    
-    // Parse price for display
-    final priceNum = double.tryParse(product.price) ?? 0.0;
-    final formattedPrice = '\$${priceNum.toStringAsFixed(2)}';
-    
-    final data = _PreOrderDataAdapter(
-      imageUrl: product.imageUrl,
-      daysLeft: daysLeft,
-      price: formattedPrice,
-      discount: discount,
+  double _parsePrice(String rawPrice) {
+    final normalized = rawPrice.replaceAll(RegExp(r'[^0-9.]'), '');
+    return double.tryParse(normalized) ?? 0.0;
+  }
+
+  ProductItem _cachedToProductItem(CachedProduct product) {
+    final normalizedUnit = (product.unit ?? '').trim();
+
+    return ProductItem(
+      productId: product.id,
+      farmerId: product.farmerId,
+      farmerName: product.farmName,
+      farmerAvatarUrl: product.farmerAvatarUrl,
       name: product.name,
-      farm: product.farm,
-      reserved: reserved,
-      target: target,
-      isAlmostGone: isAlmostGone,
+      farm: product.farmName ?? 'Farm',
+      price: '₱${product.price.toStringAsFixed(2)}',
+      unit: normalizedUnit.isEmpty ? 'kg' : normalizedUnit,
+      imageUrl: product.imageUrl ?? '',
+      rating: (product.rating ?? 0).toStringAsFixed(1),
+      reviews: '0',
+      harvestDays: product.harvestDays.toString(),
+      description: product.description,
+      reservedQuantity: 0,
+      targetQuantity: 0,
     );
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+  }
+
+  Widget _buildPreOrderSectionHeader() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.bolt_rounded,
+              color: AppColors.accent,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Ending Soon',
+            style: AppTextStyles.headline2.copyWith(fontSize: 22),
+          ),
+          const Spacer(),
+          Text(
+            'SEE ALL',
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1,
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPremiumPreOrderCard(ProductItem product) {
+    final daysLeft = int.tryParse(product.harvestDays ?? '7') ?? 7;
+    final reservedQty = product.reservedQuantity ?? 0;
+    final targetQty = product.targetQuantity ?? 0;
+    final reservedCount = targetQty > 0
+        ? ((reservedQty / targetQty) * 100).clamp(0, 100).round()
+        : 0;
+    final isHot = reservedCount > 75;
+
+    return Container(
+      decoration: AppDecorations.cardDecoration.copyWith(
+        borderRadius: BorderRadius.circular(28),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image section
           Stack(
             children: [
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(22),
+                  top: Radius.circular(28),
                 ),
                 child: CachedNetworkImage(
-                  imageUrl: data.imageUrl,
-                  height: 200,
+                  imageUrl: product.imageUrl,
+                  height: 220,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  placeholder: (_, _) =>
-                      Container(height: 200, color: Colors.grey[200]),
-                  errorWidget: (_, _, _) => Container(
-                    height: 200,
-                    color: Colors.grey[200],
-                    child: const Icon(
-                      Icons.image,
-                      size: 40,
-                      color: Colors.grey,
-                    ),
+                ),
+              ),
+              Positioned(
+                top: 16,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.bookmark_border_rounded,
+                    size: 20,
+                    color: AppColors.textHeadline,
                   ),
                 ),
               ),
-              // Days left badge
               Positioned(
-                top: 14,
-                left: 14,
+                top: 16,
+                left: 16,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
+                    horizontal: 14,
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                      ),
-                    ],
+                    color: Colors.white.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Column(
                     children: [
                       Text(
-                        '${data.daysLeft}',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 20,
+                        '$daysLeft',
+                        style: GoogleFonts.poppins(
+                          fontSize: 22,
                           fontWeight: FontWeight.w800,
-                          color: primary,
+                          color: AppColors.primary,
+                          height: 1.2,
                         ),
                       ),
                       Text(
                         'DAYS LEFT',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: AppTextStyles.labelSmall.copyWith(
                           fontSize: 8,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.grey[500],
+                          fontWeight: FontWeight.w800,
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -362,154 +519,119 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
                   ),
                 ),
               ),
-              // Price and discount badge
-              Positioned(
-                bottom: 14,
-                left: 14,
-                child: Row(
+              _buildPriceOverlay(product.price),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      data.price,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withOpacity(0.5),
-                            blurRadius: 10,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.name,
+                            style: AppTextStyles.headline2.copyWith(
+                              fontSize: 20,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.eco_rounded,
+                                size: 14,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                product.farm,
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.textSubtle,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: primary,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        data.discount,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ),
+                    _buildHotTag(isHot),
                   ],
                 ),
-              ),
-            ],
-          ),
-          // Content
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  data.name,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.storefront, size: 14, color: Colors.grey[500]),
-                    const SizedBox(width: 6),
-                    Text(
-                      data.farm,
-                      style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Progress bar
+                const SizedBox(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      data.isAlmostGone
-                          ? '${data.reserved}% Reserved · Almost Gone'
-                          : '${data.reserved}% Reserved',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: data.isAlmostGone
-                            ? Colors.red[600]
-                            : const Color(0xFF0F172A),
+                      '$reservedCount% Reserved',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: isHot ? AppColors.error : AppColors.textHeadline,
                       ),
                     ),
                     Text(
-                      'Target: ${data.target}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      targetQty > 0
+                          ? '${targetQty.toStringAsFixed(0)} ${product.unit.isNotEmpty ? product.unit : 'kg'} Target'
+                          : 'Target TBD',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSubtle,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                // Progress bar
+                const SizedBox(height: 12),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(10),
                   child: LinearProgressIndicator(
-                    value: data.reserved / 100,
+                    value: reservedCount / 100,
                     minHeight: 8,
-                    backgroundColor: const Color(0xFFE2E8F0),
+                    backgroundColor: AppColors.background,
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      data.isAlmostGone ? Colors.red[500]! : primary,
+                      isHot ? AppColors.error : AppColors.primary,
                     ),
                   ),
                 ),
-                const SizedBox(height: 18),
-                // Reserve button + heart
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: primary,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Reserve Now',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
+                const SizedBox(height: 24),
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.25),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      context.push(AppRoutes.preorderDetails, extra: product);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(
-                        data.isAlmostGone
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        size: 22,
-                        color: data.isAlmostGone
-                            ? Colors.red[400]
-                            : Colors.grey[400],
+                    child: Text(
+                      'RESERVE HARVEST',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.5,
+                        color: Colors.white,
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -518,28 +640,82 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
       ),
     );
   }
-}
 
-class _PreOrderDataAdapter {
-  final String imageUrl;
-  final int daysLeft;
-  final String price;
-  final String discount;
-  final String name;
-  final String farm;
-  final int reserved;
-  final String target;
-  final bool isAlmostGone;
+  Widget _buildPriceOverlay(String price) {
+    final normalizedPrice = _normalizePrice(price);
 
-  _PreOrderDataAdapter({
-    required this.imageUrl,
-    required this.daysLeft,
-    required this.price,
-    required this.discount,
-    required this.name,
-    required this.farm,
-    required this.reserved,
-    required this.target,
-    required this.isAlmostGone,
-  });
+    return Positioned(
+      bottom: 16,
+      left: 16,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.textHeadline.withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Text(
+              normalizedPrice,
+              style: GoogleFonts.poppins(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'PRE-ORDER',
+                style: AppTextStyles.labelSmall.copyWith(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _normalizePrice(String price) {
+    final trimmed = price.trim();
+    if (trimmed.isEmpty) return '₱0';
+
+    final numeric = trimmed.replaceAll(RegExp(r'[^0-9.]'), '');
+    if (numeric.isEmpty) return '₱0';
+    return '₱$numeric';
+  }
+
+  Widget _buildHotTag(bool isHot) {
+    if (!isHot) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.whatshot_rounded, color: AppColors.error, size: 14),
+          const SizedBox(width: 4),
+          Text(
+            'HOT Reservation',
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.error,
+              fontWeight: FontWeight.w800,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

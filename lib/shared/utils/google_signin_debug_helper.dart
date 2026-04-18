@@ -10,19 +10,19 @@ class GoogleSignInDebugHelper {
     Map<String, dynamic>? additionalInfo,
   }) {
     if (kDebugMode) {
-      print('🔍 [GoogleSignIn Debug] $stage');
+      debugPrint('🔍 [GoogleSignIn Debug] $stage');
       if (message != null) {
-        print('  Message: $message');
+        debugPrint('  Message: $message');
       }
       if (error != null) {
-        print('  Error: $error');
+        debugPrint('  Error: $error');
       }
       if (additionalInfo != null) {
         additionalInfo.forEach((key, value) {
-          print('  $key: $value');
+          debugPrint('  $key: $value');
         });
       }
-      print('');
+      debugPrint('');
     }
   }
 

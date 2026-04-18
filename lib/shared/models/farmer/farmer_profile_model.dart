@@ -14,6 +14,8 @@ class FarmerProfile {
   final String farmName;
   final String? specialty;
   final String? location;
+  final double? farmLatitude;
+  final double? farmLongitude;
   final String? badge;
   final String? imageUrl;
   final bool isVerified;
@@ -33,6 +35,8 @@ class FarmerProfile {
     required this.farmName,
     this.specialty,
     this.location,
+    this.farmLatitude,
+    this.farmLongitude,
     this.badge,
     this.imageUrl,
     this.isVerified = false,
@@ -55,6 +59,8 @@ class FarmerProfile {
     String? farmName,
     String? specialty,
     String? location,
+    double? farmLatitude,
+    double? farmLongitude,
     String? badge,
     String? imageUrl,
     bool? isVerified,
@@ -72,6 +78,8 @@ class FarmerProfile {
       farmName: farmName ?? this.farmName,
       specialty: specialty ?? this.specialty,
       location: location ?? this.location,
+      farmLatitude: farmLatitude ?? this.farmLatitude,
+      farmLongitude: farmLongitude ?? this.farmLongitude,
       badge: badge ?? this.badge,
       imageUrl: imageUrl ?? this.imageUrl,
       isVerified: isVerified ?? this.isVerified,

@@ -9,15 +9,22 @@ part 'order_item_model.g.dart';
 
 @JsonSerializable()
 class OrderItem {
+  @JsonKey(name: 'order_item_id')
   final String orderItemId;
+  @JsonKey(name: 'order_id')
   final String orderId;
+  @JsonKey(name: 'product_id')
   final String productId;
   final double quantity;
+  @JsonKey(name: 'unit_price')
   final double unitPrice;
+  @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
   // Related data from view
+  @JsonKey(name: 'product_name')
   final String? productName;
+  @JsonKey(name: 'product_image')
   final String? productImage;
   final double? subtotal;
 

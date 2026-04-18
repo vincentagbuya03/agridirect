@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../services/auth_service.dart';
-import '../services/onboarding_service.dart';
-import '../screens/wallet_screen.dart';
+import '../services/auth/auth_service.dart';
+import '../services/auth/onboarding_service.dart';
 import '../../mobile/mobile_navigation.dart';
 import '../../mobile/screens/auth/login_screen.dart';
 import '../../mobile/screens/auth/registration_screen.dart';
@@ -10,6 +9,9 @@ import '../../mobile/screens/auth/farmer_registration_screen.dart';
 import '../../mobile/screens/auth/google_complete_profile_screen.dart';
 import '../../mobile/screens/common/onboarding_screen.dart';
 import '../../mobile/screens/common/face_capture_screen.dart';
+import '../../mobile/screens/farmer/add_product_screen.dart';
+import '../../mobile/screens/consumer/farmers_map_screen.dart';
+import '../../mobile/screens/consumer/my_details_screen.dart';
 import '../../web/web_navigation.dart';
 import '../../web/screens/auth/web_login_screen.dart';
 import '../../web/screens/auth/web_registration_screen.dart';
@@ -20,6 +22,7 @@ import '../../web/screens/auth/web_password_reset_with_code_screen.dart';
 import '../../web/screens/consumer/web_preorder_details.dart';
 import '../../web/screens/admin/admin_dashboard_redesigned.dart';
 import '../../web/screens/common/web_welcome_screen.dart';
+import '../screens/messages/messages_screen.dart';
 
 /// Route name constants for type-safe navigation.
 class AppRoutes {
@@ -34,11 +37,16 @@ class AppRoutes {
   static const String authCallback = '/auth/callback';
   static const String resetPassword = '/reset-password';
   static const String resetPasswordWithCode = '/reset-password-code';
-  static const String wallet = '/wallet';
+  static const String messages = '/messages';
+  static const String customerMessages = '/customer-messages';
+  static const String farmerMessages = '/farmer-messages';
 
   // ── Mobile-specific ──
   static const String farmerRegister = '/farmer-register';
   static const String googleCompleteProfile = '/google-complete-profile';
+  static const String addProduct = '/add-product';
+  static const String myDetails = '/my-details';
+  static const String farmersMap = '/farmers-map';
 
   // ── Web-specific ──
   static const String webWelcome = '/web-welcome';
@@ -93,6 +101,11 @@ GoRouter createAppRouter() {
       final width = MediaQuery.of(context).size.width;
       final isMobile = width <= 800;
 
+      // Never redirect away while profile completion is actively saving.
+      if (auth.isLoading && location == AppRoutes.googleCompleteProfile) {
+        return null;
+      }
+
       // ── Mobile redirect logic ──────────────────────────────────────────────
       if (isMobile) {
         // ⚠️ NEW: If user needs profile completion, redirect them there!
@@ -118,9 +131,12 @@ GoRouter createAppRouter() {
           AppRoutes.onboarding,
           AppRoutes.faceCapture,
           AppRoutes.googleCompleteProfile,
+          AppRoutes.resetPassword,
+          AppRoutes.resetPasswordWithCode,
         ];
-        if (!isLoggedIn && !mobilePublic.contains(location))
+        if (!isLoggedIn && !mobilePublic.contains(location)) {
           return AppRoutes.login;
+        }
         if (isLoggedIn &&
             (location == AppRoutes.login || location == AppRoutes.register)) {
           return AppRoutes.home;
@@ -134,6 +150,26 @@ GoRouter createAppRouter() {
       if (location == AppRoutes.resetPassword ||
           location == AppRoutes.resetPasswordWithCode) {
         return null;
+      }
+
+      const protectedWebRoutes = <String>{
+        AppRoutes.profile,
+        AppRoutes.farmerDashboard,
+        AppRoutes.addProduct,
+        AppRoutes.myDetails,
+        AppRoutes.messages,
+        AppRoutes.customerMessages,
+        AppRoutes.farmerMessages,
+        AppRoutes.admin,
+      };
+
+      if (!isLoggedIn && protectedWebRoutes.contains(location)) {
+        return AppRoutes.login;
+      }
+
+      if (location == AppRoutes.admin && !isAdmin) {
+        if (!isLoggedIn) return AppRoutes.login;
+        return isFarmer ? AppRoutes.farmerDashboard : AppRoutes.marketplace;
       }
 
       // ⚠️ NEW: If user needs profile completion (mobile or web), redirect them there!
@@ -165,12 +201,10 @@ GoRouter createAppRouter() {
       // Profile requires login on web
       if (location == AppRoutes.profile && !isLoggedIn) return AppRoutes.login;
 
-      // Wallet requires login on web
-      if (location == AppRoutes.wallet && !isLoggedIn) return AppRoutes.login;
-
       // Farmer dashboard requires login
-      if (location == AppRoutes.farmerDashboard && !isLoggedIn)
+      if (location == AppRoutes.farmerDashboard && !isLoggedIn) {
         return AppRoutes.marketplace;
+      }
 
       // Logged-in users skip login/register pages
       if (isLoggedIn &&
@@ -245,18 +279,76 @@ GoRouter createAppRouter() {
       ),
       GoRoute(
         path: AppRoutes.farmerDashboard,
-        builder: (context, state) => WebNavigation(
-          onLogout: () {
-            AuthService().logout();
-            context.go(AppRoutes.home);
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 800) {
+              return WebNavigation(
+                onLogout: () {
+                  AuthService().logout();
+                  context.go(AppRoutes.home);
+                },
+              );
+            }
+
+            final auth = AuthService();
+            auth.switchToFarmerMode();
+            return MobileNavigation(
+              onLogout: () {
+                AuthService().logout();
+                context.go(AppRoutes.login);
+              },
+            );
           },
         ),
       ),
 
       // ── Wallet (shared) ──────────────────────────────────────────────────
       GoRoute(
-        path: AppRoutes.wallet,
-        builder: (context, state) => const WalletScreen(),
+        path: AppRoutes.addProduct,
+        builder: (context, state) => const AddProductScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.myDetails,
+        builder: (context, state) => const MyDetailsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.farmersMap,
+        builder: (context, state) => const FarmersMapScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.messages,
+        builder: (context, state) {
+          final extra = state.extra;
+          final farmerUserId = extra is Map<String, dynamic>
+              ? extra['farmerUserId'] as String?
+              : null;
+          final asFarmer = extra is Map<String, dynamic>
+              ? extra['asFarmer'] as bool?
+              : null;
+
+          return MessagesScreen(
+            initialFarmerUserId: farmerUserId,
+            asFarmer: asFarmer ?? (farmerUserId == null ? null : false),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.customerMessages,
+        builder: (context, state) {
+          final extra = state.extra;
+          final farmerUserId = extra is Map<String, dynamic>
+              ? extra['farmerUserId'] as String?
+              : null;
+
+          return MessagesScreen(
+            initialFarmerUserId: farmerUserId,
+            asFarmer: false,
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.farmerMessages,
+        builder: (context, state) => MessagesScreen(asFarmer: true),
       ),
 
       // ── Web Welcome (landing page for first-time visitors) ────────────────

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
-import '../../../shared/services/onboarding_service.dart';
+import '../../../shared/services/auth/onboarding_service.dart';
 import '../../widgets/animated_components.dart';
 
 /// Web Welcome Screen — Premium animated landing page
@@ -97,12 +97,12 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
           vertical: sw < 768 ? 10 : 14,
         ),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.85),
+          color: Colors.white.withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AgriColors.border.withOpacity(0.5)),
+          border: Border.all(color: AgriColors.border.withValues(alpha: 0.5)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 20,
               offset: const Offset(0, 4),
             ),
@@ -128,7 +128,10 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Center(
-                          child: AnimatedLeafIcon(size: 22, color: Colors.white),
+                          child: AnimatedLeafIcon(
+                            size: 22,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
@@ -150,7 +153,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
             // Nav items
             ...List.generate(navItems.length, (i) {
               final isHovered = _hoveredNav == i;
-              final navRoutes = ['/shop', '/shop', '/community']; // Home, Shop, Community
+              final navRoutes = [
+                '/shop',
+                '/shop',
+                '/community',
+              ]; // Home, Shop, Community
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: MouseRegion(
@@ -161,7 +168,10 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     onTap: () => context.go(navRoutes[i]),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
                         color: isHovered
@@ -172,8 +182,12 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                         navItems[i],
                         style: GoogleFonts.inter(
                           fontSize: 14,
-                          fontWeight: isHovered ? FontWeight.w600 : FontWeight.w500,
-                          color: isHovered ? AgriColors.emerald700 : AgriColors.muted,
+                          fontWeight: isHovered
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                          color: isHovered
+                              ? AgriColors.emerald700
+                              : AgriColors.muted,
                         ),
                       ),
                     ),
@@ -237,7 +251,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               animation: _waveController,
               builder: (context, _) {
                 return CustomPaint(
-                  painter: AuroraGlowPainter(animationValue: _waveController.value),
+                  painter: AuroraGlowPainter(
+                    animationValue: _waveController.value,
+                  ),
                 );
               },
             ),
@@ -258,7 +274,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 return CustomPaint(
                   painter: RibbonPainter(
                     animationValue: _waveController.value,
-                    color: Colors.white.withOpacity(0.04),
+                    color: Colors.white.withValues(alpha: 0.04),
                     strokeWidth: 1.0,
                   ),
                 );
@@ -274,7 +290,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 return CustomPaint(
                   painter: BlobPainter(
                     animationValue: _waveController.value,
-                    color: AgriColors.emerald400.withOpacity(0.08),
+                    color: AgriColors.emerald400.withValues(alpha: 0.08),
                     center: const Offset(0.8, 0.3),
                     radius: 280,
                   ),
@@ -290,7 +306,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 return CustomPaint(
                   painter: BlobPainter(
                     animationValue: 1 - _waveController.value,
-                    color: AgriColors.teal400.withOpacity(0.06),
+                    color: AgriColors.teal400.withValues(alpha: 0.06),
                     center: const Offset(0.2, 0.7),
                     radius: 220,
                   ),
@@ -307,7 +323,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 return CustomPaint(
                   painter: BlobPainter(
                     animationValue: _waveController.value * 0.7,
-                    color: AgriColors.gold400.withOpacity(0.03),
+                    color: AgriColors.gold400.withValues(alpha: 0.03),
                     center: const Offset(0.9, 0.15),
                     radius: 120,
                   ),
@@ -346,7 +362,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 return CustomPaint(
                   painter: WavePainter(
                     animationValue: _waveController.value,
-                    color: Colors.white.withOpacity(0.06),
+                    color: Colors.white.withValues(alpha: 0.06),
                     amplitude: 25,
                   ),
                 );
@@ -364,7 +380,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 return CustomPaint(
                   painter: WavePainter(
                     animationValue: 1 - _waveController.value,
-                    color: Colors.white.withOpacity(0.04),
+                    color: Colors.white.withValues(alpha: 0.04),
                     amplitude: 15,
                   ),
                 );
@@ -375,19 +391,30 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
           // Content
           Center(
             child: FadeTransition(
-              opacity: CurvedAnimation(parent: _heroFadeCtrl, curve: Curves.easeOut),
+              opacity: CurvedAnimation(
+                parent: _heroFadeCtrl,
+                curve: Curves.easeOut,
+              ),
               child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 0.08),
-                  end: Offset.zero,
-                ).animate(
-                  CurvedAnimation(parent: _heroFadeCtrl, curve: Curves.easeOutCubic),
-                ),
+                position:
+                    Tween<Offset>(
+                      begin: const Offset(0, 0.08),
+                      end: Offset.zero,
+                    ).animate(
+                      CurvedAnimation(
+                        parent: _heroFadeCtrl,
+                        curve: Curves.easeOutCubic,
+                      ),
+                    ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1300),
                   child: Padding(
                     padding: EdgeInsets.symmetric(
-                      horizontal: sw < 480 ? 16 : sw < 768 ? 24 : sw * 0.06,
+                      horizontal: sw < 480
+                          ? 16
+                          : sw < 768
+                          ? 24
+                          : sw * 0.06,
                       vertical: sw < 480 ? 40 : 80,
                     ),
                     child: sw >= 900
@@ -411,7 +438,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
 
   Widget _heroContent(double sw) {
     return Column(
-      crossAxisAlignment: sw >= 900 ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+      crossAxisAlignment: sw >= 900
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.center,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         // Badge — gold accent
@@ -420,12 +449,12 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                AgriColors.gold400.withOpacity(0.15),
-                AgriColors.emerald400.withOpacity(0.1),
+                AgriColors.gold400.withValues(alpha: 0.15),
+                AgriColors.emerald400.withValues(alpha: 0.1),
               ],
             ),
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: AgriColors.gold300.withOpacity(0.25)),
+            border: Border.all(color: AgriColors.gold300.withValues(alpha: 0.25)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -438,7 +467,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: AgriColors.gold400.withOpacity(0.5),
+                      color: AgriColors.gold400.withValues(alpha: 0.5),
                       blurRadius: 6,
                     ),
                   ],
@@ -497,7 +526,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
             textAlign: sw >= 900 ? TextAlign.left : TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 16,
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               height: 1.7,
             ),
           ),
@@ -525,7 +554,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.white.withValues(alpha: _heroCtaHovered ? 0.25 : 0.1),
+                        color: Colors.white.withValues(
+                          alpha: _heroCtaHovered ? 0.25 : 0.1,
+                        ),
                         blurRadius: _heroCtaHovered ? 28 : 16,
                         offset: const Offset(0, 4),
                       ),
@@ -568,10 +599,14 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   height: 56,
                   padding: const EdgeInsets.symmetric(horizontal: 36),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: _heroSecondaryHovered ? 0.12 : 0.05),
+                    color: Colors.white.withValues(
+                      alpha: _heroSecondaryHovered ? 0.12 : 0.05,
+                    ),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: _heroSecondaryHovered ? 0.5 : 0.25),
+                      color: Colors.white.withValues(
+                        alpha: _heroSecondaryHovered ? 0.5 : 0.25,
+                      ),
                       width: 1.5,
                     ),
                   ),
@@ -618,13 +653,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Colors.white.withOpacity(0.12),
-                    Colors.white.withOpacity(0.04),
+                    Colors.white.withValues(alpha: 0.12),
+                    Colors.white.withValues(alpha: 0.04),
                   ],
                 ),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.15),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(28),
@@ -642,7 +675,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     Center(
                       child: AnimatedLeafIcon(
                         size: 140,
-                        color: AgriColors.emerald400.withOpacity(0.15),
+                        color: AgriColors.emerald400.withValues(alpha: 0.15),
                       ),
                     ),
                     // Overlaid info
@@ -651,8 +684,8 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       left: 24,
                       right: 24,
                       child: GlassCard(
-                        backgroundColor: Colors.white.withOpacity(0.15),
-                        borderColor: Colors.white.withOpacity(0.2),
+                        backgroundColor: Colors.white.withValues(alpha: 0.15),
+                        borderColor: Colors.white.withValues(alpha: 0.2),
                         borderRadius: 16,
                         padding: const EdgeInsets.all(16),
                         child: Row(
@@ -664,7 +697,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                 gradient: AgriColors.primaryGradient,
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Icon(Icons.eco_rounded, color: Colors.white, size: 22),
+                              child: const Icon(
+                                Icons.eco_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                             ),
                             const SizedBox(width: 14),
                             Expanded(
@@ -683,7 +720,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                     'Direct from verified farms',
                                     style: GoogleFonts.inter(
                                       fontSize: 11,
-                                      color: Colors.white.withOpacity(0.6),
+                                      color: Colors.white.withValues(alpha: 0.6),
                                     ),
                                   ),
                                 ],
@@ -710,7 +747,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: AgriColors.emerald400.withOpacity(0.4),
+                    color: AgriColors.emerald400.withValues(alpha: 0.4),
                     blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
@@ -719,7 +756,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.verified_rounded, size: 14, color: Colors.white),
+                  const Icon(
+                    Icons.verified_rounded,
+                    size: 14,
+                    color: Colors.white,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'Trusted',
@@ -745,7 +786,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
+                    color: Colors.black.withValues(alpha: 0.12),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -761,7 +802,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       color: AgriColors.emerald50,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.people_rounded, size: 18, color: AgriColors.emerald600),
+                    child: const Icon(
+                      Icons.people_rounded,
+                      size: 18,
+                      color: AgriColors.emerald600,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Column(
@@ -778,7 +823,10 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       ),
                       Text(
                         'Across the region',
-                        style: GoogleFonts.inter(fontSize: 10, color: AgriColors.muted),
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          color: AgriColors.muted,
+                        ),
                       ),
                     ],
                   ),
@@ -812,16 +860,36 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _statItem(200, '+', 'Local Farmers', Icons.agriculture_rounded),
-                        _statItem(5000, '+', 'Products', Icons.inventory_2_rounded),
+                        _statItem(
+                          200,
+                          '+',
+                          'Local Farmers',
+                          Icons.agriculture_rounded,
+                        ),
+                        _statItem(
+                          5000,
+                          '+',
+                          'Products',
+                          Icons.inventory_2_rounded,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 32),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _statItem(24, 'hrs', 'Fast Delivery', Icons.local_shipping_rounded),
-                        _statItem(98, '%', 'Satisfaction', Icons.thumb_up_rounded),
+                        _statItem(
+                          24,
+                          'hrs',
+                          'Fast Delivery',
+                          Icons.local_shipping_rounded,
+                        ),
+                        _statItem(
+                          98,
+                          '%',
+                          'Satisfaction',
+                          Icons.thumb_up_rounded,
+                        ),
                       ],
                     ),
                   ],
@@ -831,11 +899,21 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               return Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _statItem(200, '+', 'Local Farmers', Icons.agriculture_rounded),
+                  _statItem(
+                    200,
+                    '+',
+                    'Local Farmers',
+                    Icons.agriculture_rounded,
+                  ),
                   _statDivider(),
                   _statItem(5000, '+', 'Products', Icons.inventory_2_rounded),
                   _statDivider(),
-                  _statItem(24, 'hrs', 'Fast Delivery', Icons.local_shipping_rounded),
+                  _statItem(
+                    24,
+                    'hrs',
+                    'Fast Delivery',
+                    Icons.local_shipping_rounded,
+                  ),
                   _statDivider(),
                   _statItem(98, '%', 'Satisfaction', Icons.thumb_up_rounded),
                 ],
@@ -859,7 +937,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: AgriColors.emerald500.withOpacity(0.2),
+                color: AgriColors.emerald500.withValues(alpha: 0.2),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -891,11 +969,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   }
 
   Widget _statDivider() {
-    return Container(
-      width: 1,
-      height: 50,
-      color: AgriColors.border,
-    );
+    return Container(width: 1, height: 50, color: AgriColors.border);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -903,32 +977,58 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   // ═══════════════════════════════════════════════════════════════
   Widget _buildFeaturesSection() {
     final features = [
-      _Feature(Icons.eco_rounded, 'Direct from Farmers',
-          'Skip the middleman. Get the freshest produce at fair prices directly from verified local farms.',
-          AgriColors.emerald500),
-      _Feature(Icons.calendar_today_rounded, 'Pre-Order Harvests',
-          'Secure seasonal favorites before harvest and get exclusive early-bird pricing on premium produce.',
-          const Color(0xFF3B82F6)),
-      _Feature(Icons.auto_awesome_rounded, 'Smart Insights',
-          'AI-powered weather alerts, demand predictions, and expert farming tips to optimize your experience.',
-          const Color(0xFF8B5CF6)),
-      _Feature(Icons.people_rounded, 'Community Driven',
-          'Connect with consumers and farmers, share knowledge, exchange tips, and grow together.',
-          const Color(0xFFF59E0B)),
-      _Feature(Icons.verified_rounded, 'Verified Farmers',
-          'Every farmer is identity-verified with transparent farm info, real reviews, and quality certificates.',
-          const Color(0xFF06B6D4)),
-      _Feature(Icons.local_shipping_rounded, 'Fast Delivery',
-          'Farm-fresh produce picked and delivered to your door within 24 hours with proper care packaging.',
-          const Color(0xFFEF4444)),
+      _Feature(
+        Icons.eco_rounded,
+        'Direct from Farmers',
+        'Skip the middleman. Get the freshest produce at fair prices directly from verified local farms.',
+        AgriColors.emerald500,
+      ),
+      _Feature(
+        Icons.calendar_today_rounded,
+        'Pre-Order Harvests',
+        'Secure seasonal favorites before harvest and get exclusive early-bird pricing on premium produce.',
+        const Color(0xFF3B82F6),
+      ),
+      _Feature(
+        Icons.auto_awesome_rounded,
+        'Smart Insights',
+        'AI-powered weather alerts, demand predictions, and expert farming tips to optimize your experience.',
+        const Color(0xFF8B5CF6),
+      ),
+      _Feature(
+        Icons.people_rounded,
+        'Community Driven',
+        'Connect with consumers and farmers, share knowledge, exchange tips, and grow together.',
+        const Color(0xFFF59E0B),
+      ),
+      _Feature(
+        Icons.verified_rounded,
+        'Verified Farmers',
+        'Every farmer is identity-verified with transparent farm info, real reviews, and quality certificates.',
+        const Color(0xFF06B6D4),
+      ),
+      _Feature(
+        Icons.local_shipping_rounded,
+        'Fast Delivery',
+        'Farm-fresh produce picked and delivered to your door within 24 hours with proper care packaging.',
+        const Color(0xFFEF4444),
+      ),
     ];
 
     final sw = MediaQuery.of(context).size.width;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(
-        horizontal: sw < 480 ? 16 : sw < 768 ? 24 : 48,
-        vertical: sw < 480 ? 50 : sw < 768 ? 60 : 100,
+        horizontal: sw < 480
+            ? 16
+            : sw < 768
+            ? 24
+            : 48,
+        vertical: sw < 480
+            ? 50
+            : sw < 768
+            ? 60
+            : 100,
       ),
       color: Colors.white,
       child: Center(
@@ -940,7 +1040,10 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               const GradientDivider(width: 50, height: 4),
               const SizedBox(height: 20),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AgriColors.emerald50,
                   borderRadius: BorderRadius.circular(40),
@@ -960,7 +1063,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 'Everything You Need',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: sw < 480 ? 28 : sw < 768 ? 32 : 40,
+                  fontSize: sw < 480
+                      ? 28
+                      : sw < 768
+                      ? 32
+                      : 40,
                   fontWeight: FontWeight.w800,
                   color: AgriColors.dark,
                   letterSpacing: -0.5,
@@ -970,16 +1077,15 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               Text(
                 'A complete ecosystem connecting farmers and consumers',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  color: AgriColors.muted,
-                ),
+                style: GoogleFonts.inter(fontSize: 16, color: AgriColors.muted),
               ),
               const SizedBox(height: 60),
               // Feature cards grid
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final crossAxisCount = constraints.maxWidth < 768 ? 1 : (constraints.maxWidth < 1024 ? 2 : 3);
+                  final crossAxisCount = constraints.maxWidth < 768
+                      ? 1
+                      : (constraints.maxWidth < 1024 ? 2 : 3);
                   return GridView.count(
                     crossAxisCount: crossAxisCount,
                     crossAxisSpacing: 24,
@@ -998,18 +1104,24 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeOutCubic,
                           padding: const EdgeInsets.all(28),
-                          transform: Matrix4.translationValues(0, isHovered ? -8 : 0, 0),
+                          transform: Matrix4.translationValues(
+                            0,
+                            isHovered ? -8 : 0,
+                            0,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(24),
                             border: Border.all(
-                              color: isHovered ? f.color.withOpacity(0.3) : AgriColors.border,
+                              color: isHovered
+                                  ? f.color.withValues(alpha: 0.3)
+                                  : AgriColors.border,
                             ),
                             boxShadow: [
                               BoxShadow(
                                 color: isHovered
-                                    ? f.color.withOpacity(0.12)
-                                    : Colors.black.withOpacity(0.03),
+                                    ? f.color.withValues(alpha: 0.12)
+                                    : Colors.black.withValues(alpha: 0.03),
                                 blurRadius: isHovered ? 30 : 8,
                                 offset: Offset(0, isHovered ? 16 : 4),
                               ),
@@ -1024,15 +1136,19 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                 width: 56,
                                 height: 56,
                                 decoration: BoxDecoration(
-                                  color: isHovered ? f.color : f.color.withOpacity(0.08),
+                                  color: isHovered
+                                      ? f.color
+                                      : f.color.withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(16),
-                                  boxShadow: isHovered ? [
-                                    BoxShadow(
-                                      color: f.color.withOpacity(0.3),
-                                      blurRadius: 16,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ] : [],
+                                  boxShadow: isHovered
+                                      ? [
+                                          BoxShadow(
+                                            color: f.color.withValues(alpha: 0.3),
+                                            blurRadius: 16,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ]
+                                      : [],
                                 ),
                                 child: Icon(
                                   f.icon,
@@ -1080,9 +1196,21 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   // ═══════════════════════════════════════════════════════════════
   Widget _buildHowItWorksSection() {
     final steps = [
-      _Step('Browse & Discover', 'Explore fresh produce from verified local farmers. Filter by category, season, or organic certification.', Icons.search_rounded),
-      _Step('Order & Pre-Order', 'Add items to cart or pre-order upcoming harvests. Secure the best seasonal produce before it sells out.', Icons.shopping_cart_rounded),
-      _Step('Farm-Fresh Delivery', 'Produce is harvested and packed with care, then delivered directly to your doorstep within 24 hours.', Icons.local_shipping_rounded),
+      _Step(
+        'Browse & Discover',
+        'Explore fresh produce from verified local farmers. Filter by category, season, or organic certification.',
+        Icons.search_rounded,
+      ),
+      _Step(
+        'Order & Pre-Order',
+        'Add items to cart or pre-order upcoming harvests. Secure the best seasonal produce before it sells out.',
+        Icons.shopping_cart_rounded,
+      ),
+      _Step(
+        'Farm-Fresh Delivery',
+        'Produce is harvested and packed with care, then delivered directly to your doorstep within 24 hours.',
+        Icons.local_shipping_rounded,
+      ),
     ];
 
     final sw = MediaQuery.of(context).size.width;
@@ -1090,11 +1218,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     return Stack(
       children: [
         // Background with dot pattern
-        Positioned.fill(
-          child: Container(
-            color: AgriColors.surface,
-          ),
-        ),
+        Positioned.fill(child: Container(color: AgriColors.surface)),
         Positioned.fill(
           child: CustomPaint(
             painter: DotPatternPainter(
@@ -1114,7 +1238,10 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   const GradientDivider(width: 50, height: 4),
                   const SizedBox(height: 20),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: AgriColors.emerald50,
                       borderRadius: BorderRadius.circular(40),
@@ -1134,7 +1261,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     'Simple as 1-2-3',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: sw < 480 ? 28 : sw < 768 ? 32 : 40,
+                      fontSize: sw < 480
+                          ? 28
+                          : sw < 768
+                          ? 32
+                          : 40,
                       fontWeight: FontWeight.w800,
                       color: AgriColors.dark,
                       letterSpacing: -0.5,
@@ -1158,7 +1289,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                             onExit: (_) => setState(() => _hoveredStep = -1),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 300),
-                              transform: Matrix4.translationValues(0, isHovered ? -8 : 0, 0),
+                              transform: Matrix4.translationValues(
+                                0,
+                                isHovered ? -8 : 0,
+                                0,
+                              ),
                               child: Column(
                                 children: [
                                   // Step number circle
@@ -1174,12 +1309,16 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                       shape: BoxShape.circle,
                                       border: isHovered
                                           ? null
-                                          : Border.all(color: AgriColors.emerald200, width: 2),
+                                          : Border.all(
+                                              color: AgriColors.emerald200,
+                                              width: 2,
+                                            ),
                                       boxShadow: [
                                         BoxShadow(
                                           color: isHovered
-                                              ? AgriColors.emerald500.withOpacity(0.3)
-                                              : Colors.black.withOpacity(0.05),
+                                              ? AgriColors.emerald500
+                                                    .withValues(alpha: 0.3)
+                                              : Colors.black.withValues(alpha: 0.05),
                                           blurRadius: isHovered ? 24 : 8,
                                           offset: const Offset(0, 4),
                                         ),
@@ -1187,14 +1326,20 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                     ),
                                     child: Center(
                                       child: isHovered
-                                          ? Icon(step.icon, color: Colors.white, size: 28)
+                                          ? Icon(
+                                              step.icon,
+                                              color: Colors.white,
+                                              size: 28,
+                                            )
                                           : Text(
                                               '${i + 1}',
-                                              style: GoogleFonts.plusJakartaSans(
-                                                fontSize: 26,
-                                                fontWeight: FontWeight.w800,
-                                                color: AgriColors.emerald600,
-                                              ),
+                                              style:
+                                                  GoogleFonts.plusJakartaSans(
+                                                    fontSize: 26,
+                                                    fontWeight: FontWeight.w800,
+                                                    color:
+                                                        AgriColors.emerald600,
+                                                  ),
                                             ),
                                     ),
                                   ),
@@ -1243,8 +1388,16 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(
-        horizontal: sw < 480 ? 16 : sw < 768 ? 24 : 48,
-        vertical: sw < 480 ? 50 : sw < 768 ? 60 : 100,
+        horizontal: sw < 480
+            ? 16
+            : sw < 768
+            ? 24
+            : 48,
+        vertical: sw < 480
+            ? 50
+            : sw < 768
+            ? 60
+            : 100,
       ),
       color: Colors.white,
       child: Center(
@@ -1273,20 +1426,28 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: AgriColors.emerald500.withOpacity(0.25),
+                            color: AgriColors.emerald500.withValues(alpha: 0.25),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
                         ],
                       ),
-                      child: const Icon(Icons.format_quote_rounded, color: Colors.white, size: 28),
+                      child: const Icon(
+                        Icons.format_quote_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
                     ),
                     const SizedBox(height: 28),
                     Text(
                       '"AgriDirect has completely transformed how we buy fresh produce. The quality is incomparable, and knowing exactly which farmer grew our food makes every meal special."',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: sw < 480 ? 16 : sw < 768 ? 18 : 22,
+                        fontSize: sw < 480
+                            ? 16
+                            : sw < 768
+                            ? 18
+                            : 22,
                         fontWeight: FontWeight.w600,
                         color: AgriColors.dark,
                         height: 1.6,
@@ -1340,10 +1501,17 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                         ),
                         const SizedBox(width: 24),
                         // Stars
-                        ...List.generate(5, (_) => const Padding(
-                          padding: EdgeInsets.only(right: 2),
-                          child: Icon(Icons.star_rounded, size: 20, color: Color(0xFFF59E0B)),
-                        )),
+                        ...List.generate(
+                          5,
+                          (_) => const Padding(
+                            padding: EdgeInsets.only(right: 2),
+                            child: Icon(
+                              Icons.star_rounded,
+                              size: 20,
+                              color: Color(0xFFF59E0B),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -1366,8 +1534,16 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
         Container(
           width: double.infinity,
           padding: EdgeInsets.symmetric(
-            horizontal: sw < 480 ? 16 : sw < 768 ? 24 : 48,
-            vertical: sw < 480 ? 50 : sw < 768 ? 60 : 100,
+            horizontal: sw < 480
+                ? 16
+                : sw < 768
+                ? 24
+                : 48,
+            vertical: sw < 480
+                ? 50
+                : sw < 768
+                ? 60
+                : 100,
           ),
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -1395,16 +1571,22 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const AnimatedLeafIcon(size: 48, color: AgriColors.emerald300),
+                          const AnimatedLeafIcon(
+                            size: 48,
+                            color: AgriColors.emerald300,
+                          ),
                           const SizedBox(width: 12),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               gradient: AgriColors.goldGradient,
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AgriColors.gold400.withOpacity(0.4),
+                                  color: AgriColors.gold400.withValues(alpha: 0.4),
                                   blurRadius: 12,
                                 ),
                               ],
@@ -1426,7 +1608,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                         'Start Your Fresh Journey Today',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: sw < 480 ? 28 : sw < 768 ? 32 : 42,
+                          fontSize: sw < 480
+                              ? 28
+                              : sw < 768
+                              ? 32
+                              : 42,
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
                           letterSpacing: -0.5,
@@ -1439,7 +1625,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                         textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
                           fontSize: 16,
-                          color: Colors.white.withOpacity(0.6),
+                          color: Colors.white.withValues(alpha: 0.6),
                           height: 1.7,
                         ),
                       ),
@@ -1459,7 +1645,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.white.withValues(alpha: _ctaHovered ? 0.25 : 0.1),
+                                  color: Colors.white.withValues(
+                                    alpha: _ctaHovered ? 0.25 : 0.1,
+                                  ),
                                   blurRadius: _ctaHovered ? 32 : 16,
                                   offset: const Offset(0, 4),
                                 ),
@@ -1480,7 +1668,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                 AnimatedRotation(
                                   turns: _ctaHovered ? 0.05 : 0,
                                   duration: const Duration(milliseconds: 200),
-                                  child: const Icon(Icons.arrow_forward_rounded, size: 20, color: AgriColors.emerald700),
+                                  child: const Icon(
+                                    Icons.arrow_forward_rounded,
+                                    size: 20,
+                                    color: AgriColors.emerald700,
+                                  ),
                                 ),
                               ],
                             ),
@@ -1506,8 +1698,16 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(
-        horizontal: sw < 480 ? 16 : sw < 768 ? 24 : 48,
-        vertical: sw < 480 ? 40 : sw < 768 ? 48 : 56,
+        horizontal: sw < 480
+            ? 16
+            : sw < 768
+            ? 24
+            : 48,
+        vertical: sw < 480
+            ? 40
+            : sw < 768
+            ? 48
+            : 56,
       ),
       color: AgriColors.dark,
       child: Center(
@@ -1533,7 +1733,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                 gradient: AgriColors.primaryGradient,
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.eco_rounded, color: Colors.white, size: 20),
+                              child: const Icon(
+                                Icons.eco_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                             ),
                             const SizedBox(width: 10),
                             Text(
@@ -1576,7 +1780,14 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Quick Links', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+                              Text(
+                                'Quick Links',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
                               const SizedBox(height: 12),
                               _footerLink('Find a Farmer'),
                               _footerLink('Seasonal Calendar'),
@@ -1589,7 +1800,14 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Categories', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+                              Text(
+                                'Categories',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
                               const SizedBox(height: 12),
                               _footerLink('Vegetables'),
                               _footerLink('Fruits & Berries'),
@@ -1605,11 +1823,22 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Stay Updated', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+                        Text(
+                          'Stay Updated',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         Text(
                           'Get harvest updates, recipes, and\nexclusive deals in your inbox.',
-                          style: GoogleFonts.inter(fontSize: 11, color: AgriColors.mutedLight, height: 1.5),
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AgriColors.mutedLight,
+                            height: 1.5,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -1617,19 +1846,31 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                             Expanded(
                               child: Container(
                                 height: 40,
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AgriColors.darkMuted,
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: const Color(0xFF374151)),
+                                  border: Border.all(
+                                    color: const Color(0xFF374151),
+                                  ),
                                 ),
                                 child: TextField(
-                                  style: GoogleFonts.inter(fontSize: 12, color: Colors.white),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                  ),
                                   decoration: InputDecoration(
                                     hintText: 'Email address',
-                                    hintStyle: GoogleFonts.inter(fontSize: 12, color: AgriColors.muted),
+                                    hintStyle: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: AgriColors.muted,
+                                    ),
                                     border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 10,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1642,7 +1883,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                 gradient: AgriColors.primaryGradient,
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.send_rounded, size: 16, color: Colors.white),
+                              child: const Icon(
+                                Icons.send_rounded,
+                                size: 16,
+                                color: Colors.white,
+                              ),
                             ),
                           ],
                         ),
@@ -1654,139 +1899,185 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 // Desktop: horizontal footer
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Brand
-                  Expanded(
-                    flex: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                gradient: AgriColors.primaryGradient,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.eco_rounded, color: Colors.white, size: 20),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'AgriDirect',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Connecting local farmers\ndirectly to your kitchen for a\nhealthier, more sustainable world.',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            color: AgriColors.mutedLight,
-                            height: 1.7,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        // Social icons
-                        Row(
-                          children: [
-                            _socialIcon(Icons.language),
-                            const SizedBox(width: 10),
-                            _socialIcon(Icons.facebook_rounded),
-                            const SizedBox(width: 10),
-                            _socialIcon(Icons.camera_alt_outlined),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Links
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Quick Links', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-                        const SizedBox(height: 18),
-                        _footerLink('Find a Farmer'),
-                        _footerLink('Seasonal Calendar'),
-                        _footerLink('Pricing Plans'),
-                        _footerLink('Help Center'),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Categories', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-                        const SizedBox(height: 18),
-                        _footerLink('Vegetables'),
-                        _footerLink('Fruits & Berries'),
-                        _footerLink('Dairy & Eggs'),
-                        _footerLink('Organic Grains'),
-                      ],
-                    ),
-                  ),
-                  // Newsletter
-                  Expanded(
-                    flex: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Stay Updated', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Get harvest updates, recipes, and\nexclusive deals in your inbox.',
-                          style: GoogleFonts.inter(fontSize: 13, color: AgriColors.mutedLight, height: 1.6),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                height: 44,
-                                padding: const EdgeInsets.symmetric(horizontal: 14),
+                  children: [
+                    // Brand
+                    Expanded(
+                      flex: 3,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
                                 decoration: BoxDecoration(
-                                  color: AgriColors.darkMuted,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFF374151)),
+                                  gradient: AgriColors.primaryGradient,
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: TextField(
-                                  style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
-                                  decoration: InputDecoration(
-                                    hintText: 'Email address',
-                                    hintStyle: GoogleFonts.inter(fontSize: 13, color: AgriColors.muted),
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                                child: const Icon(
+                                  Icons.eco_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                'AgriDirect',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Connecting local farmers\ndirectly to your kitchen for a\nhealthier, more sustainable world.',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: AgriColors.mutedLight,
+                              height: 1.7,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          // Social icons
+                          Row(
+                            children: [
+                              _socialIcon(Icons.language),
+                              const SizedBox(width: 10),
+                              _socialIcon(Icons.facebook_rounded),
+                              const SizedBox(width: 10),
+                              _socialIcon(Icons.camera_alt_outlined),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Links
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Quick Links',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          _footerLink('Find a Farmer'),
+                          _footerLink('Seasonal Calendar'),
+                          _footerLink('Pricing Plans'),
+                          _footerLink('Help Center'),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Categories',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          _footerLink('Vegetables'),
+                          _footerLink('Fruits & Berries'),
+                          _footerLink('Dairy & Eggs'),
+                          _footerLink('Organic Grains'),
+                        ],
+                      ),
+                    ),
+                    // Newsletter
+                    Expanded(
+                      flex: 3,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Stay Updated',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Get harvest updates, recipes, and\nexclusive deals in your inbox.',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: AgriColors.mutedLight,
+                              height: 1.6,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  height: 44,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AgriColors.darkMuted,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFF374151),
+                                    ),
+                                  ),
+                                  child: TextField(
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: Colors.white,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: 'Email address',
+                                      hintStyle: GoogleFonts.inter(
+                                        fontSize: 13,
+                                        color: AgriColors.muted,
+                                      ),
+                                      border: InputBorder.none,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                          ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                gradient: AgriColors.primaryGradient,
-                                borderRadius: BorderRadius.circular(12),
+                              const SizedBox(width: 8),
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  gradient: AgriColors.primaryGradient,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.send_rounded,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
                               ),
-                              child: const Icon(Icons.send_rounded, size: 18, color: Colors.white),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
               const SizedBox(height: 48),
               Container(height: 1, color: const Color(0xFF1F2937)),
               const SizedBox(height: 24),
@@ -1796,16 +2087,37 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   children: [
                     Text(
                       '© 2026 AgriDirect. All rights reserved.',
-                      style: GoogleFonts.inter(fontSize: 11, color: AgriColors.muted),
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: AgriColors.muted,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 12,
                       runSpacing: 8,
                       children: [
-                        Text('Privacy Policy', style: GoogleFonts.inter(fontSize: 11, color: AgriColors.muted)),
-                        Text('Terms of Service', style: GoogleFonts.inter(fontSize: 11, color: AgriColors.muted)),
-                        Text('Cookie Policy', style: GoogleFonts.inter(fontSize: 11, color: AgriColors.muted)),
+                        Text(
+                          'Privacy Policy',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AgriColors.muted,
+                          ),
+                        ),
+                        Text(
+                          'Terms of Service',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AgriColors.muted,
+                          ),
+                        ),
+                        Text(
+                          'Cookie Policy',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AgriColors.muted,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -1816,15 +2128,36 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   children: [
                     Text(
                       '© 2026 AgriDirect. All rights reserved.',
-                      style: GoogleFonts.inter(fontSize: 12, color: AgriColors.muted),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: AgriColors.muted,
+                      ),
                     ),
                     Row(
                       children: [
-                        Text('Privacy Policy', style: GoogleFonts.inter(fontSize: 12, color: AgriColors.muted)),
+                        Text(
+                          'Privacy Policy',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: AgriColors.muted,
+                          ),
+                        ),
                         const SizedBox(width: 24),
-                        Text('Terms of Service', style: GoogleFonts.inter(fontSize: 12, color: AgriColors.muted)),
+                        Text(
+                          'Terms of Service',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: AgriColors.muted,
+                          ),
+                        ),
                         const SizedBox(width: 24),
-                        Text('Cookie Policy', style: GoogleFonts.inter(fontSize: 12, color: AgriColors.muted)),
+                        Text(
+                          'Cookie Policy',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: AgriColors.muted,
+                          ),
+                        ),
                       ],
                     ),
                   ],

@@ -1,352 +1,491 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/admin_service.dart';
-import '../../../shared/services/auth_service.dart';
+import '../../../shared/services/admin/admin_service.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
+import 'admin_ui.dart';
 
-/// Admin Moderation Tab - Manage reported content and community moderation (Modern White)
 class AdminModerationTab extends StatefulWidget {
   final AdminService adminService;
-
   const AdminModerationTab({super.key, required this.adminService});
 
   @override
   State<AdminModerationTab> createState() => _AdminModerationTabState();
 }
 
-class _AdminModerationTabState extends State<AdminModerationTab>
-    with TickerProviderStateMixin {
-  late TabController _tabController;
-  late Future<List<Map<String, dynamic>>> _pendingReportsFuture;
-  late Future<List<Map<String, dynamic>>> _resolvedReportsFuture;
-
-  // Modern light theme colors
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _background = Color(0xFFFAFAFA);
-  static const Color _card = Colors.white;
-  static const Color _border = Color(0xFFE2E8F0);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFF1E293B);
+class _AdminModerationTabState extends State<AdminModerationTab> {
+  late Future<List<Map<String, dynamic>>> _reportsFuture;
+  String _filterStatus = 'pending';
+  final String _filterReason = 'Any Reason';
+  int? _selectedReportIndex;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _loadReports();
+    _loadData();
   }
 
-  void _loadReports() {
-    _pendingReportsFuture = widget.adminService.getReportedContent(status: 'pending');
-    _resolvedReportsFuture = widget.adminService.getReportedContent(status: 'resolved');
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  void _loadData() {
+    setState(() {
+      _reportsFuture = widget.adminService.getReportedContent(status: _filterStatus);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: _background,
-      child: Column(
-        children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return AdminPageFrame(
+      child: SingleChildScrollView(
+        padding: AdminUi.pagePadding(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Title + Filter Row ──
+            _buildHeader(),
+            const SizedBox(height: 24),
+            // ── Main Content (Table + Detail Panel) ──
+            _buildMainContent(),
+            const SizedBox(height: 32),
+            // ── Bottom Stats Row ──
+            _buildBottomStats(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HEADER: Title + Filter Pills
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildHeader() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Moderation Queue', style: AdminUi.display(context, size: 28)),
+              const SizedBox(height: 4),
+              Text(
+                'Review flagged content and maintain the community standard.',
+                style: AdminUi.body(size: 15, color: AdminUi.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 24),
+        // Filter Status Pill
+        _filterPill('FILTER STATUS:', _filterStatus == 'pending' ? 'All Reports' : 'Resolved', () {
+          setState(() {
+            _filterStatus = _filterStatus == 'pending' ? 'resolved' : 'pending';
+            _loadData();
+          });
+        }),
+        const SizedBox(width: 12),
+        // Reason Pill
+        _filterPill('REASON:', _filterReason, () {}),
+      ],
+    );
+  }
+
+  Widget _filterPill(String label, String value, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: AdminUi.radiusFull,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: AdminUi.radiusFull,
+          border: Border.all(color: AdminUi.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: AdminUi.label(size: 11, color: AdminUi.textMuted, weight: FontWeight.w600)),
+            const SizedBox(width: 6),
+            Text(value, style: AdminUi.label(size: 12, color: AdminUi.textPrimary, weight: FontWeight.w800)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MAIN CONTENT: Table (left) + Report Detail Panel (right)
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildMainContent() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Left: Table
+        Expanded(
+          flex: 3,
+          child: Container(
+            decoration: AdminUi.cardDecoration(),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Content Moderation',
-                      style: GoogleFonts.inter(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: _text,
-                      ),
-                    ),
-                    Text(
-                      'Review and resolve reported platform content',
-                      style: GoogleFonts.inter(fontSize: 13, color: _muted),
-                    ),
-                  ],
-                ),
-                ElevatedButton.icon(
-                  onPressed: () => setState(() => _loadReports()),
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: const Text('Refresh'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: _text,
-                    elevation: 0,
-                    side: const BorderSide(color: _border),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                // Table header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: AdminUi.panelAlt,
+                    border: Border(bottom: BorderSide(color: AdminUi.border)),
+                  ),
+                  child: Row(
+                    children: [
+                      _headerCell('CONTENT TYPE', flex: 2),
+                      _headerCell('REASON', flex: 2),
+                      _headerCell('REPORTED BY', flex: 2),
+                      _headerCell('STATUS', flex: 2),
+                      _headerCell('DATE', flex: 1),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          // Tab Bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            decoration: BoxDecoration(
-              color: _card,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _border),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: _primary,
-              labelColor: _primary,
-              unselectedLabelColor: _muted,
-              labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-              indicatorSize: TabBarIndicatorSize.tab,
-              dividerColor: Colors.transparent,
-              indicator: BoxDecoration(
-                color: _primary.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              padding: const EdgeInsets.all(4),
-              tabs: const [
-                Tab(text: 'Pending Reports'),
-                Tab(text: 'History'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _ReportsListView(
-                  future: _pendingReportsFuture,
-                  adminService: widget.adminService,
-                  onReload: () => setState(() {
-                    _pendingReportsFuture = widget.adminService.getReportedContent(status: 'pending');
-                  }),
-                ),
-                _ReportsListView(
-                  future: _resolvedReportsFuture,
-                  adminService: widget.adminService,
-                  onReload: () => setState(() {
-                    _resolvedReportsFuture = widget.adminService.getReportedContent(status: 'resolved');
-                  }),
+                // Table body
+                FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _reportsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.all(60),
+                        child: Center(child: AppShimmerLoader(color: AdminUi.brand)),
+                      );
+                    }
+
+                    final reports = snapshot.data ?? [];
+                    if (reports.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.all(60),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              Icon(Icons.assignment_turned_in_rounded, size: 48, color: AdminUi.border),
+                              const SizedBox(height: 16),
+                              Text('No $_filterStatus reports found.', style: AdminUi.body(color: AdminUi.textMuted)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: reports.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1, color: AdminUi.border),
+                      itemBuilder: (context, index) => _buildReportRow(reports[index], index),
+                    );
+                  },
                 ),
               ],
             ),
           ),
-        ],
+        ),
+        const SizedBox(width: 24),
+        // Right: Report Detail Panel
+        SizedBox(
+          width: 320,
+          child: _buildReportDetailPanel(),
+        ),
+      ],
+    );
+  }
+
+  Widget _headerCell(String text, {int flex = 1}) {
+    return Expanded(
+      flex: flex,
+      child: Text(
+        text,
+        style: AdminUi.label(size: 11, color: AdminUi.textMuted, weight: FontWeight.w700, letterSpacing: 0.5),
       ),
     );
   }
-}
 
-class _ReportsListView extends StatelessWidget {
-  final Future<List<Map<String, dynamic>>> future;
-  final AdminService adminService;
-  final VoidCallback onReload;
+  Widget _buildReportRow(Map<String, dynamic> report, int index) {
+    final isSelected = _selectedReportIndex == index;
+    final reason = report['reason'] ?? 'No reason';
+    final status = report['status'] ?? _filterStatus;
+    final isResolved = status.toString().toLowerCase() == 'resolved';
+    final date = report['created_at'] != null
+        ? DateFormat('MMM d,\nHH:mm').format(DateTime.parse(report['created_at']))
+        : 'N/A';
 
-  const _ReportsListView({
-    required this.future,
-    required this.adminService,
-    required this.onReload,
-  });
+    // Determine content type icon
+    IconData typeIcon;
+    String typeLabel;
+    if (reason.toString().toLowerCase().contains('spam')) {
+      typeIcon = Icons.article_rounded;
+      typeLabel = 'Post';
+    } else if (reason.toString().toLowerCase().contains('harassment')) {
+      typeIcon = Icons.comment_rounded;
+      typeLabel = 'Comment';
+    } else {
+      typeIcon = Icons.article_rounded;
+      typeLabel = 'Post';
+    }
 
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _danger = Color(0xFFEF4444);
-  static const Color _muted = Color(0xFF64748B);
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 768;
-
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(isMobile ? 16 : 24),
-      child: FutureBuilder<List<Map<String, dynamic>>>(
-        future: future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator(color: _primary)));
-          }
-
-          if (snapshot.hasError) {
-            return Center(child: Text('Failed to load reports', style: GoogleFonts.inter(color: _danger)));
-          }
-
-          final reports = snapshot.data ?? [];
-
-          if (reports.isEmpty) {
-            return Center(
-              child: Column(
-                children: [
-                  const SizedBox(height: 60),
-                  Icon(Icons.verified_user_outlined, color: _muted.withOpacity(0.2), size: 64),
-                  const SizedBox(height: 16),
-                  Text('All clear! No reports found', style: GoogleFonts.inter(color: _muted, fontWeight: FontWeight.bold)),
-                ],
+    return Material(
+      color: isSelected ? AdminUi.brandSoft : Colors.white,
+      child: InkWell(
+        onTap: () => setState(() => _selectedReportIndex = index),
+        hoverColor: AdminUi.panelAlt,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Row(
+                  children: [
+                    Icon(typeIcon, size: 18, color: AdminUi.textSecondary),
+                    const SizedBox(width: 12),
+                    Text(typeLabel, style: AdminUi.label(size: 14, color: AdminUi.textPrimary, weight: FontWeight.w700)),
+                  ],
+                ),
               ),
-            );
-          }
-
-          return Column(
-            children: reports.map((report) => _ReportCard(
-              report: report,
-              adminService: adminService,
-              onReload: onReload,
-            )).toList(),
-          );
-        },
+              Expanded(
+                flex: 2,
+                child: Text(
+                  reason,
+                  style: AdminUi.body(size: 13, color: AdminUi.textSecondary),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text('@user_reporter', style: AdminUi.body(size: 13, color: AdminUi.textSecondary)),
+              ),
+              Expanded(
+                flex: 2,
+                child: _statusBadge(isResolved),
+              ),
+              Expanded(
+                flex: 1,
+                child: Text(date, style: AdminUi.body(size: 12, color: AdminUi.textMuted)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
-}
 
-class _ReportCard extends StatelessWidget {
-  final Map<String, dynamic> report;
-  final AdminService adminService;
-  final VoidCallback onReload;
-
-  const _ReportCard({required this.report, required this.adminService, required this.onReload});
-
-  @override
-  Widget build(BuildContext context) {
-    final status = report['status'] ?? 'pending';
-    final isResolved = status == 'resolved';
-    final type = report['content_type'] ?? 'Content';
-
+  Widget _statusBadge(bool resolved) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
+        color: resolved ? AdminUi.success.withValues(alpha: 0.1) : AdminUi.danger.withValues(alpha: 0.1),
+        borderRadius: AdminUi.radiusSm,
       ),
-      padding: const EdgeInsets.all(20),
+      child: Text(
+        resolved ? 'RESOLVED' : 'PENDING',
+        style: AdminUi.label(
+          size: 10,
+          color: resolved ? AdminUi.success : AdminUi.danger,
+          weight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REPORT DETAIL PANEL (right sidebar)
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildReportDetailPanel() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: AdminUi.cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _Badge(text: type.toUpperCase(), color: _getTypeColor(type)),
-              _Badge(text: status.toUpperCase(), color: isResolved ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+              Text('Report Detail', style: AdminUi.title(size: 18)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AdminUi.danger.withValues(alpha: 0.1),
+                  borderRadius: AdminUi.radiusSm,
+                ),
+                child: Text('CRITICAL', style: AdminUi.label(size: 10, color: AdminUi.danger, weight: FontWeight.w800)),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text('Reason for Report', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
-          const SizedBox(height: 4),
-          Text(report['reason'] ?? 'Violation of community guidelines', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B))),
-          const SizedBox(height: 12),
-          Text(report['description'] ?? '', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569))),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
+          // User info
           Row(
             children: [
-              Icon(Icons.calendar_today_rounded, size: 12, color: const Color(0xFF94A3B8)),
-              const SizedBox(width: 6),
-              Text(_formatDate(report['created_at']), style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
-              const Spacer(),
-              if (!isResolved)
-                ElevatedButton(
-                  onPressed: () => _showResolveDialog(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text('Take Action'),
-                ),
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AdminUi.brandSoft,
+                child: Text('GT', style: AdminUi.label(size: 14, color: AdminUi.brand, weight: FontWeight.w800)),
+              ),
+              const SizedBox(width: 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('@green_thumb_22', style: AdminUi.label(size: 14, color: AdminUi.textPrimary, weight: FontWeight.w700)),
+                  Text('Reported for: Spam / Promotion', style: AdminUi.body(size: 12, color: AdminUi.textSecondary)),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Color _getTypeColor(String type) {
-    switch (type.toLowerCase()) {
-      case 'user': return const Color(0xFFEF4444);
-      case 'product': return const Color(0xFF10B981);
-      case 'comment': return const Color(0xFF3B82F6);
-      default: return const Color(0xFF64748B);
-    }
-  }
-
-  String _formatDate(String? dateStr) {
-    if (dateStr == null) return '-';
-    try {
-      final date = DateTime.parse(dateStr);
-      return '${date.month}/${date.day}/${date.year}';
-    } catch (_) { return '-'; }
-  }
-
-  void _showResolveDialog(BuildContext context) {
-    final notesController = TextEditingController();
-    final authService = AuthService();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Resolve Report', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Please provide resolution notes for this moderation action.', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B))),
-            const SizedBox(height: 16),
-            TextField(
-              controller: notesController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'e.g. Content removed, User warned...',
-                hintStyle: GoogleFonts.inter(fontSize: 13),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                fillColor: const Color(0xFFFAFAFA),
-                filled: true,
+          const SizedBox(height: 20),
+          // Content Preview
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AdminUi.panelAlt,
+              borderRadius: AdminUi.radiusMd,
+              border: Border.all(color: AdminUi.border),
+            ),
+            child: Text(
+              '"Hey everyone! Looking for cheap fertilizer? Visit our store at [Link Removed] for 50% off all organic nitrogen supplements. Best quality in the region, don\'t miss out on these harvest gains!"',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AdminUi.textSecondary,
+                fontStyle: FontStyle.italic,
+                height: 1.5,
               ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              await adminService.resolveReport(
-                reportId: report['report_id'] ?? '',
-                adminId: authService.userId,
-                resolutionNotes: notesController.text.isEmpty ? 'Action taken by admin' : notesController.text,
-              );
-              if (context.mounted) {
-                Navigator.pop(context);
-                onReload();
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
-            child: const Text('Submit'),
+          ),
+          const SizedBox(height: 24),
+          // Immediate Actions label
+          Text('IMMEDIATE ACTIONS', style: AdminUi.label(size: 11, color: AdminUi.textMuted, weight: FontWeight.w700, letterSpacing: 0.5)),
+          const SizedBox(height: 16),
+          // Action Buttons Grid (2x2)
+          Row(
+            children: [
+              Expanded(child: _actionButton(Icons.block_rounded, 'Remove Content', AdminUi.brand, () {})),
+              const SizedBox(width: 8),
+              Expanded(child: _actionButton(Icons.check_circle_outline_rounded, 'Dismiss Report', AdminUi.brand, () {})),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: _actionButton(Icons.warning_amber_rounded, 'Warn User', AdminUi.warning, () {})),
+              const SizedBox(width: 8),
+              Expanded(child: _actionButton(Icons.do_not_disturb_rounded, 'Ban User', AdminUi.danger, () {})),
+            ],
+          ),
+          const SizedBox(height: 24),
+          // View User History
+          Center(
+            child: TextButton(
+              onPressed: () {},
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('VIEW USER HISTORY', style: AdminUi.label(size: 11, color: AdminUi.textSecondary, weight: FontWeight.w700, letterSpacing: 0.5)),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_forward_rounded, size: 14, color: AdminUi.textSecondary),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
   }
-}
 
-class _Badge extends StatelessWidget {
-  final String text;
-  final Color color;
-  const _Badge({required this.text, required this.color});
+  Widget _actionButton(IconData icon, String label, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: AdminUi.radiusMd,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: AdminUi.radiusMd,
+          border: Border.all(color: color.withValues(alpha: 0.15)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 6),
+            Text(label, style: AdminUi.label(size: 11, color: color, weight: FontWeight.w700), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-      child: Text(text, style: GoogleFonts.inter(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+  // ═══════════════════════════════════════════════════════════════════════════
+  // BOTTOM STATS (Unresolved Reports + Average Resolve Time)
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildBottomStats() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 140,
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7ED), // warm background
+              borderRadius: AdminUi.radiusLg,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('UNRESOLVED REPORTS', style: AdminUi.label(size: 11, color: AdminUi.textMuted, weight: FontWeight.w700, letterSpacing: 0.5)),
+                      const SizedBox(height: 8),
+                      FutureBuilder<Map<String, dynamic>>(
+                        future: widget.adminService.getDashboardCounts(),
+                        builder: (context, snapshot) {
+                          return Text(
+                            '${snapshot.data?['pending_reports'] ?? "..."}', 
+                            style: GoogleFonts.plusJakartaSans(fontSize: 40, fontWeight: FontWeight.w800, color: AdminUi.textPrimary)
+                          );
+                        }
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.warning_amber_rounded, size: 64, color: AdminUi.warning.withValues(alpha: 0.3)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: Container(
+            height: 140,
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: AdminUi.brand,
+              borderRadius: AdminUi.radiusLg,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('AVERAGE RESOLVE TIME', style: AdminUi.label(size: 11, color: Colors.white.withValues(alpha: 0.7), weight: FontWeight.w700, letterSpacing: 0.5)),
+                      const SizedBox(height: 8),
+                      Text('14m', style: GoogleFonts.plusJakartaSans(fontSize: 40, fontWeight: FontWeight.w800, color: Colors.white)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.speed_rounded, size: 64, color: Colors.white.withValues(alpha: 0.2)),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

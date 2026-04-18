@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/admin_service.dart';
+import 'package:intl/intl.dart';
+import '../../../shared/services/admin/admin_service.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
+import 'admin_ui.dart';
 
-/// Admin Orders Tab - View and manage all platform orders (Modern White)
 class AdminOrdersTab extends StatefulWidget {
   final AdminService adminService;
-
   const AdminOrdersTab({super.key, required this.adminService});
 
   @override
@@ -14,495 +15,370 @@ class AdminOrdersTab extends StatefulWidget {
 
 class _AdminOrdersTabState extends State<AdminOrdersTab> {
   late Future<List<Map<String, dynamic>>> _ordersFuture;
-  int _currentPage = 0;
-
-  // Modern light theme colors
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _secondary = Color(0xFF3B82F6);
-  static const Color _warning = Color(0xFFF59E0B);
-  static const Color _danger = Color(0xFFEF4444);
-  static const Color _background = Color(0xFFFAFAFA);
-  static const Color _card = Colors.white;
-  static const Color _border = Color(0xFFE2E8F0);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFF1E293B);
+  String _searchQuery = '';
+  String _filterStatus = 'all'; 
 
   @override
   void initState() {
     super.initState();
-    _loadOrders();
+    _loadData();
   }
 
-  void _loadOrders() {
-    _ordersFuture = widget.adminService.getAllOrders(page: _currentPage);
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status.toUpperCase()) {
-      case 'COMPLETED':
-        return _primary;
-      case 'PENDING':
-        return _warning;
-      case 'CANCELLED':
-        return _danger;
-      case 'SHIPPED':
-        return _secondary;
-      case 'PROCESSING':
-        return _secondary;
-      default:
-        return _muted;
-    }
+  void _loadData() {
+    setState(() {
+      _ordersFuture = widget.adminService.getAllOrders();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 768;
-
-    return Container(
-      color: _background,
+    return AdminPageFrame(
       child: SingleChildScrollView(
-        padding: EdgeInsets.all(isMobile ? 16 : 24),
+        padding: AdminUi.pagePadding(context),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Sales & Orders',
-                      style: GoogleFonts.inter(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: _text,
-                      ),
-                    ),
-                    Text(
-                      'Monitor platform transactions and fulfillment',
-                      style: GoogleFonts.inter(fontSize: 13, color: _muted),
-                    ),
-                  ],
-                ),
-                if (!isMobile)
-                  ElevatedButton.icon(
-                    onPressed: () => setState(() => _loadOrders()),
-                    icon: const Icon(Icons.refresh_rounded, size: 18),
-                    label: const Text('Refresh'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: _text,
-                      elevation: 0,
-                      side: const BorderSide(color: _border),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
+            AdminHeroCard(
+              useGradient: true,
+              eyebrow: 'Commerce System',
+              title: 'Order Management',
+              description: 'Monitor marketplace transactions, oversee fulfillment, and analyze sales performance.',
+              metrics: [
+                AdminMiniMetric(label: 'Total Revenue', value: '₱428,210', icon: Icons.payments_rounded, light: true),
+                AdminMiniMetric(label: 'Pending Orders', value: '24', icon: Icons.pending_actions_rounded, light: true),
+                AdminMiniMetric(label: 'Sales Growth', value: '+18.4%', icon: Icons.trending_up_rounded, light: true),
+              ],
+              actions: [
+                ElevatedButton.icon(
+                  onPressed: _loadData,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.15),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: AdminUi.radiusMd),
                   ),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Sync Transactions'),
+                ),
               ],
             ),
             const SizedBox(height: 24),
-            FutureBuilder<List<Map<String, dynamic>>>(
-              future: _ordersFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(40),
-                      child: CircularProgressIndicator(color: _primary),
-                    ),
-                  );
-                }
-
-                if (snapshot.hasError) {
-                  return _buildErrorState();
-                }
-
-                final orders = snapshot.data ?? [];
-
-                if (orders.isEmpty) {
-                  return _buildEmptyState();
-                }
-
-                return Column(
-                  children: [
-                    if (!isMobile)
-                      _OrdersTable(
-                        orders: orders,
-                        getStatusColor: _getStatusColor,
-                        onReload: () => setState(() => _loadOrders()),
-                      )
-                    else
-                      Column(
-                        children: orders
-                            .map(
-                              (order) => _OrderCard(
-                                order: order,
-                                getStatusColor: _getStatusColor,
-                                onReload: () => setState(() => _loadOrders()),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    const SizedBox(height: 32),
-                    _buildPagination(orders.length),
-                  ],
-                );
-              },
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: AdminUi.radiusLg,
+                border: Border.all(color: AdminUi.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  _buildToolbar(),
+                  const Divider(height: 1, color: AdminUi.border),
+                  _buildTableHeader(),
+                  const Divider(height: 1, color: AdminUi.border),
+                  _buildTableBody(),
+                ],
+              ),
             ),
+            const SizedBox(height: 32),
+            _buildBottomInsights(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPagination(int count) {
+  Widget _buildBottomInsights() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        IconButton(
-          onPressed: _currentPage > 0
-              ? () => setState(() {
-                  _currentPage--;
-                  _loadOrders();
-                })
-              : null,
-          icon: const Icon(Icons.chevron_left),
-          style: IconButton.styleFrom(
-            backgroundColor: _card,
-            side: const BorderSide(color: _border),
+        Expanded(
+          child: Container(
+            height: 180,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: AdminUi.brand,
+              borderRadius: AdminUi.radiusLg,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Fulfillment Efficiency', style: AdminUi.title(size: 20, color: Colors.white)),
+                const SizedBox(height: 8),
+                Text(
+                  'Current average fulfillment time is 4.2 hours. This is 12% faster than last month.',
+                  style: AdminUi.body(size: 14, color: Colors.white.withValues(alpha: 0.8)),
+                ),
+                const Spacer(),
+                Text('VIEW LOGISTICS DASHBOARD', style: AdminUi.label(size: 12, color: Colors.white, weight: FontWeight.w800)),
+              ],
+            ),
           ),
         ),
-        const SizedBox(width: 16),
-        Text(
-          'Page ${_currentPage + 1}',
-          style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: _text),
-        ),
-        const SizedBox(width: 16),
-        IconButton(
-          onPressed: count >= 20
-              ? () => setState(() {
-                  _currentPage++;
-                  _loadOrders();
-                })
-              : null,
-          icon: const Icon(Icons.chevron_right),
-          style: IconButton.styleFrom(
-            backgroundColor: _card,
-            side: const BorderSide(color: _border),
+        const SizedBox(width: 24),
+        Expanded(
+          child: Container(
+            height: 180,
+            padding: const EdgeInsets.all(32),
+            decoration: AdminUi.cardDecoration(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Payment Methods', style: AdminUi.title(size: 20)),
+                const SizedBox(height: 16),
+                _paymentStat('Credit/Debit Card', '68%', AdminUi.brand),
+                const SizedBox(height: 12),
+                _paymentStat('Digital Wallets', '32%', AdminUi.success),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.error_outline, size: 48, color: _danger),
-          const SizedBox(height: 16),
-          Text(
-            'Failed to load orders',
-            style: GoogleFonts.inter(
-              color: _danger,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          TextButton(onPressed: _loadOrders, child: const Text('Retry')),
-        ],
-      ),
+  Widget _paymentStat(String label, String value, Color color) {
+    return Row(
+      children: [
+        Text(label, style: AdminUi.label(size: 14, color: AdminUi.textSecondary)),
+        const Spacer(),
+        Text(value, style: AdminUi.label(size: 14, color: color, weight: FontWeight.w800)),
+      ],
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+  Widget _buildToolbar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      child: Row(
         children: [
-          const SizedBox(height: 60),
-          Icon(
-            Icons.shopping_bag_outlined,
-            size: 64,
-            color: _muted.withOpacity(0.2),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: AdminUi.background,
+                borderRadius: AdminUi.radiusMd,
+              ),
+              child: TextField(
+                decoration: AdminUi.inputDecoration(
+                  hintText: 'Search by Order ID or Buyer Name...',
+                  prefixIcon: const Icon(Icons.search_rounded, color: AdminUi.textMuted, size: 20),
+                ).copyWith(
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                ),
+                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            'No orders found',
-            style: GoogleFonts.inter(
-              color: _muted,
-              fontWeight: FontWeight.bold,
+          const SizedBox(width: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: AdminUi.background,
+              borderRadius: AdminUi.radiusMd,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OrdersTable extends StatelessWidget {
-  final List<Map<String, dynamic>> orders;
-  final Color Function(String) getStatusColor;
-  final VoidCallback onReload;
-
-  const _OrdersTable({
-    required this.orders,
-    required this.getStatusColor,
-    required this.onReload,
-  });
-
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _card = Colors.white;
-  static const Color _border = Color(0xFFE2E8F0);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _text = Color(0xFF1E293B);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: DataTable(
-          headingRowHeight: 56,
-          headingRowColor: MaterialStateProperty.all(const Color(0xFFF1F5F9)),
-          dividerThickness: 0.5,
-          columns: [
-            DataColumn(
-              label: Text(
-                'ORDER ID',
-                style: GoogleFonts.inter(
-                  color: _muted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            DataColumn(
-              label: Text(
-                'CUSTOMER',
-                style: GoogleFonts.inter(
-                  color: _muted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            DataColumn(
-              label: Text(
-                'TOTAL',
-                style: GoogleFonts.inter(
-                  color: _muted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            DataColumn(
-              label: Text(
-                'STATUS',
-                style: GoogleFonts.inter(
-                  color: _muted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            DataColumn(
-              label: Text(
-                'DATE',
-                style: GoogleFonts.inter(
-                  color: _muted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            DataColumn(
-              label: Text(
-                'ACTIONS',
-                style: GoogleFonts.inter(
-                  color: _muted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-          rows: orders.map((order) {
-            final customerName = order['users']?['name'] ?? 'Unknown';
-            return DataRow(
-              cells: [
-                DataCell(
-                  Text(
-                    order['order_number'] ?? '-',
-                    style: GoogleFonts.inter(
-                      color: _text,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                DataCell(
-                  Text(customerName, style: GoogleFonts.inter(color: _text)),
-                ),
-                DataCell(
-                  Text(
-                    '₱${order['total'] ?? 0}',
-                    style: GoogleFonts.inter(
-                      color: _primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                DataCell(
-                  _StatusBadge(
-                    status: order['status'],
-                    color: getStatusColor(order['status'] ?? ''),
-                  ),
-                ),
-                DataCell(
-                  Text(
-                    _formatDate(order['created_at']),
-                    style: GoogleFonts.inter(color: _muted, fontSize: 13),
-                  ),
-                ),
-                DataCell(
-                  IconButton(
-                    icon: const Icon(Icons.more_horiz_rounded, color: _muted),
-                    onPressed: () {}, // Detail view coming soon
-                  ),
-                ),
+            child: DropdownButton<String>(
+              value: _filterStatus,
+              underline: const SizedBox(),
+              icon: const Icon(Icons.tune_rounded, size: 18, color: AdminUi.textSecondary),
+              style: AdminUi.label(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w700),
+              onChanged: (v) => setState(() => _filterStatus = v ?? 'all'),
+              items: const [
+                DropdownMenuItem(value: 'all', child: Text('All Orders')),
+                DropdownMenuItem(value: 'pending', child: Text('Pending Review')),
+                DropdownMenuItem(value: 'completed', child: Text('Completed')),
+                DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
               ],
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  String _formatDate(String? dateStr) {
-    if (dateStr == null) return '-';
-    try {
-      final date = DateTime.parse(dateStr);
-      return '${date.month}/${date.day}/${date.year}';
-    } catch (_) {
-      return '-';
-    }
-  }
-}
-
-class _OrderCard extends StatelessWidget {
-  final Map<String, dynamic> order;
-  final Color Function(String) getStatusColor;
-  final VoidCallback onReload;
-
-  const _OrderCard({
-    required this.order,
-    required this.getStatusColor,
-    required this.onReload,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final status = order['status'] ?? 'PENDING';
-    final customerName = order['users']?['name'] ?? 'Unknown';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                order['order_number'] ?? '-',
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF1E293B),
-                ),
-              ),
-              _StatusBadge(status: status, color: getStatusColor(status)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Icon(
-                Icons.person_outline,
-                size: 14,
-                color: Color(0xFF64748B),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                customerName,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '₱${order['total'] ?? 0}',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF10B981),
-                ),
-              ),
-              TextButton(onPressed: () {}, child: const Text('Details')),
-            ],
+            ),
           ),
         ],
       ),
     );
   }
-}
 
-class _StatusBadge extends StatelessWidget {
-  final String? status;
-  final Color color;
-  const _StatusBadge({this.status, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildTableHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+      color: AdminUi.sidebarBg.withValues(alpha: 0.5),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+      child: Row(
+        children: [
+          _headerCell('Transaction ID', flex: 2),
+          _headerCell('Fulfillment', flex: 1),
+          _headerCell('Amount', flex: 1),
+          _headerCell('Date', flex: 1),
+          _headerCell('Actions', flex: 1, align: TextAlign.right),
+        ],
       ),
+    );
+  }
+
+  Widget _headerCell(String text, {int flex = 1, TextAlign align = TextAlign.left}) {
+    return Expanded(
+      flex: flex,
       child: Text(
-        status?.toUpperCase() ?? 'PENDING',
-        style: GoogleFonts.inter(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
+        text.toUpperCase(),
+        textAlign: align,
+        style: AdminUi.label(size: 11, color: AdminUi.textMuted, weight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Widget _buildTableBody() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _ordersFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(40),
+            child: Center(child: AppShimmerLoader(color: AdminUi.brand)),
+          );
+        }
+
+        var orders = snapshot.data ?? [];
+        
+        // Filtering
+        if (_searchQuery.isNotEmpty) {
+          orders = orders.where((o) {
+            final id = (o['order_id'] ?? '').toString().toLowerCase();
+            return id.contains(_searchQuery);
+          }).toList();
+        }
+        if (_filterStatus != 'all') {
+          orders = orders.where((o) => o['status'] == _filterStatus).toList();
+        }
+
+        if (orders.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(40),
+            child: Center(
+              child: Text('No orders found.', style: AdminUi.body(color: AdminUi.textMuted)),
+            ),
+          );
+        }
+
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          itemCount: orders.length,
+          separatorBuilder: (context, index) => const Divider(height: 1, color: AdminUi.border),
+          itemBuilder: (context, index) => _buildRow(orders[index]),
+        );
+      },
+    );
+  }
+
+  Widget _buildRow(Map<String, dynamic> order) {
+    final status = order['status'] ?? 'pending';
+    final orderId = order['order_id'] ?? 'Unknown';
+    final amount = order['total_amount'] ?? 0;
+    final date = order['created_at'] != null 
+        ? DateFormat('MMM d, yyyy HH:mm').format(DateTime.parse(order['created_at']))
+        : 'Unknown';
+
+    Color statusColor;
+    if (status == 'completed') {
+      statusColor = AdminUi.success;
+    } else if (status == 'cancelled') {
+      statusColor = AdminUi.danger;
+    } else {
+      statusColor = AdminUi.warning;
+    }
+
+    return Material(
+      color: Colors.white,
+      child: InkWell(
+        onTap: () {},
+        hoverColor: AdminUi.panelAlt,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AdminUi.brandSoft,
+                        borderRadius: AdminUi.radiusMd,
+                      ),
+                      child: const Icon(Icons.receipt_rounded, size: 20, color: AdminUi.brand),
+                    ),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '#${orderId.toString().substring(0, 8).toUpperCase()}',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AdminUi.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Payment via Card',
+                          style: AdminUi.body(size: 12, color: AdminUi.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                flex: 1,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: AdminUi.radiusFull,
+                      border: Border.all(color: statusColor.withValues(alpha: 0.2)),
+                    ),
+                    child: Text(
+                      status.toUpperCase(),
+                      style: AdminUi.label(size: 10, color: statusColor, weight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 1,
+                child: Text('₱${amount.toStringAsFixed(2)}', style: AdminUi.label(size: 13, color: AdminUi.textPrimary)),
+              ),
+              Expanded(
+                flex: 1,
+                child: Text(date, style: AdminUi.body(size: 13, color: AdminUi.textSecondary)),
+              ),
+              Expanded(
+                flex: 1,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right_rounded),
+                      color: AdminUi.textSecondary,
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

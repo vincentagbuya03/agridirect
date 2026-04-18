@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/password_reset_service.dart';
+import 'package:go_router/go_router.dart';
+import '../../../shared/services/auth/password_reset_service.dart';
+import '../../../shared/router/app_router.dart';
 
 /// Web Password Reset with Code Screen
-/// Users receive a 6-digit code via email and enter it here
+/// High-Security 3NF Implementation.
 class WebPasswordResetWithCodeScreen extends StatefulWidget {
   const WebPasswordResetWithCodeScreen({super.key});
 
@@ -15,28 +18,21 @@ class WebPasswordResetWithCodeScreen extends StatefulWidget {
 class _WebPasswordResetWithCodeScreenState
     extends State<WebPasswordResetWithCodeScreen> {
   final _emailController = TextEditingController();
-  final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
   bool _obscurePassword = true;
-  bool _obscureConfirm = true;
+  bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   bool _codeSent = false;
   bool _resetSuccess = false;
 
   static const Color _primary = Color(0xFF16A34A);
-  static const Color _dark = Color(0xFF111827);
-  static const Color _darkSecondary = Color(0xFF1F2937);
-  static const Color _muted = Color(0xFF9CA3AF);
-  static const Color _mutedDark = Color(0xFF6B7280);
-  static const Color _border = Color(0xFFE5E7EB);
   static const Color _danger = Color(0xFFEF4444);
 
   @override
   void dispose() {
     _emailController.dispose();
-    _codeController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -52,29 +48,44 @@ class _WebPasswordResetWithCodeScreenState
     setState(() => _isLoading = true);
 
     try {
-      await PasswordResetService.sendResetCode(email);
-      setState(() {
-        _isLoading = false;
-        _codeSent = true;
-      });
-      _showSnackBar(
-        'Verification code sent! Check your email.',
-        isError: false,
-      );
+      final mode = await PasswordResetService.sendResetCode(email);
+
+      if (mode == PasswordResetDeliveryMode.code) {
+        setState(() {
+          _isLoading = false;
+          _codeSent = true;
+        });
+        _showSnackBar(
+          'Reset code sent! Check your email, then set your new password below.',
+          isError: false,
+        );
+      } else {
+        setState(() {
+          _isLoading = false;
+          _resetSuccess = true;
+        });
+        _showSnackBar(
+          'Reset link sent! Check your email to continue.',
+          isError: false,
+        );
+
+        await Future.delayed(const Duration(seconds: 2));
+        if (!mounted) return;
+        context.go(AppRoutes.login);
+      }
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnackBar('Failed to send code: ${e.toString()}', isError: true);
+      _showSnackBar('Failed: $e', isError: true);
     }
   }
 
   Future<void> _handleResetPassword() async {
     final email = _emailController.text.trim();
-    final code = _codeController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    if (code.isEmpty) {
-      _showSnackBar('Please enter the verification code', isError: true);
+    if (email.isEmpty || !email.contains('@')) {
+      _showSnackBar('Please enter a valid email address', isError: true);
       return;
     }
 
@@ -96,9 +107,8 @@ class _WebPasswordResetWithCodeScreenState
     setState(() => _isLoading = true);
 
     try {
-      await PasswordResetService.resetPasswordWithCode(
+      await PasswordResetService.resetPasswordWithLatestCode(
         email: email,
-        code: code,
         newPassword: password,
       );
 
@@ -108,19 +118,17 @@ class _WebPasswordResetWithCodeScreenState
       });
 
       _showSnackBar('Password reset successfully!', isError: false);
-
-      // Navigate to login after 2 seconds
       await Future.delayed(const Duration(seconds: 2));
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/login');
-      }
+      if (!mounted) return;
+      context.go(AppRoutes.login);
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnackBar('Failed to reset password: ${e.toString()}', isError: true);
+      _showSnackBar('Failed to reset password: $e', isError: true);
     }
   }
 
   void _showSnackBar(String message, {required bool isError}) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -134,8 +142,7 @@ class _WebPasswordResetWithCodeScreenState
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 768;
+    final isMobile = MediaQuery.of(context).size.width < 768;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -147,7 +154,7 @@ class _WebPasswordResetWithCodeScreenState
             child: _resetSuccess
                 ? _buildSuccessView()
                 : _codeSent
-                ? _buildVerifyCodeForm()
+                ? _buildCreatePasswordForm()
                 : _buildSendCodeForm(),
           ),
         ),
@@ -158,210 +165,115 @@ class _WebPasswordResetWithCodeScreenState
   Widget _buildSendCodeForm() {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: _primary.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Icon(
-            Icons.lock_reset_rounded,
-            color: _primary,
-            size: 32,
-          ),
-        ),
+        const Icon(Icons.lock_reset_rounded, color: _primary, size: 64),
         const SizedBox(height: 32),
         Text(
           'Reset Password',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 28,
-            fontWeight: FontWeight.w700,
-            color: _dark,
+            fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 12),
-        Text(
-          'Enter your email address and we\'ll send you a verification code.',
-          style: GoogleFonts.inter(
-            fontSize: 15,
-            color: _mutedDark,
-            height: 1.6,
-          ),
+        const Text(
+          'Enter your email to receive a reset code. If a valid code already exists, it will be reused.',
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 36),
         _buildTextField(
-          controller: _emailController,
-          label: 'Email Address',
-          hint: 'you@example.com',
-          icon: Icons.email_outlined,
-          keyboardType: TextInputType.emailAddress,
+          _emailController,
+          'Email Address',
+          Icons.email_outlined,
         ),
         const SizedBox(height: 28),
         SizedBox(
           width: double.infinity,
-          height: 54,
+          height: 52,
           child: ElevatedButton(
-            onPressed: _isLoading ? null : _handleSendCode,
             style: ElevatedButton.styleFrom(
               backgroundColor: _primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              disabledBackgroundColor: _muted,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
             ),
+            onPressed: _isLoading ? null : _handleSendCode,
             child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : Text(
-                    'Send Code',
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                ? const AppShimmerLoader(color: Colors.white)
+                : const Text(
+                    'Send Reset Code',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
           ),
         ),
-        const SizedBox(height: 24),
-        Center(
-          child: TextButton(
-            onPressed: () =>
-                Navigator.of(context).pushReplacementNamed('/login'),
-            child: Text(
-              'Back to Login',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: _primary,
-              ),
-            ),
-          ),
+        TextButton(
+          onPressed: () => context.go(AppRoutes.login),
+          child: const Text('Back to Login', style: TextStyle(color: _primary)),
         ),
       ],
     );
   }
 
-  Widget _buildVerifyCodeForm() {
+  Widget _buildCreatePasswordForm() {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: _primary.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Icon(
-            Icons.verified_user_rounded,
-            color: _primary,
-            size: 32,
-          ),
-        ),
+        const Icon(Icons.verified_user_rounded, color: _primary, size: 64),
         const SizedBox(height: 32),
         Text(
-          'Enter Verification Code',
+          'Create New Password',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 28,
-            fontWeight: FontWeight.w700,
-            color: _dark,
+            fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 12),
-        Text(
-          'We sent a 6-digit code to ${_emailController.text}. Enter it below along with your new password.',
-          style: GoogleFonts.inter(
-            fontSize: 15,
-            color: _mutedDark,
-            height: 1.6,
-          ),
+        const Text(
+          'The latest valid reset code is used automatically when you set your new password.',
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 36),
         _buildTextField(
-          controller: _codeController,
-          label: 'Verification Code',
-          hint: '123456',
-          icon: Icons.pin_outlined,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-        ),
-        const SizedBox(height: 16),
-        _buildPasswordField(
-          controller: _passwordController,
-          label: 'New Password',
-          hint: 'Enter new password',
+          _passwordController,
+          'New Password',
+          Icons.lock_outline,
           obscure: _obscurePassword,
           onToggle: () => setState(() => _obscurePassword = !_obscurePassword),
         ),
-        const SizedBox(height: 16),
-        _buildPasswordField(
-          controller: _confirmPasswordController,
-          label: 'Confirm Password',
-          hint: 'Confirm new password',
-          obscure: _obscureConfirm,
-          onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+        const SizedBox(height: 18),
+        _buildTextField(
+          _confirmPasswordController,
+          'Confirm New Password',
+          Icons.lock_outline,
+          obscure: _obscureConfirmPassword,
+          onToggle: () => setState(
+            () => _obscureConfirmPassword = !_obscureConfirmPassword,
+          ),
         ),
         const SizedBox(height: 28),
         SizedBox(
           width: double.infinity,
-          height: 54,
+          height: 52,
           child: ElevatedButton(
-            onPressed: _isLoading ? null : _handleResetPassword,
             style: ElevatedButton.styleFrom(
               backgroundColor: _primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              disabledBackgroundColor: _muted,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
             ),
+            onPressed: _isLoading ? null : _handleResetPassword,
             child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : Text(
+                ? const AppShimmerLoader(color: Colors.white)
+                : const Text(
                     'Reset Password',
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Center(
-          child: TextButton(
-            onPressed: _isLoading
-                ? null
-                : () => setState(() {
-                    _codeSent = false;
-                    _codeController.clear();
-                  }),
-            child: Text(
-              'Send New Code',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: _primary,
-              ),
-            ),
           ),
         ),
       ],
@@ -372,146 +284,59 @@ class _WebPasswordResetWithCodeScreenState
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: _primary.withOpacity(0.08),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.check_circle_rounded,
-            color: _primary,
-            size: 48,
-          ),
-        ),
+        const Icon(Icons.check_circle_rounded, color: _primary, size: 80),
         const SizedBox(height: 32),
         Text(
-          'Password Reset!',
+          'Success!',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-            color: _dark,
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 12),
-        Text(
-          'Your password has been reset successfully.\nRedirecting to login...',
+        const Text(
+          'Your password has been reset. Redirecting...',
           textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            fontSize: 15,
-            color: _mutedDark,
-            height: 1.6,
-          ),
         ),
       ],
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    TextInputType? keyboardType,
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    bool obscure = false,
+    VoidCallback? onToggle,
     int? maxLength,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: _dark,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          keyboardType: keyboardType,
-          maxLength: maxLength,
-          style: GoogleFonts.inter(fontSize: 15, color: _dark),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: GoogleFonts.inter(fontSize: 15, color: _muted),
-            filled: true,
-            fillColor: const Color(0xFFF9FAFB),
-            counterText: '',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: _border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: _border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: _primary, width: 2),
-            ),
-            prefixIcon: Icon(icon, size: 20),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPasswordField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required bool obscure,
-    required VoidCallback onToggle,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: _dark,
-          ),
-        ),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
           obscureText: obscure,
-          style: GoogleFonts.inter(fontSize: 15, color: _dark),
+          maxLength: maxLength,
           decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: GoogleFonts.inter(fontSize: 15, color: _muted),
+            prefixIcon: Icon(icon, size: 20),
+            suffixIcon: onToggle != null
+                ? IconButton(
+                    icon: Icon(
+                      obscure ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: onToggle,
+                  )
+                : null,
             filled: true,
             fillColor: const Color(0xFFF9FAFB),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: _border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: _border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: _primary, width: 2),
-            ),
-            prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
-            suffixIcon: IconButton(
-              icon: Icon(
-                obscure
-                    ? Icons.visibility_off_rounded
-                    : Icons.visibility_rounded,
-                size: 20,
-                color: _muted,
-              ),
-              onPressed: onToggle,
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+            counterText: '',
           ),
         ),
       ],
     );
   }
 }
+

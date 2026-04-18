@@ -1,10 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
-import '../../../shared/services/auth_service.dart';
-import '../../../shared/services/supabase_config.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/router/app_router.dart';
+import '../../../shared/widgets/image_widgets.dart';
 import '../../widgets/animated_components.dart';
 
 /// Web Profile screen.
@@ -41,6 +43,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   int _hoveredNav = -1;
 
   String? _registrationStatus; // 'pending', 'approved', 'rejected', or null
+  StreamSubscription<String?>? _registrationStatusSubscription;
 
   @override
   void initState() {
@@ -49,25 +52,19 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     )..forward();
-    _loadRegistrationStatus();
-  }
-
-  Future<void> _loadRegistrationStatus() async {
-    try {
-      final auth = AuthService();
-      final reg = await SupabaseDB.getFarmerRegistration(auth.userId);
-      if (mounted) {
-        setState(() {
-          _registrationStatus = reg?['status'] as String?;
+    final auth = AuthService();
+    _registrationStatusSubscription =
+        SupabaseDB.watchFarmerRegistrationStatus(auth.userId).listen((status) {
+          if (!mounted) return;
+          setState(() {
+            _registrationStatus = status;
+          });
         });
-      }
-    } catch (e) {
-      debugPrint('Error loading registration status: $e');
-    }
   }
 
   @override
   void dispose() {
+    _registrationStatusSubscription?.cancel();
     _fadeInController.dispose();
     super.dispose();
   }
@@ -75,12 +72,19 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   void _handleStartSelling() {
     if (_registrationStatus == 'pending') {
       _showPendingDialog();
+    } else if (_registrationStatus == 'rejected') {
+      // Rejected applications should always be allowed to re-apply.
+      context.push(
+        AppRoutes.webFarmerRegister,
+        extra: () async {
+          widget.onModeChanged();
+        },
+      );
     } else {
       context.push(
         AppRoutes.webFarmerRegister,
-        extra: () {
+        extra: () async {
           widget.onModeChanged();
-          _loadRegistrationStatus();
         },
       );
     }
@@ -97,7 +101,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -157,6 +161,35 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     );
   }
 
+  Future<void> _confirmLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to log out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true) {
+      widget.onLogout();
+    }
+  }
+
   void _handleSwitchToFarmer() {
     AuthService().switchToFarmerMode();
     widget.onModeChanged();
@@ -165,6 +198,12 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   void _handleSwitchToCustomer() {
     AuthService().switchToCustomerMode();
     widget.onModeChanged();
+  }
+
+  String _messagesRoute(AuthService auth) {
+    return auth.isViewingAsFarmer
+        ? AppRoutes.farmerMessages
+        : AppRoutes.customerMessages;
   }
 
   @override
@@ -224,7 +263,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         child: MouseRegion(
                           cursor: SystemMouseCursors.click,
                           child: GestureDetector(
-                            onTap: widget.onLogout,
+                            onTap: _confirmLogout,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 24,
@@ -234,7 +273,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: Colors.red.withOpacity(0.2),
+                                  color: Colors.red.withValues(alpha: 0.2),
                                 ),
                               ),
                               child: const Row(
@@ -278,12 +317,12 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _border.withOpacity(0.5)),
+        border: Border.all(color: _border.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -343,9 +382,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: isActive
-                          ? primary.withOpacity(0.08)
+                          ? primary.withValues(alpha: 0.08)
                           : isHovered
-                          ? _border.withOpacity(0.5)
+                          ? _border.withValues(alpha: 0.5)
                           : Colors.transparent,
                     ),
                     child: Text(
@@ -392,7 +431,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -407,20 +446,16 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               shape: BoxShape.circle,
               border: Border.all(color: primary, width: 3),
               boxShadow: [
-                BoxShadow(
-                  color: primary.withOpacity(0.2),
-                  blurRadius: 16,
-                ),
+                BoxShadow(color: primary.withValues(alpha: 0.2), blurRadius: 16),
               ],
             ),
             child: ClipOval(
-              child: CachedNetworkImage(
-                imageUrl:
-                    'https://lh3.googleusercontent.com/aida-public/AB6AXuA7SO8J3CebwmP_4K0nwWhDkMsWISrTpnfbOkYJ79_ZiTCLVxdvX_FJArJ1xwYsLAJx8gW_Wtk3xValGb9mDShlpRvdPIMoD9UGWJ9LwNRlF0vvmsKesjK6liNaDGy7C5HGWdOAE1hEPvF3UTq81_QK7QkgKAAMQgeICa4pykDXTF8JYtnrFYPiavyC7N-wkK4pGMGQJcdoyKpRglzbFXWGqTdoa3xP-Bm86BGxFKlWg21Mbw-FylTfHiJeJMKgLbfSJr8MhPFg1zqB',
+              child: SafeNetworkImage(
+                imageUrl: auth.userAvatarUrl,
+                defaultBucket: 'uploads',
                 fit: BoxFit.cover,
-                placeholder: (ctx, url) => Container(color: Colors.grey[200]),
-                errorWidget: (ctx, url, err) =>
-                    const Icon(Icons.person, size: 36),
+                placeholder: Container(color: Colors.grey[200]),
+                errorWidget: const Icon(Icons.person, size: 36),
               ),
             ),
           ),
@@ -443,7 +478,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: primary.withOpacity(0.12),
+                color: primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
@@ -497,10 +532,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: primary.withOpacity(0.2)),
+          border: Border.all(color: primary.withValues(alpha: 0.2)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -514,7 +549,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: primary.withOpacity(0.12),
+                    color: primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
@@ -587,7 +622,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                   (isViewingAsFarmer
                                           ? const Color(0xFF3B82F6)
                                           : primary)
-                                      .withOpacity(0.5),
+                                      .withValues(alpha: 0.5),
                               blurRadius: 16,
                               offset: const Offset(0, 8),
                             ),
@@ -598,7 +633,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                   (isViewingAsFarmer
                                           ? const Color(0xFF3B82F6)
                                           : primary)
-                                      .withOpacity(0.3),
+                                      .withValues(alpha: 0.3),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -648,18 +683,15 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           end: Alignment.bottomRight,
           colors: _registrationStatus == 'pending'
               ? [
-                  Colors.orange.withOpacity(0.1),
-                  Colors.orange.withOpacity(0.03),
+                  Colors.orange.withValues(alpha: 0.1),
+                  Colors.orange.withValues(alpha: 0.03),
                 ]
-              : [
-                  primary.withOpacity(0.1),
-                  primary.withOpacity(0.03),
-                ],
+              : [primary.withValues(alpha: 0.1), primary.withValues(alpha: 0.03)],
         ),
         border: Border.all(
           color: _registrationStatus == 'pending'
-              ? Colors.orange.withOpacity(0.2)
-              : primary.withOpacity(0.2),
+              ? Colors.orange.withValues(alpha: 0.2)
+              : primary.withValues(alpha: 0.2),
         ),
       ),
       child: Stack(
@@ -673,8 +705,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   : Icons.agriculture_rounded,
               size: 140,
               color: _registrationStatus == 'pending'
-                  ? Colors.orange.withOpacity(0.08)
-                  : primary.withOpacity(0.08),
+                  ? Colors.orange.withValues(alpha: 0.08)
+                  : primary.withValues(alpha: 0.08),
             ),
           ),
           Column(
@@ -686,8 +718,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: _registrationStatus == 'pending'
-                          ? Colors.orange.withOpacity(0.15)
-                          : primary.withOpacity(0.15),
+                          ? Colors.orange.withValues(alpha: 0.15)
+                          : primary.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(
@@ -749,11 +781,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
+                    color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.orange.withOpacity(0.3),
-                    ),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -795,14 +825,14 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         boxShadow: _hoveredButtons.contains(1)
                             ? [
                                 BoxShadow(
-                                  color: primary.withOpacity(0.5),
+                                  color: primary.withValues(alpha: 0.5),
                                   blurRadius: 20,
                                   offset: const Offset(0, 10),
                                 ),
                               ]
                             : [
                                 BoxShadow(
-                                  color: primary.withOpacity(0.3),
+                                  color: primary.withValues(alpha: 0.3),
                                   blurRadius: 16,
                                   offset: const Offset(0, 6),
                                 ),
@@ -850,20 +880,19 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         'My Orders',
         'Track purchases',
       ),
-      _SettingsItem(Icons.favorite_outline, 'Wishlist', 'Saved items'),
       _SettingsItem(
         Icons.location_on_outlined,
         'Addresses',
         'Delivery locations',
       ),
-      // Only show wallet for farmers
-      if (auth.isSeller)
-        _SettingsItem(
-          Icons.account_balance_wallet_outlined,
-          'My Wallet',
-          'Earnings & withdrawals',
-          onTap: () => context.push(AppRoutes.wallet),
-        ),
+      _SettingsItem(
+        Icons.chat_bubble_outline_rounded,
+        'Messages',
+        auth.isViewingAsFarmer
+            ? 'Messages from customers'
+            : 'Messages from farmers',
+        onTap: () => context.push(_messagesRoute(auth)),
+      ),
       _SettingsItem(
         Icons.notifications_outlined,
         'Notifications',
@@ -889,7 +918,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
+                      color: Colors.black.withValues(alpha: 0.03),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),

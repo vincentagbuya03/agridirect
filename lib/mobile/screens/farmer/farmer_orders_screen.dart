@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/supabase_data_service.dart';
+import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/styles/app_theme.dart';
 
-/// Farmer Orders Screen
+/// Farmer Orders Screen - Professional Enterprise UI
 class FarmerOrdersScreen extends StatefulWidget {
   const FarmerOrdersScreen({super.key});
 
@@ -12,101 +13,128 @@ class FarmerOrdersScreen extends StatefulWidget {
 }
 
 class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
-  static const Color primary = Color(0xFF13EC5B);
   int _selectedTab = 0;
   final _tabs = ['Active', 'Completed', 'Refunds'];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAF7),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildTabBar(),
-            Expanded(child: _buildOrdersList()),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-      child: Row(
+      backgroundColor: AppColors.background,
+      body: Column(
         children: [
-          Text(
-            'Orders',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.search_rounded,
-              color: Colors.grey[600],
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.tune_rounded, color: Colors.grey[600], size: 20),
-          ),
+          _buildPremiumHeader(),
+          _buildSleekTabBar(),
+          Expanded(child: _buildOrdersList()),
         ],
       ),
     );
   }
 
-  Widget _buildTabBar() {
+  Widget _buildPremiumHeader() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.textHeadline.withValues(alpha: 0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ORDER MANAGEMENT',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Recent Orders',
+                    style: AppTextStyles.headline2.copyWith(fontSize: 24),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  _buildHeaderAction(Icons.search_rounded),
+                  const SizedBox(width: 12),
+                  _buildHeaderAction(Icons.filter_list_rounded),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderAction(IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+      ),
+      child: Icon(icon, color: AppColors.textHeadline, size: 20),
+    );
+  }
+
+  Widget _buildSleekTabBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+      ),
       child: Row(
         children: List.generate(_tabs.length, (i) {
           final isSelected = _selectedTab == i;
           return Expanded(
             child: GestureDetector(
               onTap: () => setState(() => _selectedTab = i),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Text(
-                      _tabs[i],
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected ? primary : Colors.grey[400],
-                      ),
-                    ),
-                  ),
-                  if (isSelected)
-                    Container(
-                      height: 3,
-                      decoration: BoxDecoration(
-                        color: primary,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: isSelected ? [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     )
-                  else
-                    const SizedBox(height: 3),
-                ],
+                  ] : null,
+                ),
+                child: Text(
+                  _tabs[i],
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.labelSmall.copyWith(
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    color: isSelected ? Colors.white : AppColors.textSubtle,
+                  ),
+                ),
               ),
             ),
           );
@@ -120,340 +148,300 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
       future: SupabaseDataService().getFarmerOrders(status: _tabs[_selectedTab]),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: AppShimmerLoader());
         }
 
         final orders = snapshot.data ?? [];
 
-        if (_selectedTab == 0) {
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-            children: [
-              // Today's total card
-              Container(
-                margin: const EdgeInsets.only(bottom: 20),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: primary.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: primary.withOpacity(0.2)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'TODAY\'S TOTAL',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.grey[600],
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: primary,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            Icons.bar_chart_rounded,
-                            size: 16,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${orders.length} Orders',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFA500),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${orders.where((o) => o['status'] == 'PENDING').length} Pending',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF3B82F6),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${orders.where((o) => o['status'] == 'PROCESSING').length} In Progress',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              // Active orders header
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Text(
-                      'ACTIVE ORDERS',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.grey[600],
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'Sort by: Earliest',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                    ),
-                  ],
-                ),
-              ),
-              // Order cards
-              if (orders.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(40),
-                    child: Column(
-                      children: [
-                        Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No orders yet',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                ...orders.map((order) => _buildOrderCard(order)),
-            ],
-          );
-        }
-
-        if (orders.isEmpty) {
-          return Center(
-            child: Text(
-              'No orders in this category',
-              style: TextStyle(color: Colors.grey[500]),
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-          itemCount: orders.length,
-          itemBuilder: (context, index) => _buildOrderCard(orders[index]),
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+          physics: const BouncingScrollPhysics(),
+          children: [
+            if (_selectedTab == 0) _buildSummaryChart(orders),
+            if (orders.isEmpty)
+              _buildEmptyOrdersState()
+            else
+              ...orders.map((order) => _buildOrderCard(order)),
+          ],
         );
       },
     );
   }
 
-  Widget _buildOrderCard(Map<String, dynamic> order) {
+  Widget _buildSummaryChart(List<Map<String, dynamic>> orders) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
+            color: AppColors.primary.withValues(alpha: 0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Customer info
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipOval(
-                child: CachedNetworkImage(
-                  imageUrl: order['customerImage'],
-                  width: 48,
-                  height: 48,
-                  fit: BoxFit.cover,
-                  placeholder: (_, _) =>
-                      Container(width: 48, height: 48, color: Colors.grey[200]),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      order['customerName'],
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF0F172A),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          'Order #${order['orderId']}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '· ${order['timeAgo']}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: order['statusColor'].withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  order['status'],
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: order['statusColor'],
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Divider(color: Colors.grey[200]),
-          const SizedBox(height: 12),
-          // Items
-          Text(
-            'Items',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            order['items'],
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Total
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Total',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-              Text(
-                order['total'],
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF0F172A),
+                'TODAY\'S REVENUE',
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1,
                 ),
               ),
+              const Icon(Icons.auto_graph_rounded, color: Colors.white, size: 20),
             ],
           ),
           const SizedBox(height: 12),
-          // Update status button
+          Text(
+            '₱2,450.00',
+            style: AppTextStyles.headline1.copyWith(
+              color: Colors.white,
+              fontSize: 32,
+            ),
+          ),
+          const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: primary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Update Status',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.more_vert_rounded,
-                  size: 18,
-                  color: Colors.grey[600],
-                ),
-              ),
+              _buildMetricChip(Icons.pending_actions_rounded, '${orders.where((o) => o['status'] == 'PENDING').length} Pending'),
+              const SizedBox(width: 12),
+              _buildMetricChip(Icons.local_shipping_rounded, '${orders.where((o) => o['status'] == 'PROCESSING').length} Active'),
             ],
           ),
         ],
       ),
     );
   }
+
+  Widget _buildMetricChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderCard(Map<String, dynamic> order) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: AppDecorations.cardDecoration.copyWith(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.1), width: 2),
+                      ),
+                      child: ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: order['customerImage'],
+                          width: 44,
+                          height: 44,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            order['customerName'],
+                            style: AppTextStyles.headline3.copyWith(fontSize: 16),
+                          ),
+                          Text(
+                            'Order #${order['orderId']} • ${order['timeAgo']}',
+                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: (order['statusColor'] as Color).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        order['status'],
+                        style: AppTextStyles.labelSmall.copyWith(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: order['statusColor'],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Items Ordered', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontSize: 10)),
+                          const SizedBox(height: 4),
+                          Text(order['items'], style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('Total Value', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontSize: 10)),
+                          const SizedBox(height: 4),
+                          Text(order['total'], style: AppTextStyles.headline3.copyWith(color: AppColors.primary, fontSize: 16)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.textHeadline.withValues(alpha: 0.02),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildActionButton(
+                    Icons.check_circle_outline_rounded,
+                    'Update Status',
+                    () {},
+                    isPrimary: true,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.more_vert_rounded, size: 20, color: AppColors.textSubtle),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton(IconData icon, String label, VoidCallback onTap, {bool isPrimary = false}) {
+    return Material(
+      color: isPrimary ? AppColors.primary : Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            border: isPrimary ? null : Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: isPrimary ? Colors.white : AppColors.textHeadline),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: isPrimary ? Colors.white : AppColors.textHeadline,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyOrdersState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(60),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.receipt_long_outlined, size: 64, color: AppColors.primary.withValues(alpha: 0.2)),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Orders Yet',
+              style: AppTextStyles.headline2.copyWith(fontSize: 20),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'When you receive orders, they will appear here for management.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+

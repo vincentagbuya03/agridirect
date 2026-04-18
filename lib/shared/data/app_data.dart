@@ -3,24 +3,40 @@
 library;
 
 class ProductItem {
+  final String? productId;
+  final String? farmerId;
+  final String? farmerName;
+  final String? farmerAvatarUrl;
   final String name;
   final String farm;
   final String price;
   final String unit;
   final String imageUrl;
+  final List<String> imageUrls;
   final String? rating;
   final String? reviews;
   final String? harvestDays;
+  final String? description;
+  final double? reservedQuantity;
+  final double? targetQuantity;
 
   const ProductItem({
+    this.productId,
+    this.farmerId,
+    this.farmerName,
+    this.farmerAvatarUrl,
     required this.name,
     required this.farm,
     required this.price,
     required this.unit,
     required this.imageUrl,
+    this.imageUrls = const [],
     this.rating,
     this.reviews,
     this.harvestDays,
+    this.description,
+    this.reservedQuantity,
+    this.targetQuantity,
   });
 }
 
@@ -130,4 +146,3 @@ class AppData {
   static const String articleImageUrl =
       'https://lh3.googleusercontent.com/aida-public/AB6AXuCEX_FGbTSlEvgcVwHHEMfPDvDPCwf1jJgoRvqWeM8YKnhq8MslvsCTDPBiEOLgf3ghqffQxCGDQaDPrUPojIs8Hun-ffZwkSQqnqYzomI0eTTnZPMnVJBbp9YWKVBJ11uHyhNV9em8FQJ4zwY1NdiWx-7XTpZ99nPgQrz7YSgBAbjFGHI-kjDVMfghvcp1_6wcRXV6PUgvLTA215YdbIKOEwxK0JE2lWioNIZ-pdZHBenPdwZi2VwpDUO-Z7_KTqbiJBgPyZTYBanU';
 }
-

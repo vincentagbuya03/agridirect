@@ -1,6 +1,6 @@
 // ignore_for_file: uri_does_not_exist, creation_with_non_type
 import 'package:flutter/material.dart';
-import '../shared/services/auth_service.dart';
+import '../shared/services/auth/auth_service.dart';
 import 'screens/consumer/home_screen.dart';
 import 'screens/consumer/marketplace_screen.dart';
 import 'screens/consumer/preorder_hub_screen.dart';
@@ -12,9 +12,6 @@ import 'screens/farmer/farmer_community_hub.dart';
 import 'screens/consumer/profile_screen.dart';
 import 'screens/common/loading_screen.dart';
 
-/// Mobile Navigation Wrapper
-/// Customer mode: Home, Community, Profile
-/// Farmer mode: Dashboard, Community, Profile
 class MobileNavigation extends StatefulWidget {
   final VoidCallback onLogout;
 
@@ -51,7 +48,6 @@ class _MobileNavigationState extends State<MobileNavigation> {
 
   List<Widget> get _screens {
     if (_auth.isViewingAsFarmer) {
-      // Farmer mode: Dashboard, Products, Orders, Community, Profile
       return [
         const FarmerSalesDashboard(),
         const FarmerProductsScreen(),
@@ -89,7 +85,7 @@ class _MobileNavigationState extends State<MobileNavigation> {
     return [
       _NavItemData(Icons.home_rounded, 'Home'),
       _NavItemData(Icons.storefront_rounded, 'Marketplace'),
-      _NavItemData(Icons.timer_rounded, 'Pre-Order'),
+      _NavItemData(Icons.timer_rounded, 'Pre-Orders'),
       _NavItemData(Icons.receipt_long_rounded, 'Orders'),
       _NavItemData(Icons.person_rounded, 'Profile'),
     ];

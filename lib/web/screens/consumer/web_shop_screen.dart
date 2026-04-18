@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/data/app_data.dart';
-import '../../../shared/services/supabase_data_service.dart';
+import '../../../shared/services/core/supabase_data_service.dart';
 import '../../widgets/animated_components.dart';
 
 /// Web Shop Screen — Fresh Produce Marketplace
@@ -169,7 +170,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 return CustomPaint(
                   painter: BlobPainter(
                     animationValue: _blobController.value,
-                    color: AgriColors.emerald400.withOpacity(0.03),
+                    color: AgriColors.emerald400.withValues(alpha: 0.03),
                     center: const Offset(0.85, 0.15),
                     radius: 200,
                   ),
@@ -184,7 +185,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 return CustomPaint(
                   painter: BlobPainter(
                     animationValue: 1 - _blobController.value,
-                    color: AgriColors.teal400.withOpacity(0.02),
+                    color: AgriColors.teal400.withValues(alpha: 0.02),
                     center: const Offset(0.15, 0.85),
                     radius: 250,
                   ),
@@ -282,7 +283,7 @@ class _WebShopScreenState extends State<WebShopScreen>
           border: Border.all(color: _border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -415,7 +416,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                     decoration: BoxDecoration(
                       color: _primaryLight,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: _primary.withOpacity(0.2)),
+                      border: Border.all(color: _primary.withValues(alpha: 0.2)),
                     ),
                     child: Icon(Icons.shopping_bag_outlined, size: 18, color: _primary),
                   ),
@@ -561,7 +562,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 gradient: LinearGradient(
                   colors: [
                     _border,
-                    _border.withOpacity(0),
+                    _border.withValues(alpha: 0),
                   ],
                 ),
               ),
@@ -584,7 +585,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 activeTrackColor: _primary,
                 inactiveTrackColor: _border,
                 thumbColor: _primary,
-                overlayColor: _primary.withOpacity(0.15),
+                overlayColor: _primary.withValues(alpha: 0.15),
                 trackHeight: 5,
                 thumbShape: const RoundSliderThumbShape(
                   enabledThumbRadius: 8,
@@ -609,10 +610,10 @@ class _WebShopScreenState extends State<WebShopScreen>
                     decoration: BoxDecoration(
                       color: _primaryLight,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _primary.withOpacity(0.2)),
+                      border: Border.all(color: _primary.withValues(alpha: 0.2)),
                     ),
                     child: Text(
-                      '\$${_priceRange.toInt()}',
+                      '₱${_priceRange.toInt()}',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
@@ -620,7 +621,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                       ),
                     ),
                   ),
-                  Text('\$500+', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: _mutedLight)),
+                  Text('₱500+', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: _mutedLight)),
                 ],
               ),
             ),
@@ -632,7 +633,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 gradient: LinearGradient(
                   colors: [
                     _border,
-                    _border.withOpacity(0),
+                    _border.withValues(alpha: 0),
                   ],
                 ),
               ),
@@ -661,7 +662,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 gradient: LinearGradient(
                   colors: [
                     _border,
-                    _border.withOpacity(0),
+                    _border.withValues(alpha: 0),
                   ],
                 ),
               ),
@@ -674,10 +675,10 @@ class _WebShopScreenState extends State<WebShopScreen>
               decoration: BoxDecoration(
                 color: _primaryLight,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _primary.withOpacity(0.3)),
+                border: Border.all(color: _primary.withValues(alpha: 0.3)),
                 boxShadow: [
                   BoxShadow(
-                    color: _primary.withOpacity(0.08),
+                    color: _primary.withValues(alpha: 0.08),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -696,7 +697,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: _primary.withOpacity(0.3),
+                              color: _primary.withValues(alpha: 0.3),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -720,7 +721,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                     'Direct from verified farms. Fresh produce delivered within 24 hours.',
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: _primary.withOpacity(0.7),
+                      color: _primary.withValues(alpha: 0.7),
                       height: 1.6,
                       fontWeight: FontWeight.w500,
                     ),
@@ -843,7 +844,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 borderRadius: BorderRadius.circular(7),
                 boxShadow: [
                   BoxShadow(
-                    color: AgriColors.gold400.withOpacity(0.3),
+                    color: AgriColors.gold400.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -918,7 +919,7 @@ class _WebShopScreenState extends State<WebShopScreen>
           color: _white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isHovered ? _primary.withOpacity(0.4) : _border,
+            color: isHovered ? _primary.withValues(alpha: 0.4) : _border,
             width: isHovered ? 2 : 1,
           ),
           boxShadow: [
@@ -973,13 +974,13 @@ class _WebShopScreenState extends State<WebShopScreen>
                             gradient: LinearGradient(
                               colors: [
                                 const Color(0xFFF59E0B),
-                                const Color(0xFFF59E0B).withOpacity(0.8),
+                                const Color(0xFFF59E0B).withValues(alpha: 0.8),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(9),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFFF59E0B).withOpacity(0.3),
+                                color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
                                 blurRadius: 12,
                               ),
                             ],
@@ -1029,12 +1030,12 @@ class _WebShopScreenState extends State<WebShopScreen>
                                 gradient: LinearGradient(
                                   colors: [
                                     _primaryLight,
-                                    _primaryLight.withOpacity(0.6),
+                                    _primaryLight.withValues(alpha: 0.6),
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(7),
                                 border: Border.all(
-                                  color: _primary.withOpacity(0.2),
+                                  color: _primary.withValues(alpha: 0.2),
                                 ),
                               ),
                               child: Row(
@@ -1109,7 +1110,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                                         ? LinearGradient(
                                             colors: [
                                               _primary,
-                                              _primary.withOpacity(0.85),
+                                              _primary.withValues(alpha: 0.85),
                                             ],
                                             begin: Alignment.topLeft,
                                             end: Alignment.bottomRight,
@@ -1124,13 +1125,13 @@ class _WebShopScreenState extends State<WebShopScreen>
                                     border: Border.all(
                                       color: isHovered
                                           ? _primary
-                                          : _primary.withOpacity(0.2),
+                                          : _primary.withValues(alpha: 0.2),
                                       width: 1.5,
                                     ),
                                     boxShadow: isHovered
                                         ? [
                                             BoxShadow(
-                                              color: _primary.withOpacity(0.3),
+                                              color: _primary.withValues(alpha: 0.3),
                                               blurRadius: 16,
                                               offset: const Offset(0, 6),
                                             ),
@@ -1234,7 +1235,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 border: Border.all(color: _border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
+                    color: Colors.black.withValues(alpha: 0.03),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -1273,7 +1274,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 border: Border.all(color: _border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
+                    color: Colors.black.withValues(alpha: 0.03),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -1389,7 +1390,7 @@ class _WebShopScreenState extends State<WebShopScreen>
           color: _white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isHovered ? _border.withOpacity(0.8) : _border,
+            color: isHovered ? _border.withValues(alpha: 0.8) : _border,
             width: isHovered ? 1.5 : 1,
           ),
           boxShadow: [
@@ -1537,12 +1538,12 @@ class _WebShopScreenState extends State<WebShopScreen>
                             gradient: LinearGradient(
                               colors: [
                                 _primaryLight,
-                                _primaryLight.withOpacity(0.6),
+                                _primaryLight.withValues(alpha: 0.6),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(7),
                             border: Border.all(
-                              color: _primary.withOpacity(0.2),
+                              color: _primary.withValues(alpha: 0.2),
                             ),
                           ),
                           child: Row(
@@ -1638,7 +1639,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                                     ? LinearGradient(
                                         colors: [
                                           _primary,
-                                          _primary.withOpacity(0.85),
+                                          _primary.withValues(alpha: 0.85),
                                         ],
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
@@ -1653,13 +1654,13 @@ class _WebShopScreenState extends State<WebShopScreen>
                                 border: Border.all(
                                   color: isHovered
                                       ? _primary
-                                      : _primary.withOpacity(0.2),
+                                      : _primary.withValues(alpha: 0.2),
                                   width: 1.5,
                                 ),
                                 boxShadow: isHovered
                                     ? [
                                         BoxShadow(
-                                          color: _primary.withOpacity(0.3),
+                                          color: _primary.withValues(alpha: 0.3),
                                           blurRadius: 16,
                                           offset: const Offset(0, 6),
                                         ),
@@ -1840,9 +1841,9 @@ class _WebShopScreenState extends State<WebShopScreen>
                     child: SizedBox(
                       width: 24,
                       height: 24,
-                      child: CircularProgressIndicator(
+                      child: AppShimmerLoader(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(_primary.withOpacity(0.3)),
+                        valueColor: AlwaysStoppedAnimation<Color>(_primary.withValues(alpha: 0.3)),
                       ),
                     ),
                   ),
@@ -1901,7 +1902,7 @@ class _WebShopScreenState extends State<WebShopScreen>
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: _primary.withOpacity(0.1),
+                color: _primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.search_off_rounded, size: 40, color: _primary),
@@ -2096,3 +2097,4 @@ class _WebShopScreenState extends State<WebShopScreen>
     );
   }
 }
+

@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/weather_service.dart';
+import '../../../shared/services/integration/weather_service.dart';
 import '../../../shared/models/weather_model.dart';
+import '../../../shared/styles/app_theme.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/core/supabase_config.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
+import '../../widgets/skeleton_loaders.dart';
+import '../../../shared/services/farmer/farmer_service.dart';
+import '../../../shared/services/offline/offline_product_service.dart';
 
 /// Farmer Sales Dashboard
 class FarmerSalesDashboard extends StatefulWidget {
@@ -15,21 +21,207 @@ class FarmerSalesDashboard extends StatefulWidget {
 }
 
 class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
+  static const String _dbAvatarCacheKeyPrefix = 'farmer_dashboard_db_avatar_';
+
+  final AuthService _auth = AuthService();
+  String? _profileName;
+  String? _profileAvatarUrl;
+  String? _cachedDbAvatarUrl;
   WeatherData? _weatherData;
   WeatherForecast? _weatherForecast;
   bool _isLoadingWeather = true;
   String? _weatherError;
   Position? _currentPosition;
-  late StreamSubscription<Position> _positionStream;
+  StreamSubscription<Position>? _positionStream;
   Timer? _refreshTimer;
+  Map<String, dynamic> _stats = {
+    'totalRevenue': 0.0,
+    'activeListings': 0,
+    'yearlySales': 0.0,
+    'revenueTrend': '0%',
+    'listingsTrend': '0%',
+  };
+  bool _isLoadingStats = true;
 
-  static const Color primary = Color(0xFF13EC5B);
+  void _retryProfileLoadAfterStartup() {
+    Future<void>.delayed(const Duration(milliseconds: 700), () async {
+      if (!mounted) return;
+      await _loadCachedDbAvatar();
+      await _loadFarmerProfile();
+    });
+
+    Future<void>.delayed(const Duration(seconds: 2), () async {
+      if (!mounted) return;
+      await _loadCachedDbAvatar();
+      await _loadFarmerProfile();
+    });
+  }
+
+  String get _farmerDisplayName {
+    // 1. Try AuthService name first (most reliable/fastest for initial load)
+    final authName = _auth.userName.trim();
+    if (authName.isNotEmpty) {
+      return authName.split(' ').first;
+    }
+
+    // 2. Try profile name from database fetch
+    final profileName = _profileName?.trim() ?? '';
+    if (profileName.isNotEmpty) {
+      return profileName.split(' ').first;
+    }
+
+    // 3. Fallback to metadata
+    final metadata = _auth.client.auth.currentUser?.userMetadata;
+    final metaName =
+        ((metadata?['name'] ?? metadata?['full_name']) as String?)?.trim() ?? '';
+    if (metaName.isNotEmpty) {
+      return metaName.split(' ').first;
+    }
+
+    return 'Farmer';
+  }
+
+  String? get _farmerAvatarUrl {
+    final profileAvatar = _profileAvatarUrl?.trim() ?? '';
+    if (profileAvatar.isNotEmpty) return profileAvatar;
+
+    final cachedDbAvatar = _cachedDbAvatarUrl?.trim() ?? '';
+    if (cachedDbAvatar.isNotEmpty) return cachedDbAvatar;
+
+    return null;
+  }
+
+  String _resolveCurrentUserId() {
+    return _auth.userId.isNotEmpty
+        ? _auth.userId
+        : (_auth.client.auth.currentUser?.id ?? '');
+  }
+
+  String _dbAvatarCacheKey(String userId) => '$_dbAvatarCacheKeyPrefix$userId';
+
+  Future<void> _loadCachedDbAvatar() async {
+    final currentUserId = _resolveCurrentUserId();
+    if (currentUserId.isEmpty || !mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final cached = (prefs.getString(_dbAvatarCacheKey(currentUserId)) ?? '')
+        .trim();
+
+    if (cached.isEmpty || !mounted) return;
+
+    setState(() {
+      _cachedDbAvatarUrl = cached;
+    });
+  }
+
+  Future<void> _persistDbAvatar(String? imageUrl) async {
+    final url = imageUrl?.trim() ?? '';
+    if (url.isEmpty) return;
+
+    final currentUserId = _resolveCurrentUserId();
+    if (currentUserId.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_dbAvatarCacheKey(currentUserId), url);
+
+    if (!mounted) return;
+    setState(() {
+      _cachedDbAvatarUrl = url;
+    });
+  }
+
+  Future<void> _precacheFarmerAvatar(String? imageUrl) async {
+    final url = imageUrl?.trim() ?? '';
+    if (url.isEmpty || !mounted) return;
+
+    try {
+      await precacheImage(CachedNetworkImageProvider(url), context);
+    } catch (e) {
+      debugPrint('Error caching farmer avatar: $e');
+    }
+  }
+
+  String _extractAvatarFromUserProfile(Map<String, dynamic> profile) {
+    final avatarUrl = (profile['avatar_url'] as String?)?.trim() ?? '';
+    if (avatarUrl.isNotEmpty) return avatarUrl;
+
+    final imageUrl = (profile['image_url'] as String?)?.trim() ?? '';
+    if (imageUrl.isNotEmpty) return imageUrl;
+
+    return '';
+  }
+
+  Future<void> _loadFarmerProfile() async {
+    final currentUserId = _resolveCurrentUserId();
+    if (currentUserId.isEmpty) return;
+
+    try {
+      // Match MobileProfileScreen behavior: farmer mode prefers farmers table.
+      final farmers = await SupabaseConfig.client
+          .from('farmers')
+          .select('farm_name, image_url')
+          .eq('user_id', currentUserId)
+          .limit(1);
+
+      if (farmers.isNotEmpty) {
+        final farmName = (farmers[0]['farm_name'] as String?)?.trim();
+        final farmImageUrl = (farmers[0]['image_url'] as String?)?.trim();
+        if (mounted) {
+          setState(() {
+            _profileName = farmName;
+            _profileAvatarUrl = farmImageUrl;
+          });
+          await _persistDbAvatar(farmImageUrl);
+          await _precacheFarmerAvatar(farmImageUrl);
+        }
+
+        // If farmer row exists but image is empty, keep farm name but still try users avatar/image.
+        if ((farmImageUrl ?? '').isNotEmpty) {
+          return;
+        }
+      }
+
+      // Fallback to users table profile if no farmer row exists.
+      final profile = await SupabaseDB.getUserProfile(currentUserId);
+      if (!mounted || profile == null) return;
+
+      setState(() {
+        _profileName = (profile['name'] as String?)?.trim();
+        _profileAvatarUrl = _extractAvatarFromUserProfile(profile);
+      });
+      await _persistDbAvatar(_profileAvatarUrl);
+      await _precacheFarmerAvatar(_profileAvatarUrl);
+    } catch (e) {
+      debugPrint('Error loading farmer profile header: $e');
+
+      // Last fallback: still try users table so DB avatar_url/image_url can win.
+      final currentUserId = _auth.userId.isNotEmpty
+          ? _auth.userId
+          : (_auth.client.auth.currentUser?.id ?? '');
+      if (currentUserId.isEmpty || !mounted) return;
+
+      final profile = await SupabaseDB.getUserProfile(currentUserId);
+      if (!mounted || profile == null) return;
+
+      setState(() {
+        _profileName = (profile['name'] as String?)?.trim();
+        _profileAvatarUrl = _extractAvatarFromUserProfile(profile);
+      });
+      await _persistDbAvatar(_profileAvatarUrl);
+      await _precacheFarmerAvatar(_profileAvatarUrl);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _loadCachedDbAvatar();
+    _loadFarmerProfile();
+    _loadDashboardStats();
+    _retryProfileLoadAfterStartup();
     _initializeLocationTracking();
     _startPeriodicRefresh();
+    OfflineProductService().init();
   }
 
   void _startPeriodicRefresh() {
@@ -46,7 +238,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       // Request location permission first
       LocationPermission permission = await Geolocator.checkPermission();
       debugPrint('Initial location permission: $permission');
-      
+
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         debugPrint('Requested location permission: $permission');
@@ -66,7 +258,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           debugPrint(
             'Initial position obtained: ${position.latitude}, ${position.longitude}',
           );
-          
+
           // Load weather immediately after getting position
           await _loadWeatherData();
         } catch (e) {
@@ -91,22 +283,26 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         }
 
         // Listen to position changes with higher frequency
-        _positionStream = Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: 100, // Update when moved 100+ meters
-            timeLimit: Duration(seconds: 30),
-          ),
-        ).listen((Position position) {
-          _currentPosition = position;
-          debugPrint(
-            'Location updated: ${position.latitude}, ${position.longitude}',
-          );
-          // Refresh weather when location changes significantly
-          _loadWeatherData();
-        }, onError: (error) {
-          debugPrint('Position stream error: $error');
-        });
+        _positionStream =
+            Geolocator.getPositionStream(
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.high,
+                distanceFilter: 100, // Update when moved 100+ meters
+                timeLimit: Duration(seconds: 30),
+              ),
+            ).listen(
+              (Position position) {
+                _currentPosition = position;
+                debugPrint(
+                  'Location updated: ${position.latitude}, ${position.longitude}',
+                );
+                // Refresh weather when location changes significantly
+                _loadWeatherData();
+              },
+              onError: (error) {
+                debugPrint('Position stream error: $error');
+              },
+            );
       } else {
         // Permission denied, load with fallback
         debugPrint('Location permission denied: $permission');
@@ -135,7 +331,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             desiredAccuracy: LocationAccuracy.high,
           ).timeout(const Duration(seconds: 15));
           _currentPosition = position;
-          debugPrint('Position acquired: ${position.latitude}, ${position.longitude}');
+          debugPrint(
+            'Position acquired: ${position.latitude}, ${position.longitude}',
+          );
         } catch (e) {
           debugPrint('Get current position error: $e');
         }
@@ -156,8 +354,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           latitude: position.latitude,
           longitude: position.longitude,
         );
-        debugPrint('Weather data received: ${weatherData?.temperature}°C at ${weatherData?.location}');
-        
+        debugPrint(
+          'Weather data received: ${weatherData?.temperature}ï¿½C at ${weatherData?.location}',
+        );
+
         // Also fetch 5-day forecast
         forecast = await WeatherService().getForecastByCoordinates(
           latitude: position.latitude,
@@ -169,7 +369,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         debugPrint('No position available, fetching weather by city...');
         weatherData = await WeatherService().getWeatherByCity('Farm Location');
         forecast = await WeatherService().getForecastByCity('Farm Location');
-        debugPrint('Fallback weather data: ${weatherData?.temperature}°C');
+        debugPrint('Fallback weather data: ${weatherData?.temperature}ï¿½C');
       }
 
       if (mounted) {
@@ -191,66 +391,260 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     }
   }
 
+  Future<void> _loadDashboardStats() async {
+    try {
+      if (mounted) setState(() => _isLoadingStats = true);
+      final stats = await FarmerService().getFarmerStats();
+      if (mounted) {
+        setState(() {
+          _stats = stats;
+          _isLoadingStats = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading dashboard stats: $e');
+      if (mounted) setState(() => _isLoadingStats = false);
+    }
+  }
+
   @override
   void dispose() {
-    _positionStream.cancel();
+    _positionStream?.cancel();
     _refreshTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7FAF7),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              _buildHeader(),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 16,
+    return ListenableBuilder(
+      listenable: _auth,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              children: [
+                if (_isLoadingStats)
+                  const LinearProgressIndicator(
+                    backgroundColor: Colors.transparent,
+                    minHeight: 2,
+                  ),
+                _buildPremiumHeader(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionHeader('Performance Overview'),
+                      const SizedBox(height: 16),
+                      _buildMetricsGrid(),
+                      const SizedBox(height: 24),
+                      _buildSectionHeader('Sales Analytics'),
+                      const SizedBox(height: 16),
+                      _buildSalesAnalytics(),
+                      const SizedBox(height: 24),
+                      _buildWeatherIntelligence(),
+                      const SizedBox(height: 24),
+                      _buildForecast(),
+                      const SizedBox(height: 24),
+                      _buildAICropInsights(),
+                      const SizedBox(height: 48),
+                    ],
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildMetricsGrid(),
-                    const SizedBox(height: 16),
-                    _buildSalesAnalytics(),
-                    const SizedBox(height: 16),
-                    _buildWeatherAlert(),
-                    const SizedBox(height: 24),
-                    _buildForecast(),
-                    const SizedBox(height: 24),
-                    _buildAICropInsights(),
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Text(
+      title,
+      style: AppTextStyles.headline3.copyWith(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textHeadline,
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildPremiumHeader() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.textHeadline.withValues(alpha: 0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -20,
+            right: -20,
+            child: Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    AppColors.primary.withValues(alpha: 0.1),
+                    AppColors.primary.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.2),
+                            width: 2,
+                          ),
+                        ),
+                        child: ClipOval(
+                          child: _farmerAvatarUrl != null
+                              ? CachedNetworkImage(
+                                  imageUrl: _farmerAvatarUrl!,
+                                  width: 52,
+                                  height: 52,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, _) => Container(
+                                    width: 52,
+                                    height: 52,
+                                    color: Colors.grey[100],
+                                  ),
+                                )
+                              : Container(
+                                  width: 52,
+                                  height: 52,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.person_rounded,
+                                    color: AppColors.primary,
+                                    size: 32,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Good Morning,',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSubtle,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                _farmerDisplayName,
+                                style: AppTextStyles.headline2.copyWith(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      _buildHeaderAction(
+                        Icons.notifications_none_rounded,
+                        true,
+                      ),
+                      const SizedBox(width: 12),
+                      _buildHeaderAction(Icons.settings_outlined, false),
+                    ],
+                  ),
+                  if (_currentPosition != null && _weatherData != null) ...[
+                    const SizedBox(height: 24),
+                    _buildWeatherQuickGlance(),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderAction(IconData icon, bool hasNotification) {
+    return Stack(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.textHeadline.withValues(alpha: 0.05),
+            ),
+          ),
+          child: Icon(icon, color: AppColors.textHeadline, size: 22),
+        ),
+        if (hasNotification)
+          Positioned(
+            top: 10,
+            right: 10,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: AppColors.error,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildWeatherQuickGlance() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
+      ),
       child: Row(
         children: [
-          ClipOval(
-            child: CachedNetworkImage(
-              imageUrl:
-                  'https://lh3.googleusercontent.com/aida-public/AB6AXuA7SO8J3CebwmP_4K0nwWhDkMsWISrTpnfbOkYJ79_ZiTCLVxdvX_FJArJ1xwYsLAJx8gW_Wtk3xValGb9mDShlpRvdPIMoD9UGWJ9LwNRlF0vvmsKesjK6liNaDGy7C5HGWdOAE1hEPvF3UTq81_QK7QkgKAAMQgeICa4pykDXTF8JYtnrFYPiavyC7N-wkK4pGMGQJcdoyKpRglzbFXWGqTdoa3xP-Bm86BGxFKlWg21Mbw-FylTfHiJeJMKgLbfSJr8MhPFg1zqB',
-              width: 48,
-              height: 48,
-              fit: BoxFit.cover,
-              placeholder: (_, _) =>
-                  Container(width: 48, height: 48, color: Colors.grey[200]),
-            ),
+          Icon(
+            _getAlertIcon(_weatherData!.description.toLowerCase()),
+            color: AppColors.primary,
+            size: 24,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -258,67 +652,26 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Good morning,',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                  _weatherData!.location,
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textHeadline,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 Text(
-                  'Farmer Marcus',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
+                  _weatherData!.description,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSubtle,
                   ),
                 ),
-                if (_currentPosition != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.location_on_rounded,
-                          size: 12,
-                          color: const Color(0xFF13EC5B),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${_currentPosition!.latitude.toStringAsFixed(2)}, ${_currentPosition!.longitude.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Stack(
-              children: [
-                Icon(
-                  Icons.notifications_outlined,
-                  size: 20,
-                  color: Colors.grey[600],
-                ),
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ],
+          Text(
+            '${_weatherData!.temperature.toStringAsFixed(0)}Â°',
+            style: AppTextStyles.headline2.copyWith(
+              color: AppColors.primary,
+              fontSize: 24,
             ),
           ),
         ],
@@ -330,239 +683,74 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     return Row(
       children: [
         Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 12,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'REVENUE',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[500],
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: primary.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '+5.2%',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '\$1,240',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'VS. YESTERDAY',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[500],
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
+          child: _buildMetricCard(
+            'Total Revenue',
+            'â‚±${_stats['totalRevenue'].toStringAsFixed(0)}',
+            _stats['revenueTrend'],
+            Icons.payments_outlined,
+            AppColors.primary,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 16),
         Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 12,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'LISTINGS',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[500],
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    Text(
-                      '0%',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '14',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'ACTIVE ITEMS',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[500],
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
+          child: _buildMetricCard(
+            'Active Listings',
+            '${_stats['activeListings']}',
+            _stats['listingsTrend'],
+            Icons.inventory_2_outlined,
+            const Color(0xFF3B82F6),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSalesAnalytics() {
+  Widget _buildMetricCard(
+    String label,
+    String value,
+    String trend,
+    IconData icon,
+    Color color,
+  ) {
+    final isPositive = trend.startsWith('+');
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
+      padding: const EdgeInsets.all(20),
+      decoration: AppDecorations.cardDecoration.copyWith(
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'SALES ANALYTICS',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[600],
-                  letterSpacing: 0.5,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: primary.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.trending_up,
-                      size: 12,
-                      color: Color(0xFF13EC5B),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '15%',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(height: 16),
-          Text(
-            '\$8,420',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            height: 140,
-            child: CustomPaint(
-              size: const Size(double.infinity, 140),
-              painter: _AnalyticsChartPainter(primary),
-            ),
-          ),
-          const SizedBox(height: 12),
+          Text(value, style: AppTextStyles.headline2.copyWith(fontSize: 24)),
+          const SizedBox(height: 4),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              for (final day in [
-                'Mon',
-                'Tue',
-                'Wed',
-                'Thu',
-                'Fri',
-                'Sat',
-                'Sun',
-              ])
-                Text(
-                  day,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[400],
-                  ),
+              Flexible(
+                child: Text(
+                  label,
+                  style: AppTextStyles.labelSmall.copyWith(fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                trend,
+                style: AppTextStyles.labelSmall.copyWith(
+                  fontSize: 11,
+                  color: isPositive ? AppColors.success : AppColors.textSubtle,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
         ],
@@ -570,492 +758,175 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     );
   }
 
-  Widget _buildWeatherAlert() {
-    if (_isLoadingWeather) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        child: const Center(
-          child: SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      );
-    }
-
-    if (_weatherError != null || _weatherData == null) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.red[50],
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.red[300]!),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.red[500],
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.error_outline_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Weather Alert',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.red[700],
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Unable to load weather data. Please try again.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.red[700],
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            GestureDetector(
-              onTap: _loadWeatherData,
-              child: Icon(Icons.refresh, color: Colors.red[700], size: 20),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Show first alert if available, otherwise show current weather summary
-    if (_weatherData!.alerts.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE0F7F3),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFB3E5DB)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: primary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.check_circle_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Weather Status',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF0D6B4D),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${_weatherData!.temperature.toStringAsFixed(1)}°C - ${_weatherData!.description}. Humidity: ${_weatherData!.humidity.toStringAsFixed(0)}%',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color(0xFF0D6B4D),
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            GestureDetector(
-              onTap: _loadWeatherData,
-              child: const Icon(Icons.refresh, color: Color(0xFF0D6B4D), size: 20),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final alert = _weatherData!.alerts.first;
-    final backgroundColor =
-        _getAlertBackgroundColor(alert.severity);
-    final borderColor =
-        _getAlertBorderColor(alert.severity);
-    final iconColor = _getAlertIconColor(alert.severity);
-    final textColor = _getAlertTextColor(alert.severity);
-
+  Widget _buildSalesAnalytics() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
+      padding: const EdgeInsets.all(24),
+      decoration: AppDecorations.cardDecoration.copyWith(
+        borderRadius: BorderRadius.circular(28),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Location indicator
-          if (_weatherData?.location != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.location_on_rounded,
-                    size: 14,
-                    color: textColor,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Weather at ${_weatherData!.location}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: textColor.withOpacity(0.7),
-                      fontWeight: FontWeight.w500,
+                    Text(
+                      'Yearly Sales',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textSubtle,
+                      ),
                     ),
-                  ),
+                    Text(
+                      'â‚±${_stats['yearlySales'].toStringAsFixed(2)}',
+                      style: AppTextStyles.headline2,
+                    ),
                 ],
               ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '+12.5%',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.success,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            height: 160,
+            child: CustomPaint(
+              size: const Size(double.infinity, 160),
+              painter: _AnalyticsChartPainter(AppColors.primary),
             ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                .map(
+                  (day) => Text(
+                    day,
+                    style: AppTextStyles.labelSmall.copyWith(
+                      fontSize: 10,
+                      color: AppColors.textSubtle.withValues(alpha: 0.6),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeatherIntelligence() {
+    if (_isLoadingWeather) {
+      return WeatherCardSkeleton(enabled: true);
+    }
+
+    if (_weatherError != null || _weatherData == null) {
+      return Container();
+    }
+
+    final isAlert = _weatherData!.alerts.isNotEmpty;
+    final color = isAlert ? AppColors.warning : AppColors.primary;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color.withValues(alpha: 0.1), color.withValues(alpha: 0.05)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: iconColor,
-                  borderRadius: BorderRadius.circular(10),
+                  color: color.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  _getAlertIcon(alert.type),
-                  color: Colors.white,
+                  isAlert ? Icons.wb_twilight_rounded : Icons.wb_sunny_rounded,
+                  color: color,
                   size: 20,
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      alert.title,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: textColor,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      alert.description,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: textColor,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
+              Text(
+                isAlert ? 'Weather Alert' : 'Weather Intelligence',
+                style: AppTextStyles.headline3.copyWith(
+                  fontSize: 16,
+                  color: color,
                 ),
               ),
-              GestureDetector(
-                onTap: _loadWeatherData,
-                child: Icon(Icons.refresh, color: textColor, size: 20),
+              const Spacer(),
+              IconButton(
+                onPressed: _loadWeatherData,
+                icon: Icon(Icons.refresh_rounded, size: 20, color: color),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
             ],
           ),
-          if (alert.recommendation != null) ...[
+          const SizedBox(height: 16),
+          Text(
+            isAlert
+                ? _weatherData!.alerts.first.description
+                : 'Current conditions are optimal for harvesting. Expect low humidity throughout the day.',
+            style: AppTextStyles.bodyMedium.copyWith(height: 1.5),
+          ),
+          if (isAlert && _weatherData!.alerts.first.recommendation != null) ...[
             const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.white.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
-                '?? ${alert.recommendation}',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: textColor,
-                  height: 1.4,
-                  fontWeight: FontWeight.w500,
-                ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.tips_and_updates_outlined,
+                    size: 16,
+                    color: AppColors.accent,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _weatherData!.alerts.first.recommendation!,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textHeadline,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ],
       ),
     );
-  }
-
-  Color _getAlertBackgroundColor(double severity) {
-    if (severity >= 0.75) {
-      return const Color(0xFFFFE5E5); // Red
-    } else if (severity >= 0.5) {
-      return const Color(0xFFFFE5D0); // Orange
-    } else {
-      return const Color(0xFFFFFDE5); // Yellow
-    }
-  }
-
-  Color _getAlertBorderColor(double severity) {
-    if (severity >= 0.75) {
-      return const Color(0xFFFFB3B3); // Red
-    } else if (severity >= 0.5) {
-      return const Color(0xFFFFD0B3); // Orange
-    } else {
-      return const Color(0xFFFFFBC0); // Yellow
-    }
-  }
-
-  Color _getAlertIconColor(double severity) {
-    if (severity >= 0.75) {
-      return Colors.red[500]!; // Red
-    } else if (severity >= 0.5) {
-      return Colors.orange[500]!; // Orange
-    } else {
-      return Colors.amber[600]!; // Yellow
-    }
-  }
-
-  Color _getAlertTextColor(double severity) {
-    if (severity >= 0.75) {
-      return const Color(0xFF991B1B); // Dark Red
-    } else if (severity >= 0.5) {
-      return const Color(0xFF9D4D0D); // Dark Orange
-    } else {
-      return const Color(0xFF78350F); // Dark Yellow
-    }
-  }
-
-  IconData _getAlertIcon(String type) {
-    switch (type.toLowerCase()) {
-      case 'frost':
-        return Icons.ac_unit_rounded;
-      case 'rain':
-        return Icons.water_drop_rounded;
-      case 'drought':
-        return Icons.wb_sunny_rounded;
-      case 'wind':
-        return Icons.air_rounded;
-      case 'pest':
-        return Icons.bug_report_rounded;
-      case 'disease':
-        return Icons.sick_rounded;
-      default:
-        return Icons.warning_amber_rounded;
-    }
-  }
-
-  Widget _buildForecast() {
-    if (_isLoadingWeather) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        child: const Center(
-          child: SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      );
-    }
-
-    if (_weatherForecast == null || _weatherForecast!.forecasts.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    // Get daily forecast (one per day)
-    final dailyForecast = _weatherForecast!.getDailyForecast();
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '5-DAY FORECAST',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 180,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: dailyForecast.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                final forecast = dailyForecast[index];
-                return _buildForecastCard(forecast);
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildForecastCard(ForecastData forecast) {
-    final isRainy = forecast.rainProbability != null && forecast.rainProbability! > 0.5;
-    
-    return Container(
-      width: 100,
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            forecast.dayName,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[500],
-            ),
-          ),
-          Text(
-            forecast.dateString,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey[400],
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Weather icon
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: isRainy ? Colors.blue[100] : primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Center(
-              child: Text(
-                _getWeatherEmoji(forecast.description, isRainy),
-                style: const TextStyle(fontSize: 20),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Temperature
-          Text(
-            '${forecast.temperature.toStringAsFixed(0)}°C',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-          const SizedBox(height: 4),
-          // Humidity
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.opacity,
-                size: 10,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(width: 2),
-              Text(
-                '${forecast.humidity.toStringAsFixed(0)}%',
-                style: TextStyle(
-                  fontSize: 9,
-                  color: Colors.grey[500],
-                ),
-              ),
-            ],
-          ),
-          // Rain probability if present
-          if (forecast.rainProbability != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: forecast.rainProbability! > 0.6
-                      ? Colors.blue[100]
-                      : Colors.orange[100],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '${(forecast.rainProbability! * 100).toStringAsFixed(0)}%',
-                  style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w600,
-                    color: forecast.rainProbability! > 0.6
-                        ? Colors.blue[700]
-                        : Colors.orange[700],
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  String _getWeatherEmoji(String description, bool isRainy) {
-    final desc = description.toLowerCase();
-    
-    if (desc.contains('rain') || isRainy) return '???';
-    if (desc.contains('cloud') || desc.contains('overcast')) return '??';
-    if (desc.contains('clear') || desc.contains('sunny')) return '??';
-    if (desc.contains('snow')) return '??';
-    if (desc.contains('wind')) return '??';
-    if (desc.contains('fog') || desc.contains('mist')) return '???';
-    if (desc.contains('thunder') || desc.contains('storm')) return '??';
-    
-    return '???'; // Default partly cloudy
   }
 
   Widget _buildAICropInsights() {
@@ -1065,108 +936,187 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            _buildSectionHeader('AI Farm Insights'),
             Text(
-              'AI Crop Insights',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: primary.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'Refresh',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: primary,
-                ),
+              'View All',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.primary,
               ),
             ),
           ],
         ),
         const SizedBox(height: 16),
-        _buildInsightCard(
-          icon: Icons.trending_up_rounded,
-          iconColor: const Color(0xFF7C3AED),
-          title: 'Market Demand Surge',
-          description:
-              'Local demand for organic bell peppers has spiked by 22% this week. Consider prioritizing this harvest.',
-        ),
-        const SizedBox(height: 12),
-        _buildInsightCard(
-          icon: Icons.water_drop_rounded,
-          iconColor: primary,
-          title: 'Irrigation Optimization',
-          description:
-              'Soil sensors in Sector 4 show 15% lower moisture. Automating irrigation at 9 PM is recommended.',
+        SizedBox(
+          height: 180,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            children: [
+              _buildInsightCard(
+                'Crop Health',
+                'Corn fields showing signs of nitrogen deficiency in Sector B.',
+                Icons.grass_rounded,
+                AppColors.primary,
+              ),
+              const SizedBox(width: 16),
+              _buildInsightCard(
+                'Market Trend',
+                'Tomato prices expected to rise by 15% in the next week.',
+                Icons.trending_up_rounded,
+                AppColors.accent,
+              ),
+              const SizedBox(width: 16),
+              _buildInsightCard(
+                'Maintenance',
+                'Irrigation system check recommended for Zone 4 tomorrow.',
+                Icons.plumbing_rounded,
+                const Color(0xFF3B82F6),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildInsightCard({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String description,
-  }) {
+  Widget _buildInsightCard(
+    String title,
+    String description,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
+      width: 260,
+      padding: const EdgeInsets.all(20),
+      decoration: AppDecorations.cardDecoration.copyWith(
+        borderRadius: BorderRadius.circular(24),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: iconColor, size: 24),
+          Row(
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                title.toUpperCase(),
+                style: AppTextStyles.labelSmall.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 10,
+                  letterSpacing: 0.5,
+                  color: color,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                    height: 1.4,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 12),
+          Text(
+            description,
+            style: AppTextStyles.bodyMedium.copyWith(
+              fontWeight: FontWeight.w600,
+              height: 1.4,
             ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const Spacer(),
+          Row(
+            children: [
+              Text(
+                'Full Report',
+                style: AppTextStyles.labelSmall.copyWith(fontSize: 11),
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.arrow_forward_rounded,
+                size: 12,
+                color: AppColors.textSubtle,
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  IconData _getAlertIcon(String type) {
+    if (type.contains('rain')) return Icons.umbrella_rounded;
+    if (type.contains('storm')) return Icons.thunderstorm_rounded;
+    if (type.contains('wind')) return Icons.air_rounded;
+    if (type.contains('heat')) return Icons.thermostat_rounded;
+    if (type.contains('flood')) return Icons.flood_rounded;
+    return Icons.wb_cloudy_rounded;
+  }
+
+  Widget _buildForecast() {
+    if (_isLoadingWeather) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader('Weekly Forecast'),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: AppDecorations.cardDecoration,
+            child: ForecastSkeleton(itemCount: 5, enabled: true),
+          ),
+        ],
+      );
+    }
+
+    if (_weatherForecast == null) return Container();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('Weekly Forecast'),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: AppDecorations.cardDecoration,
+          child: Column(
+            children: _weatherForecast!.getDailyForecast().take(5).map((f) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        f.dayName,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      _getAlertIcon(f.description.toLowerCase()),
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 3,
+                      child: Text(
+                        f.description,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSubtle,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${f.temperature.toStringAsFixed(0)}Â°',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1177,35 +1127,56 @@ class _AnalyticsChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [color.withValues(alpha: 0.3), color.withValues(alpha: 0.0)],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
     final path = Path();
     final fillPath = Path();
 
     final points = [
-      Offset(size.width * 0.1, size.height * 0.6),
-      Offset(size.width * 0.25, size.height * 0.3),
-      Offset(size.width * 0.4, size.height * 0.6),
-      Offset(size.width * 0.55, size.height * 0.4),
-      Offset(size.width * 0.7, size.height * 0.5),
-      Offset(size.width * 0.85, size.height * 0.15),
-      Offset(size.width, size.height * 0.25),
+      Offset(0, size.height * 0.7),
+      Offset(size.width * 0.15, size.height * 0.8),
+      Offset(size.width * 0.3, size.height * 0.6),
+      Offset(size.width * 0.45, size.height * 0.75),
+      Offset(size.width * 0.6, size.height * 0.4),
+      Offset(size.width * 0.75, size.height * 0.5),
+      Offset(size.width, size.height * 0.2),
     ];
 
     path.moveTo(points[0].dx, points[0].dy);
     fillPath.moveTo(points[0].dx, points[0].dy);
 
-    for (int i = 0; i < points.length - 1; i++) {
-      final cp1x = points[i].dx + (points[i + 1].dx - points[i].dx) / 2;
-      final cp1y = points[i].dy;
-      final cp2x = points[i].dx + (points[i + 1].dx - points[i].dx) / 2;
-      final cp2y = points[i + 1].dy;
-      path.cubicTo(cp1x, cp1y, cp2x, cp2y, points[i + 1].dx, points[i + 1].dy);
+    for (var i = 0; i < points.length - 1; i++) {
+      final p1 = points[i];
+      final p2 = points[i + 1];
+      final controlPoint1 = Offset(p1.dx + (p2.dx - p1.dx) / 2, p1.dy);
+      final controlPoint2 = Offset(p1.dx + (p2.dx - p1.dx) / 2, p2.dy);
+
+      path.cubicTo(
+        controlPoint1.dx,
+        controlPoint1.dy,
+        controlPoint2.dx,
+        controlPoint2.dy,
+        p2.dx,
+        p2.dy,
+      );
       fillPath.cubicTo(
-        cp1x,
-        cp1y,
-        cp2x,
-        cp2y,
-        points[i + 1].dx,
-        points[i + 1].dy,
+        controlPoint1.dx,
+        controlPoint1.dy,
+        controlPoint2.dx,
+        controlPoint2.dy,
+        p2.dx,
+        p2.dy,
       );
     }
 
@@ -1213,20 +1184,12 @@ class _AnalyticsChartPainter extends CustomPainter {
     fillPath.lineTo(0, size.height);
     fillPath.close();
 
-    final fillPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [color.withOpacity(0.2), color.withOpacity(0.0)],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
     canvas.drawPath(fillPath, fillPaint);
+    canvas.drawPath(path, paint);
 
-    final linePaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-    canvas.drawPath(path, linePaint);
+    final lastPoint = points.last;
+    canvas.drawCircle(lastPoint, 6, Paint()..color = Colors.white);
+    canvas.drawCircle(lastPoint, 4, Paint()..color = color);
   }
 
   @override
