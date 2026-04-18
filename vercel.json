@@ -1,6 +1,7 @@
 {
-  "buildCommand": "echo 'Using pre-built Flutter web app'",
-  "outputDirectory": "docs",
+  "installCommand": "git clone https://github.com/flutter/flutter.git --depth 1 -b stable ./flutter-sdk && ./flutter-sdk/bin/flutter config --no-analytics && ./flutter-sdk/bin/flutter --version",
+  "buildCommand": "./flutter-sdk/bin/flutter pub get && ./flutter-sdk/bin/flutter build web --release",
+  "outputDirectory": "build/web",
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
