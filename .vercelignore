@@ -1,0 +1,44 @@
+.git/
+.vscode/
+.idea/
+
+# Local env files
+
+.env
+.env.\*
+!.env.example
+!.env.local
+
+# Flutter and Dart artifacts
+
+build/
+.dart_tool/
+.pub/
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Android/iOS local build artifacts
+
+android/.gradle/
+android/build/
+ios/Pods/
+ios/Flutter/
+ios/build/
+
+# Node dependencies
+
+node_modules/
+
+# Supabase local artifacts (not needed for web deploy payload)
+
+supabase/.temp/
+
+# Large generated web output from old flow
+
+docs/
+
+# Misc
+
+_.log
+_.tmp
