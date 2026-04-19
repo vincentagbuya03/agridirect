@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/brand_logo.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import '../../../shared/services/auth/onboarding_service.dart';
@@ -110,32 +111,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: _primary,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.eco_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'AgriDirect',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: _darkGreen,
-                      ),
-                    ),
-                  ],
-                ),
+                const BrandLogo(size: BrandLogoSize.small),
                 GestureDetector(
                   onTap: _skip,
                   child: Container(

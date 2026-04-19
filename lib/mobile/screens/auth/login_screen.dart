@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/brand_logo.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/services.dart';
@@ -276,84 +277,63 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 56),
                   // Premium Brand Header
                   Center(
                     child: Column(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.1),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              gradient: AppColors.primaryGradient,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.eco_rounded,
-                              color: Colors.white,
-                              size: 32,
-                            ),
-                          ),
-                        ),
+                        const BrandLogo(size: BrandLogoSize.large),
                         const SizedBox(height: 20),
-                        Text(
-                          'AgriDirect',
-                          style: AppTextStyles.headline1.copyWith(
-                            fontSize: 32,
-                            letterSpacing: -0.5,
-                            color: AppColors.primary,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Direct from farm to your table',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSubtle,
+                          child: Text(
+                            'Direct from farm to your table',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
 
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 60),
                   Text(
                     'Welcome Back',
-                    style: AppTextStyles.headline1.copyWith(fontSize: 28),
+                    style: AppTextStyles.headline1.copyWith(
+                      fontSize: 32,
+                      letterSpacing: -1.0,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Sign in to access fresh local produce directly from farmers.',
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: AppColors.textSubtle,
+                      height: 1.5,
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 48),
 
                   // Login Form Section
                   _buildInputLabel('Email Address'),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   _buildTextField(
                     controller: _emailController,
                     hintText: 'name@example.com',
                     prefixIcon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
 
                   _buildInputLabel('Password'),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   _buildTextField(
                     controller: _passwordController,
                     hintText: 'Enter your password',
@@ -372,7 +352,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
@@ -393,28 +373,30 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 36),
 
                   // Sign In Button
                   SizedBox(
                     width: double.infinity,
-                    height: 58,
+                    height: 62,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _handleLogin,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
-                        elevation: 0,
+                        foregroundColor: Colors.white,
+                        elevation: 8,
+                        shadowColor: AppColors.primary.withValues(alpha: 0.3),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                       ),
                       child: _isLoading
                           ? const SizedBox(
                               height: 24,
                               width: 24,
-                              child: AppShimmerLoader(
+                              child: CircularProgressIndicator(
                                 color: Colors.white,
-                                strokeWidth: 2,
+                                strokeWidth: 2.5,
                               ),
                             )
                           : Text(
@@ -428,82 +410,68 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 40),
                   // Divider
                   Row(
                     children: [
                       Expanded(
-                        child: Divider(color: Colors.grey[200], thickness: 1),
+                        child: Divider(color: Colors.grey[200], thickness: 1.5),
                       ),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Text(
                           'OR CONTINUE WITH',
                           style: AppTextStyles.labelSmall.copyWith(
-                            color: AppColors.textSubtle,
-                            letterSpacing: 1.2,
+                            color: AppColors.textSubtle.withValues(alpha: 0.6),
+                            letterSpacing: 2.0,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
                       Expanded(
-                        child: Divider(color: Colors.grey[200], thickness: 1),
+                        child: Divider(color: Colors.grey[200], thickness: 1.5),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 40),
 
                   // Google Sign In
                   SizedBox(
                     width: double.infinity,
-                    height: 58,
+                    height: 62,
                     child: OutlinedButton(
                       onPressed: _isGoogleLoading ? null : _handleGoogleSignIn,
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Colors.grey[200]!),
+                        side: BorderSide(color: Colors.grey[200]!, width: 1.5),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                         backgroundColor: Colors.white,
+                        elevation: 0,
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
                         children: [
                           if (_isGoogleLoading)
                             const SizedBox(
                               width: 24,
                               height: 24,
-                              child: AppShimmerLoader(strokeWidth: 2),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           else ...[
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey[300]!),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                'G',
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: const Color(0xFF4285F4),
-                                  fontSize: 14,
-                                ),
-                              ),
+                            Image.network(
+                              'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_Logo.svg',
+                              width: 22,
+                              height: 22,
+                              errorBuilder: (context, _, _) => const Icon(Icons.g_mobiledata, size: 30, color: Color(0xFF4285F4)),
                             ),
-                            const SizedBox(width: 12),
-                            Flexible(
-                              child: Text(
-                                'Sign in with Google',
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textHeadline,
-                                  fontSize: 16,
-                                ),
+                            const SizedBox(width: 14),
+                            Text(
+                              'Sign in with Google',
+                              style: AppTextStyles.bodyLarge.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textHeadline,
+                                fontSize: 16,
                               ),
                             ),
                           ],
@@ -511,7 +479,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 56),
                   Center(
                     child: RichText(
                       text: TextSpan(
@@ -535,7 +503,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 48),
                 ],
               ),
             ),

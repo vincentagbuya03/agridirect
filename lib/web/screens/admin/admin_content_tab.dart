@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/admin/admin_service.dart';
+import '../../../shared/widgets/create_article_dialog.dart';
 import 'admin_ui.dart';
 
 class AdminContentTab extends StatefulWidget {
@@ -75,7 +76,15 @@ class _AdminContentTabState extends State<AdminContentTab> {
           ),
         ),
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: () async {
+            final result = await showDialog<bool>(
+              context: context,
+              builder: (context) => const CreateArticleDialog(),
+            );
+            if (result == true && mounted) {
+              _loadData();
+            }
+          },
           style: AdminUi.primaryButton,
           icon: const Icon(Icons.add_rounded, size: 18),
           label: const Text('Create New Article'),

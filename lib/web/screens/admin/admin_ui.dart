@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Agrarian Admin Premium Design System (Digital Arboretum Edition)
+/// AgriDirect Admin Premium Design System (Digital Arboretum Edition)
 class AdminUi {
   // Brand Colors
   static const Color brand = Color(0xFF064E3B); // Very Dark Forest Green
   static const Color brandSecondary = Color(0xFF10B981); // Emerald Green
   static const Color brandSoft = Color(0xFFECFDF5);
   static const Color brandDark = Color(0xFF022C22); // Near black green
-  
+
   static const Color sidebarBg = Color(0xFFF8F9FE); // Very Light Blue/Grey
   static const Color accent = Color(0xFF10B981);
   static const Color accentSoft = Color(0xFFD1FAE5);
@@ -22,9 +22,9 @@ class AdminUi {
   // Neutrals
   static const Color background = Color(0xFFF3F4F6);
   static const Color panel = Color(0xFFFFFFFF);
-  static const Color panelAlt = Color(0xFFF9FAFB); 
-  static const Color border = Color(0xFFE5E7EB); 
-  
+  static const Color panelAlt = Color(0xFFF9FAFB);
+  static const Color border = Color(0xFFE5E7EB);
+
   static const Color textPrimary = Color(0xFF111827);
   static const Color textSecondary = Color(0xFF4B5563);
   static const Color textMuted = Color(0xFF9CA3AF);
@@ -57,7 +57,13 @@ class AdminUi {
   ];
 
   // Typography
-  static TextStyle display(BuildContext context, {double size = 28, Color? color, FontWeight weight = FontWeight.w800, double? letterSpacing}) {
+  static TextStyle display(
+    BuildContext context, {
+    double size = 28,
+    Color? color,
+    FontWeight weight = FontWeight.w800,
+    double? letterSpacing,
+  }) {
     return GoogleFonts.plusJakartaSans(
       fontSize: size,
       fontWeight: weight,
@@ -66,7 +72,12 @@ class AdminUi {
     );
   }
 
-  static TextStyle title({double size = 18, Color? color, FontWeight weight = FontWeight.w700, double? letterSpacing}) {
+  static TextStyle title({
+    double size = 18,
+    Color? color,
+    FontWeight weight = FontWeight.w700,
+    double? letterSpacing,
+  }) {
     return GoogleFonts.plusJakartaSans(
       fontSize: size,
       fontWeight: weight,
@@ -75,7 +86,11 @@ class AdminUi {
     );
   }
 
-  static TextStyle body({double size = 14, Color? color, FontWeight weight = FontWeight.w500}) {
+  static TextStyle body({
+    double size = 14,
+    Color? color,
+    FontWeight weight = FontWeight.w500,
+  }) {
     return GoogleFonts.plusJakartaSans(
       fontSize: size,
       fontWeight: weight,
@@ -83,7 +98,12 @@ class AdminUi {
     );
   }
 
-  static TextStyle label({double size = 12, Color? color, FontWeight weight = FontWeight.w600, double? letterSpacing}) {
+  static TextStyle label({
+    double size = 12,
+    Color? color,
+    FontWeight weight = FontWeight.w600,
+    double? letterSpacing,
+  }) {
     return GoogleFonts.plusJakartaSans(
       fontSize: size,
       fontWeight: weight,
@@ -119,14 +139,20 @@ class AdminUi {
     textStyle: label(size: 13, weight: FontWeight.w700),
   );
 
-  static InputDecoration inputDecoration({String? hintText, Widget? prefixIcon}) {
+  static InputDecoration inputDecoration({
+    String? hintText,
+    Widget? prefixIcon,
+  }) {
     return InputDecoration(
       hintText: hintText,
       hintStyle: label(color: textMuted, weight: FontWeight.w400),
       prefixIcon: prefixIcon,
       filled: true,
       fillColor: const Color(0xFFF3F4F6),
-      border: OutlineInputBorder(borderRadius: radiusMd, borderSide: BorderSide.none),
+      border: OutlineInputBorder(
+        borderRadius: radiusMd,
+        borderSide: BorderSide.none,
+      ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     );
   }
@@ -184,7 +210,10 @@ class AdminHeroCard extends StatelessWidget {
                   children: [
                     if (eyebrow != null) ...[
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AdminUi.brandSoft,
                           borderRadius: AdminUi.radiusFull,
@@ -202,7 +231,13 @@ class AdminHeroCard extends StatelessWidget {
                     ],
                     Text(title, style: AdminUi.display(context, size: 28)),
                     const SizedBox(height: 8),
-                    Text(description, style: AdminUi.body(size: 15, color: AdminUi.textSecondary)),
+                    Text(
+                      description,
+                      style: AdminUi.body(
+                        size: 15,
+                        color: AdminUi.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -218,11 +253,7 @@ class AdminHeroCard extends StatelessWidget {
             const SizedBox(height: 32),
             const Divider(height: 1, color: AdminUi.border),
             const SizedBox(height: 24),
-            Wrap(
-              spacing: 32,
-              runSpacing: 24,
-              children: metrics,
-            ),
+            Wrap(spacing: 32, runSpacing: 24, children: metrics),
           ],
         ],
       ),
@@ -266,9 +297,15 @@ class AdminMiniMetric extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: AdminUi.label(size: 11, color: AdminUi.textMuted)),
+            Text(
+              label,
+              style: AdminUi.label(size: 11, color: AdminUi.textMuted),
+            ),
             const SizedBox(height: 2),
-            Text(value, style: AdminUi.title(size: 20, weight: FontWeight.w800)),
+            Text(
+              value,
+              style: AdminUi.title(size: 20, weight: FontWeight.w800),
+            ),
           ],
         ),
       ],
@@ -306,7 +343,16 @@ class AdminDashboardHeader extends StatelessWidget {
             ],
           ),
           if (actions.isNotEmpty)
-            Row(children: actions.map((a) => Padding(padding: const EdgeInsets.only(left: 12), child: a)).toList()),
+            Row(
+              children: actions
+                  .map(
+                    (a) => Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: a,
+                    ),
+                  )
+                  .toList(),
+            ),
         ],
       ),
     );
@@ -340,7 +386,9 @@ class AdminMetricCard extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         decoration: AdminUi.cardDecoration().copyWith(
           image: const DecorationImage(
-            image: NetworkImage('https://www.transparenttextures.com/patterns/cubes.png'),
+            image: NetworkImage(
+              'https://www.transparenttextures.com/patterns/cubes.png',
+            ),
             opacity: 0.02,
             repeat: ImageRepeat.repeat,
           ),
@@ -361,28 +409,67 @@ class AdminMetricCard extends StatelessWidget {
                 ),
                 if (trend != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AdminUi.brandSoft,
                       borderRadius: AdminUi.radiusFull,
                     ),
-                    child: Text(trend!, style: AdminUi.label(size: 10, color: AdminUi.brand, weight: FontWeight.w700)),
+                    child: Text(
+                      trend!,
+                      style: AdminUi.label(
+                        size: 10,
+                        color: AdminUi.brand,
+                        weight: FontWeight.w700,
+                      ),
+                    ),
                   )
                 else if (badge != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: badge == 'Urgent' ? AdminUi.danger.withValues(alpha: 0.1) : AdminUi.brandSoft,
+                      color: badge == 'Urgent'
+                          ? AdminUi.danger.withValues(alpha: 0.1)
+                          : AdminUi.brandSoft,
                       borderRadius: AdminUi.radiusFull,
                     ),
-                    child: Text(badge!, style: AdminUi.label(size: 10, color: badge == 'Urgent' ? AdminUi.danger : AdminUi.brand, weight: FontWeight.w700)),
+                    child: Text(
+                      badge!,
+                      style: AdminUi.label(
+                        size: 10,
+                        color: badge == 'Urgent'
+                            ? AdminUi.danger
+                            : AdminUi.brand,
+                        weight: FontWeight.w700,
+                      ),
+                    ),
                   ),
               ],
             ),
             const Spacer(),
-            Text(label.toUpperCase(), style: AdminUi.label(size: 10, color: AdminUi.textMuted, weight: FontWeight.w700, letterSpacing: 0.5)),
+            Text(
+              label.toUpperCase(),
+              style: AdminUi.label(
+                size: 10,
+                color: AdminUi.textMuted,
+                weight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(value, style: AdminUi.display(context, size: 24, weight: FontWeight.w800)),
+            Text(
+              value,
+              style: AdminUi.display(
+                context,
+                size: 24,
+                weight: FontWeight.w800,
+              ),
+            ),
           ],
         ),
       ),

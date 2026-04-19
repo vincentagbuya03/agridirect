@@ -3,6 +3,7 @@
 // Order and transaction operations
 // ============================================================================
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/order/order_model.dart';
 import '../../models/order/order_item_model.dart';
@@ -31,6 +32,23 @@ class OrderService {
           .toList();
     } catch (e) {
       throw Exception('Failed to fetch my orders: $e');
+    }
+  }
+
+  /// Watch user's orders in real-time
+  Stream<List<Order>> watchMyOrders({int limit = 20}) async* {
+    yield await getMyOrders(limit: limit);
+
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    // Trigger re-fetch when orders for this user change
+    final stream = _supabase
+        .from('orders')
+        .stream(primaryKey: ['order_id']);
+
+    await for (final _ in stream) {
+      yield await getMyOrders(limit: limit);
     }
   }
 
@@ -214,14 +232,15 @@ class OrderService {
       farmerId: farmerId,
     );
 
+    final farmerUserId = await _getFarmerUserIdByFarmerId(farmerId);
+
     if (notes != null && notes.trim().isNotEmpty) {
       await _sendConversationMessage(
         conversationId: conversationId,
         messageText: notes.trim(),
+        recipientUserId: farmerUserId,
       );
     }
-
-    final farmerUserId = await _getFarmerUserIdByFarmerId(farmerId);
 
     return {
       'order': order.toJson(),
@@ -458,6 +477,7 @@ class OrderService {
   Future<void> _sendConversationMessage({
     required String conversationId,
     required String messageText,
+    String? recipientUserId,
   }) async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
@@ -472,6 +492,57 @@ class OrderService {
         .from('conversations')
         .update({'last_message_at': DateTime.now().toIso8601String()})
         .eq('conversation_id', conversationId);
+
+    if (recipientUserId == null || recipientUserId.isEmpty) {
+      return;
+    }
+
+    final senderName = await _getUserDisplayName(userId);
+
+    try {
+      await _supabase.functions.invoke(
+        'send-push-notification',
+        body: {
+          'targetUserId': recipientUserId,
+          'title': 'New message from $senderName',
+          'body': messageText,
+          'notificationCode': 'new_message',
+          'linkType': 'conversation',
+          'linkId': conversationId,
+          'data': {
+            'conversation_id': conversationId,
+            'sender_id': userId,
+            'sender_name': senderName,
+          },
+        },
+      );
+    } catch (e) {
+      debugPrint('Failed to send order message push notification: $e');
+    }
+  }
+
+  Future<String> _getUserDisplayName(String userId) async {
+    try {
+      final user = await _supabase
+          .from('users')
+          .select('name, email')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      final name = (user?['name'] as String?)?.trim();
+      if (name != null && name.isNotEmpty) {
+        return name;
+      }
+
+      final email = (user?['email'] as String?)?.trim();
+      if (email != null && email.isNotEmpty) {
+        return email;
+      }
+    } catch (e) {
+      debugPrint('Failed to resolve sender display name: $e');
+    }
+
+    return 'Someone';
   }
 }
 

@@ -10,7 +10,6 @@ import 'screens/farmer/farmer_products_screen.dart';
 import 'screens/farmer/farmer_orders_screen.dart';
 import 'screens/farmer/farmer_community_hub.dart';
 import 'screens/consumer/profile_screen.dart';
-import 'screens/common/loading_screen.dart';
 
 class MobileNavigation extends StatefulWidget {
   final VoidCallback onLogout;
@@ -23,7 +22,6 @@ class MobileNavigation extends StatefulWidget {
 
 class _MobileNavigationState extends State<MobileNavigation> {
   int _currentIndex = 0;
-  bool _isLoading = true;
   final _auth = AuthService();
 
   @override
@@ -40,10 +38,6 @@ class _MobileNavigationState extends State<MobileNavigation> {
 
   void _onAuthChanged() {
     if (mounted) setState(() {});
-  }
-
-  void _onLoadingFinished() {
-    if (mounted) setState(() => _isLoading = false);
   }
 
   List<Widget> get _screens {
@@ -93,10 +87,6 @@ class _MobileNavigationState extends State<MobileNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return LoadingScreen(onFinished: _onLoadingFinished);
-    }
-
     final screens = _screens;
     final navItems = _navItems;
 

@@ -285,11 +285,11 @@ class ProductService {
   }) async {
     try {
       final updateData = <String, dynamic>{
-        if (name != null) 'name': name,
-        if (price != null) 'price': price,
-        if (description != null) 'description': description,
-        if (harvestDays != null) 'harvest_days': harvestDays,
-        if (isPreorder != null) 'is_preorder': isPreorder,
+        'name': ?name,
+        'price': ?price,
+        'description': ?description,
+        'harvest_days': ?harvestDays,
+        'is_preorder': ?isPreorder,
       };
 
       final response = await _supabase
@@ -447,8 +447,8 @@ class ProductService {
       final response = await _supabase
           .from('product_reviews')
           .update({
-            if (rating != null) 'rating': rating,
-            if (reviewText != null) 'review_text': reviewText,
+            'rating': ?rating,
+            'review_text': ?reviewText,
           })
           .eq('review_id', reviewId)
           .select()

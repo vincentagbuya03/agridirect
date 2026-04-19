@@ -55,6 +55,7 @@ class CategoryItem {
 }
 
 class ForumPostItem {
+  final String id;
   final String userName;
   final String time;
   final String title;
@@ -65,6 +66,7 @@ class ForumPostItem {
   final bool isLiked;
 
   const ForumPostItem({
+    required this.id,
     required this.userName,
     required this.time,
     required this.title,

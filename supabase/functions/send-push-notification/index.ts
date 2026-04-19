@@ -22,6 +22,7 @@ type GoogleTokenResponse = {
 
 type NotificationTypeRow = {
   notification_type_id: number;
+  code?: string;
 };
 
 type DeviceTokenRow = {
@@ -156,6 +157,75 @@ function buildMessageData(
   };
 }
 
+async function resolveNotificationTypeId(
+  adminClient: ReturnType<typeof createClient>,
+  notificationCode: string,
+  fallbackName: string,
+): Promise<number> {
+  const existingTypeResponse = await adminClient
+    .from("notification_types")
+    .select("notification_type_id")
+    .eq("code", notificationCode)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingTypeResponse.error) {
+    throw new Error(
+      `Failed to read notification type '${notificationCode}': ${existingTypeResponse.error.message}`,
+    );
+  }
+
+  const existingType = existingTypeResponse.data as NotificationTypeRow | null;
+  if (existingType?.notification_type_id != null) {
+    return existingType.notification_type_id;
+  }
+
+  const maxIdResponse = await adminClient
+    .from("notification_types")
+    .select("notification_type_id")
+    .order("notification_type_id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (maxIdResponse.error) {
+    throw new Error(
+      `Failed to determine next notification type id: ${maxIdResponse.error.message}`,
+    );
+  }
+
+  const maxIdRow = maxIdResponse.data as NotificationTypeRow | null;
+  const nextId = (maxIdRow?.notification_type_id ?? 0) + 1;
+
+  const insertResponse = await adminClient
+    .from("notification_types")
+    .insert({
+      notification_type_id: nextId,
+      code: notificationCode,
+      name: fallbackName,
+      description: `Generated notification type for ${notificationCode}`,
+    });
+
+  if (!insertResponse.error) {
+    return nextId;
+  }
+
+  const retryTypeResponse = await adminClient
+    .from("notification_types")
+    .select("notification_type_id")
+    .eq("code", notificationCode)
+    .limit(1)
+    .maybeSingle();
+
+  if (retryTypeResponse.error || !retryTypeResponse.data) {
+    throw new Error(
+      `Unable to resolve notification type '${notificationCode}': ${insertResponse.error.message}`,
+    );
+  }
+
+  const retryType = retryTypeResponse.data as NotificationTypeRow;
+  return retryType.notification_type_id;
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -199,31 +269,11 @@ Deno.serve(async (request: Request) => {
       );
     }
 
-    await adminClient
-      .from("notification_types")
-      .upsert(
-        {
-          code: notificationCode,
-          name: title,
-          description: `Generated notification type for ${notificationCode}`,
-        },
-        { onConflict: "code" },
-      );
-
-    const notificationTypeResponse = await adminClient
-      .from("notification_types")
-      .select("notification_type_id")
-      .eq("code", notificationCode)
-      .single();
-    const notificationType =
-      notificationTypeResponse.data as NotificationTypeRow | null;
-    const typeError = notificationTypeResponse.error;
-
-    if (typeError || !notificationType) {
-      throw new Error(
-        `Unable to resolve notification type '${notificationCode}'.`,
-      );
-    }
+    const notificationTypeId = await resolveNotificationTypeId(
+      adminClient,
+      notificationCode,
+      title,
+    );
 
     const messageData = buildMessageData(
       payload.linkType,
@@ -233,7 +283,7 @@ Deno.serve(async (request: Request) => {
 
     const notificationRow: NotificationInsertRow = {
       user_id: targetUserId,
-      notification_type_id: notificationType.notification_type_id,
+      notification_type_id: notificationTypeId,
       title,
       body,
       link_type: payload.linkType ?? null,
@@ -300,6 +350,7 @@ Deno.serve(async (request: Request) => {
                   priority: "high",
                   notification: {
                     channel_id: "agridirect_channel",
+                    sound: "default",
                   },
                 },
                 apns: {

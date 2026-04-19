@@ -61,10 +61,10 @@ class UserService {
       final response = await _supabase
           .from('users')
           .update({
-            if (name != null) 'name': name,
-            if (phone != null) 'phone': phone,
-            if (avatarUrl != null) 'avatar_url': avatarUrl,
-            if (bio != null) 'bio': bio,
+            'name': ?name,
+            'phone': ?phone,
+            'avatar_url': ?avatarUrl,
+            'bio': ?bio,
           })
           .eq('user_id', userId)
           .select()

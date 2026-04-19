@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
@@ -31,27 +30,15 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
   String? _farmerName; // Farm name loaded from database
   String? _farmerImageUrl; // Farm image URL loaded from database
   String? _customerImageUrl; // Customer avatar URL loaded from users table
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-  bool _isOnline = true; // Track connectivity status
 
   @override
   void initState() {
     super.initState();
 
-    // Listen to connectivity changes
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
-      result,
-    ) {
-      if (!mounted) return;
-      setState(() {
-        _isOnline = !result.contains(ConnectivityResult.none);
-      });
-    });
-
     _loadHeaderProfileData();
   }
 
-    // Listen to connectivity changes
+  // Listen to connectivity changes
 
   Future<void> _loadHeaderProfileData() async {
     final auth = AuthService();
@@ -69,7 +56,10 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
             _farmerName = farmers[0]['farm_name'] as String?;
           });
           final rawUrl = farmers[0]['image_url'] as String?;
-          final safeUrl = await SupabaseDB.getSafeUrl(rawUrl, defaultBucket: 'uploads');
+          final safeUrl = await SupabaseDB.getSafeUrl(
+            rawUrl,
+            defaultBucket: 'uploads',
+          );
           if (mounted) {
             setState(() {
               _farmerImageUrl = safeUrl;
@@ -85,7 +75,10 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
 
         if (users.isNotEmpty && mounted) {
           final rawUrl = users[0]['avatar_url'] as String?;
-          final safeUrl = await SupabaseDB.getSafeUrl(rawUrl, defaultBucket: 'uploads');
+          final safeUrl = await SupabaseDB.getSafeUrl(
+            rawUrl,
+            defaultBucket: 'uploads',
+          );
           if (mounted) {
             setState(() {
               _customerImageUrl = safeUrl;
@@ -96,12 +89,6 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
     } catch (e) {
       debugPrint('Error loading profile header data: $e');
     }
-  }
-
-  @override
-  void dispose() {
-    _connectivitySubscription?.cancel();
-    super.dispose();
   }
 
   void _handleStartSelling() {
@@ -482,8 +469,8 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                                 isFarmer && _farmerName != null
                                     ? _farmerName!
                                     : (auth.userName.isNotEmpty
-                                        ? auth.userName
-                                        : 'User'),
+                                          ? auth.userName
+                                          : 'User'),
                                 style: AppTextStyles.headline2.copyWith(
                                   fontSize: 24,
                                 ),
@@ -539,9 +526,6 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
   Widget _buildMenuSection(BuildContext context) {
     final auth = AuthService();
     final isFarmer = auth.isViewingAsFarmer;
-    debugPrint(
-      '🔍 Menu rendering with registrationStatus: ${auth.registrationStatus}, _isOnline: $_isOnline, auth.isSeller: ${auth.isSeller}',
-    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(

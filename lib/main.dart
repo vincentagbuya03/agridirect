@@ -22,6 +22,7 @@ import 'shared/services/community/notification_service.dart';
 import 'shared/router/app_router.dart';
 import 'shared/services/offline/offline_cache_service.dart';
 import 'shared/utils/url_strategy.dart';
+import 'mobile/screens/common/loading_screen.dart';
 
 // Handle background notifications
 @pragma('vm:entry-point')
@@ -72,7 +73,19 @@ class _BootstrapApp extends StatefulWidget {
 }
 
 class _BootstrapAppState extends State<_BootstrapApp> {
-  late final Future<void> _initializationFuture = _initializeApp();
+  late final Future<void> _initializationFuture = _initializeAppWithMinDelay();
+  bool _isAnimationDone = false;
+
+  Future<void> _initializeAppWithMinDelay() async {
+    final startTime = DateTime.now();
+    await _initializeApp();
+    final elapsed = DateTime.now().difference(startTime);
+    // Ensure we wait at least 3.2 seconds for the fancy loading animation
+    final remaining = const Duration(milliseconds: 3200) - elapsed;
+    if (remaining > Duration.zero) {
+      await Future.delayed(remaining);
+    }
+  }
 
   Future<void> _initializeApp() async {
     // Keep each step non-fatal where possible so web never stays blank.
@@ -128,40 +141,51 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     return FutureBuilder<void>(
       future: _initializationFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const _StartupLoadingScreen();
-        }
-
         if (snapshot.hasError) {
           return _StartupErrorScreen(error: snapshot.error.toString());
         }
 
-        return const AgriDirectApp();
-      },
-    );
-  }
-}
+        if (snapshot.connectionState == ConnectionState.done) {
+          final auth = AuthService();
 
-class _StartupLoadingScreen extends StatelessWidget {
-  const _StartupLoadingScreen();
+          // If NOT logged in, skip the loading animation and go straight to the app (Login)
+          if (!auth.isLoggedIn || _isAnimationDone) {
+            return const AgriDirectApp();
+          }
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        backgroundColor: AppColors.background,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(color: AppColors.primary),
-              const SizedBox(height: 16),
-              Text('Starting AgriDirect...', style: AppTextStyles.headline3),
-            ],
+          // If logged in, show the premium loading screen
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: LoadingScreen(
+              onFinished: () {
+                if (mounted) {
+                  setState(() {
+                    _isAnimationDone = true;
+                  });
+                }
+              },
+            ),
+          );
+        }
+
+        // While initializing, show a simple background or short-lived splash
+        return const MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: Scaffold(
+            backgroundColor: Color(0xFF064E3B), // Match brand green
+            body: Center(
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(
+                  color: Colors.white24,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -201,20 +225,44 @@ class AgriDirectApp extends StatefulWidget {
 
 class _AgriDirectAppState extends State<AgriDirectApp> {
   late final _router = createAppRouter();
+  final AuthService _auth = AuthService();
   final AnalyticsService _analyticsService = AnalyticsService();
   OfflineProductService? _offlineProductService;
   late final _AppLifecycleObserver _lifecycleObserver;
   bool _sessionStartedByLifecycle = false;
+  bool _isDatabaseSyncRunning = false;
 
   @override
   void initState() {
     super.initState();
     _lifecycleObserver = _AppLifecycleObserver(this);
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
+    _auth.addListener(_handleAuthSyncState);
     _initializeNotifications();
     _initializeDatabaseSync();
     _initializeOfflineProductSync();
     _initializeAppSession();
+  }
+
+  void _handleAuthSyncState() {
+    final isLoggedIn = _auth.isLoggedIn && _auth.userId.isNotEmpty;
+
+    if (isLoggedIn && !_isDatabaseSyncRunning) {
+      DatabaseSyncService().startAutoSync(
+        syncProfiles: true,
+        syncImages: true,
+        syncRegistrations: true,
+      );
+      _isDatabaseSyncRunning = true;
+      debugPrint('✅ Database realtime sync started (auth state)');
+      return;
+    }
+
+    if (!isLoggedIn && _isDatabaseSyncRunning) {
+      DatabaseSyncService().stopAutoSync();
+      _isDatabaseSyncRunning = false;
+      debugPrint('🛑 Database realtime sync stopped (auth state)');
+    }
   }
 
   Future<void> _initializeOfflineProductSync() async {
@@ -268,16 +316,7 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
 
   Future<void> _initializeDatabaseSync() async {
     try {
-      final auth = AuthService();
-      if (auth.isLoggedIn) {
-        // Start automatic database sync
-        DatabaseSyncService().startAutoSync(
-          syncProfiles: true,
-          syncImages: true,
-          syncRegistrations: true,
-        );
-        debugPrint('✅ Database sync service started');
-      }
+      _handleAuthSyncState();
     } catch (e) {
       debugPrint('⚠️ Database sync initialization error: $e');
     }
@@ -297,7 +336,9 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
   @override
   void dispose() {
     // Stop database sync when app closes
+    _auth.removeListener(_handleAuthSyncState);
     DatabaseSyncService().stopAutoSync();
+    _isDatabaseSyncRunning = false;
     _offlineProductService?.pendingProductsCount.dispose();
     _offlineProductService?.isSyncing.dispose();
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);

@@ -220,7 +220,7 @@ class AdminService {
 
       return (response as List<dynamic>).cast<Map<String, dynamic>>().toList();
     } catch (e) {
-      throw Exception('Failed to fetch pending reports: \$e');
+      throw Exception('Failed to fetch pending reports: $e');
     }
   }
 
@@ -232,7 +232,7 @@ class AdminService {
           .update({'status': 'reviewing'})
           .eq('report_id', reportId);
     } catch (e) {
-      throw Exception('Failed to mark report as reviewing: \$e');
+      throw Exception('Failed to mark report as reviewing: $e');
     }
   }
 
@@ -261,7 +261,7 @@ class AdminService {
         'Resolved report - \$action + \$resolutionNotes',
       );
     } catch (e) {
-      throw Exception('Failed to resolve report: \$e');
+      throw Exception('Failed to resolve report: $e');
     }
   }
 
@@ -279,7 +279,7 @@ class AdminService {
 
       await logAdminAction('dismiss_report', reason ?? 'Dismissed report');
     } catch (e) {
-      throw Exception('Failed to dismiss report: \$e');
+      throw Exception('Failed to dismiss report: $e');
     }
   }
 
@@ -312,7 +312,7 @@ class AdminService {
         targetUserId: userId,
       );
     } catch (e) {
-      throw Exception('Failed to suspend user: \$e');
+      throw Exception('Failed to suspend user: $e');
     }
   }
 
@@ -327,7 +327,7 @@ class AdminService {
         targetUserId: userId,
       );
     } catch (e) {
-      throw Exception('Failed to lift suspension: \$e');
+      throw Exception('Failed to lift suspension: $e');
     }
   }
 
@@ -407,7 +407,7 @@ class AdminService {
 
       return (response as List<dynamic>).cast<Map<String, dynamic>>().toList();
     } catch (e) {
-      throw Exception('Failed to fetch admin logs: \$e');
+      throw Exception('Failed to fetch admin logs: $e');
     }
   }
 
@@ -430,7 +430,7 @@ class AdminService {
 
       return (response as List<dynamic>).cast<Map<String, dynamic>>().toList();
     } catch (e) {
-      throw Exception('Failed to fetch articles: \$e');
+      throw Exception('Failed to fetch articles: $e');
     }
   }
 
@@ -473,7 +473,7 @@ class AdminService {
 
       return response;
     } catch (e) {
-      throw Exception('Failed to create article: \$e');
+      throw Exception('Failed to create article: $e');
     }
   }
 
@@ -490,11 +490,11 @@ class AdminService {
       await _supabase
           .from('admin_articles')
           .update({
-            if (title != null) 'title': title,
-            if (content != null) 'body': content,
-            if (imageUrl != null) 'cover_image_url': imageUrl,
-            if (readTime != null) 'summary': readTime,
-            if (published != null) 'is_published': published,
+            'title': ?title,
+            'body': ?content,
+            'cover_image_url': ?imageUrl,
+            'summary': ?readTime,
+            'is_published': ?published,
             if (published != null)
               'published_at': published
                   ? DateTime.now().toIso8601String()
@@ -502,7 +502,7 @@ class AdminService {
           })
           .eq('article_id', articleId);
     } catch (e) {
-      throw Exception('Failed to update article: \$e');
+      throw Exception('Failed to update article: $e');
     }
   }
 
@@ -514,7 +514,7 @@ class AdminService {
           .delete()
           .eq('article_id', articleId);
     } catch (e) {
-      throw Exception('Failed to delete article: \$e');
+      throw Exception('Failed to delete article: $e');
     }
   }
 }

@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/auth/onboarding_service.dart';
 import '../../widgets/animated_components.dart';
+import '../../../shared/widgets/brand_logo.dart';
+import '../../../shared/router/app_routes.dart';
 
 /// Web Welcome Screen — Premium animated landing page
 /// Features: animated wave hero, floating particles, scroll-reveal sections,
@@ -55,7 +57,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
 
   Future<void> _completeWelcome() async {
     await OnboardingService.completeOnboarding();
-    if (mounted) context.go('/');
+    if (mounted) context.go(AppRoutes.marketplace);
   }
 
   @override
@@ -110,43 +112,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
         ),
         child: Row(
           children: [
-            // Logo
             MouseRegion(
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
                 onTap: () => context.go('/shop'),
-                child: Row(
-                  children: [
-                    PulsingGlow(
-                      color: AgriColors.emerald500,
-                      radius: 20,
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          gradient: AgriColors.primaryGradient,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Center(
-                          child: AnimatedLeafIcon(
-                            size: 22,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'AgriDirect',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AgriColors.dark,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  ],
-                ),
+                child: const BrandLogo(size: BrandLogoSize.medium),
               ),
             ),
             const SizedBox(width: 48),
@@ -1724,32 +1694,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                gradient: AgriColors.primaryGradient,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.eco_rounded,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'AgriDirect',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
+                        const BrandLogo(size: BrandLogoSize.small, inverted: true),
                         const SizedBox(height: 12),
                         Text(
                           'Connecting local farmers\ndirectly to your kitchen for a\nhealthier, more sustainable world.',
@@ -1906,32 +1851,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  gradient: AgriColors.primaryGradient,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(
-                                  Icons.eco_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                'AgriDirect',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
+                          const BrandLogo(size: BrandLogoSize.small, inverted: true),
                           const SizedBox(height: 16),
                           Text(
                             'Connecting local farmers\ndirectly to your kitchen for a\nhealthier, more sustainable world.',

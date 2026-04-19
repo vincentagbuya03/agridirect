@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../shared/widgets/create_post_dialog.dart';
 
 /// Farmer Community Hub - Professional Social Interface
 class FarmerCommunityHub extends StatefulWidget {
@@ -44,7 +45,15 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
+        onPressed: () async {
+          final result = await showDialog<bool>(
+            context: context,
+            builder: (context) => const CreatePostDialog(),
+          );
+          if (result == true && mounted) {
+            setState(() {});
+          }
+        },
         backgroundColor: AppColors.primary,
         elevation: 6,
         icon: const Icon(Icons.edit_square, color: Colors.white, size: 20),

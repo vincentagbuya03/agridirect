@@ -80,6 +80,30 @@ class SupabaseDataService {
     }
   }
 
+  /// Watch nearby products in real-time
+  Stream<List<ProductItem>> watchNearbyProducts() async* {
+    // Yield initial data
+    yield await getNearbyProducts();
+
+    // Listen for changes in products or product_inventory tables
+    final productStream = _client.from('products').stream(primaryKey: ['product_id']);
+    
+    await for (final _ in productStream) {
+      yield await getNearbyProducts();
+    }
+  }
+
+  /// Watch pre-order products in real-time
+  Stream<List<ProductItem>> watchPreOrderProducts() async* {
+    yield await getPreOrderProducts();
+    
+    final productStream = _client.from('products').stream(primaryKey: ['product_id']).eq('is_preorder', true);
+    
+    await for (final _ in productStream) {
+      yield await getPreOrderProducts();
+    }
+  }
+
   /// Get all nearby/available products (not pre-order)
   Future<List<ProductItem>> getNearbyProducts() async {
     try {
@@ -437,6 +461,17 @@ class SupabaseDataService {
   // FORUM POSTS
   // ══════════════════════════════════════════════════════════════════════════
 
+  /// Watch forum posts in real-time
+  Stream<List<ForumPostItem>> watchForumPosts() async* {
+    yield await getForumPosts();
+    
+    final postStream = _client.from('forum_posts').stream(primaryKey: ['post_id']);
+    
+    await for (final _ in postStream) {
+      yield await getForumPosts();
+    }
+  }
+
   /// Get all forum posts
   Future<List<ForumPostItem>> getForumPosts() async {
     try {
@@ -469,6 +504,7 @@ class SupabaseDataService {
         posts
             .map(
               (post) => {
+                'id': post.id,
                 'user_name': post.userName,
                 'time': post.time,
                 'title': post.title,
@@ -489,6 +525,7 @@ class SupabaseDataService {
       return cached
           .map(
             (item) => ForumPostItem(
+              id: item['id']?.toString() ?? '',
               userName: item['user_name']?.toString() ?? 'Anonymous',
               time: item['time']?.toString() ?? 'Recently',
               title: item['title']?.toString() ?? '',
@@ -558,6 +595,7 @@ class SupabaseDataService {
     final timeAgo = createdAt != null ? _formatTimeAgo(createdAt) : 'Recently';
 
     return ForumPostItem(
+      id: item['post_id']?.toString() ?? '',
       userName: item['author_name'] ?? 'Anonymous',
       time: timeAgo,
       title: item['title'] ?? '',

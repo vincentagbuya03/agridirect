@@ -5,6 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../widgets/animated_components.dart';
+import '../../../shared/widgets/brand_logo.dart';
+import '../../../shared/widgets/create_post_dialog.dart';
+import '../../../shared/widgets/comments_dialog.dart';
 
 /// Web-only Community Hub — two-column layout with sidebar.
 /// Completely separate UI from the mobile community hub.
@@ -135,7 +138,15 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           ],
         ),
         child: FloatingActionButton.extended(
-          onPressed: () {},
+          onPressed: () async {
+            final result = await showDialog<bool>(
+              context: context,
+              builder: (context) => const CreatePostDialog(),
+            );
+            if (result == true && mounted) {
+              setState(() {}); // Refresh list
+            }
+          },
           backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
           elevation: 0,
@@ -168,35 +179,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
       child: Row(
         children: [
           // Logo with pulsing glow
-          Row(
-            children: [
-              PulsingGlow(
-                color: _primary,
-                radius: 20,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    gradient: AgriColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: AnimatedLeafIcon(size: 22, color: Colors.white),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'AgriDirect',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: _dark,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
-          ),
+          const BrandLogo(size: BrandLogoSize.medium),
           const SizedBox(width: 48),
           // Nav items
           ...List.generate(navItems.length, (i) {
@@ -495,9 +478,25 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                   icon: post.isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
                   label: '${post.likes}',
                   active: post.isLiked,
+                  onTap: () async {
+                    await SupabaseDataService().togglePostLike(post.id);
+                    if (mounted) setState(() {});
+                  },
                 ),
                 const SizedBox(width: 20),
-                _buildPostAction(icon: Icons.chat_bubble_outline_rounded, label: '${post.comments}'),
+                _buildPostAction(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  label: '${post.comments}',
+                  onTap: () async {
+                    final updated = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => CommentsDialog(postId: post.id),
+                    );
+                    if (updated == true && mounted) {
+                      setState(() {});
+                    }
+                  },
+                ),
                 const Spacer(),
                 _buildPostAction(icon: Icons.bookmark_border_rounded, label: 'Save'),
                 const SizedBox(width: 16),
@@ -510,10 +509,12 @@ class _WebCommunityHubState extends State<WebCommunityHub>
     );
   }
 
-  Widget _buildPostAction({required IconData icon, required String label, bool active = false}) {
+  Widget _buildPostAction({required IconData icon, required String label, bool active = false, VoidCallback? onTap}) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: Row(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 18, color: active ? _primary : _muted),
@@ -523,6 +524,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             style: TextStyle(fontSize: 13, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: active ? _primary : _muted),
           ),
         ],
+      ),
       ),
     );
   }

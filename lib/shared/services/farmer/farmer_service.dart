@@ -93,11 +93,11 @@ class FarmerService {
       final response = await _supabase
           .from('farmer_profiles')
           .update({
-            if (farmName != null) 'farm_name': farmName,
-            if (specialty != null) 'specialty': specialty,
-            if (location != null) 'location': location,
-            if (imageUrl != null) 'image_url': imageUrl,
-            if (badge != null) 'badge': badge,
+            'farm_name': ?farmName,
+            'specialty': ?specialty,
+            'location': ?location,
+            'image_url': ?imageUrl,
+            'badge': ?badge,
           })
           .eq('user_id', userId)
           .select()

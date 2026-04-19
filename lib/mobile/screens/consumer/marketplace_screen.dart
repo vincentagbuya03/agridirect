@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/brand_logo.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
@@ -16,6 +17,9 @@ import 'package:agridirect/shared/widgets/image_widgets.dart';
 import '../../../shared/services/user/user_service.dart';
 import '../../../shared/models/auth/user_address_model.dart';
 import '../../../shared/services/integration/reverse_geocoding_service.dart';
+import 'package:go_router/go_router.dart';
+import '../../../shared/router/app_router.dart';
+import '../../../shared/services/core/supabase_config.dart';
 
 /// Marketplace Screen - Professional Digital Marketplace
 class MarketplaceScreen extends StatefulWidget {
@@ -124,23 +128,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.eco_rounded,
-                        color: AppColors.primary,
-                        size: 28,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'AgriDirect',
-                        style: AppTextStyles.headline1.copyWith(fontSize: 22),
-                      ),
-                    ],
-                  ),
-                  _buildHeaderCart(),
-                ],
+                children: [const BrandLogo(), _buildHeaderCart()],
               ),
               const SizedBox(height: 24),
               Row(
@@ -341,10 +329,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     }
 
     // Online mode - fetch products and cache them
-    return FutureBuilder<List<ProductItem>>(
-      future: SupabaseDataService().getNearbyProducts(),
+    return StreamBuilder<List<ProductItem>>(
+      stream: SupabaseDataService().watchNearbyProducts(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return Padding(
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
             child: ProductGridSkeleton(itemCount: 6, enabled: true),
@@ -663,14 +651,30 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   }
 
   Future<UserAddress?> _openAddressEditor([UserAddress? initialAddress]) async {
-    final streetController = TextEditingController(text: initialAddress?.street ?? '');
-    final barangayController = TextEditingController(text: initialAddress?.barangay ?? '');
-    final cityController = TextEditingController(text: initialAddress?.city ?? '');
-    final provinceController = TextEditingController(text: initialAddress?.province ?? '');
-    final zipCodeController = TextEditingController(text: initialAddress?.zipCode ?? '');
-    final labelController = TextEditingController(text: initialAddress?.label ?? 'Home');
-    final recipientNameController = TextEditingController(text: initialAddress?.recipientName ?? '');
-    final recipientPhoneController = TextEditingController(text: initialAddress?.recipientPhone ?? '');
+    final streetController = TextEditingController(
+      text: initialAddress?.street ?? '',
+    );
+    final barangayController = TextEditingController(
+      text: initialAddress?.barangay ?? '',
+    );
+    final cityController = TextEditingController(
+      text: initialAddress?.city ?? '',
+    );
+    final provinceController = TextEditingController(
+      text: initialAddress?.province ?? '',
+    );
+    final zipCodeController = TextEditingController(
+      text: initialAddress?.zipCode ?? '',
+    );
+    final labelController = TextEditingController(
+      text: initialAddress?.label ?? 'Home',
+    );
+    final recipientNameController = TextEditingController(
+      text: initialAddress?.recipientName ?? '',
+    );
+    final recipientPhoneController = TextEditingController(
+      text: initialAddress?.recipientPhone ?? '',
+    );
 
     bool isPinningLocation = false;
     bool isSavingAddress = false;
@@ -717,7 +721,11 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                           color: AppColors.background,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.close_rounded, size: 20, color: AppColors.textHeadline),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 20,
+                          color: AppColors.textHeadline,
+                        ),
                       ),
                     ),
                   ],
@@ -730,13 +738,17 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        initialAddress == null ? 'Add New Address' : 'Edit Address',
+                        initialAddress == null
+                            ? 'Add New Address'
+                            : 'Edit Address',
                         style: AppTextStyles.headline1.copyWith(fontSize: 24),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Where should we deliver your orders?',
-                        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textSubtle,
+                        ),
                       ),
                       const SizedBox(height: 28),
 
@@ -825,7 +837,11 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                         decoration: BoxDecoration(
                           color: AppColors.background,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+                          border: Border.all(
+                            color: AppColors.textHeadline.withValues(
+                              alpha: 0.05,
+                            ),
+                          ),
                         ),
                         child: Column(
                           children: [
@@ -835,15 +851,27 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Default Address', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                                    Text(
+                                      'Default Address',
+                                      style: AppTextStyles.bodyMedium.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
                                     const SizedBox(height: 2),
-                                    Text('Use this for future checkouts', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontSize: 11)),
+                                    Text(
+                                      'Use this for future checkouts',
+                                      style: AppTextStyles.bodySmall.copyWith(
+                                        color: AppColors.textSubtle,
+                                        fontSize: 11,
+                                      ),
+                                    ),
                                   ],
                                 ),
                                 Switch.adaptive(
                                   value: isDefault,
-                                  activeColor: AppColors.primary,
-                                  onChanged: (val) => setAddressState(() => isDefault = val),
+                                  activeTrackColor: AppColors.primary,
+                                  onChanged: (val) =>
+                                      setAddressState(() => isDefault = val),
                                 ),
                               ],
                             ),
@@ -861,7 +889,8 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                                       });
 
                                       try {
-                                        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+                                        final serviceEnabled =
+                                            await Geolocator.isLocationServiceEnabled();
                                         if (!serviceEnabled) {
                                           setAddressState(() {
                                             pinError = 'GPS is disabled.';
@@ -870,34 +899,55 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                                           return;
                                         }
 
-                                        var permission = await Geolocator.checkPermission();
-                                        if (permission == LocationPermission.denied) {
-                                          permission = await Geolocator.requestPermission();
+                                        var permission =
+                                            await Geolocator.checkPermission();
+                                        if (permission ==
+                                            LocationPermission.denied) {
+                                          permission =
+                                              await Geolocator.requestPermission();
                                         }
 
-                                        if (permission == LocationPermission.denied ||
-                                            permission == LocationPermission.deniedForever) {
+                                        if (permission ==
+                                                LocationPermission.denied ||
+                                            permission ==
+                                                LocationPermission
+                                                    .deniedForever) {
                                           setAddressState(() {
-                                            pinError = 'Location access denied.';
+                                            pinError =
+                                                'Location access denied.';
                                             isPinningLocation = false;
                                           });
                                           return;
                                         }
 
-                                        final position = await Geolocator.getCurrentPosition(
-                                          desiredAccuracy: LocationAccuracy.high,
-                                        );
+                                        final position =
+                                            await Geolocator.getCurrentPosition(
+                                              desiredAccuracy:
+                                                  LocationAccuracy.high,
+                                            );
 
-                                        final resolved = await ReverseGeocodingService.resolveFromCoordinates(
-                                          latitude: position.latitude,
-                                          longitude: position.longitude,
-                                        );
+                                        final resolved =
+                                            await ReverseGeocodingService.resolveFromCoordinates(
+                                              latitude: position.latitude,
+                                              longitude: position.longitude,
+                                            );
 
                                         setAddressState(() {
-                                          if (resolved.street.isNotEmpty) streetController.text = resolved.street;
-                                          if (resolved.barangay.isNotEmpty) barangayController.text = resolved.barangay;
-                                          if (resolved.city.isNotEmpty) cityController.text = resolved.city;
-                                          if (resolved.province.isNotEmpty) provinceController.text = resolved.province;
+                                          if (resolved.street.isNotEmpty) {
+                                            streetController.text =
+                                                resolved.street;
+                                          }
+                                          if (resolved.barangay.isNotEmpty) {
+                                            barangayController.text =
+                                                resolved.barangay;
+                                          }
+                                          if (resolved.city.isNotEmpty) {
+                                            cityController.text = resolved.city;
+                                          }
+                                          if (resolved.province.isNotEmpty) {
+                                            provinceController.text =
+                                                resolved.province;
+                                          }
                                           latitude = position.latitude;
                                           longitude = position.longitude;
                                           isPinningLocation = false;
@@ -914,37 +964,69 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                                   Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: AppColors.primary.withValues(alpha: 0.1),
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.1,
+                                      ),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.my_location_rounded, size: 18, color: AppColors.primary),
+                                    child: const Icon(
+                                      Icons.my_location_rounded,
+                                      size: 18,
+                                      color: AppColors.primary,
+                                    ),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          isPinningLocation ? 'Locating...' : 'Auto-fill from GPS',
-                                          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600, color: AppColors.primary),
+                                          isPinningLocation
+                                              ? 'Locating...'
+                                              : 'Auto-fill from GPS',
+                                          style: AppTextStyles.bodyMedium
+                                              .copyWith(
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.primary,
+                                              ),
                                         ),
                                         Text(
                                           'Use current location to fill form',
-                                          style: AppTextStyles.bodySmall.copyWith(fontSize: 11, color: AppColors.textSubtle),
+                                          style: AppTextStyles.bodySmall
+                                              .copyWith(
+                                                fontSize: 11,
+                                                color: AppColors.textSubtle,
+                                              ),
                                         ),
                                       ],
                                     ),
                                   ),
                                   if (isPinningLocation)
-                                    const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
                                   else
-                                    const Icon(Icons.chevron_right_rounded, color: AppColors.textSubtle),
+                                    const Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: AppColors.textSubtle,
+                                    ),
                                 ],
                               ),
                             ),
                             if (pinError != null) ...[
                               const SizedBox(height: 8),
-                              Text(pinError!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.error, fontSize: 11)),
+                              Text(
+                                pinError!,
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.error,
+                                  fontSize: 11,
+                                ),
+                              ),
                             ],
                           ],
                         ),
@@ -956,7 +1038,12 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
               ),
               // Footer Button
               Container(
-                padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + MediaQuery.of(dialogContext).viewInsets.bottom),
+                padding: EdgeInsets.fromLTRB(
+                  24,
+                  16,
+                  24,
+                  24 + MediaQuery.of(dialogContext).viewInsets.bottom,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   boxShadow: [
@@ -971,7 +1058,12 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (saveError != null) ...[
-                      Text(saveError!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.error)),
+                      Text(
+                        saveError!,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.error,
+                        ),
+                      ),
                       const SizedBox(height: 12),
                     ],
                     Container(
@@ -998,11 +1090,21 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                                 final province = provinceController.text.trim();
                                 final zipCode = zipCodeController.text.trim();
                                 final label = labelController.text.trim();
-                                final recipientName = recipientNameController.text.trim();
-                                final recipientPhone = recipientPhoneController.text.trim();
+                                final recipientName = recipientNameController
+                                    .text
+                                    .trim();
+                                final recipientPhone = recipientPhoneController
+                                    .text
+                                    .trim();
 
-                                if (street.isEmpty || barangay.isEmpty || city.isEmpty || province.isEmpty) {
-                                  setAddressState(() => saveError = 'Please fill all required fields');
+                                if (street.isEmpty ||
+                                    barangay.isEmpty ||
+                                    city.isEmpty ||
+                                    province.isEmpty) {
+                                  setAddressState(
+                                    () => saveError =
+                                        'Please fill all required fields',
+                                  );
                                   return;
                                 }
 
@@ -1010,21 +1112,22 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                                   isSavingAddress = true;
                                   saveError = null;
                                 });
-                                
-                                final savedAddress = await UserService().upsertAddress(
-                                  addressId: initialAddress?.addressId,
-                                  street: street,
-                                  barangay: barangay,
-                                  city: city,
-                                  province: province,
-                                  zipCode: zipCode,
-                                  label: label,
-                                  recipientName: recipientName,
-                                  recipientPhone: recipientPhone,
-                                  isDefault: isDefault,
-                                  latitude: latitude,
-                                  longitude: longitude,
-                                );
+
+                                final savedAddress = await UserService()
+                                    .upsertAddress(
+                                      addressId: initialAddress?.addressId,
+                                      street: street,
+                                      barangay: barangay,
+                                      city: city,
+                                      province: province,
+                                      zipCode: zipCode,
+                                      label: label,
+                                      recipientName: recipientName,
+                                      recipientPhone: recipientPhone,
+                                      isDefault: isDefault,
+                                      latitude: latitude,
+                                      longitude: longitude,
+                                    );
 
                                 if (!mounted) return;
                                 if (savedAddress == null) {
@@ -1034,18 +1137,34 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                                   });
                                   return;
                                 }
-                                Navigator.pop(dialogContext, savedAddress);
+                                if (mounted && context.mounted) {
+                                  Navigator.pop(context, savedAddress);
+                                }
                               },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
                         ),
                         child: isSavingAddress
-                            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
                             : Text(
-                                initialAddress == null ? 'Save Address' : 'Update Details',
-                                style: AppTextStyles.headline3.copyWith(color: Colors.white, fontSize: 16),
+                                initialAddress == null
+                                    ? 'Save Address'
+                                    : 'Update Details',
+                                style: AppTextStyles.headline3.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
                               ),
                       ),
                     ),
@@ -1125,7 +1244,10 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                       Navigator.pop(context, newAddress);
                     }
                   },
-                  icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
+                  icon: const Icon(
+                    Icons.add_circle_outline_rounded,
+                    color: AppColors.primary,
+                  ),
                 ),
               ],
             ),
@@ -1136,27 +1258,44 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.location_off_outlined, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.3)),
+                          Icon(
+                            Icons.location_off_outlined,
+                            size: 64,
+                            color: AppColors.textSubtle.withValues(alpha: 0.3),
+                          ),
                           const SizedBox(height: 16),
-                          Text('No addresses found', style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSubtle)),
+                          Text(
+                            'No addresses found',
+                            style: AppTextStyles.bodyLarge.copyWith(
+                              color: AppColors.textSubtle,
+                            ),
+                          ),
                         ],
                       ),
                     )
                   : ListView.separated(
                       itemCount: addresses.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 12),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final addr = addresses[index];
-                        final isSelected = _address?.addressId == addr.addressId;
+                        final isSelected =
+                            _address?.addressId == addr.addressId;
                         return InkWell(
                           onTap: () => Navigator.pop(context, addr),
                           child: Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : AppColors.surface,
+                              color: isSelected
+                                  ? AppColors.primary.withValues(alpha: 0.05)
+                                  : AppColors.surface,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: isSelected ? AppColors.primary : AppColors.textHeadline.withValues(alpha: 0.05),
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : AppColors.textHeadline.withValues(
+                                        alpha: 0.05,
+                                      ),
                                 width: isSelected ? 2 : 1,
                               ),
                             ),
@@ -1164,25 +1303,36 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
                                           Text(
                                             addr.label,
-                                            style: AppTextStyles.headline3.copyWith(fontSize: 16),
+                                            style: AppTextStyles.headline3
+                                                .copyWith(fontSize: 16),
                                           ),
                                           if (addr.isDefault) ...[
                                             const SizedBox(width: 8),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
                                               decoration: BoxDecoration(
                                                 color: AppColors.primary,
-                                                borderRadius: BorderRadius.circular(4),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
                                               ),
                                               child: const Text(
                                                 'DEFAULT',
-                                                style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 8,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
                                             ),
                                           ],
@@ -1191,11 +1341,16 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                                       const SizedBox(height: 4),
                                       Text(
                                         addr.recipientName,
-                                        style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                                        style: AppTextStyles.bodyMedium
+                                            .copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                       ),
                                       Text(
                                         addr.fullAddress,
-                                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                                        style: AppTextStyles.bodySmall.copyWith(
+                                          color: AppColors.textSubtle,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1203,20 +1358,31 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                                 Column(
                                   children: [
                                     IconButton(
-                                      icon: const Icon(Icons.edit_outlined, size: 20),
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        size: 20,
+                                      ),
                                       onPressed: () async {
-                                        final updated = await _openAddressEditor(addr);
-                                        if (updated != null && context.mounted) {
+                                        final updated =
+                                            await _openAddressEditor(addr);
+                                        if (updated != null &&
+                                            context.mounted) {
                                           Navigator.pop(context, updated);
                                         }
                                       },
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.error),
+                                      icon: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        size: 20,
+                                        color: AppColors.error,
+                                      ),
                                       onPressed: () async {
-                                        final deleted = await _deleteAddress(addr.addressId);
+                                        final deleted = await _deleteAddress(
+                                          addr.addressId,
+                                        );
                                         if (deleted && context.mounted) {
-                                          Navigator.pop(context); 
+                                          Navigator.pop(context);
                                         }
                                       },
                                     ),
@@ -1437,16 +1603,22 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                               Expanded(
                                 child: OutlinedButton.icon(
                                   onPressed: () async {
-                                    final selected = await _openAddressSelector();
+                                    final selected =
+                                        await _openAddressSelector();
                                     if (selected != null && mounted) {
                                       setState(() => _address = selected);
                                       setSheetState(() {});
                                     }
                                   },
-                                  icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                                  icon: const Icon(
+                                    Icons.swap_horiz_rounded,
+                                    size: 18,
+                                  ),
                                   label: const Text('Change'),
                                   style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
                                     visualDensity: VisualDensity.compact,
                                   ),
                                 ),
@@ -1455,16 +1627,23 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                               Expanded(
                                 child: OutlinedButton.icon(
                                   onPressed: () async {
-                                    final updated = await _openAddressEditor(_address);
+                                    final updated = await _openAddressEditor(
+                                      _address,
+                                    );
                                     if (updated != null && mounted) {
                                       setState(() => _address = updated);
                                       setSheetState(() {});
                                     }
                                   },
-                                  icon: const Icon(Icons.edit_rounded, size: 18),
+                                  icon: const Icon(
+                                    Icons.edit_rounded,
+                                    size: 18,
+                                  ),
                                   label: const Text('Edit'),
                                   style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
                                     visualDensity: VisualDensity.compact,
                                   ),
                                 ),
@@ -2118,11 +2297,50 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                         ),
                       ),
                       GestureDetector(
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Contacting farmer...'),
-                            ),
+                        onTap: () async {
+                          if (widget.product.farmerId == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Farmer information is unavailable.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          // Prevent self-messaging
+                          final currentUserId = SupabaseConfig.currentUser?.id;
+                          if (currentUserId != null) {
+                            try {
+                              final farmerRecord = await SupabaseConfig.client
+                                  .from('farmers')
+                                  .select('farmer_id')
+                                  .eq('user_id', currentUserId)
+                                  .maybeSingle();
+                              
+                              if (farmerRecord != null && 
+                                  farmerRecord['farmer_id'] == widget.product.farmerId) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'You cannot message your own farm.',
+                                    ),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                                return;
+                              }
+                            } catch (e) {
+                              debugPrint('Error checking self-messaging: $e');
+                            }
+                          }
+
+                          if (!context.mounted) return;
+                          context.push(
+                            AppRoutes.customerMessages,
+                            extra: {'farmerId': widget.product.farmerId},
                           );
                         },
                         child: Container(

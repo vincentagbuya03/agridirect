@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/animated_components.dart';
+import '../../../shared/widgets/brand_logo.dart';
 
 /// Web Marketplace Home — Clean AgriDirect Landing Page
 /// Light mint/green design matching reference screenshot
@@ -110,35 +111,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
       child: Row(
         children: [
           // Logo with pulsing glow
-          Row(
-            children: [
-              PulsingGlow(
-                color: _primary,
-                radius: 20,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    gradient: AgriColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: AnimatedLeafIcon(size: 22, color: Colors.white),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'AgriDirect',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: _dark,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
-          ),
+          const BrandLogo(size: BrandLogoSize.medium),
           const SizedBox(width: 48),
           // Nav items
           ...List.generate(navItems.length, (i) {

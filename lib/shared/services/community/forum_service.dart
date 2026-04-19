@@ -99,9 +99,9 @@ class ForumService {
       final response = await _supabase
           .from('forum_posts')
           .update({
-            if (title != null) 'title': title,
-            if (body != null) 'body': body,
-            if (imageUrl != null) 'image_url': imageUrl,
+            'title': ?title,
+            'body': ?body,
+            'image_url': ?imageUrl,
           })
           .eq('post_id', postId)
           .select()
@@ -239,6 +239,59 @@ class ForumService {
           .from('forum_post_likes')
           .select()
           .eq('post_id', postId)
+          .eq('user_id', userId);
+
+      return (response as List<dynamic>).isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // ============================================================================
+  // COMMENT LIKES OPERATIONS
+  // ============================================================================
+
+  /// Like comment
+  Future<void> likeComment(String commentId) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      await _supabase.from('forum_comment_likes').insert({
+        'comment_id': commentId,
+        'user_id': userId,
+      });
+    } catch (e) {
+      throw Exception('Failed to like comment: $e');
+    }
+  }
+
+  /// Unlike comment
+  Future<void> unlikeComment(String commentId) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      await _supabase
+          .from('forum_comment_likes')
+          .delete()
+          .eq('comment_id', commentId)
+          .eq('user_id', userId);
+    } catch (e) {
+      throw Exception('Failed to unlike comment: $e');
+    }
+  }
+
+  /// Check if user liked comment
+  Future<bool> hasUserLikedComment(String commentId) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return false;
+
+      final response = await _supabase
+          .from('forum_comment_likes')
+          .select()
+          .eq('comment_id', commentId)
           .eq('user_id', userId);
 
       return (response as List<dynamic>).isNotEmpty;

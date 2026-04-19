@@ -567,10 +567,10 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildCommunityFeed(BuildContext context) {
-    return FutureBuilder<List<ForumPostItem>>(
-      future: SupabaseDataService().getForumPosts(),
+    return StreamBuilder<List<ForumPostItem>>(
+      stream: SupabaseDataService().watchForumPosts(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
             child: Center(child: AppShimmerLoader()),

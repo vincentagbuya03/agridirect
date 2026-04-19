@@ -23,65 +23,13 @@ import '../../web/screens/consumer/web_preorder_details.dart';
 import '../../web/screens/admin/admin_dashboard_redesigned.dart';
 import '../../web/screens/common/web_welcome_screen.dart';
 import '../screens/messages/messages_screen.dart';
+import '../../mobile/screens/common/loading_screen.dart';
 
-/// Route name constants for type-safe navigation.
-class AppRoutes {
-  // ── Shared ──
-  static const String home = '/';
-  static const String login = '/login';
-  static const String register = '/register';
-  static const String onboarding = '/onboarding';
-  static const String faceCapture = '/face-capture';
-  static const String admin = '/admin';
-  static const String preorderDetails = '/preorder-details';
-  static const String authCallback = '/auth/callback';
-  static const String resetPassword = '/reset-password';
-  static const String resetPasswordWithCode = '/reset-password-code';
-  static const String messages = '/messages';
-  static const String customerMessages = '/customer-messages';
-  static const String farmerMessages = '/farmer-messages';
+import 'app_routes.dart';
 
-  // ── Mobile-specific ──
-  static const String farmerRegister = '/farmer-register';
-  static const String googleCompleteProfile = '/google-complete-profile';
-  static const String addProduct = '/add-product';
-  static const String myDetails = '/my-details';
-  static const String farmersMap = '/farmers-map';
+export 'app_routes.dart';
 
-  // ── Web-specific ──
-  static const String webWelcome = '/web-welcome';
-  static const String marketplace = '/marketplace'; // consumer home / index 0
-  static const String shop = '/shop'; // index 1
-  static const String community = '/community'; // index 2
-  static const String profile = '/profile'; // index 3 (auth required)
-  static const String farmerDashboard =
-      '/farmer-dashboard'; // farmer home / index 0
-  static const String webFarmerRegister = '/web-farmer-register';
-
-  // ── Web tab helpers ──
-
-  /// Converts a route path to the active tab index used by web screens.
-  static int webTabIndex(String location) {
-    if (location.startsWith(shop)) return 1;
-    if (location.startsWith(community)) return 2;
-    if (location.startsWith(profile)) return 3;
-    return 0; // marketplace / farmerDashboard / home all → 0
-  }
-
-  /// Converts a tab index back to the appropriate route path.
-  static String webTabRoute(int index, {bool isFarmer = false}) {
-    switch (index) {
-      case 1:
-        return shop;
-      case 2:
-        return community;
-      case 3:
-        return profile;
-      default:
-        return isFarmer ? farmerDashboard : marketplace;
-    }
-  }
-}
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Creates and configures the GoRouter instance for the app.
 ///
@@ -91,6 +39,7 @@ GoRouter createAppRouter() {
   final auth = AuthService();
 
   return GoRouter(
+    navigatorKey: appNavigatorKey,
     initialLocation: AppRoutes.home,
     refreshListenable: auth,
     redirect: (BuildContext context, GoRouterState state) async {
@@ -187,11 +136,16 @@ GoRouter createAppRouter() {
       // Admin always goes to /admin
       if (isAdmin && location == AppRoutes.home) return AppRoutes.admin;
 
-      // Home → welcome (first visit) or the correct tab home
+      // Home → welcome (landing page) or the correct dashboard
       if (location == AppRoutes.home) {
         if (!isLoggedIn) {
-          final done = await OnboardingService.isOnboardingComplete();
-          if (!done) return AppRoutes.webWelcome;
+          if (isMobile) {
+            final done = await OnboardingService.isOnboardingComplete();
+            if (!done) return AppRoutes.onboarding;
+          } else {
+            // On web, play the loading animation before opening the welcome page.
+            return AppRoutes.loading;
+          }
         }
         if (isAdmin) return AppRoutes.admin;
         if (isFarmer) return AppRoutes.farmerDashboard;
@@ -319,16 +273,20 @@ GoRouter createAppRouter() {
         path: AppRoutes.messages,
         builder: (context, state) {
           final extra = state.extra;
-          final farmerUserId = extra is Map<String, dynamic>
-              ? extra['farmerUserId'] as String?
+          final farmerId = extra is Map<String, dynamic>
+              ? extra['farmerId'] as String?
+              : null;
+          final conversationId = extra is Map<String, dynamic>
+              ? extra['conversationId'] as String?
               : null;
           final asFarmer = extra is Map<String, dynamic>
               ? extra['asFarmer'] as bool?
               : null;
 
           return MessagesScreen(
-            initialFarmerUserId: farmerUserId,
-            asFarmer: asFarmer ?? (farmerUserId == null ? null : false),
+            initialFarmerId: farmerId,
+            initialConversationId: conversationId,
+            asFarmer: asFarmer ?? (farmerId == null ? null : false),
           );
         },
       ),
@@ -336,14 +294,11 @@ GoRouter createAppRouter() {
         path: AppRoutes.customerMessages,
         builder: (context, state) {
           final extra = state.extra;
-          final farmerUserId = extra is Map<String, dynamic>
-              ? extra['farmerUserId'] as String?
+          final farmerId = extra is Map<String, dynamic>
+              ? extra['farmerId'] as String?
               : null;
 
-          return MessagesScreen(
-            initialFarmerUserId: farmerUserId,
-            asFarmer: false,
-          );
+          return MessagesScreen(initialFarmerId: farmerId, asFarmer: false);
         },
       ),
       GoRoute(
@@ -364,6 +319,40 @@ GoRouter createAppRouter() {
           onOnboardingComplete: () => context.go(AppRoutes.home),
         ),
       ),
+      GoRoute(
+        path: AppRoutes.loading,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth <= 800;
+            final auth = AuthService();
+
+            return LoadingScreen(
+              onFinished: () {
+                if (isMobile) {
+                  context.go(AppRoutes.home);
+                  return;
+                }
+
+                if (!auth.isLoggedIn) {
+                  context.go(AppRoutes.webWelcome);
+                  return;
+                }
+
+                if (auth.isAdmin) {
+                  context.go(AppRoutes.admin);
+                  return;
+                }
+
+                context.go(
+                  auth.isViewingAsFarmer
+                      ? AppRoutes.farmerDashboard
+                      : AppRoutes.marketplace,
+                );
+              },
+            );
+          },
+        ),
+      ),
 
       // ── Login ─────────────────────────────────────────────────────────────
       GoRoute(
@@ -374,13 +363,13 @@ GoRouter createAppRouter() {
               return Scaffold(
                 body: Center(
                   child: WebLoginScreen(
-                    onLoginSuccess: () => context.go(AppRoutes.home),
+                    onLoginSuccess: () => context.go(AppRoutes.loading),
                   ),
                 ),
               );
             }
             return MobileLoginScreen(
-              onLoginSuccess: () => context.go(AppRoutes.home),
+              onLoginSuccess: () => context.go(AppRoutes.loading),
             );
           },
         ),

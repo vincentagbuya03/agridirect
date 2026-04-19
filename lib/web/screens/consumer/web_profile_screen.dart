@@ -7,7 +7,7 @@ import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/widgets/image_widgets.dart';
-import '../../widgets/animated_components.dart';
+import '../../../shared/widgets/brand_logo.dart';
 
 /// Web Profile screen.
 /// Shows user info, "Start Selling" button, and account settings.
@@ -331,35 +331,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       child: Row(
         children: [
           // Logo with pulsing glow
-          Row(
-            children: [
-              PulsingGlow(
-                color: primary,
-                radius: 20,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    gradient: AgriColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: AnimatedLeafIcon(size: 22, color: Colors.white),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'AgriDirect',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: _dark,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
-          ),
+          const BrandLogo(size: BrandLogoSize.medium),
           const SizedBox(width: 48),
           // Nav items
           ...List.generate(navItems.length, (i) {

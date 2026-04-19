@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../core/supabase_config.dart';
 
-
 /// OTP (One-Time Password) Service - Professional 3NF Logic
 /// Handles generation and verification of 6-digit OTP codes via secure DB RPCs.
 class OTPService {
@@ -11,6 +10,15 @@ class OTPService {
 
   final _client = SupabaseConfig.client;
 
+  String _normalizeVerificationType(String type) {
+    final normalized = type.trim().toLowerCase();
+
+    // Backward compatibility: older app flows still pass "signup".
+    if (normalized == 'signup') return 'email';
+
+    return normalized;
+  }
+
   /// Generate and store a secure 6-digit OTP using the Database RPC
   /// Returns the generated code or null if it fails.
   Future<String?> generateAndStoreOTP({
@@ -18,10 +26,12 @@ class OTPService {
     required String type, // e.g., 'signup' or 'password_reset'
   }) async {
     try {
+      final normalizedType = _normalizeVerificationType(type);
+
       // 1. Call our secure DB function
       final response = await _client.rpc(
         'generate_verification_code',
-        params: {'p_user_id': userId, 'p_type': type},
+        params: {'p_user_id': userId, 'p_type': normalizedType},
       );
 
       if (response == null || response['success'] != true) {

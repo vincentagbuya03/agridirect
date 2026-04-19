@@ -3,7 +3,6 @@ import '../../../shared/styles/app_theme.dart';
 import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/models/order/order_model.dart';
 import 'package:agridirect/shared/widgets/image_widgets.dart';
-import 'dart:async';
 
 /// Orders Screen - Professional Order Management
 class OrdersScreen extends StatefulWidget {
@@ -17,33 +16,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
   int _selectedTab = 0;
   final _tabs = ['Active', 'Completed', 'Cancelled'];
 
-  List<Order>? _orders;
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _loadOrders();
-  }
-
-  Future<void> _loadOrders() async {
-    setState(() => _isLoading = true);
-    try {
-      final orders = await OrderService().getMyOrders();
-      if (mounted) {
-        setState(() {
-          _orders = orders;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _orders = [];
-          _isLoading = false;
-        });
-      }
-    }
   }
 
   @override
@@ -194,96 +169,103 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Widget _buildOrdersList() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
-    }
-
-    if (_orders == null || _orders!.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.history_rounded, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.2)),
-            const SizedBox(height: 16),
-            Text(
-              'No orders found',
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
-            ),
-          ],
-        ),
-      );
-    }
-
-    List<Order> filteredOrders;
-    if (_selectedTab == 0) {
-      // Active
-      filteredOrders = _orders!.where((o) => o.isPending || o.isConfirmed || o.isShipped).toList();
-    } else if (_selectedTab == 1) {
-      // Completed
-      filteredOrders = _orders!.where((o) => o.isDelivered).toList();
-    } else {
-      // Cancelled
-      filteredOrders = _orders!.where((o) => o.isCancelled).toList();
-    }
-
-    if (filteredOrders.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.history_rounded, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.2)),
-            const SizedBox(height: 16),
-            Text(
-              'No ${_tabs[_selectedTab].toLowerCase()} orders',
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      physics: const BouncingScrollPhysics(),
-      itemCount: filteredOrders.length,
-      itemBuilder: (context, index) {
-        final order = filteredOrders[index];
-        
-        // Map status to color and progress
-        Color statusColor = AppColors.primary;
-        double progress = 0.5;
-        String statusText = order.status;
-        
-        if (order.isPending) {
-          statusColor = AppColors.warning;
-          progress = 0.2;
-        } else if (order.isConfirmed) {
-          statusColor = const Color(0xFF0EA5E9); // Info color
-          progress = 0.4;
-        } else if (order.isShipped) {
-          statusColor = AppColors.primary;
-          progress = 0.8;
-        } else if (order.isDelivered) {
-          statusColor = AppColors.success;
-          progress = 1.0;
-        } else if (order.isCancelled) {
-          statusColor = AppColors.error;
-          progress = 0.0;
+    return StreamBuilder<List<Order>>(
+      stream: OrderService().watchMyOrders(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator(color: AppColors.primary));
         }
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: _buildOrderCard(
-            farmImage: order.farmerAvatarUrl,
-            farmName: order.farmName ?? 'AgriDirect Farm',
-            orderId: order.orderNumber,
-            itemCount: order.itemCount ?? 1,
-            price: '₱${(order.total ?? 0).toStringAsFixed(2)}',
-            status: statusText,
-            statusColor: statusColor,
-            estimatedTime: order.isDelivered ? 'Delivered' : 'Pending Update',
-            progress: progress,
-          ),
+        final orders = snapshot.data ?? [];
+
+        if (orders.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.history_rounded, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.2)),
+                const SizedBox(height: 16),
+                Text(
+                  'No orders found',
+                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
+                ),
+              ],
+            ),
+          );
+        }
+
+        List<Order> filteredOrders;
+        if (_selectedTab == 0) {
+          // Active
+          filteredOrders = orders.where((o) => o.isPending || o.isConfirmed || o.isShipped).toList();
+        } else if (_selectedTab == 1) {
+          // Completed
+          filteredOrders = orders.where((o) => o.isDelivered).toList();
+        } else {
+          // Cancelled
+          filteredOrders = orders.where((o) => o.isCancelled).toList();
+        }
+
+        if (filteredOrders.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.history_rounded, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.2)),
+                const SizedBox(height: 16),
+                Text(
+                  'No ${_tabs[_selectedTab].toLowerCase()} orders',
+                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          physics: const BouncingScrollPhysics(),
+          itemCount: filteredOrders.length,
+          itemBuilder: (context, index) {
+            final order = filteredOrders[index];
+            
+            // Map status to color and progress
+            Color statusColor = AppColors.primary;
+            double progress = 0.5;
+            String statusText = order.status;
+            
+            if (order.isPending) {
+              statusColor = AppColors.warning;
+              progress = 0.2;
+            } else if (order.isConfirmed) {
+              statusColor = const Color(0xFF0EA5E9); // Info color
+              progress = 0.4;
+            } else if (order.isShipped) {
+              statusColor = AppColors.primary;
+              progress = 0.8;
+            } else if (order.isDelivered) {
+              statusColor = AppColors.success;
+              progress = 1.0;
+            } else if (order.isCancelled) {
+              statusColor = AppColors.error;
+              progress = 0.0;
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _buildOrderCard(
+                farmImage: order.farmerAvatarUrl,
+                farmName: order.farmName ?? 'AgriDirect Farm',
+                orderId: order.orderNumber,
+                itemCount: order.itemCount ?? 1,
+                price: '₱${(order.total ?? 0).toStringAsFixed(2)}',
+                status: statusText,
+                statusColor: statusColor,
+                estimatedTime: order.isDelivered ? 'Delivered' : 'Pending Update',
+                progress: progress,
+              ),
+            );
+          },
         );
       },
     );

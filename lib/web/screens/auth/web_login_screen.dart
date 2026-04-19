@@ -116,7 +116,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
       // Check if new user needs profile completion (mobile only)
       if (authService.needsProfileCompletion) {
         _showSnackBar('Complete your profile to finish setup');
-        // TODO: Navigate to profile completion screen for web
+
         return;
       }
 

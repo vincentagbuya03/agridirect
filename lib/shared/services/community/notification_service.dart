@@ -4,10 +4,13 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:go_router/go_router.dart';
+import '../../router/app_router.dart';
+import '../auth/auth_service.dart';
 
 class NotificationService {
   static const String channelId = 'agridirect_channel';
-  static const String channelName = 'AgrIDirect Notifications';
+  static const String channelName = 'AgriDirect Notifications';
   static const String channelDescription =
       'Notifications for orders, messages, reviews, and updates';
   static const AndroidNotificationChannel _androidChannel =
@@ -30,6 +33,15 @@ class NotificationService {
   final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
   StreamSubscription<AuthState>? _authStateSubscription;
+  RealtimeChannel? _messageSubscription;
+  RealtimeChannel? _presenceChannel;
+  String? _activeConversationId;
+  final ValueNotifier<Set<String>> onlineUsersNotifier = ValueNotifier({});
+
+  /// Call this when entering a chat screen to suppress notifications for that chat
+  void setActiveConversation(String? conversationId) {
+    _activeConversationId = conversationId;
+  }
 
   SupabaseClient get supabase => Supabase.instance.client;
   bool get _isWeb => kIsWeb;
@@ -79,6 +91,8 @@ class NotificationService {
     }
 
     _listenToAuthChanges();
+    _startMessageListener();
+    _startPresenceTracking();
 
     _initialized = true;
   }
@@ -105,7 +119,8 @@ class NotificationService {
     if (_isAndroid) {
       final androidPlugin = flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       await androidPlugin?.requestNotificationsPermission();
     }
 
@@ -146,7 +161,8 @@ class NotificationService {
 
     final androidPlugin = flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+          AndroidFlutterLocalNotificationsPlugin
+        >();
 
     await androidPlugin?.createNotificationChannel(_androidChannel);
   }
@@ -211,41 +227,150 @@ class NotificationService {
   }
 
   void _listenToAuthChanges() {
-    _authStateSubscription ??=
-        supabase.auth.onAuthStateChange.listen((authState) async {
-      switch (authState.event) {
-        case AuthChangeEvent.signedIn:
-        case AuthChangeEvent.tokenRefreshed:
-        case AuthChangeEvent.userUpdated:
-        case AuthChangeEvent.initialSession:
-          await _getFCMToken();
-          break;
-        case AuthChangeEvent.signedOut:
-          final token = await messaging.getToken();
-          if (token != null) {
-            await deleteToken(token);
-          }
-          break;
-        case AuthChangeEvent.passwordRecovery:
-        case AuthChangeEvent.mfaChallengeVerified:
-          break;
-        default:
-          break;
+    _authStateSubscription ??= supabase.auth.onAuthStateChange.listen((
+      authState,
+    ) async {
+      final event = authState.event;
+      if (event == AuthChangeEvent.signedIn || event == AuthChangeEvent.tokenRefreshed || event == AuthChangeEvent.initialSession) {
+        _getFCMToken();
+        _startMessageListener();
+        _startPresenceTracking();
+      } else if (event == AuthChangeEvent.signedOut) {
+        _stopMessageListener();
+        _stopPresenceTracking();
+        final token = await messaging.getToken();
+        if (token != null) {
+          await deleteToken(token);
+        }
       }
     });
+  }
+
+  void _startPresenceTracking() {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    _stopPresenceTracking();
+
+    _presenceChannel = supabase.channel('presence-global', opts: const RealtimeChannelConfig(self: true));
+    
+    _presenceChannel!.onPresenceSync((payload) {
+      final state = _presenceChannel!.presenceState();
+      final onlineIds = <String>{};
+      
+      for (final presenceState in state) {
+        for (final presence in presenceState.presences) {
+          final userId = presence.payload['user_id']?.toString();
+          if (userId != null) {
+            onlineIds.add(userId);
+          }
+        }
+      }
+      
+      onlineUsersNotifier.value = onlineIds;
+    }).onPresenceJoin((payload) {
+      debugPrint('User joined presence: ${payload.newPresences}');
+    }).onPresenceLeave((payload) {
+      debugPrint('User left presence: ${payload.leftPresences}');
+    });
+
+    _presenceChannel!.subscribe((status, error) async {
+      if (status == RealtimeSubscribeStatus.subscribed) {
+        await _presenceChannel!.track({'user_id': user.id});
+      }
+    });
+  }
+
+  void _stopPresenceTracking() {
+    _presenceChannel?.unsubscribe();
+    _presenceChannel = null;
+    onlineUsersNotifier.value = {};
   }
 
   // Delete FCM token when user logs out
   Future<void> deleteToken(String token) async {
     try {
-      await supabase
-          .from('user_device_tokens')
-          .delete()
-          .eq('fcm_token', token);
+      await supabase.from('user_device_tokens').delete().eq('fcm_token', token);
       debugPrint('FCM token deleted from database');
     } catch (e) {
       debugPrint('Error deleting FCM token: $e');
     }
+  }
+
+  void _startMessageListener() {
+    _messageSubscription?.unsubscribe();
+
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _messageSubscription = supabase
+        .channel('public:messages')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'messages',
+          callback: (payload) async {
+            final senderId = payload.newRecord['sender_id']?.toString();
+            final conversationId = payload.newRecord['conversation_id']
+                ?.toString();
+            final text =
+                payload.newRecord['message_text']?.toString() ?? 'New message';
+
+            // Only notify if:
+            // 1. Message is from someone else
+            // 2. We aren't currently looking at this conversation
+            if (senderId != null &&
+                senderId != userId &&
+                conversationId != _activeConversationId) {
+              final senderName = await _resolveSenderDisplayName(senderId);
+              await _showLocalMessageNotification(
+                conversationId,
+                text,
+                senderName: senderName,
+              );
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  void _stopMessageListener() {
+    _messageSubscription?.unsubscribe();
+    _messageSubscription = null;
+  }
+
+  Future<void> _showLocalMessageNotification(
+    String? conversationId,
+    String text, {
+    String? senderName,
+  }) async {
+    final title = senderName != null && senderName.trim().isNotEmpty
+        ? 'New message from ${senderName.trim()}'
+        : 'New Message';
+
+    await flutterLocalNotificationsPlugin.show(
+      conversationId.hashCode,
+      title,
+      text,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          channelName,
+          channelDescription: channelDescription,
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+          icon: '@mipmap/ic_launcher',
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: 'chat:$conversationId',
+    );
   }
 
   // Handle foreground messages
@@ -256,10 +381,15 @@ class NotificationService {
     if (message.notification != null) {
       debugPrint('Message notification: ${message.notification}');
 
+      final senderName = message.data['sender_name']?.toString().trim();
+      final title = senderName != null && senderName.isNotEmpty
+          ? 'New message from $senderName'
+          : message.notification!.title;
+
       // Show local notification
       await flutterLocalNotificationsPlugin.show(
         message.hashCode,
-        message.notification!.title,
+        title,
         message.notification!.body,
         NotificationDetails(
           android: AndroidNotificationDetails(
@@ -268,6 +398,8 @@ class NotificationService {
             channelDescription: channelDescription,
             importance: Importance.max,
             priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
             icon: '@mipmap/ic_launcher',
           ),
           iOS: const DarwinNotificationDetails(
@@ -291,9 +423,10 @@ class NotificationService {
 
     debugPrint('Link type: $linkType, Link ID: $linkId');
 
-    // Handle navigation based on notification type
-    // This will be called from your router/navigation logic
-    // For now, just print for debugging
+    await _navigateFromLink(
+      linkType: linkType.toString(),
+      linkId: linkId.toString(),
+    );
   }
 
   // Local notification handlers
@@ -303,15 +436,19 @@ class NotificationService {
     String? body,
     String? payload,
   ) async {
-    debugPrint('onDidReceiveLocalNotification: id=$id, title=$title, body=$body');
+    debugPrint(
+      'onDidReceiveLocalNotification: id=$id, title=$title, body=$body',
+    );
   }
 
-  static Future<void> _onDidReceiveNotificationResponse(
+  Future<void> _onDidReceiveNotificationResponse(
     NotificationResponse notificationResponse,
   ) async {
     final payload = notificationResponse.payload;
     debugPrint('Notification tapped with payload: $payload');
-    // Handle navigation here
+
+    final parsed = _parsePayload(payload);
+    await _navigateFromLink(linkType: parsed.$1, linkId: parsed.$2);
   }
 
   // Helper to get payload from message
@@ -319,6 +456,77 @@ class NotificationService {
     final linkType = message.data['link_type'] ?? '';
     final linkId = message.data['link_id'] ?? '';
     return '$linkType:$linkId';
+  }
+
+  (String, String) _parsePayload(String? payload) {
+    if (payload == null || payload.isEmpty) {
+      return ('', '');
+    }
+
+    final separator = payload.indexOf(':');
+    if (separator <= 0 || separator >= payload.length - 1) {
+      return (payload, '');
+    }
+
+    final rawType = payload.substring(0, separator);
+    final rawId = payload.substring(separator + 1);
+    final normalizedType = rawType == 'chat' ? 'conversation' : rawType;
+    return (normalizedType, rawId);
+  }
+
+  Future<void> _navigateFromLink({
+    required String linkType,
+    required String linkId,
+    int retryCount = 0,
+  }) async {
+    final context = appNavigatorKey.currentContext;
+    if (context == null) {
+      if (retryCount < 6) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        await _navigateFromLink(
+          linkType: linkType,
+          linkId: linkId,
+          retryCount: retryCount + 1,
+        );
+      }
+      return;
+    }
+
+    if (linkType == 'conversation' && linkId.isNotEmpty) {
+      final isFarmer = AuthService().isViewingAsFarmer;
+      GoRouter.of(context).go(
+        AppRoutes.messages,
+        extra: {'conversationId': linkId, 'asFarmer': isFarmer},
+      );
+      setActiveConversation(linkId);
+      return;
+    }
+
+    GoRouter.of(context).go(AppRoutes.messages);
+  }
+
+  Future<String?> _resolveSenderDisplayName(String senderId) async {
+    try {
+      final user = await supabase
+          .from('users')
+          .select('name, email')
+          .eq('user_id', senderId)
+          .maybeSingle();
+
+      final name = (user?['name'] as String?)?.trim();
+      if (name != null && name.isNotEmpty) {
+        return name;
+      }
+
+      final email = (user?['email'] as String?)?.trim();
+      if (email != null && email.isNotEmpty) {
+        return email;
+      }
+    } catch (e) {
+      debugPrint('Failed to resolve sender name for local notification: $e');
+    }
+
+    return null;
   }
 
   // Get unread notification count
@@ -369,8 +577,11 @@ class NotificationService {
   }
 
   // Get notifications for user
-  Future<List<Map<String, dynamic>>> getNotifications(String userId,
-      {int limit = 20, int offset = 0}) async {
+  Future<List<Map<String, dynamic>>> getNotifications(
+    String userId, {
+    int limit = 20,
+    int offset = 0,
+  }) async {
     try {
       final response = await supabase
           .from('notifications')

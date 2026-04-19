@@ -59,7 +59,8 @@ class AuthService extends ChangeNotifier {
   static String _nameKey(String userId) => 'auth.userName.$userId';
   static String _avatarKey(String userId) => 'auth.userAvatarUrl.$userId';
   static String _viewModeKey(String userId) => 'auth.isViewingAsFarmer.$userId';
-  static String _regStatusKey(String userId) => 'auth.registrationStatus.$userId';
+  static String _regStatusKey(String userId) =>
+      'auth.registrationStatus.$userId';
 
   Future<void> _restoreCachedUserState(String userId) async {
     try {
@@ -245,7 +246,9 @@ class AuthService extends ChangeNotifier {
         _registrationStatus = reg?['status'] as String?;
         _startWatchingRegistrationStatus(user.id);
       } catch (e) {
-        debugPrint('Error fetching roles/status on initialize, using cache: $e');
+        debugPrint(
+          'Error fetching roles/status on initialize, using cache: $e',
+        );
       }
 
       // If seller status exists locally but sync may have failed, retry
@@ -434,6 +437,9 @@ class AuthService extends ChangeNotifier {
         _isViewingAsFarmer = false;
       }
 
+      await _refreshRegistrationStatusFromServer();
+      _startWatchingRegistrationStatus(_userId);
+
       await _persistCachedUserState();
       await AnalyticsService().startSession(userId: _userId);
 
@@ -532,11 +538,22 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  Future<void> _refreshRegistrationStatusFromServer() async {
+    if (_userId.isEmpty) return;
+    try {
+      final reg = await SupabaseDB.getFarmerRegistration(_userId);
+      _registrationStatus = reg?['status'] as String?;
+      await _persistCachedUserState();
+    } catch (e) {
+      debugPrint('Error fetching registration status: $e');
+    }
+  }
+
   void _startWatchingRegistrationStatus(String userId) {
     _regStatusSubscription?.cancel();
-    _regStatusSubscription =
-        SupabaseDB.watchFarmerRegistrationStatus(userId).listen((status) {
-          if (status != null && status != _registrationStatus) {
+    _regStatusSubscription = SupabaseDB.watchFarmerRegistrationStatus(userId)
+        .listen((status) {
+          if (status != _registrationStatus) {
             _registrationStatus = status;
             _persistCachedUserState();
             notifyListeners();
@@ -669,13 +686,16 @@ class AuthService extends ChangeNotifier {
       _userId = user.id;
       _userEmail = user.email ?? '';
       _userName = (profile['name'] as String?) ?? '';
-      
+
       _userAvatarUrl = (profile['avatar_url'] as String?) ?? '';
       _isLoggedIn = true;
 
       final roles = await SupabaseDB.getUserRoles(_userId);
       _isSeller = roles.contains('seller') || roles.contains('farmer');
       _isAdmin = roles.contains('admin');
+
+      await _refreshRegistrationStatusFromServer();
+      _startWatchingRegistrationStatus(_userId);
 
       await _persistCachedUserState();
       await AnalyticsService().startSession(userId: _userId);
@@ -741,6 +761,9 @@ class AuthService extends ChangeNotifier {
       _isAdmin = roles.contains('admin');
       _isLoggedIn = true;
 
+      await _refreshRegistrationStatusFromServer();
+      _startWatchingRegistrationStatus(_userId);
+
       await _persistCachedUserState();
       _isLoading = false;
       notifyListeners();
@@ -786,6 +809,7 @@ class AuthService extends ChangeNotifier {
       _isSeller = false;
       _isViewingAsFarmer = false;
       _isAdmin = false;
+      _registrationStatus = null;
       _clearPendingGoogleProfileState();
       notifyListeners();
     } catch (e) {

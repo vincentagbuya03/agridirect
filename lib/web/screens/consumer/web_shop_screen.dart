@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../widgets/animated_components.dart';
+import '../../../shared/widgets/brand_logo.dart';
 
 /// Web Shop Screen — Fresh Produce Marketplace
 /// Dark navbar, left sidebar filters, product grid with badges
@@ -296,35 +297,7 @@ class _WebShopScreenState extends State<WebShopScreen>
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
                 onTap: () => widget.onNavigate(0),
-                child: Row(
-                  children: [
-                    PulsingGlow(
-                      color: _primary,
-                      radius: 16,
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          gradient: AgriColors.primaryGradient,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Center(
-                          child: AnimatedLeafIcon(size: 18, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'AgriDirect',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: _dark,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ],
-                ),
+                child: const BrandLogo(size: BrandLogoSize.small),
               ),
             ),
             const SizedBox(width: 40),

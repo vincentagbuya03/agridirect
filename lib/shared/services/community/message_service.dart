@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/supabase_config.dart';
@@ -8,6 +10,7 @@ class MessageConversation {
     required this.otherUserId,
     required this.otherDisplayName,
     required this.otherSubtitle,
+    required this.otherAvatarUrl,
     required this.lastMessage,
     required this.lastMessageAt,
     required this.unreadCount,
@@ -17,10 +20,13 @@ class MessageConversation {
   final String otherUserId;
   final String otherDisplayName;
   final String otherSubtitle;
+  final String? otherAvatarUrl;
   final String lastMessage;
   final DateTime? lastMessageAt;
   final int unreadCount;
 }
+
+enum MessageStatus { sending, sent, error }
 
 class ChatMessage {
   const ChatMessage({
@@ -30,6 +36,7 @@ class ChatMessage {
     required this.messageText,
     required this.isRead,
     required this.createdAt,
+    this.status = MessageStatus.sent,
   });
 
   final String messageId;
@@ -38,6 +45,7 @@ class ChatMessage {
   final String messageText;
   final bool isRead;
   final DateTime createdAt;
+  final MessageStatus status;
 
   factory ChatMessage.fromMap(Map<String, dynamic> map) {
     return ChatMessage(
@@ -49,6 +57,7 @@ class ChatMessage {
       createdAt:
           DateTime.tryParse(map['created_at']?.toString() ?? '') ??
           DateTime.now(),
+      status: MessageStatus.sent,
     );
   }
 }
@@ -85,6 +94,16 @@ class MessageService {
         .map((row) => row['conversation_id'].toString())
         .toList();
 
+    final messageRows = List<Map<String, dynamic>>.from(
+      await _client
+          .from('messages')
+          .select(
+            'message_id, conversation_id, sender_id, message_text, is_read, created_at',
+          )
+          .inFilter('conversation_id', conversationIds)
+          .order('created_at', ascending: false),
+    );
+
     final farmerIds = conversations
         .map((row) => row['farmer_id'].toString())
         .toSet()
@@ -99,7 +118,7 @@ class MessageService {
         : List<Map<String, dynamic>>.from(
             await _client
                 .from('farmers')
-                .select('farmer_id, user_id, farm_name, specialty')
+                .select('farmer_id, user_id, farm_name, specialty, image_url')
                 .inFilter('farmer_id', farmerIds),
           );
 
@@ -112,9 +131,33 @@ class MessageService {
                 .inFilter('customer_id', customerIds),
           );
 
+    // Some historical rows can miss customer.user_id/farmer.user_id, so derive
+    // counterpart user IDs from recent message sender IDs as a fallback.
+    final otherSenderByConversation = <String, String>{};
+    for (final row in messageRows) {
+      final conversationId = row['conversation_id']?.toString();
+      final senderId = row['sender_id']?.toString();
+      if (conversationId == null || senderId == null || senderId.isEmpty) {
+        continue;
+      }
+      if (senderId == context.userId) {
+        continue;
+      }
+      otherSenderByConversation.putIfAbsent(conversationId, () => senderId);
+    }
+
+    final inferredOtherUserIds = conversations
+        .map(
+          (row) => otherSenderByConversation[row['conversation_id'].toString()],
+        )
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
     final userIds = <String>{
       ...farmerRows.map((row) => row['user_id'].toString()),
       ...customerRows.map((row) => row['user_id'].toString()),
+      ...inferredOtherUserIds,
     }.toList();
 
     final userRows = userIds.isEmpty
@@ -122,19 +165,9 @@ class MessageService {
         : List<Map<String, dynamic>>.from(
             await _client
                 .from('users')
-                .select('user_id, name, email')
+                .select('user_id, name, email, avatar_url')
                 .inFilter('user_id', userIds),
           );
-
-    final messageRows = List<Map<String, dynamic>>.from(
-      await _client
-          .from('messages')
-          .select(
-            'message_id, conversation_id, sender_id, message_text, is_read, created_at',
-          )
-          .inFilter('conversation_id', conversationIds)
-          .order('created_at', ascending: false),
-    );
 
     final farmerById = {
       for (final row in farmerRows) row['farmer_id'].toString(): row,
@@ -170,18 +203,27 @@ class MessageService {
       late String otherUserId;
       late String displayName;
       late String subtitle;
+      String? avatarUrl;
 
       if (asFarmer) {
-        final customerUser =
-            userById[customer?['user_id']?.toString() ?? ''] ?? const {};
-        otherUserId = customer?['user_id']?.toString() ?? '';
+        final fallbackUserId = otherSenderByConversation[conversationId];
+        final resolvedUserId =
+            customer?['user_id']?.toString().isNotEmpty == true
+            ? customer!['user_id'].toString()
+            : (fallbackUserId ?? '');
+        final customerUser = userById[resolvedUserId] ?? const {};
+        otherUserId = resolvedUserId;
         displayName =
             (customerUser['name'] as String?)?.trim().isNotEmpty == true
             ? customerUser['name'].toString()
             : (customerUser['email'] as String?) ?? 'Customer';
         subtitle = 'Customer';
+        avatarUrl = customerUser['avatar_url'] as String?;
       } else {
-        otherUserId = farmer?['user_id']?.toString() ?? '';
+        final fallbackUserId = otherSenderByConversation[conversationId];
+        otherUserId = farmer?['user_id']?.toString().isNotEmpty == true
+            ? farmer!['user_id'].toString()
+            : (fallbackUserId ?? '');
         displayName =
             (farmer?['farm_name'] as String?)?.trim().isNotEmpty == true
             ? farmer!['farm_name'].toString()
@@ -189,6 +231,7 @@ class MessageService {
         subtitle = (farmer?['specialty'] as String?)?.trim().isNotEmpty == true
             ? farmer!['specialty'].toString()
             : 'Farmer';
+        avatarUrl = farmer?['image_url'] as String?;
       }
 
       final lastMessage = lastMessageByConversation[conversationId];
@@ -198,6 +241,7 @@ class MessageService {
         otherUserId: otherUserId,
         otherDisplayName: displayName,
         otherSubtitle: subtitle,
+        otherAvatarUrl: avatarUrl,
         lastMessage: lastMessage?.messageText ?? 'No messages yet',
         lastMessageAt: lastMessage?.createdAt,
         unreadCount: unreadCountByConversation[conversationId] ?? 0,
@@ -218,25 +262,56 @@ class MessageService {
         );
   }
 
-  Future<String> startConversationWithFarmerUser(String farmerUserId) async {
+  Stream<List<MessageConversation>> watchInbox({required bool asFarmer}) {
+    return (() async* {
+      // Initial fetch
+      yield await getInbox(asFarmer: asFarmer);
+
+      final context = await _resolveActorContext();
+      final actorId = asFarmer ? context.farmerId : context.customerId;
+      if (actorId == null) return;
+
+      // Trigger refreshes from both conversation updates and message inserts/updates.
+      final refreshController = StreamController<void>.broadcast();
+
+      final conversationsSub = _client
+          .from('conversations')
+          .stream(primaryKey: ['conversation_id'])
+          .eq(asFarmer ? 'farmer_id' : 'customer_id', actorId)
+          .listen((_) {
+            if (!refreshController.isClosed) {
+              refreshController.add(null);
+            }
+          });
+
+      final messagesSub = _client
+          .from('messages')
+          .stream(primaryKey: ['message_id'])
+          .listen((_) {
+            if (!refreshController.isClosed) {
+              refreshController.add(null);
+            }
+          });
+
+      try {
+        await for (final _ in refreshController.stream) {
+          yield await getInbox(asFarmer: asFarmer);
+        }
+      } finally {
+        await conversationsSub.cancel();
+        await messagesSub.cancel();
+        await refreshController.close();
+      }
+    })();
+  }
+
+  Future<String> startConversationWithFarmer(String farmerId) async {
     final context = await _resolveActorContext();
     if (context.customerId == null) {
       throw Exception(
         'A customer profile is required to start a conversation.',
       );
     }
-
-    final farmer = await _client
-        .from('farmers')
-        .select('farmer_id')
-        .eq('user_id', farmerUserId)
-        .maybeSingle();
-
-    if (farmer == null) {
-      throw Exception('Farmer profile not found.');
-    }
-
-    final farmerId = farmer['farmer_id'].toString();
 
     final existing = await _client
         .from('conversations')
@@ -283,6 +358,81 @@ class MessageService {
         .from('conversations')
         .update({'last_message_at': DateTime.now().toIso8601String()})
         .eq('conversation_id', conversationId);
+
+    final senderName = await _resolveSenderDisplayName(senderContext: context);
+
+    await _sendMessagePushNotification(
+      conversationId: conversationId,
+      senderContext: context,
+      senderName: senderName,
+      messageText: trimmed,
+    );
+  }
+
+  Future<void> _sendMessagePushNotification({
+    required String conversationId,
+    required _ActorContext senderContext,
+    required String senderName,
+    required String messageText,
+  }) async {
+    try {
+      final conversation = await _client
+          .from('conversations')
+          .select('customer_id, farmer_id')
+          .eq('conversation_id', conversationId)
+          .maybeSingle();
+
+      final customerId = conversation?['customer_id']?.toString();
+      final farmerId = conversation?['farmer_id']?.toString();
+
+      if (customerId == null || farmerId == null) {
+        return;
+      }
+
+      String? targetUserId;
+      if (senderContext.customerId == customerId) {
+        final farmer = await _client
+            .from('farmers')
+            .select('user_id')
+            .eq('farmer_id', farmerId)
+            .maybeSingle();
+        targetUserId = farmer?['user_id']?.toString();
+      } else if (senderContext.farmerId == farmerId) {
+        final customer = await _client
+            .from('customers')
+            .select('user_id')
+            .eq('customer_id', customerId)
+            .maybeSingle();
+        targetUserId = customer?['user_id']?.toString();
+      }
+
+      if (targetUserId == null || targetUserId.isEmpty) {
+        return;
+      }
+
+      final preview = messageText.length > 120
+          ? '${messageText.substring(0, 117)}...'
+          : messageText;
+
+      await _client.functions.invoke(
+        'send-push-notification',
+        body: {
+          'targetUserId': targetUserId,
+          'title': 'New message from $senderName',
+          'body': preview,
+          'notificationCode': 'new_message',
+          'linkType': 'conversation',
+          'linkId': conversationId,
+          'data': {
+            'conversation_id': conversationId,
+            'sender_id': senderContext.userId,
+            'sender_name': senderName,
+          },
+        },
+      );
+    } catch (e) {
+      debugPrint('Failed to send message push notification: $e');
+    }
   }
 
   Future<void> markConversationAsRead(String conversationId) async {
@@ -319,6 +469,42 @@ class MessageService {
       customerId: customer?['customer_id']?.toString(),
       farmerId: farmer?['farmer_id']?.toString(),
     );
+  }
+
+  Future<String> _resolveSenderDisplayName({
+    required _ActorContext senderContext,
+  }) async {
+    // Prefer farm name for farmer senders; otherwise use user profile display name.
+    if (senderContext.farmerId != null) {
+      final farmer = await _client
+          .from('farmers')
+          .select('farm_name')
+          .eq('farmer_id', senderContext.farmerId!)
+          .maybeSingle();
+
+      final farmName = (farmer?['farm_name'] as String?)?.trim();
+      if (farmName != null && farmName.isNotEmpty) {
+        return farmName;
+      }
+    }
+
+    final user = await _client
+        .from('users')
+        .select('name, email')
+        .eq('user_id', senderContext.userId)
+        .maybeSingle();
+
+    final name = (user?['name'] as String?)?.trim();
+    if (name != null && name.isNotEmpty) {
+      return name;
+    }
+
+    final email = (user?['email'] as String?)?.trim();
+    if (email != null && email.isNotEmpty) {
+      return email;
+    }
+
+    return 'Someone';
   }
 }
 

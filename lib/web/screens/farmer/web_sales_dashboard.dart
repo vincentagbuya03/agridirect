@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/animated_components.dart';
+import '../../../shared/widgets/brand_logo.dart';
 
 /// Web Sales Dashboard — Modern Design
 /// Professional analytics dashboard for farmers
@@ -132,28 +133,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
       padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 14),
       child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: _primary,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.eco_rounded, color: Colors.white, size: 17),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'AgriDirect',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: _dark,
-                ),
-              ),
-            ],
-          ),
+          const BrandLogo(size: BrandLogoSize.small),
           const SizedBox(width: 40),
           ...List.generate(navItems.length, (i) {
             final isHovered = _hoveredNav == i;
