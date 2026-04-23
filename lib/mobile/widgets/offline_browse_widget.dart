@@ -22,7 +22,7 @@ class OfflineModeIndicator extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.orange.withValues(alpha: 0.1),
-          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -44,7 +44,7 @@ class OfflineModeIndicator extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.1),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -119,12 +119,12 @@ class _SaveForOfflineButtonState extends State<SaveForOfflineButton> {
         decoration: BoxDecoration(
           color: _isSaved
               ? AppColors.primary.withValues(alpha: 0.1)
-              : Colors.grey.withValues(alpha: 0.08),
+              : Colors.grey.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: _isSaved
-                ? AppColors.primary.withValues(alpha: 0.3)
-                : Colors.grey.withValues(alpha: 0.2),
+                ? AppColors.primary.withValues(alpha: 0.1)
+                : Colors.grey.withValues(alpha: 0.1),
           ),
         ),
         child: Row(
@@ -192,8 +192,8 @@ class CachedProductCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSaved
-                ? AppColors.primary.withValues(alpha: 0.3)
-                : Colors.grey.withValues(alpha: 0.1),
+                ? AppColors.primary.withValues(alpha: 0.2)
+                : Colors.grey.withValues(alpha: 0.2),
             width: isSaved ? 2 : 1,
           ),
         ),
@@ -330,7 +330,7 @@ class CachedProductCard extends StatelessWidget {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.amber.withValues(alpha: 0.1),
+                              color: Colors.amber.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
@@ -409,4 +409,3 @@ class CachedProductsList extends StatelessWidget {
     );
   }
 }
-

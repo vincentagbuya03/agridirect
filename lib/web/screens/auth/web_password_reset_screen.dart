@@ -119,22 +119,51 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 768;
+    final screenSize = MediaQuery.sizeOf(context);
+    final shortestSide = screenSize.shortestSide;
+    final isHandset = shortestSide < 600;
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: SingleChildScrollView(
-          child: Container(
-            width: isMobile ? double.infinity : 480,
-            padding: EdgeInsets.all(isMobile ? 24 : 48),
-            child: _resetSuccess
-                ? _buildSuccessView()
-                : !_hasValidSession
-                ? _buildErrorView()
-                : _buildResetForm(),
-          ),
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final horizontalPadding = isHandset ? 16.0 : 24.0;
+            final cardPadding = isHandset ? 24.0 : 40.0;
+
+            return Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: horizontalPadding,
+                  vertical: 24,
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(cardPadding),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: _border),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x140F172A),
+                          blurRadius: 32,
+                          offset: Offset(0, 16),
+                        ),
+                      ],
+                    ),
+                    child: _resetSuccess
+                        ? _buildSuccessView()
+                        : !_hasValidSession
+                        ? _buildErrorView()
+                        : _buildResetForm(),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -148,7 +177,7 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
           width: 80,
           height: 80,
           decoration: BoxDecoration(
-            color: _danger.withValues(alpha: 0.08),
+            color: _danger.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: const Icon(
@@ -215,7 +244,7 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
           width: 64,
           height: 64,
           decoration: BoxDecoration(
-            color: _primary.withValues(alpha: 0.08),
+            color: _primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
           ),
           child: const Icon(
@@ -323,7 +352,7 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
           width: 80,
           height: 80,
           decoration: BoxDecoration(
-            color: _primary.withValues(alpha: 0.08),
+            color: _primary.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: const Icon(

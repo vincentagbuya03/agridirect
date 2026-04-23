@@ -14,7 +14,11 @@ import '../../../shared/services/offline/offline_cache_service.dart';
 import '../../../shared/services/offline/offline_queue_service.dart';
 import '../../../shared/models/offline_product_queue.dart';
 import '../../widgets/offline_browse_widget.dart';
+import '../../widgets/offline_sync_widget.dart';
 import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/offline/offline_product_service.dart';
+import '../../../shared/services/offline/network_status_service.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Farmer Products/Inventory Screen - Professional Enterprise UI
 class FarmerProductsScreen extends StatefulWidget {
@@ -28,8 +32,12 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
   late Future<List<Map<String, dynamic>>> _productsFuture;
   final TextEditingController _searchController = TextEditingController();
   bool _isOnline = true;
+  bool _isManualOffline = false;
+
+  bool get _effectiveOnline => _isOnline && !_isManualOffline;
   late OfflineCacheService _cacheService;
   late OfflineQueueService _queueService;
+  late OfflineProductService _offlineProductService;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
@@ -37,8 +45,16 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
     super.initState();
     _initializeCacheService();
     _initializeQueueService();
+    _initializeOfflineProductService();
     _setupConnectivityListener();
     _loadProducts();
+  }
+
+  void _initializeOfflineProductService() {
+    _offlineProductService = OfflineProductService(
+      queueService: _queueService,
+      connectivity: Connectivity(),
+    );
   }
 
   void _initializeCacheService() {
@@ -78,29 +94,126 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
   }
 
   void _setupConnectivityListener() {
-    Connectivity().checkConnectivity().then((result) {
-      final isOnline =
-          result.isNotEmpty && result.first != ConnectivityResult.none;
+    _refreshConnectivityStatus();
+
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((_) async {
+      final wasOffline = !_isOnline;
+      final isOnline = await NetworkStatusService().isOnline();
       if (mounted) {
         setState(() {
           _isOnline = isOnline;
         });
-        if (!isOnline) {
+        // When transitioning from offline → online, refresh cache to purge deleted products
+        if (wasOffline && isOnline) {
+          _refreshCacheFromServer();
         }
       }
     });
+  }
 
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
-      result,
-    ) {
-      final isOnline =
-          result.isNotEmpty && result.first != ConnectivityResult.none;
+  Future<void> _refreshConnectivityStatus() async {
+    final isOnline = await NetworkStatusService().isOnline();
+    if (mounted) {
+      setState(() => _isOnline = isOnline);
+    }
+  }
+
+  Future<void> _retryAllPendingProducts() async {
+    await _offlineProductService.syncPendingProducts();
+    if (mounted) {
+      _loadProducts();
+    }
+  }
+
+  Future<void> _retryPendingProduct(String productId) async {
+    try {
+      await _offlineProductService.retryFailedProduct(productId);
       if (mounted) {
-        setState(() {
-          _isOnline = isOnline;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Queued product synced successfully')),
+        );
+        _loadProducts();
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Retry failed: $e')),
+        );
+      }
+    }
+  }
+
+  /// Refresh the offline cache by comparing with live server data.
+  /// Removes any cached products that no longer exist on the server.
+  Future<void> _refreshCacheFromServer() async {
+    try {
+      debugPrint('[FarmerProducts] 🔄 Refreshing cache after reconnect...');
+      final liveProducts = await SupabaseDataService().getFarmerProducts();
+      final liveIds = liveProducts
+          .map((p) => p['id']?.toString())
+          .whereType<String>()
+          .toSet();
+
+      // Get all cached products belonging to this farmer
+      final farmerId = AuthService().userId;
+      final cachedProducts = _cacheService.getAllCachedProducts();
+      final farmerCached = cachedProducts
+          .where((p) => p.farmerId == farmerId)
+          .toList();
+
+      int removed = 0;
+      for (final cached in farmerCached) {
+        // Skip pending-sync products (they don't exist on server yet)
+        final isPendingInQueue = _queueService.getPendingProducts().any(
+          (q) => q.id == cached.id,
+        );
+        if (isPendingInQueue) continue;
+
+        if (!liveIds.contains(cached.id)) {
+          await _cacheService.removeCachedProduct(cached.id);
+          removed++;
+        }
+      }
+
+      if (removed > 0) {
+        debugPrint(
+          '[FarmerProducts] 🧹 Purged $removed stale products from cache',
+        );
+      }
+
+      // Re-cache the fresh live products
+      for (final product in liveProducts) {
+        final availableQty = (product['available'] as num?)?.toInt();
+        final harvestDays =
+            int.tryParse(
+              product['harvest']?.toString().replaceAll(
+                    RegExp(r'[^0-9]'),
+                    '',
+                  ) ??
+                  '',
+            ) ??
+            0;
+        final cachedProduct = CachedProduct(
+          id: product['id'] as String? ?? 'unknown',
+          farmerId: farmerId,
+          name: product['name'] as String? ?? 'Unknown',
+          price: double.tryParse(product['price']?.toString() ?? '0') ?? 0.0,
+          description: product['description'] as String?,
+          imageUrl: product['image'] as String?,
+          availableQuantity:
+              (product['available_quantity'] as num?)?.toInt() ?? availableQty,
+          isPreorder: product['is_preorder'] as bool? ?? false,
+          harvestDays: harvestDays,
+        );
+        _cacheService.autoCacheProduct(cachedProduct);
+      }
+
+      // Reload the UI
+      _loadProducts();
+      debugPrint('[FarmerProducts] ✅ Cache refresh complete');
+    } catch (e) {
+      debugPrint('[FarmerProducts] ⚠️ Cache refresh failed: $e');
+    }
   }
 
   @override
@@ -124,13 +237,18 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
       body: Column(
         children: [
           _buildPremiumHeader(),
+          _buildStatusBanner(),
           _buildSearchAndFilter(),
           Expanded(
             child: ValueListenableBuilder(
-              valueListenable: Hive.box<OfflineProductQueue>(OfflineQueueService.boxName).listenable(),
+              valueListenable: Hive.box<OfflineProductQueue>(
+                OfflineQueueService.boxName,
+              ).listenable(),
               builder: (context, queueBox, _) {
                 return ValueListenableBuilder(
-                  valueListenable: Hive.box<CachedProduct>('cached_products').listenable(),
+                  valueListenable: Hive.box<CachedProduct>(
+                    'cached_products',
+                  ).listenable(),
                   builder: (context, cacheBox, _) {
                     return _buildProductsList();
                   },
@@ -171,7 +289,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textHeadline.withValues(alpha: 0.03),
+            color: AppColors.textHeadline.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -179,49 +297,202 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
       ),
       child: SafeArea(
         bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'MY INVENTORY',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'MY INVENTORY',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Product Catalog',
-                        style: AppTextStyles.headline2.copyWith(fontSize: 24),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Product Catalog',
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.headline2.copyWith(fontSize: 24),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      // Manual sync button removed for auto-sync experience
+
+                      if (_offlineProductService.pendingProductsCount.value >
+                              0 &&
+                          _effectiveOnline)
+                        const SizedBox(width: 8),
+                      _buildConnectivityToggle(),
+                      const SizedBox(width: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.bar_chart_rounded,
+                            color: AppColors.primary,
+                          ),
+                          onPressed: () {},
+                        ),
                       ),
                     ],
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.bar_chart_rounded,
-                        color: AppColors.primary,
-                      ),
-                      onPressed: () {},
-                    ),
-                  ),
                 ],
               ),
-            ],
+            ),
+            _buildQuickStats(),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickStats() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          _buildStatCard(
+            'Total Sales',
+            '₱24,500',
+            Icons.payments_outlined,
+            const Color(0xFF6366F1),
           ),
+          const SizedBox(width: 16),
+          _buildStatCard(
+            'Active',
+            '12 Items',
+            Icons.inventory_2_outlined,
+            AppColors.primary,
+          ),
+          const SizedBox(width: 16),
+          _buildStatCard(
+            'Sync Status',
+            _offlineProductService.pendingProductsCount.value == 0
+                ? 'All Synced'
+                : '${_offlineProductService.pendingProductsCount.value} Pending',
+            Icons.cloud_sync_outlined,
+            _offlineProductService.pendingProductsCount.value == 0
+                ? AppColors.success
+                : Colors.orange,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      width: 150,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            value,
+            style: AppTextStyles.headline3.copyWith(
+              color: AppColors.textHeadline,
+              fontSize: 18,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: AppTextStyles.labelSmall.copyWith(
+              color: AppColors.textSubtle,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildConnectivityToggle() {
+    final statusColor = _effectiveOnline ? Colors.green : Colors.orange;
+    final statusLabel = _isManualOffline
+        ? 'OFFLINE'
+        : (_isOnline ? 'ONLINE' : 'OFFLINE');
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _isManualOffline = !_isManualOffline;
+          if (!_isManualOffline && _isOnline) {
+            _refreshCacheFromServer();
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isManualOffline
+                  ? 'Switched to Offline Mode'
+                  : 'Back to Online Mode',
+            ),
+            backgroundColor: statusColor,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: statusColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(radius: 4, backgroundColor: statusColor),
+            const SizedBox(width: 8),
+            Text(
+              statusLabel,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: statusColor,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -274,19 +545,82 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
     );
   }
 
+  Widget _buildStatusBanner() {
+    if (_effectiveOnline &&
+        _offlineProductService.pendingProductsCount.value == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: _isManualOffline
+          ? Colors.orange.withValues(alpha: 0.1)
+          : (_effectiveOnline
+                ? Colors.green.withValues(alpha: 0.1)
+                : Colors.orange.withValues(alpha: 0.1)),
+      child: Row(
+        children: [
+          Icon(
+            _isManualOffline
+                ? Icons.wifi_off_rounded
+                : (_effectiveOnline
+                      ? Icons.check_circle_outline
+                      : Icons.cloud_off_rounded),
+            size: 16,
+            color: _isManualOffline
+                ? Colors.orange
+                : (_effectiveOnline ? Colors.green : Colors.orange),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _isManualOffline
+                  ? 'Manual Offline Mode active'
+                  : (_effectiveOnline
+                        ? '${_offlineProductService.pendingProductsCount.value} products waiting to sync'
+                        : 'You are currently offline'),
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _isManualOffline
+                    ? Colors.orange[800]
+                    : (_effectiveOnline
+                          ? Colors.green[800]
+                          : Colors.orange[800]),
+              ),
+            ),
+          ),
+          if (_effectiveOnline &&
+              _offlineProductService.pendingProductsCount.value > 0)
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.primary,
+              ),
+            ),
+
+        ],
+      ),
+    );
+  }
+
+
   Widget _buildProductsList() {
-    if (!_isOnline) {
+    if (!_effectiveOnline) {
       final cachedProducts = _cacheService.getAllCachedProducts();
       final farmerCached = cachedProducts
           .where((p) => p.farmerId == AuthService().userId)
           .toList();
       final pendingProducts = _getFilteredPendingProducts();
       final pendingIds = pendingProducts.map((p) => p.id).toSet();
-      
+
       final pendingAsCached = pendingProducts
           .map(_pendingToCachedProduct)
           .toList();
-      
+
       final mergedById = <String, CachedProduct>{};
       for (final p in farmerCached) {
         mergedById[p.id] = p;
@@ -294,16 +628,26 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
       for (final p in pendingAsCached) {
         mergedById[p.id] = p;
       }
-      
+
       final offlineProducts = mergedById.values.toList();
 
       return ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
         physics: const BouncingScrollPhysics(),
         children: [
+          OfflineSyncStatusWidget(
+            pendingProductCount: pendingProducts.length,
+            isSyncing: _offlineProductService.isSyncing.value,
+            isOnline: _effectiveOnline,
+            onRetry: _retryAllPendingProducts,
+          ),
           Padding(
             padding: const EdgeInsets.only(bottom: 20),
             child: OfflineModeIndicator(cacheService: _cacheService),
+          ),
+          PendingProductsListWidget(
+            products: pendingProducts.where((p) => p.syncError != null).toList(),
+            onRetryProduct: _retryPendingProduct,
           ),
           if (offlineProducts.isEmpty)
             _buildEmptyState(
@@ -313,10 +657,12 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
               action: () {},
             )
           else
-            ...offlineProducts.map((p) => _buildOfflineProductCard(
-              p, 
-              isPending: pendingIds.contains(p.id),
-            )),
+            ...offlineProducts.map(
+              (p) => _buildOfflineProductCard(
+                p,
+                isPending: pendingIds.contains(p.id),
+              ),
+            ),
         ],
       );
     }
@@ -335,7 +681,10 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
         if (pendingProducts.isNotEmpty) {
           for (final pending in pendingProducts) {
             listItems.add(
-              _buildOfflineProductCard(_pendingToCachedProduct(pending), isPending: true),
+              _buildOfflineProductCard(
+                _pendingToCachedProduct(pending),
+                isPending: true,
+              ),
             );
           }
         }
@@ -393,16 +742,33 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
             physics: const BouncingScrollPhysics(),
-            children: listItems,
+            children: [
+              OfflineSyncStatusWidget(
+                pendingProductCount: pendingProducts.length,
+                isSyncing: _offlineProductService.isSyncing.value,
+                isOnline: _effectiveOnline,
+                onRetry: _retryAllPendingProducts,
+              ),
+              PendingProductsListWidget(
+                products: pendingProducts.where((p) => p.syncError != null).toList(),
+                onRetryProduct: _retryPendingProduct,
+              ),
+              ...listItems,
+            ],
           ),
         );
       },
     );
   }
 
-  Widget _buildOfflineProductCard(CachedProduct product, {bool isPending = false}) {
+  Widget _buildOfflineProductCard(
+    CachedProduct product, {
+    bool isPending = false,
+  }) {
     // Check if there's a sync error for this product
-    final queueItem = isPending ? _queueService.getAllProducts().firstWhere((p) => p.id == product.id) : null;
+    final queueItem = isPending
+        ? _queueService.getAllProducts().firstWhere((p) => p.id == product.id)
+        : null;
     final syncError = queueItem?.syncError;
 
     return _buildProductCard({
@@ -413,10 +779,12 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
       'image': product.imageUrl,
       'available': product.availableQuantity,
       'is_preorder': product.isPreorder,
-      'harvest': product.harvestDays > 0 
-          ? 'In ${product.harvestDays} days' 
+      'harvest': product.harvestDays > 0
+          ? 'In ${product.harvestDays} days'
           : (product.isPreorder ? 'Pre-order' : 'Ready Now'),
-      'status': syncError != null ? 'SYNC ERROR' : (isPending ? 'PENDING SYNC' : 'LIVE (OFFLINE)'),
+      'status': syncError != null
+          ? 'SYNC ERROR'
+          : (isPending ? 'PENDING SYNC' : 'LIVE (OFFLINE)'),
       'unit': 'kg',
       'is_pending': isPending,
       'is_offline': true,
@@ -454,7 +822,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
         borderRadius: BorderRadius.circular(24),
         border: isOffline
             ? Border.all(
-                color: Colors.orange.withValues(alpha: 0.3),
+                color: Colors.orange.withValues(alpha: 0.1),
                 width: 1.5,
               )
             : null,
@@ -505,61 +873,140 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
+                              horizontal: 10,
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
                               color: statusColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: statusColor.withValues(alpha: 0.3),
+                              ),
                             ),
                             child: Text(
                               status,
                               style: AppTextStyles.labelSmall.copyWith(
                                 color: statusColor,
                                 fontWeight: FontWeight.w800,
-                                fontSize: 9,
+                                fontSize: 10,
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ),
-                          const Icon(
-                            Icons.more_horiz_rounded,
-                            color: AppColors.textSubtle,
-                            size: 20,
-                          ),
+                          if (!isOffline)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.verified_user_rounded,
+                                    size: 12,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'PROVENANCE VERIFIED',
+                                    style: AppTextStyles.labelSmall.copyWith(
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Text(
                         product['name'] ?? 'Product Name',
-                        style: AppTextStyles.headline3.copyWith(fontSize: 18),
+                        style: AppTextStyles.headline3.copyWith(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        '₱${(product['price'] ?? 0).toStringAsFixed(2)} / ${product['unit'] ?? 'kg'}',
-                        style: AppTextStyles.headline2.copyWith(
-                          color: AppColors.primary,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
                         children: [
-                          _buildMiniStat(
-                            Icons.inventory_2_outlined,
-                            '${product['available'] ?? 0} ${product['unit'] ?? 'kg'}',
+                          Text(
+                            '₱${(product['price'] ?? 0).toStringAsFixed(0)}',
+                            style: AppTextStyles.headline2.copyWith(
+                              color: AppColors.primary,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
-                          _buildMiniStat(
-                            Icons.event_available_outlined,
-                            product['harvest'] ?? 'Ready Now',
+                          Text(
+                            ' / ${product['unit'] ?? 'kg'}',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.textSubtle,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Stock Level',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    color: AppColors.textSubtle,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${product['available'] ?? 0} left',
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  color: statusColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value:
+                                  ((product['available'] as num?)?.toDouble() ??
+                                      0) /
+                                  100,
+                              backgroundColor: AppColors.background,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                statusColor,
+                              ),
+                              minHeight: 6,
+                            ),
                           ),
                         ],
                       ),
@@ -569,15 +1016,12 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppColors.textHeadline.withValues(alpha: 0.02),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(24),
-                bottomRight: Radius.circular(24),
-              ),
-            ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Divider(height: 1),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
             child: Row(
               children: [
                 Expanded(
@@ -608,26 +1052,6 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
     );
   }
 
-  Widget _buildMiniStat(IconData icon, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: AppColors.textSubtle),
-        const SizedBox(width: 4),
-        Flexible(
-          child: Text(
-            label,
-            style: AppTextStyles.bodySmall.copyWith(
-              color: AppColors.textSubtle,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildActionButton(
     IconData icon,
@@ -645,8 +1069,8 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
           decoration: BoxDecoration(
             border: Border.all(
               color: isDestructive
-                  ? AppColors.error.withValues(alpha: 0.2)
-                  : AppColors.textHeadline.withValues(alpha: 0.05),
+                  ? AppColors.error.withValues(alpha: 0.1)
+                  : AppColors.textHeadline.withValues(alpha: 0.1),
             ),
             borderRadius: BorderRadius.circular(12),
           ),
@@ -659,13 +1083,16 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                 color: isDestructive ? AppColors.error : AppColors.textHeadline,
               ),
               const SizedBox(width: 8),
-              Text(
-                label,
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: isDestructive
-                      ? AppColors.error
-                      : AppColors.textHeadline,
-                  fontWeight: FontWeight.w700,
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: isDestructive
+                        ? AppColors.error
+                        : AppColors.textHeadline,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -691,13 +1118,13 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
             Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.05),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 size: 64,
-                color: AppColors.primary.withValues(alpha: 0.2),
+                color: AppColors.primary.withValues(alpha: 0.3),
               ),
             ),
             const SizedBox(height: 24),
@@ -799,7 +1226,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
       if (isOffline) {
         final isPending = product['is_pending'] == true;
         bool success = false;
-        
+
         if (isPending) {
           // Remove from both queue and cache to ensure it disappears
           final queueSuccess = await _queueService.removeProduct(productId);
@@ -810,7 +1237,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
           await _cacheService.removeCachedProduct(productId);
           success = true;
         }
-        
+
         if (success && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -830,6 +1257,11 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
       } else {
         final success = await SupabaseDataService().deleteProduct(productId);
         if (success) {
+          // Also remove from the offline cache so it doesn't reappear offline
+          await _cacheService.removeCachedProduct(productId);
+          debugPrint(
+            '🧹 Removed deleted product $productId from offline cache',
+          );
           _loadProducts();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

@@ -182,7 +182,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       }
 
       // Fallback to users table profile if no farmer row exists.
-      final profile = await SupabaseDB.getUserProfile(currentUserId);
+      final profile = await SupabaseDatabase.getUserProfile(currentUserId);
       if (!mounted || profile == null) return;
 
       setState(() {
@@ -200,7 +200,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           : (_auth.client.auth.currentUser?.id ?? '');
       if (currentUserId.isEmpty || !mounted) return;
 
-      final profile = await SupabaseDB.getUserProfile(currentUserId);
+      final profile = await SupabaseDatabase.getUserProfile(currentUserId);
       if (!mounted || profile == null) return;
 
       setState(() {
@@ -483,7 +483,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textHeadline.withValues(alpha: 0.03),
+            color: AppColors.textHeadline.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -502,7 +502,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                 gradient: RadialGradient(
                   colors: [
                     AppColors.primary.withValues(alpha: 0.1),
-                    AppColors.primary.withValues(alpha: 0.0),
+                    AppColors.primary.withValues(alpha: 0.1),
                   ],
                 ),
               ),
@@ -521,7 +521,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.2),
+                            color: AppColors.primary.withValues(alpha: 0.3),
                             width: 2,
                           ),
                         ),
@@ -609,7 +609,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             color: AppColors.background,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: AppColors.textHeadline.withValues(alpha: 0.05),
+              color: AppColors.textHeadline.withValues(alpha: 0.1),
             ),
           ),
           child: Icon(icon, color: AppColors.textHeadline, size: 22),
@@ -635,9 +635,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.05),
+        color: AppColors.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -820,7 +820,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                     day,
                     style: AppTextStyles.labelSmall.copyWith(
                       fontSize: 10,
-                      color: AppColors.textSubtle.withValues(alpha: 0.6),
+                      color: AppColors.textSubtle.withValues(alpha: 0.5),
                     ),
                   ),
                 )
@@ -840,19 +840,28 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       return Container();
     }
 
-    final isAlert = _weatherData!.alerts.isNotEmpty;
+    // Check for both current alerts and advance forecast alerts
+    final currentAlerts = _weatherData!.alerts;
+    final forecastAlerts = _weatherForecast?.alerts ?? [];
+    
+    final isAlert = currentAlerts.isNotEmpty || forecastAlerts.isNotEmpty;
     final color = isAlert ? AppColors.warning : AppColors.primary;
+
+    // Use the most relevant alert (Emergency first, then Advance Warning)
+    final activeAlert = currentAlerts.isNotEmpty 
+        ? currentAlerts.first 
+        : (forecastAlerts.isNotEmpty ? forecastAlerts.first : null);
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [color.withValues(alpha: 0.1), color.withValues(alpha: 0.05)],
+          colors: [color.withValues(alpha: 0.1), color.withValues(alpha: 0.1)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -862,18 +871,18 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.2),
+                  color: color.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isAlert ? Icons.wb_twilight_rounded : Icons.wb_sunny_rounded,
+                  isAlert ? Icons.warning_amber_rounded : Icons.wb_sunny_rounded,
                   color: color,
                   size: 20,
                 ),
               ),
               const SizedBox(width: 12),
               Text(
-                isAlert ? 'Weather Alert' : 'Weather Intelligence',
+                isAlert ? (activeAlert?.title ?? 'Weather Alert') : 'Weather Intelligence',
                 style: AppTextStyles.headline3.copyWith(
                   fontSize: 16,
                   color: color,
@@ -891,16 +900,16 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           const SizedBox(height: 16),
           Text(
             isAlert
-                ? _weatherData!.alerts.first.description
+                ? (activeAlert?.description ?? '')
                 : 'Current conditions are optimal for harvesting. Expect low humidity throughout the day.',
-            style: AppTextStyles.bodyMedium.copyWith(height: 1.5),
+            style: AppTextStyles.bodyMedium.copyWith(height: 1.5, fontWeight: isAlert ? FontWeight.w600 : FontWeight.normal),
           ),
-          if (isAlert && _weatherData!.alerts.first.recommendation != null) ...[
+          if (isAlert && activeAlert!.recommendation != null) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -913,9 +922,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _weatherData!.alerts.first.recommendation!,
+                      activeAlert.recommendation ?? '',
                       style: AppTextStyles.bodySmall.copyWith(
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.textHeadline,
                       ),
                     ),
@@ -1076,23 +1085,43 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           decoration: AppDecorations.cardDecoration,
           child: Column(
             children: _weatherForecast!.getDailyForecast().take(5).map((f) {
+              // Check if this day has a specific advisory from the backend
+              final dayAdvisory = _weatherForecast!.dailyAdvisories.firstWhere(
+                (a) => a.day.startsWith(f.dayName) || f.dayName.startsWith(a.day),
+                orElse: () => DailyAdvisory(day: '', condition: '', message: '', isSevere: false),
+              );
+              final hasAdvisory = dayAdvisory.day.isNotEmpty;
+
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
                   children: [
                     Expanded(
                       flex: 2,
-                      child: Text(
-                        f.dayName,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      child: Row(
+                        children: [
+                          Text(
+                            f.dayName,
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: hasAdvisory ? AppColors.error : AppColors.textHeadline,
+                            ),
+                          ),
+                          if (hasAdvisory) ...[
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              size: 14,
+                              color: AppColors.error,
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     Icon(
                       _getAlertIcon(f.description.toLowerCase()),
                       size: 20,
-                      color: AppColors.primary,
+                      color: hasAdvisory ? AppColors.error : AppColors.primary,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1100,7 +1129,8 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                       child: Text(
                         f.description,
                         style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSubtle,
+                          color: hasAdvisory ? AppColors.error : AppColors.textSubtle,
+                          fontWeight: hasAdvisory ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
                     ),
@@ -1137,7 +1167,7 @@ class _AnalyticsChartPainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [color.withValues(alpha: 0.3), color.withValues(alpha: 0.0)],
+        colors: [color.withValues(alpha: 0.3), color.withValues(alpha: 0.1)],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
     final path = Path();

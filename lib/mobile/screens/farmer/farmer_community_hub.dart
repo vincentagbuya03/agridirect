@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/widgets/create_post_dialog.dart';
+import '../../../shared/widgets/comments_dialog.dart';
+import '../../../shared/data/app_data.dart';
+import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/screens/post_detail_screen.dart';
+import '../../../shared/screens/article_detail_screen.dart';
 
 /// Farmer Community Hub - Professional Social Interface
 class FarmerCommunityHub extends StatefulWidget {
@@ -14,16 +19,21 @@ class FarmerCommunityHub extends StatefulWidget {
 class _FarmerCommunityHubState extends State<FarmerCommunityHub>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  late Stream<List<ForumPostItem>> _forumStream;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _forumStream = SupabaseDataService().watchForumPosts();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -80,7 +90,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textHeadline.withValues(alpha: 0.03),
+            color: AppColors.textHeadline.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -100,7 +110,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                     height: 44,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2), width: 2),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 2),
                     ),
                     child: const ClipOval(
                       child: Icon(Icons.person_rounded, color: AppColors.textSubtle),
@@ -142,7 +152,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
           decoration: BoxDecoration(
             color: AppColors.background,
             shape: BoxShape.circle,
-            border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+            border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
           ),
           child: const Icon(Icons.notifications_none_rounded, size: 24, color: AppColors.textHeadline),
         ),
@@ -172,6 +182,10 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
           borderRadius: BorderRadius.circular(16),
         ),
         child: TextField(
+          controller: _searchController,
+          onChanged: (value) {
+            setState(() => _searchQuery = value.trim().toLowerCase());
+          },
           decoration: InputDecoration(
             hintText: 'Search pests, crops, or topics...',
             hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
@@ -210,64 +224,114 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
   }
 
   Widget _buildForumContent() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-      physics: const BouncingScrollPhysics(),
-      children: [
-        _buildForumCard(
-          userName: 'Samuel Green',
-          time: '2 hours ago',
-          title: 'Optimal Pest Control for Cabbage',
-          body: "I've started using cold-pressed neem oil for my cabbage crop. It’s highly effective against aphids without harming beneficial insects. Best applied during dusk to prevent leaf burn.",
-          imageUrl: 'https://images.unsplash.com/photo-1591857177580-dc82b9ac4e1e?auto=format&fit=crop&q=80&w=800',
-          likes: 24,
-          comments: 12,
-          isLiked: true,
-        ),
-        _buildForumCard(
-          userName: 'Anita Rao',
-          time: '5 hours ago',
-          title: 'Organic Fertilizer Subsidy Updates',
-          body: 'Does anyone have experience applying for the Department of Agriculture’s new organic vermicompost subsidy? The portal seems to have updated registration requirements.',
-          likes: 8,
-          comments: 3,
-          isLiked: false,
-        ),
-      ],
+    return StreamBuilder<List<ForumPostItem>>(
+      stream: _forumStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Unable to load community posts right now.',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textSubtle,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
+
+        final posts = (snapshot.data ?? [])
+            .where((post) {
+              if (_searchQuery.isEmpty) return true;
+              final haystack =
+                  '${post.userName} ${post.title} ${post.body}'.toLowerCase();
+              return haystack.contains(_searchQuery);
+            })
+            .toList();
+
+        if (posts.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.forum_outlined, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.3)),
+                const SizedBox(height: 16),
+                Text('No posts yet', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle)),
+              ],
+            ),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+          physics: const BouncingScrollPhysics(),
+          itemCount: posts.length,
+          itemBuilder: (context, index) {
+            final post = posts[index];
+            return InkWell(
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PostDetailScreen(post: post),
+                  ),
+                );
+                if (mounted) setState(() {});
+              },
+              borderRadius: BorderRadius.circular(24),
+              child: _buildForumCard(post: post),
+            );
+          },
+        );
+      },
     );
   }
 
   Widget _buildArticlesContent() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-      physics: const BouncingScrollPhysics(),
-      children: [
-        _buildArticleCard(
-          title: 'Sustainable Water Management in 2024',
-          excerpt: 'Discover advanced drip irrigation techniques designed specifically for high-yield seasonal crops...',
-          category: 'RESOURCE GUIDE',
-          readTime: '5 min read',
-        ),
-        _buildArticleCard(
-          title: 'Market Outlook: Seasonal Pricing Insights',
-          excerpt: 'Analysis of upcoming market trends for primary vegetables and root crops in the central district...',
-          category: 'MARKET TRENDS',
-          readTime: '3 min read',
-        ),
-      ],
+    return FutureBuilder<List<ArticleItem>>(
+      future: SupabaseDataService().getArticles(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final articles = snapshot.data ?? [];
+        if (articles.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.article_outlined, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.3)),
+                const SizedBox(height: 16),
+                Text('No articles yet', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle)),
+              ],
+            ),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+          physics: const BouncingScrollPhysics(),
+          itemCount: articles.length,
+          itemBuilder: (context, index) {
+            final article = articles[index];
+            return InkWell(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ArticleDetailScreen(article: article)),
+              ),
+              borderRadius: BorderRadius.circular(24),
+              child: _buildArticleCard(article: article),
+            );
+          },
+        );
+      },
     );
   }
 
-  Widget _buildForumCard({
-    required String userName,
-    required String time,
-    required String title,
-    required String body,
-    String? imageUrl,
-    required int likes,
-    required int comments,
-    required bool isLiked,
-  }) {
+  Widget _buildForumCard({required ForumPostItem post}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       decoration: AppDecorations.cardDecoration.copyWith(
@@ -289,7 +353,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                       decoration: BoxDecoration(
                         color: AppColors.background,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.1)),
+                        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
                       ),
                       child: const Icon(Icons.person_rounded, size: 20, color: AppColors.textSubtle),
                     ),
@@ -298,8 +362,36 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(userName, style: AppTextStyles.headline3.copyWith(fontSize: 15)),
-                          Text(time, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontSize: 11)),
+                          Row(
+                            children: [
+                              Text(post.userName, style: AppTextStyles.headline3.copyWith(fontSize: 15)),
+                              if (post.isPinned) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.push_pin_rounded, size: 10, color: AppColors.primary),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'PINNED',
+                                        style: AppTextStyles.labelSmall.copyWith(
+                                          color: AppColors.primary,
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          Text(post.time, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontSize: 11)),
                         ],
                       ),
                     ),
@@ -307,18 +399,18 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                   ],
                 ),
                 const SizedBox(height: 16),
-                Text(title, style: AppTextStyles.headline3.copyWith(fontSize: 17, height: 1.3)),
+                Text(post.title, style: AppTextStyles.headline3.copyWith(fontSize: 17, height: 1.3)),
                 const SizedBox(height: 8),
                 Text(
-                  body,
+                  post.body,
                   style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHeadline.withValues(alpha: 0.7), height: 1.5),
                 ),
-                if (imageUrl != null) ...[
+                if (post.imageUrl != null) ...[
                   const SizedBox(height: 16),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: CachedNetworkImage(
-                      imageUrl: imageUrl,
+                      imageUrl: post.imageUrl!,
                       height: 200,
                       width: double.infinity,
                       fit: BoxFit.cover,
@@ -331,17 +423,34 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: AppColors.textHeadline.withValues(alpha: 0.05))),
+              border: Border(top: BorderSide(color: AppColors.textHeadline.withValues(alpha: 0.1))),
             ),
             child: Row(
               children: [
                 _buildSocialAction(
-                  isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
-                  '$likes',
-                  isLiked ? AppColors.primary : AppColors.textSubtle,
+                  post.isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
+                  '${post.likes}',
+                  post.isLiked ? AppColors.primary : AppColors.textSubtle,
+                  onTap: () async {
+                    await SupabaseDataService().togglePostLike(post.id);
+                    if (mounted) setState(() {});
+                  },
                 ),
                 const SizedBox(width: 24),
-                _buildSocialAction(Icons.chat_bubble_outline_rounded, '$comments', AppColors.textSubtle),
+                _buildSocialAction(
+                  Icons.chat_bubble_outline_rounded,
+                  '${post.comments}',
+                  AppColors.textSubtle,
+                  onTap: () async {
+                    final updated = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => CommentsDialog(postId: post.id),
+                    );
+                    if (updated == true && mounted) {
+                      setState(() {});
+                    }
+                  },
+                ),
                 const Spacer(),
                 const Icon(Icons.share_outlined, size: 20, color: AppColors.textSubtle),
               ],
@@ -352,29 +461,36 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
     );
   }
 
-  Widget _buildSocialAction(IconData icon, String label, Color color) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: AppTextStyles.labelSmall.copyWith(
-            color: color,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
+  Widget _buildSocialAction(
+    IconData icon,
+    String label,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildArticleCard({
-    required String title,
-    required String excerpt,
-    required String category,
-    required String readTime,
-  }) {
+  Widget _buildArticleCard({required ArticleItem article}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       decoration: AppDecorations.cardDecoration.copyWith(
@@ -389,7 +505,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    category,
+                    'RESOURCE GUIDE',
                     style: AppTextStyles.labelSmall.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w800,
@@ -398,17 +514,23 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(title, style: AppTextStyles.headline3.copyWith(fontSize: 16)),
+                  Text(article.title, style: AppTextStyles.headline3.copyWith(fontSize: 16), maxLines: 2, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       const CircleAvatar(radius: 8, backgroundColor: AppColors.primary, child: Icon(Icons.spa, size: 8, color: Colors.white)),
                       const SizedBox(width: 8),
-                      Text('By AgriDirect', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
+                      Flexible(
+                        child: Text(
+                          'By ${article.author}',
+                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       const Icon(Icons.circle, size: 3, color: AppColors.textSubtle),
                       const SizedBox(width: 8),
-                      Text(readTime, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
+                      Text(article.time, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
                     ],
                   ),
                 ],
@@ -421,7 +543,14 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                 width: 90,
                 height: 90,
                 color: AppColors.background,
-                child: const Icon(Icons.article_outlined, color: AppColors.textSubtle),
+                child: article.imageUrl != null && article.imageUrl!.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: article.imageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => const Icon(Icons.article_outlined, color: AppColors.textSubtle),
+                      errorWidget: (context, url, error) => const Icon(Icons.article_outlined, color: AppColors.textSubtle),
+                    )
+                  : const Icon(Icons.article_outlined, color: AppColors.textSubtle),
               ),
             ),
           ],

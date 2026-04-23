@@ -66,8 +66,8 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
                         ),
                         const SizedBox(width: 24),
                         AdminMiniMetric(
-                          label: 'Active Admins', 
-                          value: '3', 
+                          label: 'System Admins', 
+                          value: '${data?['total_admins'] ?? "0"}', 
                           icon: Icons.admin_panel_settings_rounded, 
                           light: true
                         ),
@@ -85,7 +85,7 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
                 border: Border.all(color: AdminUi.border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -224,7 +224,7 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
             padding: const EdgeInsets.all(80),
             child: Column(
               children: [
-                Icon(Icons.history_rounded, size: 48, color: AdminUi.textMuted.withValues(alpha: 0.3)),
+                Icon(Icons.history_rounded, size: 48, color: AdminUi.textMuted.withValues(alpha: 0.5)),
                 const SizedBox(height: 16),
                 Text('No activity logs found matching your criteria.', style: AdminUi.body(color: AdminUi.textMuted)),
               ],

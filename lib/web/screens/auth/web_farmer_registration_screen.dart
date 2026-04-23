@@ -100,7 +100,7 @@ class _WebFarmerRegistrationScreenState
             borderRadius: BorderRadius.circular(32),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 40,
                 offset: const Offset(0, 20),
               ),
@@ -138,7 +138,7 @@ class _WebFarmerRegistrationScreenState
                         'Join our community of verified sellers and grow your business.',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
-                          color: Colors.white.withValues(alpha: 0.8),
+                          color: Colors.white.withValues(alpha: 0.7),
                           height: 1.5,
                         ),
                       ),
@@ -194,8 +194,8 @@ class _WebFarmerRegistrationScreenState
             shape: BoxShape.circle,
             color: isActive
                 ? Colors.white
-                : (isDone ? Colors.white.withValues(alpha: 0.2) : Colors.transparent),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
+                : (isDone ? Colors.white.withValues(alpha: 0.3) : Colors.transparent),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 2),
           ),
           child: Center(
             child: isDone
@@ -542,7 +542,7 @@ class _WebFarmerRegistrationScreenState
                 Center(
                   child: Text(
                     'Draw your signature here',
-                    style: TextStyle(color: _muted.withValues(alpha: 0.4)),
+                    style: TextStyle(color: _muted.withValues(alpha: 0.5)),
                   ),
                 ),
               GestureDetector(
@@ -672,7 +672,7 @@ class _WebFarmerRegistrationScreenState
       child: Container(
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: done ? _primary.withValues(alpha: 0.05) : _surface,
+          color: done ? _primary.withValues(alpha: 0.1) : _surface,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: done ? _primary : _border, width: 2),
         ),
@@ -816,7 +816,7 @@ class _WebFarmerRegistrationScreenState
 
     try {
       final auth = AuthService();
-      await SupabaseDB.submitFarmerRegistration(
+      await SupabaseDatabase.submitFarmerRegistration(
         userId: auth.userId,
         registration: _registration,
         faceImageBytes: _faceImageBytes,
@@ -892,8 +892,10 @@ class _WebFarmerRegistrationScreenState
                             children: [
                               TileLayer(
                                 urlTemplate:
-                                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                                subdomains: const ['a', 'b', 'c', 'd'],
                                 userAgentPackageName: 'com.agridirect.app',
+                                retinaMode: RetinaMode.isHighDensity(context),
                               ),
                               MarkerLayer(
                                 markers: [

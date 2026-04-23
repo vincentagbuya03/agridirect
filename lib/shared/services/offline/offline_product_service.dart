@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import '../core/supabase_config.dart';
@@ -43,6 +44,8 @@ class OfflineProductService {
        _productService = productService,
        _connectivity = connectivity;
 
+  Timer? _backgroundSyncTimer;
+
   Future<void> init() async {
     await _queueService.init();
     try {
@@ -57,6 +60,18 @@ class OfflineProductService {
     _listenToConnectivity();
     await _triggerInitialSyncIfNeeded();
     _listenToQueueChanges();
+    _startBackgroundSyncTimer();
+  }
+
+  void _startBackgroundSyncTimer() {
+    _backgroundSyncTimer?.cancel();
+    _backgroundSyncTimer = Timer.periodic(const Duration(minutes: 1), (timer) async {
+      final online = await isOnline();
+      if (online && pendingProductsCount.value > 0 && !isSyncing.value) {
+        debugPrint('🔄 Background auto-sync triggered...');
+        syncPendingProducts();
+      }
+    });
   }
 
   void _listenToQueueChanges() {

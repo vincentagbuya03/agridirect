@@ -14,11 +14,23 @@ class AdminProductsTab extends StatefulWidget {
 class _AdminProductsTabState extends State<AdminProductsTab> {
   late Future<List<Map<String, dynamic>>> _productsFuture;
   String _searchQuery = '';
+  late VoidCallback _dataRefreshListener;
 
   @override
   void initState() {
     super.initState();
+    _dataRefreshListener = () {
+      if (!mounted) return;
+      _loadData();
+    };
+    widget.adminService.dataVersionListenable.addListener(_dataRefreshListener);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    widget.adminService.dataVersionListenable.removeListener(_dataRefreshListener);
+    super.dispose();
   }
 
   void _loadData() {
@@ -76,7 +88,7 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                 ElevatedButton.icon(
                   onPressed: _loadData,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.15),
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -95,7 +107,7 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                 border: Border.all(color: AdminUi.border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -142,7 +154,7 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                 Text('Market Demand Analysis', style: AdminUi.title(size: 20, color: Colors.white)),
                 const SizedBox(height: 12),
                 Text(
-                  'Organic root vegetables are trending up 24% this week. Consider advising farmers to list more heirloom varieties.',
+                  'Market inventory levels are monitored in real-time. Platform trends indicate steady engagement with fresh produce listings.',
                   style: AdminUi.body(size: 14, color: Colors.white.withValues(alpha: 0.8)),
                 ),
                 const Spacer(),
@@ -253,7 +265,7 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
 
   Widget _buildTableHeader() {
     return Container(
-      color: AdminUi.sidebarBg.withValues(alpha: 0.5),
+      color: AdminUi.sidebarBg.withValues(alpha: 0.05),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
       child: Row(
         children: [
@@ -347,7 +359,7 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                       decoration: BoxDecoration(
                         color: AdminUi.brandSoft,
                         borderRadius: AdminUi.radiusMd,
-                        border: Border.all(color: AdminUi.brand.withValues(alpha: 0.1)),
+                        border: Border.all(color: AdminUi.brand.withValues(alpha: 0.2)),
                         image: product['image_url'] != null 
                           ? DecorationImage(image: NetworkImage(product['image_url']), fit: BoxFit.cover)
                           : null,
@@ -401,6 +413,27 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    IconButton(
+                      icon: Icon(
+                        product['is_featured'] == true 
+                          ? Icons.star_rounded 
+                          : Icons.star_outline_rounded,
+                        color: product['is_featured'] == true ? Colors.orange : AdminUi.textMuted,
+                      ),
+                      tooltip: product['is_featured'] == true ? 'Unfeature Product' : 'Feature Product',
+                      onPressed: () async {
+                        final success = await widget.adminService.toggleFeaturedProduct(
+                          product['product_id'], 
+                          !(product['is_featured'] == true)
+                        );
+                        if (success && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(product['is_featured'] == true ? 'Product unfeatured' : 'Product featured')),
+                          );
+                          _loadData();
+                        }
+                      },
+                    ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline_rounded),
                       color: AdminUi.danger,

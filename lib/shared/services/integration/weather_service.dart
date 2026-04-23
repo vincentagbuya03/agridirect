@@ -1,60 +1,39 @@
-import 'package:flutter/material.dart';
-import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'dart:math' as math;
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../models/weather_model.dart';
+import '../core/supabase_config.dart';
 
 /// Weather Service using OpenWeatherMap API
 class WeatherService {
-  static String get _apiKey => dotenv.env['OPENWEATHER_API_KEY']?.trim() ?? '';
-
-  static const String _baseUrl =
-      'https://api.openweathermap.org/data/2.5/weather';
-  static const String _forecastUrl =
-      'https://api.openweathermap.org/data/2.5/forecast';
-
-  static final WeatherService _instance = WeatherService._internal();
-
-  factory WeatherService() => _instance;
-
-  WeatherService._internal();
-
   /// Fetch weather data for a location
-  /// latitude: The latitude of the location
-  /// longitude: The longitude of the location
   Future<WeatherData?> getWeatherByCoordinates({
     required double latitude,
     required double longitude,
   }) async {
     try {
-      if (_apiKey.isEmpty) {
-        debugPrint('OpenWeather API key is not configured.');
-        return _getDefaultWeatherData();
-      }
+      debugPrint('Fetching weather via Supabase Edge Function...');
 
-      final url =
-          '$_baseUrl?lat=$latitude&lon=$longitude&units=metric&appid=$_apiKey';
-      debugPrint('Weather API request started for coordinates.');
+      final response = await SupabaseConfig.client.functions.invoke(
+        'get-weather',
+        body: {
+          'lat': latitude,
+          'lon': longitude,
+          'type': 'current',
+          'userId': SupabaseConfig.client.auth.currentUser?.id,
+        },
+      ).timeout(const Duration(seconds: 15));
 
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () => http.Response('Timeout', 408),
-          );
-
-      debugPrint('Weather API response code: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final jsonData = jsonDecode(response.body);
+      if (response.status == 200) {
+        final jsonData = response.data;
         final weatherData = WeatherData.fromJson(jsonData);
-        debugPrint(
-          'Successfully fetched weather: ${weatherData.temperature}°C at ${weatherData.location}',
-        );
 
-        // Generate alerts based on weather conditions
-        final weatherDataWithAlerts = WeatherData(
+        // Merge backend emergency alerts with locally generated alerts
+        final allAlerts = [
+          ...weatherData.alerts, // Backend alerts (Typhoon, etc)
+          ...weatherData.generateAlerts(), // Local alerts (Frost, Humidity, etc)
+        ];
+
+        return WeatherData(
           location: weatherData.location,
           temperature: weatherData.temperature,
           feelsLike: weatherData.feelsLike,
@@ -64,17 +43,10 @@ class WeatherService {
           pressure: weatherData.pressure,
           description: weatherData.description,
           icon: weatherData.icon,
-          alerts: weatherData.generateAlerts(),
+          alerts: allAlerts,
         );
-
-        return weatherDataWithAlerts;
-      } else if (response.statusCode == 401) {
-        debugPrint('Invalid API key: ${response.body}');
-        return _getDefaultWeatherData();
       } else {
-        debugPrint(
-          'Weather API error: ${response.statusCode} - ${response.body}',
-        );
+        debugPrint('Weather Edge Function error: ${response.status}');
         return _getDefaultWeatherData();
       }
     } catch (e) {
@@ -86,25 +58,25 @@ class WeatherService {
   /// Fetch weather by city name
   Future<WeatherData?> getWeatherByCity(String cityName) async {
     try {
-      if (_apiKey.isEmpty) {
-        debugPrint('OpenWeather API key is not configured.');
-        return _getDefaultWeatherData();
-      }
+      final response = await SupabaseConfig.client.functions.invoke(
+        'get-weather',
+        body: {
+          'city': cityName,
+          'type': 'current',
+          'userId': SupabaseConfig.client.auth.currentUser?.id,
+        },
+      );
 
-      final url = '$_baseUrl?q=$cityName&units=metric&appid=$_apiKey';
-
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () => http.Response('Timeout', 408),
-          );
-
-      if (response.statusCode == 200) {
-        final jsonData = jsonDecode(response.body);
+      if (response.status == 200) {
+        final jsonData = response.data;
         final weatherData = WeatherData.fromJson(jsonData);
 
-        final weatherDataWithAlerts = WeatherData(
+        final allAlerts = [
+          ...weatherData.alerts,
+          ...weatherData.generateAlerts(),
+        ];
+
+        return WeatherData(
           location: weatherData.location,
           temperature: weatherData.temperature,
           feelsLike: weatherData.feelsLike,
@@ -114,12 +86,10 @@ class WeatherService {
           pressure: weatherData.pressure,
           description: weatherData.description,
           icon: weatherData.icon,
-          alerts: weatherData.generateAlerts(),
+          alerts: allAlerts,
         );
-
-        return weatherDataWithAlerts;
       } else {
-        debugPrint('Weather API error: ${response.statusCode}');
+        debugPrint('Weather API error: ${response.status}');
         return _getDefaultWeatherData();
       }
     } catch (e) {
@@ -134,33 +104,20 @@ class WeatherService {
     required double longitude,
   }) async {
     try {
-      final url =
-          '$_forecastUrl?lat=$latitude&lon=$longitude&units=metric&appid=$_apiKey';
-      debugPrint('Forecast API URL: $url');
+      final response = await SupabaseConfig.client.functions.invoke(
+        'get-weather',
+        body: {
+          'lat': latitude,
+          'lon': longitude,
+          'type': 'forecast',
+          'userId': SupabaseConfig.client.auth.currentUser?.id,
+        },
+      );
 
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () => http.Response('Timeout', 408),
-          );
-
-      debugPrint('Forecast API response code: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final jsonData = jsonDecode(response.body);
-        final forecast = WeatherForecast.fromJson(jsonData);
-        debugPrint(
-          'Successfully fetched forecast: ${forecast.forecasts.length} items for ${forecast.location}',
-        );
-        return forecast;
-      } else if (response.statusCode == 401) {
-        debugPrint('Invalid API key: ${response.body}');
-        return _getDefaultForecast();
+      if (response.status == 200) {
+        return WeatherForecast.fromJson(response.data);
       } else {
-        debugPrint(
-          'Forecast API error: ${response.statusCode} - ${response.body}',
-        );
+        debugPrint('Forecast Edge Function error: ${response.status}');
         return _getDefaultForecast();
       }
     } catch (e) {
@@ -172,27 +129,19 @@ class WeatherService {
   /// Fetch 5-day forecast by city name
   Future<WeatherForecast?> getForecastByCity(String cityName) async {
     try {
-      final url = '$_forecastUrl?q=$cityName&units=metric&appid=$_apiKey';
-      debugPrint('Forecast by city URL: $url');
+      final response = await SupabaseConfig.client.functions.invoke(
+        'get-weather',
+        body: {
+          'city': cityName,
+          'type': 'forecast',
+          'userId': SupabaseConfig.client.auth.currentUser?.id,
+        },
+      );
 
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () => http.Response('Timeout', 408),
-          );
-
-      debugPrint('Forecast API response code: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final jsonData = jsonDecode(response.body);
-        final forecast = WeatherForecast.fromJson(jsonData);
-        debugPrint(
-          'Successfully fetched forecast: ${forecast.forecasts.length} items for ${forecast.location}',
-        );
-        return forecast;
+      if (response.status == 200) {
+        return WeatherForecast.fromJson(response.data);
       } else {
-        debugPrint('Forecast API error: ${response.statusCode}');
+        debugPrint('Forecast API error: ${response.status}');
         return _getDefaultForecast();
       }
     } catch (e) {
@@ -230,25 +179,25 @@ class WeatherService {
       );
     }
 
-    return WeatherForecast(location: 'Default Location', forecasts: forecasts);
+    return WeatherForecast(location: 'San Carlos City, Pangasinan', forecasts: forecasts);
   }
 
   /// Get default/mock weather data (fallback when API is not available)
   WeatherData _getDefaultWeatherData() {
     final now = DateTime.now();
     // Simulate realistic daily temperature curve using sine wave
-    // Temperature ranges from ~16°C at 6 AM to ~28°C at 2 PM
+    // Temperature ranges from ~24°C at 6 AM to ~34°C at 2 PM (Tropical)
     final hour = now.hour.toDouble();
-    final temp = 22 + 6 * math.sin((hour - 6) * math.pi / 12);
+    final temp = 29 + 5 * math.sin((hour - 6) * math.pi / 12);
 
     final weatherData = WeatherData(
-      location: 'Default Location',
-      temperature: temp.clamp(10.0, 35.0),
-      feelsLike: (temp - 1).clamp(10.0, 35.0),
-      humidity: 65 + (now.second % 30),
-      windSpeed: 12 + (now.minute % 20),
+      location: 'San Carlos City, Pangasinan',
+      temperature: temp.clamp(24.0, 36.0),
+      feelsLike: (temp + 2).clamp(24.0, 38.0),
+      humidity: 75 + (now.second % 15),
+      windSpeed: 8 + (now.minute % 10),
       cloudiness: 40 + (now.second % 40),
-      pressure: 1013,
+      pressure: 1010,
       description: 'Partly Cloudy',
       icon: '02d',
       alerts: [],

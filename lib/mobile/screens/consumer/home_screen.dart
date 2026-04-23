@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/router/app_router.dart';
+import '../../../shared/services/commerce/cart_service.dart';
+import 'cart_screen.dart';
 import '../../../shared/styles/app_theme.dart';
 
 /// Home Screen - Premium Customer Interface
@@ -24,10 +26,13 @@ class HomeScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 24),
               physics: const BouncingScrollPhysics(),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   _buildGlassAIMarketInsight(),
-                  _buildSectionHeader('Browse Categories', 'Show all', () {}),
+                  _buildSectionHeader('Browse Categories', 'Show all', () {
+                    SupabaseDataService.navigationTabNotifier.value = 1;
+                    SupabaseDataService.marketplaceCategoryNotifier.value = null;
+                  }),
                   _buildCategoryGrid(),
                   const SizedBox(height: 32),
                   _buildSectionHeader(
@@ -40,7 +45,7 @@ class HomeScreen extends StatelessWidget {
                   _buildSectionHeader('Community Stories', 'Join Chat', () {}),
                   _buildCommunityFeed(context),
                   const SizedBox(height: 40),
-                ],
+                  ],
               ),
             ),
           ),
@@ -87,7 +92,7 @@ class HomeScreen extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textHeadline.withValues(alpha: 0.03),
+            color: AppColors.textHeadline.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -138,10 +143,17 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  _buildHeaderAction(
-                    context,
-                    Icons.chat_bubble_outline_rounded,
-                    true,
+                  Row(
+                    children: [
+                      _buildHeaderAction(
+                        context,
+                        Icons.chat_bubble_outline_rounded,
+                        true,
+                        () => context.push(AppRoutes.customerMessages),
+                      ),
+                      const SizedBox(width: 8),
+                      _buildCartAction(context),
+                    ],
                   ),
                 ],
               ),
@@ -155,7 +167,7 @@ class HomeScreen extends StatelessWidget {
                         color: AppColors.background,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: AppColors.textHeadline.withValues(alpha: 0.05),
+                          color: AppColors.textHeadline.withValues(alpha: 0.1),
                         ),
                       ),
                       child: TextField(
@@ -186,7 +198,7 @@ class HomeScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.2),
+                          color: AppColors.primary.withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -211,9 +223,10 @@ class HomeScreen extends StatelessWidget {
     BuildContext context,
     IconData icon,
     bool hasNotification,
+    VoidCallback onTap,
   ) {
     return InkWell(
-      onTap: () => context.push(AppRoutes.customerMessages),
+      onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.all(10),
@@ -221,7 +234,7 @@ class HomeScreen extends StatelessWidget {
           color: AppColors.background,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: AppColors.textHeadline.withValues(alpha: 0.05),
+            color: AppColors.textHeadline.withValues(alpha: 0.1),
           ),
         ),
         child: Stack(
@@ -247,6 +260,66 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildCartAction(BuildContext context) {
+    return ListenableBuilder(
+      listenable: CartService(),
+      builder: (context, _) {
+        final count = CartService().itemCount;
+        return InkWell(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const CartScreen()),
+          ),
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.textHeadline.withValues(alpha: 0.1),
+              ),
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(
+                  Icons.shopping_cart_outlined,
+                  color: AppColors.textHeadline,
+                  size: 24,
+                ),
+                if (count > 0)
+                  Positioned(
+                    top: -6,
+                    right: -6,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: AppColors.accent,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        '$count',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildGlassAIMarketInsight() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
@@ -261,7 +334,7 @@ class HomeScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0369A1).withValues(alpha: 0.25),
+              color: const Color(0xFF0369A1).withValues(alpha: 0.3),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -275,7 +348,7 @@ class HomeScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -290,7 +363,7 @@ class HomeScreen extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: Colors.white.withValues(alpha: 0.7),
                     letterSpacing: 1.2,
                   ),
                 ),
@@ -309,7 +382,7 @@ class HomeScreen extends StatelessWidget {
             Text(
               'Market supply peaked this morning. Local farmers are offering fresh harvests at wholesale prices.',
               style: AppTextStyles.bodyMedium.copyWith(
-                color: Colors.white.withValues(alpha: 0.85),
+                color: Colors.white.withValues(alpha: 0.8),
                 height: 1.5,
               ),
             ),
@@ -343,75 +416,87 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildCategoryGrid() {
-    final categories = [
-      _CategoryData(
-        Icons.eco_rounded,
-        'Veggies',
-        const Color(0xFFDCFCE7),
-        AppColors.primary,
-      ),
-      _CategoryData(
-        Icons.apple_rounded,
-        'Fruits',
-        const Color(0xFFFFEDD5),
-        const Color(0xFFEA580C),
-      ),
-      _CategoryData(
-        Icons.grass_rounded,
-        'Grains',
-        const Color(0xFFFEF3C7),
-        const Color(0xFFD97706),
-      ),
-      _CategoryData(
-        Icons.water_drop_rounded,
-        'Dairy',
-        const Color(0xFFDBEAFE),
-        const Color(0xFF2563EB),
-      ),
-      _CategoryData(
-        Icons.spa_rounded,
-        'Organic',
-        const Color(0xFFD1FAE5),
-        const Color(0xFF059669),
-      ),
-    ];
-
-    return SizedBox(
-      height: 110,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        scrollDirection: Axis.horizontal,
-        clipBehavior: Clip.none,
-        itemCount: categories.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 20),
-        itemBuilder: (_, i) {
-          final cat = categories[i];
-          return Column(
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: cat.bgColor.withValues(alpha: 0.5),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: cat.bgColor, width: 2),
-                ),
-                child: Center(
-                  child: Icon(cat.icon, size: 28, color: cat.iconColor),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                cat.label,
-                style: AppTextStyles.labelSmall.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textHeadline,
-                ),
-              ),
-            ],
+    return FutureBuilder<List<CategoryItem>>(
+      future: SupabaseDataService().getCategories(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 110,
+            child: Center(child: AppShimmerLoader()),
           );
-        },
-      ),
+        }
+
+        final categories = snapshot.data ?? [];
+        if (categories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return SizedBox(
+          height: 80,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            itemCount: categories.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 14),
+            itemBuilder: (_, i) {
+              final cat = categories[i];
+              return GestureDetector(
+                onTap: () {
+                  // 1. Set the global category filter
+                  SupabaseDataService.marketplaceCategoryNotifier.value = cat.name;
+                  // 2. Switch to the Marketplace tab (Index 1 in MobileNavigation)
+                  SupabaseDataService.navigationTabNotifier.value = 1;
+                },
+                child: Container(
+                  width: 130,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Color(cat.bgColor).withValues(alpha: 0.2),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(cat.bgColor).withValues(alpha: 0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Color(cat.iconColor),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          cat.name,
+                          style: AppTextStyles.labelSmall.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textHeadline,
+                            fontSize: 14,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -627,7 +712,7 @@ class HomeScreen extends StatelessWidget {
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.2),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                   ),
                 ),
                 child: Center(
@@ -677,7 +762,7 @@ class HomeScreen extends StatelessWidget {
     return Container(
       height: 150,
       width: double.infinity,
-      color: AppColors.primary.withValues(alpha: 0.08),
+      color: AppColors.primary.withValues(alpha: 0.1),
       child: const Center(
         child: Icon(
           Icons.agriculture_rounded,
@@ -720,7 +805,7 @@ class HomeScreen extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.05),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -729,20 +814,26 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Column(
+              Expanded(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     authorName,
                     style: AppTextStyles.headline3.copyWith(fontSize: 15),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     '$authorRole • $timeAgo',
                     style: AppTextStyles.bodySmall.copyWith(
                       color: AppColors.textSubtle,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
+                ),
               ),
             ],
           ),
@@ -750,7 +841,7 @@ class HomeScreen extends StatelessWidget {
           Text(
             postContent,
             style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textHeadline.withValues(alpha: 0.8),
+              color: AppColors.textHeadline.withValues(alpha: 0.9),
               height: 1.5,
             ),
           ),
@@ -790,11 +881,4 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _CategoryData {
-  final IconData icon;
-  final String label;
-  final Color bgColor;
-  final Color iconColor;
-  _CategoryData(this.icon, this.label, this.bgColor, this.iconColor);
-}
 

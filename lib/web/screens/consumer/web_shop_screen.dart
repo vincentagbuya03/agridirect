@@ -56,17 +56,7 @@ class _WebShopScreenState extends State<WebShopScreen>
   int _currentPage = 1;
   final int _itemsPerPage = 12;
 
-  final List<String> _categories = [
-    'All',
-    'Vegetables',
-    'Fruits',
-    'Grains',
-    'Dairy',
-    'Eggs',
-    'Honey',
-    'Meat',
-    'Herbs',
-  ];
+  List<String> _categories = ['All'];
 
   @override
   void initState() {
@@ -98,9 +88,12 @@ class _WebShopScreenState extends State<WebShopScreen>
     setState(() => _isLoading = true);
     try {
       final products = await _dataService.getAllProducts();
+      final categories = await _dataService.getMarketplaceCategories();
+      
       setState(() {
         _allProducts = products;
         _filteredProducts = products;
+        _categories = ['All', ...categories];
         _isLoading = false;
       });
       _createProductAnimations();
@@ -133,12 +126,33 @@ class _WebShopScreenState extends State<WebShopScreen>
     setState(() {
       _filteredProducts = _allProducts.where((p) {
         final matchesCategory = _selectedCategory == 'All' ||
-            p.name.toLowerCase().contains(_selectedCategory.toLowerCase());
+            (p.categoryName?.toLowerCase() == _selectedCategory.toLowerCase());
+        
         final matchesSearch = _searchQuery.isEmpty ||
             p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
             p.farm.toLowerCase().contains(_searchQuery.toLowerCase());
-        return matchesCategory && matchesSearch;
+            
+        final matchesPrice = (double.tryParse(p.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0) <= _priceRange;
+        
+        // Note: organicOnly filter skipped for now as DB schema doesn't strictly flag it yet
+        return matchesCategory && matchesSearch && (_priceRange >= 500 || matchesPrice);
       }).toList();
+      
+      // Sort logic
+      if (_sortBy == 'Price: Low to High') {
+        _filteredProducts.sort((a, b) {
+          final pa = double.tryParse(a.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+          final pb = double.tryParse(b.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+          return pa.compareTo(pb);
+        });
+      } else if (_sortBy == 'Price: High to Low') {
+        _filteredProducts.sort((a, b) {
+          final pa = double.tryParse(a.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+          final pb = double.tryParse(b.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+          return pb.compareTo(pa);
+        });
+      }
+      
       _currentPage = 1;
     });
     _createProductAnimations();
@@ -171,7 +185,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 return CustomPaint(
                   painter: BlobPainter(
                     animationValue: _blobController.value,
-                    color: AgriColors.emerald400.withValues(alpha: 0.03),
+                    color: AgriColors.emerald400.withValues(alpha: 0.05),
                     center: const Offset(0.85, 0.15),
                     radius: 200,
                   ),
@@ -186,7 +200,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 return CustomPaint(
                   painter: BlobPainter(
                     animationValue: 1 - _blobController.value,
-                    color: AgriColors.teal400.withValues(alpha: 0.02),
+                    color: AgriColors.teal400.withValues(alpha: 0.05),
                     center: const Offset(0.15, 0.85),
                     radius: 250,
                   ),
@@ -284,7 +298,7 @@ class _WebShopScreenState extends State<WebShopScreen>
           border: Border.all(color: _border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -535,7 +549,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 gradient: LinearGradient(
                   colors: [
                     _border,
-                    _border.withValues(alpha: 0),
+                    _border.withValues(alpha: 0.1),
                   ],
                 ),
               ),
@@ -558,7 +572,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 activeTrackColor: _primary,
                 inactiveTrackColor: _border,
                 thumbColor: _primary,
-                overlayColor: _primary.withValues(alpha: 0.15),
+                overlayColor: _primary.withValues(alpha: 0.1),
                 trackHeight: 5,
                 thumbShape: const RoundSliderThumbShape(
                   enabledThumbRadius: 8,
@@ -569,7 +583,10 @@ class _WebShopScreenState extends State<WebShopScreen>
                 value: _priceRange,
                 min: 0,
                 max: 500,
-                onChanged: (v) => setState(() => _priceRange = v),
+                onChanged: (v) {
+                  setState(() => _priceRange = v);
+                  _filterProducts();
+                },
               ),
             ),
             Padding(
@@ -606,7 +623,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 gradient: LinearGradient(
                   colors: [
                     _border,
-                    _border.withValues(alpha: 0),
+                    _border.withValues(alpha: 0.1),
                   ],
                 ),
               ),
@@ -635,7 +652,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 gradient: LinearGradient(
                   colors: [
                     _border,
-                    _border.withValues(alpha: 0),
+                    _border.withValues(alpha: 0.1),
                   ],
                 ),
               ),
@@ -648,10 +665,10 @@ class _WebShopScreenState extends State<WebShopScreen>
               decoration: BoxDecoration(
                 color: _primaryLight,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _primary.withValues(alpha: 0.3)),
+                border: Border.all(color: _primary.withValues(alpha: 0.2)),
                 boxShadow: [
                   BoxShadow(
-                    color: _primary.withValues(alpha: 0.08),
+                    color: _primary.withValues(alpha: 0.1),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -670,7 +687,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: _primary.withValues(alpha: 0.3),
+                              color: _primary.withValues(alpha: 0.2),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -694,7 +711,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                     'Direct from verified farms. Fresh produce delivered within 24 hours.',
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: _primary.withValues(alpha: 0.7),
+                      color: _primary.withValues(alpha: 0.8),
                       height: 1.6,
                       fontWeight: FontWeight.w500,
                     ),
@@ -892,18 +909,18 @@ class _WebShopScreenState extends State<WebShopScreen>
           color: _white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isHovered ? _primary.withValues(alpha: 0.4) : _border,
+            color: isHovered ? _primary.withValues(alpha: 0.3) : _border,
             width: isHovered ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: _primary.withValues(alpha: isHovered ? 0.15 : 0),
+              color: _primary.withValues(alpha: 0.1),
               blurRadius: isHovered ? 32 : 0,
               offset: const Offset(0, 0),
               spreadRadius: isHovered ? 4 : 0,
             ),
             BoxShadow(
-              color: Colors.black.withValues(alpha: isHovered ? 0.08 : 0.03),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: isHovered ? 20 : 10,
               offset: const Offset(0, 6),
             ),
@@ -947,7 +964,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                             gradient: LinearGradient(
                               colors: [
                                 const Color(0xFFF59E0B),
-                                const Color(0xFFF59E0B).withValues(alpha: 0.8),
+                                const Color(0xFFF59E0B).withValues(alpha: 0.7),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(9),
@@ -1003,7 +1020,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                                 gradient: LinearGradient(
                                   colors: [
                                     _primaryLight,
-                                    _primaryLight.withValues(alpha: 0.6),
+                                    _primaryLight.withValues(alpha: 0.7),
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(7),
@@ -1083,7 +1100,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                                         ? LinearGradient(
                                             colors: [
                                               _primary,
-                                              _primary.withValues(alpha: 0.85),
+                                              _primary.withValues(alpha: 0.7),
                                             ],
                                             begin: Alignment.topLeft,
                                             end: Alignment.bottomRight,
@@ -1104,7 +1121,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                                     boxShadow: isHovered
                                         ? [
                                             BoxShadow(
-                                              color: _primary.withValues(alpha: 0.3),
+                                              color: _primary.withValues(alpha: 0.1),
                                               blurRadius: 16,
                                               offset: const Offset(0, 6),
                                             ),
@@ -1208,7 +1225,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 border: Border.all(color: _border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -1247,7 +1264,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 border: Border.all(color: _border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -1271,7 +1288,10 @@ class _WebShopScreenState extends State<WebShopScreen>
                           .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                           .toList(),
                       onChanged: (val) {
-                        if (val != null) setState(() => _sortBy = val);
+                        if (val != null) {
+                          setState(() => _sortBy = val);
+                          _filterProducts();
+                        }
                       },
                     ),
                   ),
@@ -1363,18 +1383,18 @@ class _WebShopScreenState extends State<WebShopScreen>
           color: _white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isHovered ? _border.withValues(alpha: 0.8) : _border,
+            color: isHovered ? _border.withValues(alpha: 0.5) : _border,
             width: isHovered ? 1.5 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: _primary.withValues(alpha: isHovered ? 0.12 : 0),
+              color: _primary.withValues(alpha: 0.1),
               blurRadius: isHovered ? 32 : 0,
               offset: const Offset(0, 0),
               spreadRadius: isHovered ? 4 : 0,
             ),
             BoxShadow(
-              color: Colors.black.withValues(alpha: isHovered ? 0.08 : 0.03),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: isHovered ? 20 : 10,
               offset: const Offset(0, 6),
             ),
@@ -1427,11 +1447,11 @@ class _WebShopScreenState extends State<WebShopScreen>
                       duration: const Duration(milliseconds: 250),
                       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
                       decoration: BoxDecoration(
-                        color: (badge['color'] as Color).withValues(alpha: isHovered ? 1 : 0.95),
+                        color: (badge['color'] as Color).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(9),
                         boxShadow: [
                           BoxShadow(
-                            color: (badge['color'] as Color).withValues(alpha: isHovered ? 0.4 : 0.25),
+                            color: (badge['color'] as Color).withValues(alpha: 0.3),
                             blurRadius: isHovered ? 16 : 8,
                             offset: const Offset(0, 3),
                           ),
@@ -1457,14 +1477,14 @@ class _WebShopScreenState extends State<WebShopScreen>
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: _white.withValues(alpha: isHovered ? 0.95 : 0.85),
+                        color: _white.withValues(alpha: 0.8),
                         borderRadius: BorderRadius.circular(11),
                         border: Border.all(
-                          color: _border.withValues(alpha: isHovered ? 0.4 : 0.2),
+                          color: _border.withValues(alpha: 0.5),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: isHovered ? 0.1 : 0.04),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: isHovered ? 12 : 6,
                             offset: const Offset(0, 2),
                           ),
@@ -1511,7 +1531,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                             gradient: LinearGradient(
                               colors: [
                                 _primaryLight,
-                                _primaryLight.withValues(alpha: 0.6),
+                                _primaryLight.withValues(alpha: 0.7),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(7),
@@ -1612,7 +1632,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                                     ? LinearGradient(
                                         colors: [
                                           _primary,
-                                          _primary.withValues(alpha: 0.85),
+                                          _primary.withValues(alpha: 0.7),
                                         ],
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
@@ -1633,7 +1653,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                                 boxShadow: isHovered
                                     ? [
                                         BoxShadow(
-                                          color: _primary.withValues(alpha: 0.3),
+                                          color: _primary.withValues(alpha: 0.1),
                                           blurRadius: 16,
                                           offset: const Offset(0, 6),
                                         ),

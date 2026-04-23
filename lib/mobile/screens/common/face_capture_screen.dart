@@ -416,10 +416,10 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
                     height: 80,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _primary.withValues(alpha: 0.85),
+                      color: _primary.withValues(alpha: 0.1),
                       boxShadow: [
                         BoxShadow(
-                          color: _primary.withValues(alpha: 0.4),
+                          color: _primary.withValues(alpha: 0.1),
                           blurRadius: 20,
                           spreadRadius: 5,
                         ),
@@ -488,9 +488,9 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
                     ),
                     decoration: BoxDecoration(
                       color: _faceCentered
-                          ? _primary.withValues(alpha: 0.9)
+                          ? _primary.withValues(alpha: 0.8)
                           : (_faceDetected
-                              ? _warningColor.withValues(alpha: 0.85)
+                              ? _warningColor.withValues(alpha: 0.8)
                               : Colors.black54),
                       borderRadius: BorderRadius.circular(24),
                     ),
@@ -588,7 +588,7 @@ class _FaceOverlayPainter extends CustomPainter {
     canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = Colors.black.withValues(alpha: 0.55),
+      Paint()..color = Colors.black.withValues(alpha: 0.7),
     );
     canvas.drawOval(ovalRect, Paint()..blendMode = BlendMode.clear);
     canvas.restore();
@@ -600,7 +600,7 @@ class _FaceOverlayPainter extends CustomPainter {
     } else if (faceDetected) {
       borderColor = warningColor;
     } else {
-      borderColor = Colors.white.withValues(alpha: 0.6);
+      borderColor = Colors.white.withValues(alpha: 0.5);
     }
 
     final borderPaint = Paint()

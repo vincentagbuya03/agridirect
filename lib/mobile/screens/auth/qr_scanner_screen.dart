@@ -25,7 +25,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
   void _onDetect(BarcodeCapture capture) {
     if (_isProcessing) return;
-    
+
     final List<Barcode> barcodes = capture.barcodes;
     for (final barcode in barcodes) {
       if (barcode.rawValue != null) {
@@ -45,7 +45,10 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
@@ -60,11 +63,8 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
-          MobileScanner(
-            controller: _scannerController,
-            onDetect: _onDetect,
-          ),
-          
+          MobileScanner(controller: _scannerController, onDetect: _onDetect),
+
           // Scanning Overlay
           Container(
             decoration: ShapeDecoration(
@@ -154,24 +154,15 @@ class QROverlayShape extends ShapeBorder {
     }
 
     return getLeftTopPath(rect)
-      ..lineTo(
-        rect.right,
-        rect.bottom,
-      )
-      ..lineTo(
-        rect.left,
-        rect.bottom,
-      )
-      ..lineTo(
-        rect.left,
-        rect.top,
-      );
+      ..lineTo(rect.right, rect.bottom)
+      ..lineTo(rect.left, rect.bottom)
+      ..lineTo(rect.left, rect.top);
   }
 
   @override
   void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
     final backgroundPaint = Paint()
-      ..color = Colors.black.withValues(alpha: overlayOpacity)
+      ..color = Colors.black.withValues(alpha: 0.6)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
@@ -198,38 +189,54 @@ class QROverlayShape extends ShapeBorder {
     final path = Path()
       // top left
       ..moveTo(cutOutRect.left, cutOutRect.top + borderRadius)
-      ..quadraticBezierTo(cutOutRect.left, cutOutRect.top,
-          cutOutRect.left + borderRadius, cutOutRect.top)
+      ..quadraticBezierTo(
+        cutOutRect.left,
+        cutOutRect.top,
+        cutOutRect.left + borderRadius,
+        cutOutRect.top,
+      )
       ..lineTo(cutOutRect.left + borderRadius + borderLength, cutOutRect.top)
       ..moveTo(cutOutRect.left, cutOutRect.top + borderRadius)
       ..lineTo(cutOutRect.left, cutOutRect.top + borderRadius + borderLength)
-
       // top right
       ..moveTo(cutOutRect.right, cutOutRect.top + borderRadius)
-      ..quadraticBezierTo(cutOutRect.right, cutOutRect.top,
-          cutOutRect.right - borderRadius, cutOutRect.top)
+      ..quadraticBezierTo(
+        cutOutRect.right,
+        cutOutRect.top,
+        cutOutRect.right - borderRadius,
+        cutOutRect.top,
+      )
       ..lineTo(cutOutRect.right - borderRadius - borderLength, cutOutRect.top)
       ..moveTo(cutOutRect.right, cutOutRect.top + borderRadius)
       ..lineTo(cutOutRect.right, cutOutRect.top + borderRadius + borderLength)
-
       // bottom left
       ..moveTo(cutOutRect.left, cutOutRect.bottom - borderRadius)
-      ..quadraticBezierTo(cutOutRect.left, cutOutRect.bottom,
-          cutOutRect.left + borderRadius, cutOutRect.bottom)
-      ..lineTo(
-          cutOutRect.left + borderRadius + borderLength, cutOutRect.bottom)
+      ..quadraticBezierTo(
+        cutOutRect.left,
+        cutOutRect.bottom,
+        cutOutRect.left + borderRadius,
+        cutOutRect.bottom,
+      )
+      ..lineTo(cutOutRect.left + borderRadius + borderLength, cutOutRect.bottom)
       ..moveTo(cutOutRect.left, cutOutRect.bottom - borderRadius)
       ..lineTo(cutOutRect.left, cutOutRect.bottom - borderRadius - borderLength)
-
       // bottom right
       ..moveTo(cutOutRect.right, cutOutRect.bottom - borderRadius)
-      ..quadraticBezierTo(cutOutRect.right, cutOutRect.bottom,
-          cutOutRect.right - borderRadius, cutOutRect.bottom)
+      ..quadraticBezierTo(
+        cutOutRect.right,
+        cutOutRect.bottom,
+        cutOutRect.right - borderRadius,
+        cutOutRect.bottom,
+      )
       ..lineTo(
-          cutOutRect.right - borderRadius - borderLength, cutOutRect.bottom)
+        cutOutRect.right - borderRadius - borderLength,
+        cutOutRect.bottom,
+      )
       ..moveTo(cutOutRect.right, cutOutRect.bottom - borderRadius)
       ..lineTo(
-          cutOutRect.right, cutOutRect.bottom - borderRadius - borderLength);
+        cutOutRect.right,
+        cutOutRect.bottom - borderRadius - borderLength,
+      );
 
     canvas.drawPath(path, borderPaint);
   }

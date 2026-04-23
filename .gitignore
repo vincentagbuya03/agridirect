@@ -75,6 +75,7 @@ ios/Flutter/Flutter.podspec
 
 # Node / JS dependencies
 node_modules/
+.gradle-user-home/
 
 # Service account keys / credentials
 *firebase-adminsdk*.json

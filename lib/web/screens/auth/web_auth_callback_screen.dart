@@ -40,7 +40,9 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
         });
 
         // Initialize auth state
+        debugPrint('🔵 OAuth successful for email: ${user.email}');
         await _auth.initialize();
+        debugPrint('🔵 Auth initialized. isAdmin: ${_auth.isAdmin}');
 
         // Wait a moment before redirect
         await Future.delayed(const Duration(milliseconds: 1500));

@@ -1,6 +1,7 @@
 // ignore_for_file: uri_does_not_exist, creation_with_non_type
 import 'package:flutter/material.dart';
 import '../shared/services/auth/auth_service.dart';
+import '../shared/services/core/supabase_data_service.dart';
 import 'screens/consumer/home_screen.dart';
 import 'screens/consumer/marketplace_screen.dart';
 import 'screens/consumer/preorder_hub_screen.dart';
@@ -13,26 +14,44 @@ import 'screens/consumer/profile_screen.dart';
 
 class MobileNavigation extends StatefulWidget {
   final VoidCallback onLogout;
+  final int initialIndex;
 
-  const MobileNavigation({super.key, required this.onLogout});
+  const MobileNavigation({
+    super.key,
+    required this.onLogout,
+    this.initialIndex = 0,
+  });
 
   @override
   State<MobileNavigation> createState() => _MobileNavigationState();
 }
 
 class _MobileNavigationState extends State<MobileNavigation> {
-  int _currentIndex = 0;
+  late int _currentIndex;
   final _auth = AuthService();
 
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex;
     _auth.addListener(_onAuthChanged);
+    SupabaseDataService.navigationTabNotifier.addListener(_onExternalTabChange);
+    // Sync initial state
+    _currentIndex = SupabaseDataService.navigationTabNotifier.value;
+  }
+
+  void _onExternalTabChange() {
+    if (mounted) {
+      setState(() {
+        _currentIndex = SupabaseDataService.navigationTabNotifier.value;
+      });
+    }
   }
 
   @override
   void dispose() {
     _auth.removeListener(_onAuthChanged);
+    SupabaseDataService.navigationTabNotifier.removeListener(_onExternalTabChange);
     super.dispose();
   }
 
@@ -102,7 +121,7 @@ class _MobileNavigationState extends State<MobileNavigation> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 16,
               offset: const Offset(0, -4),
             ),
@@ -143,7 +162,11 @@ class _MobileNavigationState extends State<MobileNavigation> {
   }) {
     final isSelected = _currentIndex == index;
     return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () {
+        setState(() => _currentIndex = index);
+        // Sync the global notifier so future category clicks from Home work correctly
+        SupabaseDataService.navigationTabNotifier.value = index;
+      },
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
         width: 60,
@@ -182,7 +205,11 @@ class _MobileNavigationState extends State<MobileNavigation> {
   }) {
     final isSelected = _currentIndex == index;
     return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () {
+        setState(() => _currentIndex = index);
+        // Sync the global notifier
+        SupabaseDataService.navigationTabNotifier.value = index;
+      },
       behavior: HitTestBehavior.opaque,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -198,7 +225,7 @@ class _MobileNavigationState extends State<MobileNavigation> {
               border: isSelected
                   ? null
                   : Border.all(
-                      color: const Color(0xFF13EC5B).withValues(alpha: 0.3),
+                      color: const Color(0xFF13EC5B).withValues(alpha: 0.2),
                       width: 2,
                     ),
             ),

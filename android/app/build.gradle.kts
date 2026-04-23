@@ -1,3 +1,6 @@
+import com.android.build.gradle.internal.api.BaseVariantOutputImpl
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -5,6 +8,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
 }
+
+val installerBaseName = "AgriDirect-Installer"
 
 android {
     namespace = "com.example.agridirect"
@@ -17,8 +22,10 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
     }
 
     defaultConfig {
@@ -31,16 +38,27 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
-
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
+    applicationVariants.all {
+        outputs.all {
+            val output = this as BaseVariantOutputImpl
+            val apkVersionName = defaultConfig.versionName ?: "0.0.0"
+            output.outputFileName = "$installerBaseName-v$apkVersionName-$name.apk"
+        }
+    }
+}
+
+configurations.all {
+    exclude(group = "com.google.firebase", module = "firebase-iid")
 }
 
 dependencies {

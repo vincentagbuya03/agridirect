@@ -42,7 +42,7 @@ class AdminUi {
   // Shadow (Extremely subtle)
   static List<BoxShadow> get shadowSm => [
     BoxShadow(
-      color: Colors.black.withValues(alpha: 0.03),
+      color: Colors.black.withValues(alpha: 0.05),
       blurRadius: 10,
       offset: const Offset(0, 4),
     ),
@@ -50,7 +50,7 @@ class AdminUi {
 
   static List<BoxShadow> get shadowMd => [
     BoxShadow(
-      color: Colors.black.withValues(alpha: 0.05),
+      color: Colors.black.withValues(alpha: 0.08),
       blurRadius: 20,
       offset: const Offset(0, 8),
     ),
@@ -287,7 +287,7 @@ class AdminMiniMetric extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: (color ?? AdminUi.brand).withValues(alpha: 0.08),
+              color: (color ?? AdminUi.brand).withValues(alpha: 0.1),
               borderRadius: AdminUi.radiusMd,
             ),
             child: Icon(icon, size: 18, color: color ?? AdminUi.brand),

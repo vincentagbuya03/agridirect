@@ -56,11 +56,9 @@ class _RegistrationCompletionScreenState
       return;
     }
 
-    if (password.length < 6) {
-      _showErrorModal(
-        'Weak Password',
-        'Password must be at least 6 characters',
-      );
+    final passwordError = AuthService.validatePassword(password);
+    if (passwordError != null) {
+      _showErrorModal('Weak Password', passwordError);
       return;
     }
 
@@ -144,7 +142,7 @@ class _RegistrationCompletionScreenState
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.18),
+                      color: AppColors.primary.withValues(alpha: 0.2),
                     ),
                 ),
                 child: Row(

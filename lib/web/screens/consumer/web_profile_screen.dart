@@ -54,7 +54,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     )..forward();
     final auth = AuthService();
     _registrationStatusSubscription =
-        SupabaseDB.watchFarmerRegistrationStatus(auth.userId).listen((status) {
+        SupabaseDatabase.watchFarmerRegistrationStatus(auth.userId).listen((status) {
           if (!mounted) return;
           setState(() {
             _registrationStatus = status;
@@ -70,96 +70,116 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   }
 
   void _handleStartSelling() {
-    if (_registrationStatus == 'pending') {
-      _showPendingDialog();
-    } else if (_registrationStatus == 'rejected') {
-      // Rejected applications should always be allowed to re-apply.
-      context.push(
-        AppRoutes.webFarmerRegister,
-        extra: () async {
-          widget.onModeChanged();
-        },
-      );
-    } else {
-      context.push(
-        AppRoutes.webFarmerRegister,
-        extra: () async {
-          widget.onModeChanged();
-        },
-      );
-    }
+    // Show redirect dialog to mobile app as per modernization plan
+    _showMobileOnlyDialog();
   }
 
-  void _showPendingDialog() {
+  void _showMobileOnlyDialog() {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          width: 400,
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.smartphone_rounded,
+                  size: 56,
+                  color: primary,
+                ),
               ),
-              child: Icon(
-                Icons.hourglass_bottom_rounded,
-                size: 56,
-                color: Colors.orange[400],
+              const SizedBox(height: 24),
+              Text(
+                'Farmer Registration is Mobile-Only',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: _dark,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Pending Admin Approval',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: _dark,
+              const SizedBox(height: 12),
+              Text(
+                'To ensure the best experience and verify your farm location, farmer registration is only available through our mobile app.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: _muted,
+                  height: 1.5,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Your farmer registration is under review. We will notify you as soon as it\'s approved.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 13,
-                color: _muted,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(
-                  onTap: () => Navigator.of(ctx).pop(),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.orange[400],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Got it',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () {
+                      // Note: In a real app we'd use url_launcher to open a real download link
+                      Navigator.of(ctx).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Redirecting to download...')),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [_accent, primary]),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: primary.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        'Download AgriDirect App',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(
+                  'Maybe Later',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _muted,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+
 
   Future<void> _confirmLogout() async {
     final shouldLogout = await showDialog<bool>(
@@ -322,7 +342,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         border: Border.all(color: _border.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -354,7 +374,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: isActive
-                          ? primary.withValues(alpha: 0.08)
+                          ? primary.withValues(alpha: 0.1)
                           : isHovered
                           ? _border.withValues(alpha: 0.5)
                           : Colors.transparent,
@@ -403,7 +423,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -418,7 +438,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               shape: BoxShape.circle,
               border: Border.all(color: primary, width: 3),
               boxShadow: [
-                BoxShadow(color: primary.withValues(alpha: 0.2), blurRadius: 16),
+                BoxShadow(color: primary.withValues(alpha: 0.3), blurRadius: 16),
               ],
             ),
             child: ClipOval(
@@ -450,7 +470,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: primary.withValues(alpha: 0.12),
+                color: primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
@@ -507,7 +527,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           border: Border.all(color: primary.withValues(alpha: 0.2)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -521,7 +541,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: primary.withValues(alpha: 0.12),
+                    color: primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
@@ -594,7 +614,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                   (isViewingAsFarmer
                                           ? const Color(0xFF3B82F6)
                                           : primary)
-                                      .withValues(alpha: 0.5),
+                                      .withValues(alpha: 0.4),
                               blurRadius: 16,
                               offset: const Offset(0, 8),
                             ),
@@ -655,10 +675,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           end: Alignment.bottomRight,
           colors: _registrationStatus == 'pending'
               ? [
-                  Colors.orange.withValues(alpha: 0.1),
-                  Colors.orange.withValues(alpha: 0.03),
+                  Colors.orange.withValues(alpha: 0.05),
+                  Colors.orange.withValues(alpha: 0.02),
                 ]
-              : [primary.withValues(alpha: 0.1), primary.withValues(alpha: 0.03)],
+              : [primary.withValues(alpha: 0.05), primary.withValues(alpha: 0.02)],
         ),
         border: Border.all(
           color: _registrationStatus == 'pending'
@@ -677,8 +697,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   : Icons.agriculture_rounded,
               size: 140,
               color: _registrationStatus == 'pending'
-                  ? Colors.orange.withValues(alpha: 0.08)
-                  : primary.withValues(alpha: 0.08),
+                  ? Colors.orange.withValues(alpha: 0.1)
+                  : primary.withValues(alpha: 0.1),
             ),
           ),
           Column(
@@ -690,8 +710,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: _registrationStatus == 'pending'
-                          ? Colors.orange.withValues(alpha: 0.15)
-                          : primary.withValues(alpha: 0.15),
+                          ? Colors.orange.withValues(alpha: 0.1)
+                          : primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(
@@ -755,7 +775,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     children: [
@@ -797,7 +817,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         boxShadow: _hoveredButtons.contains(1)
                             ? [
                                 BoxShadow(
-                                  color: primary.withValues(alpha: 0.5),
+                                  color: primary.withValues(alpha: 0.4),
                                   blurRadius: 20,
                                   offset: const Offset(0, 10),
                                 ),
@@ -890,7 +910,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),

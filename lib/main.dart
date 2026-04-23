@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'shared/styles/app_theme.dart';
 
@@ -21,6 +23,7 @@ import 'shared/services/offline/offline_queue_service.dart';
 import 'shared/services/community/notification_service.dart';
 import 'shared/router/app_router.dart';
 import 'shared/services/offline/offline_cache_service.dart';
+import 'shared/services/integration/weather_alert_service.dart';
 import 'shared/utils/url_strategy.dart';
 import 'mobile/screens/common/loading_screen.dart';
 
@@ -105,7 +108,9 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     }
 
     try {
-      await dotenv.load(fileName: kIsWeb ? '.env.web' : '.env');
+      final envFile = kIsWeb ? '.env.web' : '.env';
+      debugPrint('🚀 Loading environment: $envFile');
+      await dotenv.load(fileName: envFile);
     } catch (e) {
       try {
         await dotenv.load(fileName: '.env');
@@ -229,8 +234,10 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
   final AnalyticsService _analyticsService = AnalyticsService();
   OfflineProductService? _offlineProductService;
   late final _AppLifecycleObserver _lifecycleObserver;
+  StreamSubscription<AuthState>? _authStateSubscription;
   bool _sessionStartedByLifecycle = false;
   bool _isDatabaseSyncRunning = false;
+  Timer? _weatherCheckTimer;
 
   @override
   void initState() {
@@ -242,6 +249,25 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
     _initializeDatabaseSync();
     _initializeOfflineProductSync();
     _initializeAppSession();
+    _initializeWeatherAlerts();
+    _authStateSubscription = SupabaseConfig.client.auth.onAuthStateChange.listen((
+      data,
+    ) async {
+      final event = data.event;
+      debugPrint('🔔 Auth State Change: $event');
+
+      if (event == AuthChangeEvent.signedIn) {
+        debugPrint('🔵 User signed in, initializing auth service...');
+        await _auth.initialize();
+      } else if (event == AuthChangeEvent.signedOut) {
+        debugPrint('🟠 User signed out, cleaning up...');
+        await _auth.initialize();
+      } else if (event == AuthChangeEvent.tokenRefreshed ||
+          event == AuthChangeEvent.userUpdated ||
+          event == AuthChangeEvent.initialSession) {
+        await _auth.initialize();
+      }
+    });
   }
 
   void _handleAuthSyncState() {
@@ -322,6 +348,18 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
     }
   }
 
+  Future<void> _initializeWeatherAlerts() async {
+    // Initial check
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WeatherAlertService().checkWeatherAndNotify();
+    });
+
+    // Periodic check every 6 hours
+    _weatherCheckTimer = Timer.periodic(const Duration(hours: 6), (_) {
+      WeatherAlertService().checkWeatherAndNotify();
+    });
+  }
+
   Future<void> _initializeNotifications() async {
     try {
       // Initialize notification service
@@ -342,7 +380,9 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
     _offlineProductService?.pendingProductsCount.dispose();
     _offlineProductService?.isSyncing.dispose();
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
+    _authStateSubscription?.cancel();
     _analyticsService.dispose();
+    _weatherCheckTimer?.cancel();
     super.dispose();
   }
 

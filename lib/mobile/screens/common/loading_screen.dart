@@ -223,9 +223,9 @@ class _LoadingScreenState extends State<LoadingScreen>
             final dy = (t * constraints.maxHeight + (baseY * constraints.maxHeight)) % constraints.maxHeight;
             
             // Fade particles in and out at top/bottom
-            double opacity = 0.1 + 0.2 * math.sin(t * 2 * math.pi + phase);
-            if (dy < 100) opacity *= (dy / 100);
-            if (dy > constraints.maxHeight - 100) opacity *= ((constraints.maxHeight - dy) / 100);
+            double particleOpacity = 0.1 + 0.2 * math.sin(t * 2 * math.pi + phase);
+            if (dy < 100) particleOpacity *= (dy / 100);
+            if (dy > constraints.maxHeight - 100) particleOpacity *= ((constraints.maxHeight - dy) / 100);
 
             return Stack(
               children: [
@@ -237,10 +237,10 @@ class _LoadingScreenState extends State<LoadingScreen>
                     height: particleSize,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: opacity.clamp(0.0, 1.0)),
+                      color: Colors.white.withValues(alpha: particleOpacity.clamp(0.0, 1.0)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.white.withValues(alpha: opacity * 0.5),
+                          color: Colors.white.withValues(alpha: 0.2),
                           blurRadius: 4,
                         ),
                       ],
@@ -260,20 +260,23 @@ class _LoadingScreenState extends State<LoadingScreen>
       alignment: Alignment.center,
       children: [
         // Pulsing glow
-        ScaleTransition(
-          scale: _glowScale,
-          child: Container(
-            width: 140,
-            height: 140,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF13EC5B).withValues(alpha: _glowOpacity.value),
-                  blurRadius: 60,
-                  spreadRadius: 10,
-                ),
-              ],
+        FadeTransition(
+          opacity: _glowOpacity,
+          child: ScaleTransition(
+            scale: _glowScale,
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF13EC5B).withValues(alpha: 0.3),
+                    blurRadius: 60,
+                    spreadRadius: 10,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -311,7 +314,7 @@ class _LoadingScreenState extends State<LoadingScreen>
               letterSpacing: 4.0,
               shadows: [
                 Shadow(
-                  color: Colors.black.withValues(alpha: 0.3),
+                  color: Colors.black.withValues(alpha: 0.5),
                   offset: const Offset(0, 2),
                   blurRadius: 4,
                 ),
@@ -335,7 +338,7 @@ class _LoadingScreenState extends State<LoadingScreen>
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w400,
-              color: Colors.white.withValues(alpha: 0.5),
+              color: Colors.white.withValues(alpha: 0.7),
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -355,10 +358,10 @@ class _LoadingScreenState extends State<LoadingScreen>
             width: 200,
             height: 6,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: Colors.white.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.05),
+                color: Colors.white.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -383,7 +386,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF13EC5B).withValues(alpha: 0.4),
+                              color: const Color(0xFF13EC5B).withValues(alpha: 0.5),
                               blurRadius: 10,
                             ),
                           ],
@@ -403,11 +406,11 @@ class _LoadingScreenState extends State<LoadingScreen>
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  Colors.white.withValues(alpha: 0),
-                                  Colors.white.withValues(alpha: 0.2),
-                                  Colors.white.withValues(alpha: 0),
-                                  ],
-                                ),
+                                  Colors.white.withValues(alpha: 0.0),
+                                  Colors.white.withValues(alpha: 0.3),
+                                  Colors.white.withValues(alpha: 0.0),
+                                ],
+                              ),
                             ),
                           ),
                         );
@@ -424,7 +427,7 @@ class _LoadingScreenState extends State<LoadingScreen>
             style: GoogleFonts.inter(
               fontSize: 10,
               fontWeight: FontWeight.w800,
-              color: Colors.white.withValues(alpha: 0.3),
+              color: Colors.white.withValues(alpha: 0.6),
               letterSpacing: 2.0,
             ),
           ),
@@ -442,9 +445,9 @@ class _LoadingScreenState extends State<LoadingScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.03),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
             ),
             child: Row(
               children: [
@@ -459,7 +462,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                   style: GoogleFonts.inter(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: Colors.white.withValues(alpha: 0.8),
                     letterSpacing: 0.5,
                   ),
                 ),

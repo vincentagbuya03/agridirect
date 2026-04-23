@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../core/supabase_config.dart';
 
@@ -21,6 +22,15 @@ class AdminService extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   String? _currentAdminId;
+
+  final ValueNotifier<int> _dataVersion = ValueNotifier<int>(0);
+  ValueListenable<int> get dataVersionListenable => _dataVersion;
+
+  void _notifyDataChanged() {
+    _dataVersion.value++;
+    notifyListeners();
+  }
+
 
   Future<String?> _resolveCurrentAdminId() async {
     if (_currentAdminId != null && _currentAdminId!.trim().isNotEmpty) {
@@ -222,7 +232,7 @@ class AdminService extends ChangeNotifier {
   /// Check if current user is admin
   Future<bool> isUserAdmin(String userId) async {
     try {
-      return await SupabaseDB.hasRole(userId: userId, roleName: 'admin');
+      return await SupabaseDatabase.hasRole(userId: userId, roleName: 'admin');
     } catch (e) {
       debugPrint('Error checking admin status: $e');
       return false;
@@ -339,9 +349,9 @@ class AdminService extends ChangeNotifier {
   }) async {
     try {
       if (newRole == 'admin') {
-        await SupabaseDB.addUserRole(userId: userId, roleName: 'admin');
+        await SupabaseDatabase.addUserRole(userId: userId, roleName: 'admin');
       } else if (newRole == 'consumer') {
-        await SupabaseDB.removeUserRole(userId: userId, roleName: 'admin');
+        await SupabaseDatabase.removeUserRole(userId: userId, roleName: 'admin');
       }
 
       await _logAdminAction(
@@ -589,7 +599,7 @@ class AdminService extends ChangeNotifier {
   /// Promote user to admin
   Future<bool> promoteToAdmin(String userId) async {
     try {
-      await SupabaseDB.addUserRole(userId: userId, roleName: 'admin');
+      await SupabaseDatabase.addUserRole(userId: userId, roleName: 'admin');
 
       await _logAdminAction(
         'promote_to_admin',
@@ -608,7 +618,7 @@ class AdminService extends ChangeNotifier {
   /// Remove admin role
   Future<bool> removeAdminRole(String userId) async {
     try {
-      await SupabaseDB.removeUserRole(userId: userId, roleName: 'admin');
+      await SupabaseDatabase.removeUserRole(userId: userId, roleName: 'admin');
 
       await _logAdminAction('remove_admin_role', 'Admin role removed', userId);
       notifyListeners();
@@ -1191,7 +1201,7 @@ class AdminService extends ChangeNotifier {
 
       if (targetUserId.isNotEmpty) {
         // Grant seller role to the user upon approval
-        await SupabaseDB.addUserRole(userId: targetUserId, roleName: 'seller');
+        await SupabaseDatabase.addUserRole(userId: targetUserId, roleName: 'seller');
 
         unawaited(
           _sendFarmerApprovalNotification(
@@ -1517,7 +1527,7 @@ class AdminService extends ChangeNotifier {
       final response = await _client
           .from('categories')
           .select(
-            'category_id, name, description, icon, image_url, is_active, parent_category_id, created_at',
+            'category_id, name, description, is_active, parent_category_id, created_at',
           )
           .order('name');
       return List<Map<String, dynamic>>.from(response);
@@ -1531,21 +1541,17 @@ class AdminService extends ChangeNotifier {
   Future<bool> createCategory({
     required String name,
     String? description,
-    String? icon,
-    String? imageUrl,
     String? parentCategoryId,
   }) async {
     try {
       await _client.from('categories').insert({
         'name': name,
         'description': description,
-        'icon': icon,
-        'image_url': imageUrl,
         'parent_category_id': parentCategoryId,
         'is_active': true,
       });
       await _logAdminAction('create_category', 'Created category: $name', null);
-      notifyListeners();
+      _notifyDataChanged();
       return true;
     } catch (e) {
       _errorMessage = 'Failed to create category: $e';
@@ -1558,16 +1564,12 @@ class AdminService extends ChangeNotifier {
     required String categoryId,
     String? name,
     String? description,
-    String? icon,
-    String? imageUrl,
     bool? isActive,
   }) async {
     try {
       final updates = <String, dynamic>{};
       if (name != null) updates['name'] = name;
       if (description != null) updates['description'] = description;
-      if (icon != null) updates['icon'] = icon;
-      if (imageUrl != null) updates['image_url'] = imageUrl;
       if (isActive != null) updates['is_active'] = isActive;
 
       await _client
@@ -1575,7 +1577,7 @@ class AdminService extends ChangeNotifier {
           .update(updates)
           .eq('category_id', categoryId);
       await _logAdminAction('update_category', 'Updated category: $name', null);
-      notifyListeners();
+      _notifyDataChanged();
       return true;
     } catch (e) {
       _errorMessage = 'Failed to update category: $e';
@@ -2208,6 +2210,152 @@ class AdminService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error generating signed URL: $e');
+      return null;
+    }
+  }
+
+  // ========================================================================
+  // ARTICLE MANAGEMENT
+  // ========================================================================
+
+  /// Get all admin articles with pagination and filtering
+  Future<List<Map<String, dynamic>>> getAllArticles({
+    int page = 0,
+    int pageSize = 10,
+    String? status,
+  }) async {
+    try {
+      var query = _client.from('admin_articles').select('*');
+
+      if (status != null && status != 'All Content') {
+        if (status == 'Published') {
+          query = query.eq('is_published', true);
+        } else if (status == 'Drafts') {
+          query = query.eq('is_published', false);
+        }
+      }
+
+      final response = await query
+          .order('created_at', ascending: false)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      _errorMessage = 'Failed to load articles: $e';
+      return [];
+    }
+  }
+
+  /// Create a new article
+  Future<bool> createArticle({
+    required String title,
+    required String summary,
+    required String body,
+    String? category,
+    String? coverImageUrl,
+    bool isPublished = false,
+  }) async {
+    try {
+      final adminId = await _resolveCurrentAdminId();
+      if (adminId == null) throw Exception('Admin ID not found');
+
+      await _client.from('admin_articles').insert({
+        'title': title,
+        'summary': summary,
+        'body': body,
+        'category': category,
+        'cover_image_url': coverImageUrl,
+        'is_published': isPublished,
+        'admin_id': adminId,
+        'published_at': isPublished ? DateTime.now().toIso8601String() : null,
+      });
+
+      await _logAdminAction('create_article', 'Created article: $title', null);
+      _notifyDataChanged();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to create article: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Update article publication status
+  Future<bool> updateArticleStatus(String articleId, bool isPublished) async {
+    try {
+      await _client.from('admin_articles').update({
+        'is_published': isPublished,
+        'published_at': isPublished ? DateTime.now().toIso8601String() : null,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('article_id', articleId);
+
+      await _logAdminAction(
+        isPublished ? 'publish_article' : 'unpublish_article',
+        'Updated article status',
+        null,
+      );
+      _notifyDataChanged();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to update article: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Delete article
+  Future<bool> deleteArticle(String articleId) async {
+    try {
+      await _client.from('admin_articles').delete().eq('article_id', articleId);
+      await _logAdminAction('delete_article', 'Deleted article', null);
+      _notifyDataChanged();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to delete article: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Get article stats
+  Future<Map<String, dynamic>> getArticleStats() async {
+    try {
+      final results = await Future.wait([
+        _client.from('admin_articles').select('article_id'),
+        _client
+            .from('admin_articles')
+            .select('article_id')
+            .eq('is_published', true),
+      ]);
+
+      final total = (results[0] as List).length;
+      final published = (results[1] as List).length;
+
+      return {
+        'total': total,
+        'published': published,
+        'drafts': total - published,
+        'views':
+            '4.5K', // Still a placeholder until we have a view tracking table
+      };
+    } catch (e) {
+      return {'total': 0, 'published': 0, 'drafts': 0, 'views': '0'};
+    }
+  }
+
+  /// Upload article cover image
+  Future<String?> uploadArticleCover(dynamic bytes, String fileName) async {
+    try {
+      final path = 'articles/$fileName';
+      if (bytes is List<int>) {
+        await _client.storage.from('uploads').uploadBinary(path, Uint8List.fromList(bytes));
+      } else {
+        // Handle other types if necessary
+        return null;
+      }
+      return _client.storage.from('uploads').getPublicUrl(path);
+    } catch (e) {
+      debugPrint('Error uploading article cover: $e');
       return null;
     }
   }

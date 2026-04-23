@@ -41,7 +41,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textHeadline.withValues(alpha: 0.03),
+            color: AppColors.textHeadline.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -92,7 +92,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
       ),
       child: Icon(icon, color: AppColors.textHeadline, size: 20),
     );
@@ -105,7 +105,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: List.generate(_tabs.length, (i) {
@@ -121,7 +121,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: isSelected ? [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.2),
+                      color: AppColors.primary.withValues(alpha: 0.3),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     )
@@ -174,14 +174,14 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
+          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.1)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.2),
+            color: AppColors.primary.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -196,7 +196,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
               Text(
                 'TODAY\'S REVENUE',
                 style: AppTextStyles.labelSmall.copyWith(
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1,
                 ),
@@ -229,7 +229,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
+        color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -269,7 +269,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                       padding: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.1), width: 2),
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 2),
                       ),
                       child: ClipOval(
                         child: CachedNetworkImage(
@@ -348,7 +348,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: AppColors.textHeadline.withValues(alpha: 0.02),
+              color: AppColors.textHeadline.withValues(alpha: 0.05),
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(24),
                 bottomRight: Radius.circular(24),
@@ -368,7 +368,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+                    border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.more_vert_rounded, size: 20, color: AppColors.textSubtle),
@@ -391,7 +391,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            border: isPrimary ? null : Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+            border: isPrimary ? null : Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -422,10 +422,10 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
             Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.05),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.receipt_long_outlined, size: 64, color: AppColors.primary.withValues(alpha: 0.2)),
+              child: Icon(Icons.receipt_long_outlined, size: 64, color: AppColors.primary.withValues(alpha: 0.3)),
             ),
             const SizedBox(height: 24),
             Text(

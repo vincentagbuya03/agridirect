@@ -254,6 +254,10 @@ Deno.serve(async (request: Request) => {
     const body = payload.body?.trim();
     const notificationCode = payload.notificationCode?.trim() || "general";
 
+    console.log(`--- NEW NOTIFICATION REQUEST ---`);
+    console.log(`Target User: ${targetUserId}`);
+    console.log(`Title: ${title}`);
+
     if (!targetUserId || !title || !body) {
       return new Response(
         JSON.stringify({
@@ -312,6 +316,7 @@ Deno.serve(async (request: Request) => {
     }
 
     if (!tokenRows || tokenRows.length === 0) {
+      console.log(`[!] No active tokens found for user ${targetUserId}`);
       return new Response(
         JSON.stringify({
           success: true,
@@ -327,6 +332,7 @@ Deno.serve(async (request: Request) => {
       );
     }
 
+    console.log(`[+] Found ${tokenRows.length} active tokens. Attempting FCM send...`);
     const accessToken = await getGoogleAccessToken();
     const sendResults = await Promise.all(
       tokenRows.map(async (tokenRow) => {
@@ -367,6 +373,8 @@ Deno.serve(async (request: Request) => {
 
         const responseText = await fcmResponse.text();
         const ok = fcmResponse.ok;
+
+        console.log(`FCM Result for ${tokenRow.token_id}: OK=${ok}, Response=${responseText}`);
 
         if (!ok && responseText.includes("UNREGISTERED")) {
           await adminClient

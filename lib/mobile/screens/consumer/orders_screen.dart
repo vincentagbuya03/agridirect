@@ -16,9 +16,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
   int _selectedTab = 0;
   final _tabs = ['Active', 'Completed', 'Cancelled'];
 
+  late Stream<List<Order>> _ordersStream;
+
   @override
   void initState() {
     super.initState();
+    _ordersStream = OrderService().watchMyOrders();
   }
 
   @override
@@ -46,7 +49,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textHeadline.withValues(alpha: 0.03),
+            color: AppColors.textHeadline.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -80,7 +83,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.background,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+                  border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.1)),
                 ),
                 child: TextField(
                   decoration: InputDecoration(
@@ -105,7 +108,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.1)),
       ),
       child: Stack(
         children: [
@@ -146,7 +149,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: isSelected ? [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.2),
+                      color: AppColors.primary.withValues(alpha: 0.3),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     )
@@ -170,7 +173,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _buildOrdersList() {
     return StreamBuilder<List<Order>>(
-      stream: OrderService().watchMyOrders(),
+      stream: _ordersStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator(color: AppColors.primary));
@@ -183,7 +186,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.history_rounded, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.2)),
+                Icon(Icons.history_rounded, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.5)),
                 const SizedBox(height: 16),
                 Text(
                   'No orders found',
@@ -211,7 +214,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.history_rounded, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.2)),
+                Icon(Icons.history_rounded, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.5)),
                 const SizedBox(height: 16),
                 Text(
                   'No ${_tabs[_selectedTab].toLowerCase()} orders',
@@ -353,7 +356,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 6,
-              backgroundColor: statusColor.withValues(alpha: 0.05),
+              backgroundColor: statusColor.withValues(alpha: 0.2),
               valueColor: AlwaysStoppedAnimation<Color>(statusColor),
             ),
           ),
@@ -364,7 +367,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 child: ElevatedButton(
                   onPressed: () {},
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                     foregroundColor: AppColors.primary,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -379,7 +382,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+                  border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.1)),
                 ),
                 child: const Icon(Icons.messenger_outline_rounded, size: 20, color: AppColors.textHeadline),
               ),

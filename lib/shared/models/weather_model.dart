@@ -107,14 +107,41 @@ class ForecastData {
   }
 }
 
+class DailyAdvisory {
+  final String day;
+  final String condition;
+  final String message;
+  final bool isSevere;
+
+  DailyAdvisory({
+    required this.day,
+    required this.condition,
+    required this.message,
+    required this.isSevere,
+  });
+
+  factory DailyAdvisory.fromJson(Map<String, dynamic> json) {
+    return DailyAdvisory(
+      day: json['day'] ?? '',
+      condition: json['condition'] ?? '',
+      message: json['message'] ?? '',
+      isSevere: json['is_severe'] ?? false,
+    );
+  }
+}
+
 /// Weather Forecast Model for 5-day forecast
 class WeatherForecast {
   final String location;
   final List<ForecastData> forecasts;
+  final List<WeatherAlert> alerts;
+  final List<DailyAdvisory> dailyAdvisories;
 
   WeatherForecast({
     required this.location,
     required this.forecasts,
+    this.alerts = const [],
+    this.dailyAdvisories = const [],
   });
 
   factory WeatherForecast.fromJson(Map<String, dynamic> json) {
@@ -125,9 +152,40 @@ class WeatherForecast {
       forecasts.add(ForecastData.fromJson(item as Map<String, dynamic>));
     }
 
+    final alerts = <WeatherAlert>[];
+    final dailyAdvisories = <DailyAdvisory>[];
+
+    if (json['agridirect_alerts'] != null) {
+      final emergency = json['agridirect_alerts'];
+      
+      // Parse main alerts
+      if (emergency['is_emergency'] == true) {
+        alerts.add(
+          WeatherAlert(
+            title: emergency['title'] ?? '⚠️ Advance Warning',
+            description: emergency['message'] ?? 'Upcoming weather changes detected.',
+            type: emergency['category']?.toLowerCase() ?? 'wind',
+            severity: 0.9,
+            timestamp: emergency['check_time'] ?? DateTime.now().toString(),
+            recommendation: 'Plan your farm activities accordingly to minimize crop loss.',
+          ),
+        );
+      }
+
+      // Parse daily advisories
+      if (emergency['daily_advisories'] != null) {
+        final advisoriesList = emergency['daily_advisories'] as List<dynamic>;
+        for (final item in advisoriesList) {
+          dailyAdvisories.add(DailyAdvisory.fromJson(item as Map<String, dynamic>));
+        }
+      }
+    }
+
     return WeatherForecast(
-      location: json['city']['name'] ?? 'Unknown',
+      location: json['city']?['name'] ?? 'Unknown',
       forecasts: forecasts,
+      alerts: alerts,
+      dailyAdvisories: dailyAdvisories,
     );
   }
 
@@ -187,6 +245,25 @@ class WeatherData {
   });
 
   factory WeatherData.fromJson(Map<String, dynamic> json) {
+    final alerts = <WeatherAlert>[];
+
+    // Check for emergency alerts from our Supabase Edge Function
+    if (json['agridirect_alerts'] != null) {
+      final emergency = json['agridirect_alerts'];
+      if (emergency['is_emergency'] == true) {
+        alerts.add(
+          WeatherAlert(
+            title: emergency['title'] ?? '⚠️ Weather Emergency',
+            description: emergency['message'] ?? 'Severe weather conditions detected.',
+            type: emergency['category']?.toLowerCase() ?? 'wind',
+            severity: 1.0,
+            timestamp: emergency['check_time'] ?? DateTime.now().toString(),
+            recommendation: 'Please follow the instructions in the description above.',
+          ),
+        );
+      }
+    }
+
     return WeatherData(
       location: json['name'] ?? 'Unknown',
       temperature: (json['main']['temp'] as num).toDouble(),
@@ -197,7 +274,7 @@ class WeatherData {
       pressure: (json['main']['pressure'] as num).toDouble(),
       description: json['weather'][0]['main'] ?? 'Clear',
       icon: json['weather'][0]['icon'] ?? '01d',
-      alerts: [],
+      alerts: alerts,
     );
   }
 

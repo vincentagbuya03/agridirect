@@ -1,44 +1,37 @@
+# Standard ignores for Flutter Web on Vercel
 .git/
 .vscode/
 .idea/
-
-# Local env files
-
-.env
-.env.\*
-!.env.web
-!.env.local
-
-# Flutter and Dart artifacts
-
-build/
+node_modules/
+.vercel/
 .dart_tool/
+.gradle-user-home/
 .pub/
 .pub-cache/
-.flutter-plugins
-.flutter-plugins-dependencies
+build/
+android/
+ios/
+windows/
+linux/
+macos/
+.venv/
+artifacts/
+supabase/
+agridirect-8592b-firebase-adminsdk-fbsvc-28228d65df.json
+.env.local
+.env.vercel.production
 
-# Android/iOS local build artifacts
+# Ignore large binary files
+# Keep only the website download APKs in the Vercel payload.
+*.apk
+!web/AgriDirect-Installer.apk
+!web/AgriDirect-Installer-legacy.apk
+!web/AgriDirect-Installer-x86_64.apk
+*.zip
+*.exe
+*.msi
+*.dmg
+*.tar.gz
 
-android/.gradle/
-android/build/
-ios/Pods/
-ios/Flutter/
-ios/build/
-
-# Node dependencies
-
-node_modules/
-
-# Supabase local artifacts (not needed for web deploy payload)
-
-supabase/.temp/
-
-# Large generated web output from old flow
-
-docs/
-
-# Misc
-
-_.log
-_.tmp
+# Ignore local SDK clones if they exist
+flutter-sdk/

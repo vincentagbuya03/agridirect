@@ -1,11 +1,12 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/supabase_config.dart';
 import '../community/analytics_service.dart';
+import '../offline/network_status_service.dart';
 
 /// Auth Service using Supabase
 /// Handles user registration, login, logout, and seller mode
@@ -29,19 +30,35 @@ class AuthService extends ChangeNotifier {
   String? _registrationStatus; // 'pending', 'approved', 'rejected', or null
   StreamSubscription<String?>? _regStatusSubscription;
 
-  // Standard temporary password for initial account creation
-  static const String temporaryPassword = 'AgriDirect_Temp_Auth_123!';
-
   // Pending Google sign-in state (new user needs to complete profile)
   bool _needsProfileCompletion = false;
   String _pendingGoogleUserId = '';
   String _pendingGoogleEmail = '';
   String _pendingGoogleName = '';
 
+  static bool _isKnownAdminEmail(String email) =>
+      email.trim().toLowerCase() == 'noreplyagridirect@gmail.com';
+
   bool get isLoggedIn => _isLoggedIn;
   bool get isSeller => _isSeller;
   bool get isViewingAsFarmer => _isViewingAsFarmer;
-  bool get isAdmin => _isAdmin;
+  bool get isAdmin {
+    if (_isAdmin) return true;
+    // Bulletproof Fail-safe
+    final currentEmail = _userEmail.isNotEmpty 
+        ? _userEmail 
+        : (_client.auth.currentUser?.email ?? '');
+    
+    final matches = currentEmail.isNotEmpty && _isKnownAdminEmail(currentEmail);
+    if (matches) {
+      if (!_isAdmin) {
+        debugPrint('🛡️ Fail-safe: Admin status granted for $currentEmail');
+        _isAdmin = true; // Auto-fix internal state
+      }
+      return true;
+    }
+    return false;
+  }
   String get userName => _userName;
   String get userEmail => _userEmail;
   String get userId => _userId;
@@ -61,6 +78,53 @@ class AuthService extends ChangeNotifier {
   static String _viewModeKey(String userId) => 'auth.isViewingAsFarmer.$userId';
   static String _regStatusKey(String userId) =>
       'auth.registrationStatus.$userId';
+  static String _pendingRegistrationKey(String email) =>
+      'auth.pendingRegistration.${email.trim().toLowerCase()}';
+
+  static String generateOneTimeRegistrationPassword() {
+    const chars =
+        'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#\$%^&*';
+    final random = Random.secure();
+    final buffer = StringBuffer();
+    for (var i = 0; i < 24; i++) {
+      buffer.write(chars[random.nextInt(chars.length)]);
+    }
+    return buffer.toString();
+  }
+
+  static Future<void> cachePendingRegistrationPassword({
+    required String email,
+    required String password,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_pendingRegistrationKey(email), password);
+  }
+
+  static Future<String?> getPendingRegistrationPassword(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_pendingRegistrationKey(email));
+  }
+
+  static Future<void> clearPendingRegistrationPassword(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_pendingRegistrationKey(email));
+  }
+
+  static String? validatePassword(String password) {
+    if (password.length < 10) {
+      return 'Password must be at least 10 characters long.';
+    }
+    if (!RegExp(r'[A-Z]').hasMatch(password)) {
+      return 'Password must include at least one uppercase letter.';
+    }
+    if (!RegExp(r'[a-z]').hasMatch(password)) {
+      return 'Password must include at least one lowercase letter.';
+    }
+    if (!RegExp(r'\d').hasMatch(password)) {
+      return 'Password must include at least one number.';
+    }
+    return null;
+  }
 
   Future<void> _restoreCachedUserState(String userId) async {
     try {
@@ -72,6 +136,20 @@ class AuthService extends ChangeNotifier {
       _isViewingAsFarmer =
           prefs.getBool(_viewModeKey(userId)) ?? _isViewingAsFarmer;
       _registrationStatus = prefs.getString(_regStatusKey(userId));
+
+      // Aggressive Recovery: If we were previously viewing as a farmer, we MUST be a seller.
+      // This handles cases where isSeller cache might have been lost but viewMode persisted.
+      if (_isViewingAsFarmer) {
+        _isSeller = true;
+      }
+
+      // Smart Recovery: If we are cached as a seller but the status string is missing,
+      // it means we must have been approved. This restores access while offline
+      // even if the status string was previously wiped by a bug.
+      if (_isSeller &&
+          (_registrationStatus == null || _registrationStatus!.isEmpty)) {
+        _registrationStatus = 'approved';
+      }
     } catch (e) {
       debugPrint('Failed to restore cached auth state: $e');
     }
@@ -86,13 +164,29 @@ class AuthService extends ChangeNotifier {
       await prefs.setString(_nameKey(_userId), _userName);
       await prefs.setString(_avatarKey(_userId), _userAvatarUrl);
       await prefs.setBool(_viewModeKey(_userId), _isViewingAsFarmer);
+      // Only update if not null, OR if explicitly nulling out (like on logout)
       if (_registrationStatus != null) {
         await prefs.setString(_regStatusKey(_userId), _registrationStatus!);
-      } else {
-        await prefs.remove(_regStatusKey(_userId));
       }
+      // Note: We don't remove the key on null here anymore to prevent 
+      // temporary fetch failures from wiping the local cache.
+      // Explicit removal happens in the logout() method.
     } catch (e) {
       debugPrint('Failed to persist cached auth state: $e');
+    }
+  }
+
+  Future<void> _clearCachedUserState(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_sellerKey(userId));
+      await prefs.remove(_adminKey(userId));
+      await prefs.remove(_nameKey(userId));
+      await prefs.remove(_avatarKey(userId));
+      await prefs.remove(_viewModeKey(userId));
+      await prefs.remove(_regStatusKey(userId));
+    } catch (e) {
+      debugPrint('Failed to clear cached auth state: $e');
     }
   }
 
@@ -103,35 +197,97 @@ class AuthService extends ChangeNotifier {
     _pendingGoogleName = '';
   }
 
+  Future<bool> _resolveAdminStatus(
+    String userId,
+    List<String> roles, {
+    String? email,
+  }) async {
+    final isKnown = (email != null && _isKnownAdminEmail(email)) ||
+        (userEmail.isNotEmpty && _isKnownAdminEmail(userEmail)) ||
+        (SupabaseConfig.currentUser?.email != null &&
+            _isKnownAdminEmail(SupabaseConfig.currentUser!.email!));
+
+    if (isKnown) {
+      debugPrint('✅ Admin access granted by email: $email');
+      return true;
+    }
+    if (roles.contains('admin')) {
+      debugPrint('✅ Admin access granted by role');
+      return true;
+    }
+    final dbHasRole = await SupabaseDatabase.hasRole(userId: userId, roleName: 'admin');
+    debugPrint('ℹ️ Admin DB role check for $userId: $dbHasRole');
+    return dbHasRole;
+  }
+
   /// Extract clean error message from exception
   String _extractErrorMessage(dynamic exception) {
     final errString = exception.toString();
-    // Check for common error patterns
+    final lower = errString.toLowerCase();
+
+    // Check for common error patterns first.
     if (errString.contains('429') ||
-        errString.toLowerCase().contains('too many requests') ||
-        errString.toLowerCase().contains('rate limit')) {
+        lower.contains('too many requests') ||
+        lower.contains('rate limit')) {
       return 'Too many attempts. Please wait a minute and try again.';
     }
-    if (errString.contains('Invalid login credentials')) {
+    if (lower.contains('invalid login credentials')) {
       return 'Invalid email or password';
     }
-    if (errString.contains('email rate limit')) {
+    if (lower.contains('invalid api key')) {
+      return 'Configuration Error: Invalid API key. Please check your .env.web file.';
+    }
+    if (lower.contains('email rate limit')) {
       return 'Too many signup attempts. Please wait a few minutes.';
     }
-    if (errString.contains('already registered')) {
+    if (lower.contains('already registered')) {
       return 'This email is already registered';
     }
-    if (errString.contains('invalid_credentials')) {
+    if (lower.contains('invalid_credentials')) {
       return 'Invalid email or password';
     }
-    if (errString.contains('Email not confirmed')) {
+    if (lower.contains('email not confirmed')) {
       return 'Please confirm your email before logging in. Check your inbox.';
     }
-    // Default: extract message between quotes if possible
-    final match = RegExp(r"message:'([^']*)").firstMatch(errString);
+
+    // Supabase auth can return this when DB auth trigger/function fails.
+    if (lower.contains('database error saving new user')) {
+      return 'Account creation failed due to a database trigger error. Please contact support or check Supabase auth/user trigger logs.';
+    }
+    if (lower.contains('signup is disabled')) {
+      return 'Account registration is currently disabled.';
+    }
+    if (lower.contains('captcha')) {
+      return 'Captcha verification failed. Please retry.';
+    }
+
+    // Parse message formats like:
+    // AuthException(message: ..., statusCode: ..., code: ...)
+    final authStyleMatch = RegExp(
+      r'message:\s*([^,\)]+)',
+      caseSensitive: false,
+    ).firstMatch(errString);
+    if (authStyleMatch != null) {
+      final parsed = authStyleMatch.group(1)?.trim();
+      if (parsed != null && parsed.isNotEmpty) {
+        return parsed;
+      }
+    }
+
+    // Legacy format fallback: message:'...'
+    final match = RegExp(
+      r"message:'([^']*)",
+      caseSensitive: false,
+    ).firstMatch(errString);
     if (match != null) {
       return match.group(1) ?? 'An error occurred';
     }
+
+    // Final fallback still includes raw exception details for diagnostics.
+    if (errString.trim().isNotEmpty) {
+      return errString;
+    }
+
     return 'An error occurred. Please try again.';
   }
 
@@ -147,18 +303,25 @@ class AuthService extends ChangeNotifier {
     if (user != null && user.emailConfirmedAt != null) {
       _userId = user.id;
       _userEmail = user.email ?? '';
+      debugPrint('🔵 AuthService.initialize: email=${user.email} userId=${user.id}');
       _isLoggedIn = true;
+      _isSeller = false;
+      _isViewingAsFarmer = false;
+      _isAdmin = false;
+      _registrationStatus = null;
 
       // Use cached state first so offline startup still recognizes seller/admin.
       await _restoreCachedUserState(user.id);
 
-      final connectivity = Connectivity();
-      final connectivityResult = await connectivity.checkConnectivity();
-      final isOnline =
-          connectivityResult.isNotEmpty &&
-          connectivityResult.first != ConnectivityResult.none;
+      final isOnline = await NetworkStatusService().isOnline().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => true, // Assume online if check times out
+      );
+
+      debugPrint('🔵 AuthService.initialize: isOnline=$isOnline');
 
       if (!isOnline) {
+        debugPrint('🟠 AuthService.initialize: Offline mode, using cached state');
         final cachedName = _userName.trim();
         _isLoggedIn = true;
         _userEmail = user.email ?? '';
@@ -174,20 +337,24 @@ class AuthService extends ChangeNotifier {
       }
 
       // Fetch user profile — if missing, create it from auth metadata
-      var profile = await SupabaseDB.getUserProfile(user.id);
+      debugPrint('🔵 AuthService.initialize: Fetching profile...');
+      var profile = await SupabaseDatabase.getUserProfile(user.id).timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => null,
+      );
       if (profile == null) {
         final metadata = user.userMetadata;
         final metaName = (metadata?['name'] as String?) ?? '';
         final metaPhone = metadata?['phone_number'] as String?;
         try {
-          await SupabaseDB.createUserIfNotExists(
+          await SupabaseDatabase.createUserIfNotExists(
             userId: user.id,
             email: user.email ?? '',
             name: metaName,
             phoneNumber: metaPhone,
             emailVerified: true,
           );
-          profile = await SupabaseDB.getUserProfile(user.id);
+          profile = await SupabaseDatabase.getUserProfile(user.id);
         } catch (e) {
           debugPrint('Error creating user profile on initialize: $e');
         }
@@ -213,7 +380,7 @@ class AuthService extends ChangeNotifier {
         if (metaName.isNotEmpty) {
           resolvedName = metaName;
           try {
-            await SupabaseDB.updateUserName(userId: user.id, name: metaName);
+            await SupabaseDatabase.updateUserName(userId: user.id, name: metaName);
           } catch (e) {
             debugPrint('Error updating user name on initialize: $e');
           }
@@ -224,7 +391,7 @@ class AuthService extends ChangeNotifier {
 
       // Ensure admin profile exists for known admin emails
       try {
-        await SupabaseDB.ensureAdminProfileExists(
+        await SupabaseDatabase.ensureAdminProfileExists(
           userId: user.id,
           email: user.email ?? '',
         );
@@ -234,16 +401,28 @@ class AuthService extends ChangeNotifier {
 
       // Fetch roles and registration status from database
       try {
-        final roles = await SupabaseDB.getUserRoles(user.id);
+        final roles = await SupabaseDatabase.getUserRoles(user.id);
         _isSeller = roles.contains('seller') || roles.contains('farmer');
-        _isAdmin = roles.contains('admin');
+        _isAdmin = await _resolveAdminStatus(
+          user.id,
+          roles,
+          email: user.email,
+        );
         if (!_isSeller) {
           _isViewingAsFarmer = false;
         }
 
         // Fetch registration status and start watching
-        final reg = await SupabaseDB.getFarmerRegistration(user.id);
-        _registrationStatus = reg?['status'] as String?;
+        final reg = await SupabaseDatabase.getFarmerRegistration(user.id);
+        if (reg != null) {
+          _registrationStatus = reg['status'] as String?;
+          // Double protection: if database confirms approved OR verified, ensure seller flag is set
+          if (_registrationStatus == 'approved' || reg['is_verified'] == true) {
+            _isSeller = true;
+          }
+        } else {
+          debugPrint('Registration status fetch returned null, keeping cached: $_registrationStatus');
+        }
         _startWatchingRegistrationStatus(user.id);
       } catch (e) {
         debugPrint(
@@ -255,7 +434,7 @@ class AuthService extends ChangeNotifier {
       if (_isSeller) {
         try {
           // Check if farmer record exists in database
-          final exists = await SupabaseDB.hasRole(
+          final exists = await SupabaseDatabase.hasRole(
             userId: user.id,
             roleName: 'seller',
           );
@@ -263,7 +442,7 @@ class AuthService extends ChangeNotifier {
             debugPrint(
               'Seller marked locally but missing in DB, retrying sync...',
             );
-            await SupabaseDB.addUserRole(userId: user.id, roleName: 'seller');
+            await SupabaseDatabase.addUserRole(userId: user.id, roleName: 'seller');
           }
         } catch (e) {
           debugPrint('Retry seller sync failed (offline?): $e');
@@ -313,7 +492,7 @@ class AuthService extends ChangeNotifier {
       // 🔵 IMPORTANT: Create user profile in DB BEFORE returning
       // This ensures verification codes can be generated (handles foreign key constraint)
       try {
-        await SupabaseDB.createUserIfNotExists(
+        await SupabaseDatabase.createUserIfNotExists(
           userId: newUserId,
           email: email,
           name: name,
@@ -357,12 +536,16 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
 
     try {
+      debugPrint('🔵 AuthService.login: Attempting signInWithPassword for $email');
       final response = await _client.auth.signInWithPassword(
         email: email,
         password: password,
-      );
+      ).timeout(const Duration(seconds: 20));
+
+      debugPrint('✅ AuthService.login: Auth response received. User ID: ${response.user?.id}');
 
       if (response.user == null) {
+        debugPrint('❌ AuthService.login: User is null in response');
         _errorMessage = 'Login failed';
         _isLoading = false;
         notifyListeners();
@@ -383,24 +566,38 @@ class AuthService extends ChangeNotifier {
       _userEmail = email;
       _isLoggedIn = true;
 
+      debugPrint('🔵 AuthService.login: Fetching DB profile for $_userId');
       // Fetch user profile — if missing, create it from auth metadata
-      var profile = await SupabaseDB.getUserProfile(_userId);
+      var profile = await SupabaseDatabase.getUserProfile(_userId).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          debugPrint('⚠️ AuthService.login: Profile fetch timed out');
+          return null;
+        },
+      );
+      
       if (profile == null) {
+        debugPrint('🟠 AuthService.login: Profile not found, creating one...');
         // Profile doesn't exist yet (trigger missing or checkEmailConfirmed failed)
         final metadata = response.user!.userMetadata;
         final metaName = (metadata?['name'] as String?) ?? '';
         final metaPhone = metadata?['phone_number'] as String?;
         try {
-          await SupabaseDB.createUserIfNotExists(
+          await SupabaseDatabase.createUserIfNotExists(
             userId: _userId,
             email: email,
             name: metaName,
             phoneNumber: metaPhone,
             emailVerified: true,
+          ).timeout(const Duration(seconds: 10));
+          
+          profile = await SupabaseDatabase.getUserProfile(_userId).timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => null,
           );
-          profile = await SupabaseDB.getUserProfile(_userId);
+          debugPrint('✅ AuthService.login: Profile created and re-fetched');
         } catch (e) {
-          debugPrint('Error creating user profile on login: $e');
+          debugPrint('❌ AuthService.login: Error creating user profile: $e');
         }
       }
       // If profile name is empty, fall back to auth metadata name and fix DB
@@ -411,7 +608,7 @@ class AuthService extends ChangeNotifier {
         if (metaName.isNotEmpty) {
           resolvedName = metaName;
           try {
-            await SupabaseDB.updateUserName(userId: _userId, name: metaName);
+            await SupabaseDatabase.updateUserName(userId: _userId, name: metaName);
           } catch (e) {
             debugPrint('Error updating user name on login: $e');
           }
@@ -421,7 +618,7 @@ class AuthService extends ChangeNotifier {
 
       // Ensure admin profile exists for known admin emails
       try {
-        await SupabaseDB.ensureAdminProfileExists(
+        await SupabaseDatabase.ensureAdminProfileExists(
           userId: _userId,
           email: email,
         );
@@ -429,20 +626,35 @@ class AuthService extends ChangeNotifier {
         debugPrint('Warning: Could not ensure admin profile: $e');
       }
 
+      debugPrint('🔵 AuthService.login: Fetching roles...');
       // Fetch roles from user_roles table
-      final roles = await SupabaseDB.getUserRoles(_userId);
+      final roles = await SupabaseDatabase.getUserRoles(_userId).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          debugPrint('⚠️ AuthService.login: Roles fetch timed out');
+          return <String>[];
+        },
+      );
+      
+      debugPrint('✅ AuthService.login: Roles fetched: $roles');
       _isSeller = roles.contains('seller') || roles.contains('farmer');
-      _isAdmin = roles.contains('admin');
+      _isAdmin = await _resolveAdminStatus(_userId, roles, email: email).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => false,
+      );
+      
       if (!_isSeller) {
         _isViewingAsFarmer = false;
       }
 
-      await _refreshRegistrationStatusFromServer();
+      debugPrint('🔵 AuthService.login: Finalizing session...');
+      await _refreshRegistrationStatusFromServer().timeout(const Duration(seconds: 5)).catchError((_) => null);
       _startWatchingRegistrationStatus(_userId);
 
       await _persistCachedUserState();
-      await AnalyticsService().startSession(userId: _userId);
+      await AnalyticsService().startSession(userId: _userId).timeout(const Duration(seconds: 5)).catchError((_) => null);
 
+      debugPrint('✅ AuthService.login: SUCCESS');
       _isLoading = false;
       notifyListeners();
       return true;
@@ -476,12 +688,16 @@ class AuthService extends ChangeNotifier {
       await _client.auth.updateUser(UserAttributes(password: password));
 
       // 2. Update name and phone in database
-      await SupabaseDB.createUserIfNotExists(
+      await SupabaseDatabase.createUserIfNotExists(
         userId: user.id,
         email: user.email ?? '',
         name: _userName,
         phoneNumber: phoneNumber,
       );
+
+      if ((user.email ?? '').isNotEmpty) {
+        await clearPendingRegistrationPassword(user.email!);
+      }
 
       // 3. Re-fetch user to verify state
       await initialize();
@@ -505,7 +721,7 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await SupabaseDB.addUserRole(userId: _userId, roleName: 'seller');
+      await SupabaseDatabase.addUserRole(userId: _userId, roleName: 'seller');
     } catch (e) {
       debugPrint('Failed to sync seller role: $e');
     }
@@ -529,10 +745,12 @@ class AuthService extends ChangeNotifier {
   Future<void> refreshRegistrationStatus() async {
     if (_userId.isEmpty) return;
     try {
-      final reg = await SupabaseDB.getFarmerRegistration(_userId);
-      _registrationStatus = reg?['status'] as String?;
-      await _persistCachedUserState();
-      notifyListeners();
+      final reg = await SupabaseDatabase.getFarmerRegistration(_userId);
+      if (reg != null) {
+        _registrationStatus = reg['status'] as String?;
+        await _persistCachedUserState();
+        notifyListeners();
+      }
     } catch (e) {
       debugPrint('Error refreshing registration status: $e');
     }
@@ -541,7 +759,7 @@ class AuthService extends ChangeNotifier {
   Future<void> _refreshRegistrationStatusFromServer() async {
     if (_userId.isEmpty) return;
     try {
-      final reg = await SupabaseDB.getFarmerRegistration(_userId);
+      final reg = await SupabaseDatabase.getFarmerRegistration(_userId);
       _registrationStatus = reg?['status'] as String?;
       await _persistCachedUserState();
     } catch (e) {
@@ -551,7 +769,7 @@ class AuthService extends ChangeNotifier {
 
   void _startWatchingRegistrationStatus(String userId) {
     _regStatusSubscription?.cancel();
-    _regStatusSubscription = SupabaseDB.watchFarmerRegistrationStatus(userId)
+    _regStatusSubscription = SupabaseDatabase.watchFarmerRegistrationStatus(userId)
         .listen((status) {
           if (status != _registrationStatus) {
             _registrationStatus = status;
@@ -577,7 +795,7 @@ class AuthService extends ChangeNotifier {
       if (response.user != null && response.user!.emailConfirmedAt != null) {
         final userId = response.user!.id;
         try {
-          await SupabaseDB.createUserIfNotExists(
+          await SupabaseDatabase.createUserIfNotExists(
             userId: userId,
             email: email,
             name: name,
@@ -610,9 +828,8 @@ class AuthService extends ChangeNotifier {
       if (kIsWeb) {
         await _client.auth.signInWithOAuth(
           OAuthProvider.google,
-          redirectTo: kDebugMode
-              ? 'http://localhost:3000/auth/callback'
-              : 'https://agridirect.vercel.app/auth/callback',
+          redirectTo: '${Uri.base.origin}/auth/callback',
+          queryParams: const {'prompt': 'select_account'},
         );
         _isLoading = false;
         notifyListeners();
@@ -666,7 +883,7 @@ class AuthService extends ChangeNotifier {
       }
 
       final user = response.user!;
-      var profile = await SupabaseDB.getUserProfile(user.id);
+      var profile = await SupabaseDatabase.getUserProfile(user.id);
       final isIncompleteProfile =
           profile == null ||
           profile['phone'] == null ||
@@ -690,9 +907,13 @@ class AuthService extends ChangeNotifier {
       _userAvatarUrl = (profile['avatar_url'] as String?) ?? '';
       _isLoggedIn = true;
 
-      final roles = await SupabaseDB.getUserRoles(_userId);
+      final roles = await SupabaseDatabase.getUserRoles(_userId);
       _isSeller = roles.contains('seller') || roles.contains('farmer');
-      _isAdmin = roles.contains('admin');
+      _isAdmin = await _resolveAdminStatus(
+        _userId,
+        roles,
+        email: _userEmail,
+      );
 
       await _refreshRegistrationStatusFromServer();
       _startWatchingRegistrationStatus(_userId);
@@ -742,7 +963,7 @@ class AuthService extends ChangeNotifier {
         return false;
       }
 
-      await SupabaseDB.createUserIfNotExists(
+      await SupabaseDatabase.createUserIfNotExists(
         userId: _pendingGoogleUserId,
         email: _pendingGoogleEmail,
         name: _pendingGoogleName,
@@ -752,13 +973,17 @@ class AuthService extends ChangeNotifier {
 
       await _client.auth.updateUser(UserAttributes(password: password));
 
-      final roles = await SupabaseDB.getUserRoles(_pendingGoogleUserId);
+      final roles = await SupabaseDatabase.getUserRoles(_pendingGoogleUserId);
       _userId = _pendingGoogleUserId;
       _userEmail = _pendingGoogleEmail;
       _userName = _pendingGoogleName;
       _needsProfileCompletion = false;
       _isSeller = roles.contains('seller') || roles.contains('farmer');
-      _isAdmin = roles.contains('admin');
+      _isAdmin = await _resolveAdminStatus(
+        _pendingGoogleUserId,
+        roles,
+        email: _pendingGoogleEmail,
+      );
       _isLoggedIn = true;
 
       await _refreshRegistrationStatusFromServer();
@@ -791,6 +1016,7 @@ class AuthService extends ChangeNotifier {
 
   Future<void> logout() async {
     try {
+      final previousUserId = _userId;
       if (_userId.isNotEmpty) {
         await AnalyticsService().endSession(userId: _userId);
       }
@@ -811,6 +1037,9 @@ class AuthService extends ChangeNotifier {
       _isAdmin = false;
       _registrationStatus = null;
       _clearPendingGoogleProfileState();
+      if (previousUserId.isNotEmpty) {
+        await _clearCachedUserState(previousUserId);
+      }
       notifyListeners();
     } catch (e) {
       _errorMessage = 'Logout failed: $e';

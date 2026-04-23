@@ -392,7 +392,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         boxShadow: isHovered
             ? [
                 BoxShadow(
-                  color: color.withValues(alpha: 0.1),
+                  color: color.withValues(alpha: 0.2),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -416,7 +416,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: color.withValues(alpha: 0.25),
+                      color: color.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),

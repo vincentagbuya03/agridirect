@@ -25,6 +25,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
   final MapController _mapController = MapController();
   late Future<List<Map<String, dynamic>>> _farmersFuture;
   int _selectedIndex = 0;
+  bool _isSatellite = false; // Add this
   final Map<String, Future<Map<String, String>>> _addressFutureCache = {};
 
   @override
@@ -284,12 +285,12 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
             return Marker(
               point: LatLng(latitude, longitude),
               width: 140,
-              height: 90,
+              height: 100,
               alignment: Alignment.bottomCenter,
               child: GestureDetector(
                 onTap: () {
                   setState(() => _selectedIndex = index);
-                  _mapController.move(LatLng(latitude, longitude), 14.5);
+                  _mapController.move(LatLng(latitude, longitude), 15.0);
                 },
                 onLongPress: () => _openFarmerInfo(
                   farmName: farmName,
@@ -298,42 +299,68 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
                   longitude: longitude,
                 ),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.14),
-                            blurRadius: isSelected ? 10 : 6,
-                            offset: const Offset(0, 2),
+                    if (isSelected)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        margin: const EdgeInsets.only(bottom: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          farmName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
                           ),
-                        ],
-                      ),
-                      child: Text(
-                        farmName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textHeadline,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Icon(
-                      Icons.location_on,
-                      color: isSelected ? AppColors.accent : AppColors.primary,
-                      size: isSelected ? 40 : 34,
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.elasticOut,
+                          width: isSelected ? 48 : 36,
+                          height: isSelected ? 48 : 36,
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.accent : Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                  color: (isSelected ? AppColors.accent : AppColors.primary)
+                                      .withValues(alpha: 0.2),
+                                  blurRadius: isSelected ? 12 : 6,
+                                  spreadRadius: isSelected ? 2 : 0,
+                              ),
+                            ],
+                            border: Border.all(
+                              color: isSelected ? Colors.white : AppColors.primary,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.agriculture_rounded,
+                          size: isSelected ? 24 : 18,
+                          color: isSelected ? Colors.white : AppColors.primary,
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -378,9 +405,12 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
                           ),
                           children: [
                             TileLayer(
-                              urlTemplate:
-                                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              urlTemplate: _isSatellite
+                                  ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+                                  : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                              subdomains: const ['a', 'b', 'c', 'd'],
                               userAgentPackageName: 'com.agridirect.app',
+                              retinaMode: RetinaMode.isHighDensity(context),
                             ),
                             MarkerLayer(markers: markers),
                           ],
@@ -388,18 +418,47 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
                         Positioned(
                           top: 14,
                           right: 14,
-                          child: Material(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            elevation: 3,
-                            child: IconButton(
-                              onPressed: () => _mapController.move(
-                                LatLng(selectedLat, selectedLng),
-                                14.5,
+                          child: Column(
+                            children: [
+                              Material(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                elevation: 3,
+                                child: IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _isSatellite = !_isSatellite;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _isSatellite
+                                        ? Icons.map_rounded
+                                        : Icons.layers_rounded,
+                                    color: AppColors.primary,
+                                  ),
+                                  tooltip: _isSatellite
+                                      ? 'Switch to Street View'
+                                      : 'Switch to Satellite',
+                                ),
                               ),
-                              icon: const Icon(Icons.my_location_rounded),
-                              tooltip: 'Center selected farm',
-                            ),
+                              const SizedBox(height: 10),
+                              Material(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                elevation: 3,
+                                child: IconButton(
+                                  onPressed: () => _mapController.move(
+                                    LatLng(selectedLat, selectedLng),
+                                    15.0,
+                                  ),
+                                  icon: const Icon(
+                                    Icons.my_location_rounded,
+                                    color: AppColors.primary,
+                                  ),
+                                  tooltip: 'Center selected farm',
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         Positioned(
@@ -452,7 +511,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: AppColors.textHeadline.withValues(alpha: 0.05),
+          color: AppColors.textHeadline.withValues(alpha: 0.1),
         ),
       ),
       child: Row(
@@ -485,11 +544,11 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 14,
             offset: const Offset(0, 5),
           ),
@@ -506,7 +565,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
                 height: 34,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.primary.withValues(alpha: 0.12),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                 ),
                 child: const Icon(
                   Icons.agriculture_rounded,

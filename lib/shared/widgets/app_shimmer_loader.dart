@@ -25,8 +25,8 @@ class AppShimmerLoader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final resolvedColor = color ?? valueColor?.value ?? const Color(0xFF16A34A);
-    final baseColor = resolvedColor.withValues(alpha: 0.25);
-    final highlightColor = resolvedColor.withValues(alpha: 0.8);
+    final baseColor = resolvedColor.withValues(alpha: 0.1);
+    final highlightColor = resolvedColor.withValues(alpha: 0.3);
 
     return SizedBox(
       width: size,

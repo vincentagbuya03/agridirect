@@ -56,8 +56,9 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
       return;
     }
 
-    if (password.length < 6) {
-      _showSnackBar('Password must be at least 6 characters');
+    final passwordError = AuthService.validatePassword(password);
+    if (passwordError != null) {
+      _showSnackBar(passwordError);
       return;
     }
 
@@ -145,7 +146,7 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
                           textAlign: TextAlign.center,
                           style: GoogleFonts.inter(
                             fontSize: 15,
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: Colors.white.withValues(alpha: 0.7),
                             height: 1.45,
                           ),
                         ),

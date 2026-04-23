@@ -17,11 +17,23 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
   String _searchQuery = '';
   String _filterRole = 'all'; // all, buyer, farmer, admin
   bool _piiMasked = true;
+  late VoidCallback _dataRefreshListener;
 
   @override
   void initState() {
     super.initState();
+    _dataRefreshListener = () {
+      if (!mounted) return;
+      _loadData();
+    };
+    widget.adminService.dataVersionListenable.addListener(_dataRefreshListener);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    widget.adminService.dataVersionListenable.removeListener(_dataRefreshListener);
+    super.dispose();
   }
 
   void _loadData() {
@@ -59,7 +71,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                         const SizedBox(width: 24),
                         AdminMiniMetric(
                           label: 'Active Now', 
-                          value: '${(data?['total_users'] ?? 0) > 0 ? (data!['total_users'] * 0.1).toInt() : 0}', 
+                          value: (data?['total_users'] ?? 0) > 0 ? "Live" : "0", 
                           icon: Icons.bolt_rounded, 
                           light: true
                         ),
@@ -79,7 +91,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                 Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: AdminUi.radiusMd,
                   ),
                   child: Row(
@@ -95,7 +107,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                         value: _piiMasked,
                         onChanged: (v) => setState(() => _piiMasked = v),
                         activeThumbColor: Colors.white,
-                        activeTrackColor: Colors.white.withValues(alpha: 0.4),
+                        activeTrackColor: Colors.white.withValues(alpha: 0.3),
                       ),
                     ],
                   ),
@@ -110,7 +122,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                 border: Border.all(color: AdminUi.border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -153,8 +165,8 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                 Text('User Security Audit', style: AdminUi.title(size: 20, color: Colors.white)),
                 const SizedBox(height: 8),
                 Text(
-                  '12% of users have enabled Two-Factor Authentication. Recommend a platform-wide security prompt.',
-                  style: AdminUi.body(size: 14, color: Colors.white.withValues(alpha: 0.8)),
+                  'System security protocols are active. Platform-wide security audits are performed regularly to ensure data integrity.',
+                  style: AdminUi.body(size: 14, color: Colors.white.withValues(alpha: 0.7)),
                 ),
                 const Spacer(),
                 Text('RUN SECURITY SCAN', style: AdminUi.label(size: 12, color: Colors.white, weight: FontWeight.w800)),
@@ -355,7 +367,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                       decoration: BoxDecoration(
                         color: AdminUi.brandSoft,
                         borderRadius: AdminUi.radiusMd,
-                        border: Border.all(color: AdminUi.brand.withValues(alpha: 0.1)),
+                        border: Border.all(color: AdminUi.brand.withValues(alpha: 0.2)),
                       ),
                       child: Center(
                         child: Text(

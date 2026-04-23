@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/animated_components.dart';
 import '../../../shared/widgets/brand_logo.dart';
+import '../../../shared/services/core/supabase_config.dart';
 
 /// Web Marketplace Home — Clean AgriDirect Landing Page
 /// Light mint/green design matching reference screenshot
@@ -40,6 +41,10 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
   int _hoveredNav = -1;
   bool _hoveringDeliveryBadge = false;
 
+  late Future<List<Map<String, dynamic>>> _categoriesFuture;
+  late Future<List<Map<String, dynamic>>> _productsFuture;
+  late Future<List<Map<String, dynamic>>> _farmersFuture;
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +60,10 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
       duration: const Duration(seconds: 8),
       vsync: this,
     )..repeat();
+
+    _categoriesFuture = SupabaseDatabase.getCategories();
+    _productsFuture = SupabaseDatabase.getProducts(limit: 4, onlyFeatured: true);
+    _farmersFuture = SupabaseDatabase.getFarmerSpotlight(limit: 3);
   }
 
   @override
@@ -102,7 +111,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
         border: Border.all(color: _border.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -131,7 +140,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: isActive
-                          ? _primary.withValues(alpha: 0.08)
+                          ? _primary.withValues(alpha: 0.1)
                           : isHovered
                               ? _border.withValues(alpha: 0.5)
                               : Colors.transparent,
@@ -217,7 +226,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 return CustomPaint(
                   painter: RibbonPainter(
                     animationValue: _waveController.value,
-                    color: Colors.white.withValues(alpha: 0.04),
+                    color: Colors.white.withValues(alpha: 0.15),
                     strokeWidth: 1.0,
                   ),
                 );
@@ -233,7 +242,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 return CustomPaint(
                   painter: BlobPainter(
                     animationValue: _waveController.value,
-                    color: AgriColors.emerald400.withValues(alpha: 0.08),
+                    color: AgriColors.emerald400.withValues(alpha: 0.15),
                     center: const Offset(0.8, 0.3),
                     radius: 280,
                   ),
@@ -250,7 +259,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 return CustomPaint(
                   painter: BlobPainter(
                     animationValue: 1 - _waveController.value,
-                    color: AgriColors.teal400.withValues(alpha: 0.06),
+                    color: AgriColors.teal400.withValues(alpha: 0.15),
                     center: const Offset(0.2, 0.7),
                     radius: 220,
                   ),
@@ -267,7 +276,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 return CustomPaint(
                   painter: BlobPainter(
                     animationValue: _waveController.value * 0.7,
-                    color: AgriColors.gold400.withValues(alpha: 0.03),
+                    color: AgriColors.gold400.withValues(alpha: 0.12),
                     center: const Offset(0.9, 0.15),
                     radius: 120,
                   ),
@@ -306,7 +315,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 return CustomPaint(
                   painter: WavePainter(
                     animationValue: _waveController.value,
-                    color: Colors.white.withValues(alpha: 0.06),
+                    color: Colors.white.withValues(alpha: 0.1),
                     amplitude: 25,
                   ),
                 );
@@ -324,7 +333,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 return CustomPaint(
                   painter: WavePainter(
                     animationValue: 1 - _waveController.value,
-                    color: Colors.white.withValues(alpha: 0.04),
+                    color: Colors.white.withValues(alpha: 0.05),
                     amplitude: 15,
                   ),
                 );
@@ -350,12 +359,12 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AgriColors.gold400.withValues(alpha: 0.15),
-                        AgriColors.emerald400.withValues(alpha: 0.1),
+                        AgriColors.gold400.withValues(alpha: 0.2),
+                        AgriColors.emerald400.withValues(alpha: 0.2),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: AgriColors.gold300.withValues(alpha: 0.25)),
+                    border: Border.all(color: AgriColors.gold300.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -368,7 +377,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: AgriColors.gold400.withValues(alpha: 0.5),
+                              color: AgriColors.gold400.withValues(alpha: 0.4),
                               blurRadius: 6,
                             ),
                           ],
@@ -416,7 +425,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     'Experience the true taste of nature with direct-from-farm produce delivered to your doorstep within 24 hours.',
                     style: GoogleFonts.inter(
                       fontSize: 15,
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: Colors.white.withValues(alpha: 0.8),
                       height: 1.7,
                     ),
                   ),
@@ -432,7 +441,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     border: Border.all(color: _border),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
+                        color: Colors.black.withValues(alpha: 0.08),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -503,7 +512,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                           begin: Alignment.topRight,
                           end: Alignment.bottomLeft,
                           colors: [
-                            _primary.withValues(alpha: 0.06),
+                            _primary.withValues(alpha: 0.15),
                             Colors.transparent,
                           ],
                         ),
@@ -543,7 +552,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                             builder: (context, _) => CustomPaint(
                               painter: BlobPainter(
                                 animationValue: _waveController.value,
-                                color: _primary.withValues(alpha: 0.10),
+                                color: _primary.withValues(alpha: 0.15),
                                 center: const Offset(0.8, 0.2),
                                 radius: 180,
                               ),
@@ -554,7 +563,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                             builder: (context, _) => CustomPaint(
                               painter: BlobPainter(
                                 animationValue: 1 - _waveController.value,
-                                color: const Color(0xFF34D399).withValues(alpha: 0.08),
+                                color: const Color(0xFF34D399).withValues(alpha: 0.15),
                                 center: const Offset(0.2, 0.8),
                                 radius: 140,
                               ),
@@ -565,7 +574,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                             builder: (context, _) => CustomPaint(
                               painter: RibbonPainter(
                                 animationValue: _waveController.value,
-                                color: _primary.withValues(alpha: 0.05),
+                                color: _primary.withValues(alpha: 0.1),
                                 strokeWidth: 1.0,
                               ),
                             ),
@@ -587,7 +596,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                               builder: (context, _) => CustomPaint(
                                 painter: WavePainter(
                                   animationValue: _waveController.value,
-                                  color: Colors.white.withValues(alpha: 0.10),
+                                  color: Colors.white.withValues(alpha: 0.2),
                                   amplitude: 16,
                                 ),
                               ),
@@ -614,7 +623,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                                 end: Alignment.bottomCenter,
                                 colors: [
                                   Colors.transparent,
-                                  _primary.withValues(alpha: 0.15),
+                                  _primary.withValues(alpha: 0.4),
                                 ],
                               ),
                             ),
@@ -724,13 +733,6 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
   // CATEGORIES — Clean card grid
   // ─────────────────────────────────────────────
   Widget _buildCategories() {
-    final cats = [
-      {'icon': Icons.eco_rounded, 'name': 'Vegetables', 'sub': 'Organic & Fresh'},
-      {'icon': Icons.apple_rounded, 'name': 'Fruits', 'sub': 'Seasonal Picks'},
-      {'icon': Icons.grain_rounded, 'name': 'Grains', 'sub': 'Whole Grains'},
-      {'icon': Icons.water_drop_rounded, 'name': 'Dairy', 'sub': 'Farm Milk & Eggs'},
-    ];
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 56),
       color: _white,
@@ -750,77 +752,95 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
             style: GoogleFonts.inter(fontSize: 14, color: _muted),
           ),
           const SizedBox(height: 36),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(cats.length, (i) {
-              final cat = cats[i];
-              final isHovered = _hoveredCategories.contains(i);
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  onEnter: (_) => setState(() => _hoveredCategories.add(i)),
-                  onExit: (_) => setState(() => _hoveredCategories.remove(i)),
-                  child: GestureDetector(
-                    onTap: () => widget.onNavigate(1),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: 160,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 24),
-                      decoration: BoxDecoration(
-                        color: isHovered ? _surface : _white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isHovered
-                              ? _primary.withValues(alpha: 0.25)
-                              : _border,
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _categoriesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: _primary));
+              }
+              final cats = snapshot.data ?? [];
+              if (cats.isEmpty) {
+                return Text('No categories found', style: GoogleFonts.inter(color: _muted));
+              }
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(cats.length.clamp(0, 5), (i) {
+                  final cat = cats[i];
+                  final isHovered = _hoveredCategories.contains(i);
+                  // Map name to icon - simplified mapping
+                  IconData icon = Icons.eco_rounded;
+                  if (cat['name'].toString().toLowerCase().contains('fruit')) icon = Icons.apple_rounded;
+                  if (cat['name'].toString().toLowerCase().contains('grain')) icon = Icons.grain_rounded;
+                  if (cat['name'].toString().toLowerCase().contains('dairy')) icon = Icons.water_drop_rounded;
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      onEnter: (_) => setState(() => _hoveredCategories.add(i)),
+                      onExit: (_) => setState(() => _hoveredCategories.remove(i)),
+                      child: GestureDetector(
+                        onTap: () => widget.onNavigate(1),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          width: 160,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                          decoration: BoxDecoration(
+                            color: isHovered ? _surface : _white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: isHovered ? _primary.withValues(alpha: 0.2) : _border,
+                            ),
+                            boxShadow: isHovered
+                                ? [
+                                    BoxShadow(
+                                      color: _primary.withValues(alpha: 0.1),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    )
+                                  ]
+                                : [],
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 52,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  color: _surface,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(icon, color: _primary, size: 24),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                cat['name'] as String,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: _dark,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                cat['description'] ?? 'Fresh & Organic',
+                                style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
                         ),
-                        boxShadow: isHovered
-                            ? [
-                                BoxShadow(
-                                  color: _primary.withValues(alpha: 0.07),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                )
-                              ]
-                            : [],
-                      ),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              color: _surface,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(cat['icon'] as IconData,
-                                color: _primary, size: 24),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            cat['name'] as String,
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: _dark,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            cat['sub'] as String,
-                            style:
-                                GoogleFonts.inter(fontSize: 12, color: _muted),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
                       ),
                     ),
-                  ),
-                ),
+                  );
+                }),
               );
-            }),
+            },
           ),
         ],
       ),
@@ -831,37 +851,6 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
   // FEATURED PRODUCTS
   // ─────────────────────────────────────────────
   Widget _buildFeaturedProducts() {
-    final products = [
-      {
-        'name': 'Organic Cherry\nTomatoes',
-        'farm': 'Green Valley Farm',
-        'price': '\$4.99/lb',
-        'img':
-            'https://images.unsplash.com/photo-1592924357228-91a4daadce55?w=300&q=80',
-      },
-      {
-        'name': 'Fresh Kale\nLeaves',
-        'farm': 'Sunny Ridge Fields',
-        'price': '\$3.50/ea',
-        'img':
-            'https://images.unsplash.com/photo-1524179091875-bf99a9a6af57?w=300&q=80',
-      },
-      {
-        'name': 'Crispy Farm\nCarrots',
-        'farm': 'Root Harvest Organics',
-        'price': '\$2.99/lb',
-        'img':
-            'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=300&q=80',
-      },
-      {
-        'name': 'Pure Grass-Fed\nMilk',
-        'farm': 'Meadow Brook Dairy',
-        'price': '\$5.25/qt',
-        'img':
-            'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300&q=80',
-      },
-    ];
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 56),
       color: _bg,
@@ -913,144 +902,182 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
             ],
           ),
           const SizedBox(height: 28),
-          Row(
-            children: List.generate(products.length, (i) {
-              final p = products[i];
-              final isHovered = _hoveredProducts.contains(i);
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    left: i == 0 ? 0 : 10,
-                    right: i == products.length - 1 ? 0 : 10,
-                  ),
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    onEnter: (_) => setState(() => _hoveredProducts.add(i)),
-                    onExit: (_) => setState(() => _hoveredProducts.remove(i)),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      transform:
-                          Matrix4.translationValues(0, isHovered ? -4 : 0, 0),
-                      decoration: BoxDecoration(
-                        color: _white,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(
-                                alpha: isHovered ? 0.08 : 0.04),
-                            blurRadius: isHovered ? 16 : 6,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Image
-                          Stack(
-                            children: [
-                              ClipRRect(
-                                borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(14)),
-                                child: CachedNetworkImage(
-                                  imageUrl: p['img']!,
-                                  height: 170,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                  placeholder: (ctx, url) =>
-                                      Container(height: 170, color: _surface),
-                                  errorWidget: (ctx, url, err) => Container(
-                                    height: 170,
-                                    color: _surface,
-                                    child: const Icon(Icons.image_outlined,
-                                        color: _muted, size: 36),
-                                  ),
-                                ),
-                              ),
-                              // Heart
-                              Positioned(
-                                top: 10,
-                                right: 10,
-                                child: Container(
-                                  width: 30,
-                                  height: 30,
-                                  decoration: BoxDecoration(
-                                    color: _white.withValues(alpha: 0.9),
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                            alpha: 0.08),
-                                        blurRadius: 6,
-                                      )
-                                    ],
-                                  ),
-                                  child: const Icon(Icons.favorite_border,
-                                      size: 15, color: _dark),
-                                ),
-                              ),
-                            ],
-                          ),
-                          // Content
-                          Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _productsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: _primary));
+              }
+              final products = snapshot.data ?? [];
+              if (products.isEmpty) {
+                return Text('No products available', style: GoogleFonts.inter(color: _muted));
+              }
+              return Center(
+                child: Wrap(
+                  spacing: 24,
+                  runSpacing: 24,
+                  children: List.generate(products.length.clamp(0, 4), (i) {
+                    final p = products[i];
+                    final isHovered = _hoveredProducts.contains(i);
+                    final farmName = (p['farmer'] != null) ? p['farmer']['farm_name'] : 'AgriDirect Farm';
+                    
+                    return MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      onEnter: (_) => setState(() => _hoveredProducts.add(i)),
+                      onExit: (_) => setState(() => _hoveredProducts.remove(i)),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        width: 280,
+                        transform: Matrix4.translationValues(0, isHovered ? -4 : 0, 0),
+                        decoration: BoxDecoration(
+                          color: _white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isHovered ? 0.08 : 0.04),
+                              blurRadius: isHovered ? 16 : 6,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Stack(
                               children: [
-                                Text(
-                                  p['name']!,
-                                  style: GoogleFonts.inter(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: _dark),
-                                  maxLines: 2,
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                                  child: CachedNetworkImage(
+                                    imageUrl: p['image_url'] ?? 'https://images.unsplash.com/photo-1592924357228-91a4daadce55?w=300&q=80',
+                                    height: 180,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    placeholder: (ctx, url) => Container(height: 180, color: _surface),
+                                    errorWidget: (ctx, url, err) => Container(
+                                      height: 180,
+                                      color: _surface,
+                                      child: const Icon(Icons.image_outlined, color: _muted, size: 36),
+                                    ),
+                                  ),
                                 ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  p['farm']!,
-                                  style: GoogleFonts.inter(
-                                      fontSize: 12, color: _muted),
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      p['price']!,
+                                Positioned(
+                                  bottom: 12,
+                                  right: 12,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: _primary,
+                                      borderRadius: BorderRadius.circular(8),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.2),
+                                          blurRadius: 8,
+                                        ),
+                                      ],
+                                    ),
+                                    child: Text(
+                                      '₱${p['price']?.toString() ?? '0'}',
                                       style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                        color: _dark,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
                                       ),
                                     ),
-                                    Container(
-                                      width: 30,
-                                      height: 30,
-                                      decoration: BoxDecoration(
-                                        color: _surface,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                            color: _primary.withValues(
-                                                alpha: 0.2)),
-                                      ),
-                                      child: const Icon(
-                                          Icons.add_shopping_cart,
-                                          size: 15,
-                                          color: _primary),
-                                    ),
-                                  ],
+                                  ),
                                 ),
+                                if ((p['stock_quantity'] ?? 0) < 5)
+                                  Positioned(
+                                    top: 12,
+                                    left: 12,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.withValues(alpha: 0.9),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        'Low Stock',
+                                        style: GoogleFonts.inter(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
-                          ),
-                        ],
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    p['category_name']?.toString().toUpperCase() ?? 'PRODUCE',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: _primary,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    p['name'] as String,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: _dark,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.store_rounded, size: 14, color: _muted),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          farmName,
+                                          style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.star_rounded, size: 16, color: Colors.orange),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            p['average_rating']?.toString() ?? '5.0',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: _dark,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        'Per ${p['unit_name'] ?? 'unit'}',
+                                        style: GoogleFonts.inter(fontSize: 11, color: _muted),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                 ),
               );
-            }),
+            },
           ),
         ],
       ),
@@ -1067,166 +1094,123 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
       child: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 900),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Left: Orange warm card with farmer illustration
-              Container(
-                width: 260,
-                height: 280,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
-                  ),
-                ),
-                child: Stack(
-                  children: [
-                    // Farmer photo in circle
-                    Center(
-                      child: Container(
-                        width: 130,
-                        height: 130,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: ClipOval(
-                          child: CachedNetworkImage(
-                            imageUrl:
-                                'https://images.unsplash.com/photo-1605000797499-95a51c5269ae?w=200&q=80',
-                            fit: BoxFit.cover,
-                            placeholder: (ctx, url) => const Icon(Icons.person,
-                                size: 60, color: Colors.white),
-                            errorWidget: (ctx, url, err) => const Icon(
-                                Icons.person,
-                                size: 60,
-                                color: Colors.white),
-                          ),
-                        ),
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _farmersFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: _primary));
+              }
+              final farmers = snapshot.data ?? [];
+              if (farmers.isEmpty) return const SizedBox.shrink();
+              
+              final farmer = farmers[0];
+              final farmerName = (farmer['user'] != null) ? farmer['user']['name'] : 'Local Farmer';
+              final farmName = farmer['farm_name'] ?? 'AgriDirect Farm';
+              final specialty = farmer['specialty'] ?? 'Organic Vegetables';
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Left: Orange warm card
+                  Container(
+                    width: 260,
+                    height: 280,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
                       ),
                     ),
-                    // Verified badge top right
-                    Positioned(
-                      top: 16,
-                      right: 16,
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: _primary,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: _primary.withValues(alpha: 0.4),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            )
-                          ],
-                        ),
-                        child: const Icon(Icons.verified_rounded,
-                            size: 17, color: Colors.white),
-                      ),
-                    ),
-                    // Bottom label
-                    Positioned(
-                      bottom: 16,
-                      left: 16,
-                      right: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Center(
-                          child: Text(
-                            "FARMER'S SPOTLIGHT",
-                            style: GoogleFonts.inter(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              color: _primary,
-                              letterSpacing: 0.8,
+                    child: Stack(
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 130,
+                            height: 130,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: (farmer['user'] != null && farmer['user']['profile_image_url'] != null)
+                                    ? farmer['user']['profile_image_url']
+                                    : 'https://images.unsplash.com/photo-1605000797499-95a51c5269ae?w=200&q=80',
+                                fit: BoxFit.cover,
+                                placeholder: (ctx, url) => const Icon(Icons.person, size: 60, color: Colors.white),
+                                errorWidget: (ctx, url, err) => const Icon(Icons.person, size: 60, color: Colors.white),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                        Positioned(
+                          top: 16,
+                          right: 16,
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: _primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.verified_rounded, size: 17, color: Colors.white),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 52),
-              // Right: Content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'FARMER SPOTLIGHT',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: _primary,
-                        letterSpacing: 1.5,
-                      ),
+                  ),
+                  const SizedBox(width: 52),
+                  // Right: Content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'FARMER SPOTLIGHT',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _primary,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Meet $farmerName',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: _dark,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'The face behind $farmName. Specializing in $specialty, $farmerName is dedicated to providing the community with the freshest produce.',
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            color: _muted,
+                            height: 1.6,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: () => widget.onNavigate(1),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _dark,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: Text('Shop from $farmName'),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Meet Farmer John',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: _dark,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      '"I believe that everyone deserves access to food grown with love and respect for the earth. At Sunny Ridge, we use zero pesticides and traditional farming methods passed down through four generations."',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: _muted,
-                        height: 1.75,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Sunny Ridge Fields',
-                      style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: _dark),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Specializing in organic leafy greens and heritage tomatoes.',
-                      style: GoogleFonts.inter(fontSize: 13, color: _muted),
-                    ),
-                    const SizedBox(height: 24),
-                    OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: _primary),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20)),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 22, vertical: 11),
-                      ),
-                      child: Text(
-                        "View Farmer's Profile",
-                        style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: _primary),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),

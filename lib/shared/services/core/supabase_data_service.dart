@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
 import 'supabase_config.dart';
 import '../../data/app_data.dart';
@@ -13,8 +15,13 @@ class SupabaseDataService {
 
   static const String _featuredFarmersCacheKey = 'cache_featured_farmers_v1';
   static const String _forumPostsCacheKey = 'cache_forum_posts_v1';
+  static const String _articlesCacheKey = 'cache_articles_v1';
 
   final _client = SupabaseConfig.client;
+
+  // Global navigation and filtering state
+  static final ValueNotifier<int> navigationTabNotifier = ValueNotifier<int>(0);
+  static final ValueNotifier<String?> marketplaceCategoryNotifier = ValueNotifier<String?>(null);
 
   // ══════════════════════════════════════════════════════════════════════════
   // PRODUCTS
@@ -301,6 +308,132 @@ class SupabaseDataService {
     }
   }
 
+  /// Get distinct product categories currently used in marketplace products.
+  Future<List<String>> getMarketplaceCategories() async {
+    try {
+      // Primary source: full active category catalog.
+      final categoryResponse = await _client
+          .from('categories')
+          .select('name')
+          .eq('is_active', true)
+          .order('name', ascending: true);
+
+      final categories = <String>[];
+      final seen = <String>{};
+
+      for (final row in (categoryResponse as List)) {
+        final raw = row['name']?.toString().trim();
+        if (raw == null || raw.isEmpty) continue;
+        final key = raw.toLowerCase();
+        if (seen.add(key)) {
+          categories.add(raw);
+        }
+      }
+
+      // Fallback/merge: categories seen on live non-preorder products.
+      // This keeps chips resilient if some product rows carry labels not yet in catalog.
+      final productCategoryResponse = await _client
+          .from('v_products')
+          .select('category_name')
+          .eq('is_preorder', false)
+          .order('category_name', ascending: true);
+
+      for (final row in (productCategoryResponse as List)) {
+        final raw = row['category_name']?.toString().trim();
+        if (raw == null || raw.isEmpty) continue;
+        final key = raw.toLowerCase();
+        if (seen.add(key)) {
+          categories.add(raw);
+        }
+      }
+
+      return categories;
+    } catch (e) {
+      debugPrint('Error fetching marketplace categories: $e');
+      return [];
+    }
+  }
+
+  /// Get all categories from the database
+  Future<List<CategoryItem>> getCategories() async {
+    try {
+      final response = await _client
+          .from('categories')
+          .select('name')
+          .eq('is_active', true)
+          .order('name');
+
+      return (response as List).map((cat) {
+        final name = cat['name']?.toString() ?? 'Other';
+
+        return CategoryItem(
+          name: name,
+          iconCodePoint: _mapCategoryToIcon(name),
+          bgColor: _getCategoryColor(name, isBackground: true),
+          iconColor: _getCategoryColor(name, isBackground: false),
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching categories: $e');
+      return [];
+    }
+  }
+
+  int _mapCategoryToIcon(String categoryName) {
+    // Mapping based on category name keywords
+    final name = categoryName.toLowerCase();
+
+    if (name.contains('veggie') || name.contains('vegetable')) {
+      return Icons.eco_rounded.codePoint;
+    }
+    if (name.contains('fruit')) {
+      return Icons.apple_rounded.codePoint;
+    }
+    if (name.contains('grain') || name.contains('rice') || name.contains('corn')) {
+      return Icons.grass_rounded.codePoint;
+    }
+    if (name.contains('dairy') || name.contains('milk') || name.contains('egg') || name.contains('cheese')) {
+      return Icons.water_drop_rounded.codePoint;
+    }
+    if (name.contains('poultry') || name.contains('chicken')) {
+      return Icons.egg_rounded.codePoint;
+    }
+    if (name.contains('livestock') || name.contains('meat')) {
+      return Icons.bakery_dining_rounded.codePoint; // Placeholder for meat
+    }
+    if (name.contains('herb') || name.contains('spice')) {
+      return Icons.spa_rounded.codePoint;
+    }
+    if (name.contains('root')) {
+      return Icons.agriculture_rounded.codePoint;
+    }
+    
+    return Icons.category_rounded.codePoint;
+  }
+
+  int _getCategoryColor(String categoryName, {required bool isBackground}) {
+    final name = categoryName.toLowerCase();
+    
+    if (name.contains('veggie')) {
+      return isBackground ? 0xFFDCFCE7 : 0xFF10B981; // Green
+    }
+    if (name.contains('fruit')) {
+      return isBackground ? 0xFFFFEDD5 : 0xFFEA580C; // Orange
+    }
+    if (name.contains('grain')) {
+      return isBackground ? 0xFFFEF3C7 : 0xFFD97706; // Amber
+    }
+    if (name.contains('dairy')) {
+      return isBackground ? 0xFFDBEAFE : 0xFF2563EB; // Blue
+    }
+    if (name.contains('organic')) {
+      return isBackground ? 0xFFD1FAE5 : 0xFF059669; // Emerald
+    }
+
+    // Default neutral colors
+    return isBackground ? 0xFFF1F5F9 : 0xFF64748B;
+  }
+
   Future<void> _enrichProductItemsWithFarmerProfiles(
     List<Map<String, dynamic>> items,
   ) async {
@@ -316,7 +449,7 @@ class SupabaseDataService {
     try {
       final response = await _client
           .from('v_farmer_profiles')
-          .select('farmer_id, farm_name, farmer_name, avatar_url, image_url')
+          .select('farmer_id, farm_name, farmer_name, avatar_url, image_url, latitude, longitude')
           .inFilter('farmer_id', farmerIds);
 
       final profileByFarmerId = {
@@ -334,7 +467,7 @@ class SupabaseDataService {
       if (missingFarmerIds.isNotEmpty) {
         final fallbackResponse = await _client
             .from('farmers')
-            .select('farmer_id, farm_name, image_url')
+            .select('farmer_id, farm_name, image_url, latitude, longitude')
             .inFilter('farmer_id', missingFarmerIds);
 
         for (final row in (fallbackResponse as List)) {
@@ -348,6 +481,8 @@ class SupabaseDataService {
             'farmer_name': null,
             'avatar_url': null,
             'image_url': fallback['image_url'],
+            'latitude': fallback['latitude'],
+            'longitude': fallback['longitude'],
           };
         }
       }
@@ -361,12 +496,14 @@ class SupabaseDataService {
         final farmerImageUrl = (profile['image_url']?.toString() ?? '').trim();
 
         item['farmer_name'] = profile['farmer_name'];
-        item['farmer_avatar_url'] = avatarUrl.isNotEmpty
-            ? avatarUrl
-            : farmerImageUrl;
+        item['farmer_avatar_url'] = farmerImageUrl.isNotEmpty
+            ? farmerImageUrl
+            : avatarUrl;
         if ((item['farm_name']?.toString().trim().isEmpty ?? true)) {
           item['farm_name'] = profile['farm_name'];
         }
+        item['latitude'] = profile['latitude'];
+        item['longitude'] = profile['longitude'];
       }
     } catch (e) {
       // Keep product loading resilient when farmer profile enrichment fails.
@@ -449,11 +586,14 @@ class SupabaseDataService {
       imageUrls:
           (item['image_urls'] as List?)?.map((e) => e.toString()).toList() ??
           [],
+      categoryName: item['category_name']?.toString(),
       rating: item['average_rating']?.toString(),
       reviews: item['review_count']?.toString(),
       harvestDays: item['harvest_days']?.toString(),
       reservedQuantity: (item['reserved_quantity'] as num?)?.toDouble(),
       targetQuantity: (item['target_quantity'] as num?)?.toDouble(),
+      latitude: (item['latitude'] as num?)?.toDouble(),
+      longitude: (item['longitude'] as num?)?.toDouble(),
     );
   }
 
@@ -461,8 +601,11 @@ class SupabaseDataService {
   // FORUM POSTS
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Watch forum posts in real-time
-  Stream<List<ForumPostItem>> watchForumPosts() async* {
+  Stream<List<ForumPostItem>> watchForumPosts() {
+    return _watchForumPostsInternal().asBroadcastStream();
+  }
+
+  Stream<List<ForumPostItem>> _watchForumPostsInternal() async* {
     yield await getForumPosts();
     
     final postStream = _client.from('forum_posts').stream(primaryKey: ['post_id']);
@@ -540,6 +683,36 @@ class SupabaseDataService {
     }
   }
 
+  /// Get a single forum post
+  Future<ForumPostItem?> getForumPostById(String postId) async {
+    try {
+      final response = await _client
+          .from('v_forum_posts')
+          .select()
+          .eq('post_id', postId)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      final userId = SupabaseConfig.currentUser?.id;
+      var isLiked = false;
+
+      if (userId != null) {
+        final like = await _client
+            .from('forum_post_likes')
+            .select('post_id')
+            .eq('post_id', postId)
+            .eq('user_id', userId)
+            .maybeSingle();
+        isLiked = like != null;
+      }
+
+      return _mapToForumPostItem(response, isLiked);
+    } catch (e) {
+      debugPrint('Error fetching forum post $postId: $e');
+      return null;
+    }
+  }
   /// Add a new forum post
   Future<void> addForumPost(ForumPostItem post) async {
     try {
@@ -590,6 +763,96 @@ class SupabaseDataService {
     }
   }
 
+  /// Upload a forum post image
+  Future<String?> uploadForumImage({String? localPath, Uint8List? bytes}) async {
+    if (localPath == null && bytes == null) return null;
+    
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final path = 'forum/$fileName';
+    
+    final result = await SupabaseDatabase.uploadImage(
+      bucket: 'uploads',
+      path: path,
+      localPath: localPath,
+      bytes: bytes,
+    );
+    
+    if (result != null) {
+      // Get the full public URL
+      return _client.storage.from('uploads').getPublicUrl(path);
+    }
+    return null;
+  }
+
+  /// Get trending topics (most engaged posts)
+  Future<List<Map<String, dynamic>>> getTrendingTopics() async {
+    try {
+      final response = await _client
+          .from('v_forum_posts')
+          .select('title, likes_count')
+          .order('likes_count', ascending: false)
+          .limit(4);
+
+      return (response as List).map((item) => {
+        'title': item['title'] ?? 'Untitled',
+        'engagement': item['likes_count'] ?? 0,
+      }).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Get popular tags (extracted from post bodies)
+  Future<List<String>> getPopularTags() async {
+    try {
+      final response = await _client
+          .from('forum_posts')
+          .select('body')
+          .limit(50);
+
+      final bodies = (response as List).map((item) => item['body']?.toString() ?? '').toList();
+      final tagRegExp = RegExp(r'#\w+');
+      final tags = <String>{};
+
+      for (var body in bodies) {
+        final matches = tagRegExp.allMatches(body);
+        for (var match in matches) {
+          tags.add(match.group(0)!);
+        }
+      }
+
+      if (tags.isEmpty) return ['#farming', '#agri', '#community', '#help'];
+      return tags.take(8).toList();
+    } catch (e) {
+      return ['#farming', '#agri', '#community', '#help'];
+    }
+  }
+
+  /// Get top contributors
+  Future<List<Map<String, dynamic>>> getTopContributors() async {
+    try {
+      // Group by author_id and count posts
+      final response = await _client
+          .from('v_forum_posts')
+          .select('author_name');
+
+      final authors = (response as List).map((item) => item['author_name']?.toString() ?? 'Anonymous').toList();
+      final counts = <String, int>{};
+      for (var author in authors) {
+        counts[author] = (counts[author] ?? 0) + 1;
+      }
+
+      final sorted = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      
+      return sorted.take(3).map((e) => {
+        'name': e.key,
+        'posts': '${e.value} posts',
+      }).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
   ForumPostItem _mapToForumPostItem(Map<String, dynamic> item, bool isLiked) {
     final createdAt = DateTime.tryParse(item['created_at'] ?? '');
     final timeAgo = createdAt != null ? _formatTimeAgo(createdAt) : 'Recently';
@@ -604,6 +867,7 @@ class SupabaseDataService {
       likes: item['likes_count'] ?? 0,
       comments: item['comments_count'] ?? 0,
       isLiked: isLiked,
+      isPinned: item['is_pinned'] ?? false,
     );
   }
 
@@ -611,14 +875,18 @@ class SupabaseDataService {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
 
-    if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m ago';
-    } else {
+    if (difference.inSeconds < 60) {
       return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} mins ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} hours ago';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
     }
   }
 
@@ -635,10 +903,43 @@ class SupabaseDataService {
           .eq('published', true)
           .order('created_at', ascending: false);
 
-      return (response as List).map((item) => _mapToArticleItem(item)).toList();
+      final articles = (response as List)
+          .map((item) => _mapToArticleItem(item))
+          .toList();
+
+      await _cacheMapList(
+        _articlesCacheKey,
+        articles
+            .map(
+              (article) => {
+                'title': article.title,
+                'excerpt': article.excerpt,
+                'author': article.author,
+                'read_time': article.readTime,
+                'time': article.time,
+                'image_url': article.imageUrl,
+              },
+            )
+            .toList(),
+      );
+
+      return articles;
     } catch (e) {
       debugPrint('Error fetching articles: $e');
-      return [];
+      final cached = await _readCachedMapList(_articlesCacheKey);
+      return cached
+          .map(
+            (item) => ArticleItem(
+              title: item['title']?.toString() ?? '',
+              excerpt: item['excerpt']?.toString() ?? '',
+              author: item['author']?.toString() ?? 'AgriDirect',
+              readTime: item['read_time']?.toString() ?? '4 min read',
+              time: item['time']?.toString() ?? 'Recently',
+              imageUrl: item['image_url']?.toString(),
+            ),
+          )
+          .where((article) => article.title.isNotEmpty)
+          .toList();
     }
   }
 
@@ -646,13 +947,20 @@ class SupabaseDataService {
   Future<void> addArticle(ArticleItem article) async {
     try {
       final userId = SupabaseConfig.currentUser?.id;
-      await _client.from('articles').insert({
+      if (userId == null) return;
+      
+      final adminResponse = await _client.from('admins').select('admin_id').eq('user_id', userId).maybeSingle();
+      final adminId = adminResponse?['admin_id'];
+
+      await _client.from('admin_articles').insert({
         'title': article.title,
-        'content': article.excerpt,
-        'author_id': userId,
+        'summary': article.excerpt,
+        'body': article.excerpt, // Using excerpt as body if body is missing in model
+        'admin_id': adminId,
         'read_time': article.readTime,
-        'image_url': article.imageUrl,
-        'published': true,
+        'cover_image_url': article.imageUrl,
+        'is_published': true,
+        'published_at': DateTime.now().toIso8601String(),
       });
     } catch (e) {
       debugPrint('Error adding article: $e');
@@ -661,12 +969,24 @@ class SupabaseDataService {
   }
 
   ArticleItem _mapToArticleItem(Map<String, dynamic> item) {
+    final createdAt = DateTime.tryParse(item['created_at'] ?? '');
+    final timeAgo = createdAt != null ? _formatTimeAgo(createdAt) : 'Recently';
+
+    String readTimeStr = item['read_time']?.toString() ?? '';
+    if (readTimeStr.isEmpty) {
+      final textContent = '${item['title'] ?? ''} ${item['excerpt'] ?? item['content'] ?? item['body'] ?? ''}';
+      final wordCount = textContent.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).length;
+      final minutes = (wordCount / 200).ceil();
+      readTimeStr = minutes > 0 ? '$minutes min read' : '1 min read';
+    }
+
     return ArticleItem(
       title: item['title'] ?? '',
-      excerpt: item['excerpt'] ?? '',
+      excerpt: item['excerpt'] ?? item['content'] ?? '',
       imageUrl: item['image_url'],
       author: item['author_name'] ?? 'AgriDirect',
-      readTime: item['read_time'],
+      readTime: readTimeStr,
+      time: timeAgo,
     );
   }
 
@@ -843,13 +1163,32 @@ class SupabaseDataService {
   /// Get featured farmers
   Future<List<Map<String, dynamic>>> getFeaturedFarmers() async {
     try {
-      final response = await _client
-          .from('v_farmer_profiles')
-          .select()
-          .eq('is_verified', true)
-          .eq('is_active', true)
-          .order('average_rating', ascending: false)
-          .limit(5);
+      dynamic response;
+      try {
+        response = await _client
+            .from('v_farmer_profiles')
+            .select()
+            .eq('is_verified', true)
+            .eq('is_active', true)
+            .order('average_rating', ascending: false)
+            .limit(5);
+      } on PostgrestException catch (e) {
+        final isMissingAverageRatingColumn =
+            e.code == '42703' && e.message.contains('average_rating');
+
+        if (!isMissingAverageRatingColumn) rethrow;
+
+        debugPrint(
+          'Featured farmers query fallback: average_rating column is missing on v_farmer_profiles.',
+        );
+
+        response = await _client
+            .from('v_farmer_profiles')
+            .select()
+            .eq('is_verified', true)
+            .eq('is_active', true)
+            .limit(5);
+      }
 
       final farmers = (response as List).map((item) {
         final rawImageUrl = item['image_url']?.toString();

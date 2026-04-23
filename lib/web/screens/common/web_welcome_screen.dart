@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../shared/services/auth/onboarding_service.dart';
 import '../../widgets/animated_components.dart';
 import '../../../shared/widgets/brand_logo.dart';
@@ -27,6 +28,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   bool _ctaHovered = false;
   bool _heroCtaHovered = false;
   bool _heroSecondaryHovered = false;
+  int _activeBannerIndex = 1; // 0, 1, or 2
 
   @override
   void initState() {
@@ -60,6 +62,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     if (mounted) context.go(AppRoutes.marketplace);
   }
 
+  Future<void> _downloadAndroidApk() async {
+    final uri = Uri.parse('/AgriDirect-Installer.apk');
+    await launchUrl(uri, webOnlyWindowName: '_self');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -68,12 +75,17 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
         child: Column(
           children: [
             _buildNavBar(),
+
             _buildHeroSection(),
+
             _buildStatsBar(),
+
             _buildFeaturesSection(),
+            _buildAppDownloadSection(),
             _buildHowItWorksSection(),
             _buildTestimonialSection(),
             _buildCtaSection(),
+
             _buildFooter(),
           ],
         ),
@@ -424,7 +436,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               ],
             ),
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: AgriColors.gold300.withValues(alpha: 0.25)),
+            border: Border.all(
+              color: AgriColors.gold300.withValues(alpha: 0.25),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -690,7 +704,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                     'Direct from verified farms',
                                     style: GoogleFonts.inter(
                                       fontSize: 11,
-                                      color: Colors.white.withValues(alpha: 0.6),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.6,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -1113,7 +1129,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                   boxShadow: isHovered
                                       ? [
                                           BoxShadow(
-                                            color: f.color.withValues(alpha: 0.3),
+                                            color: f.color.withValues(
+                                              alpha: 0.3,
+                                            ),
                                             blurRadius: 16,
                                             offset: const Offset(0, 4),
                                           ),
@@ -1288,7 +1306,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                           color: isHovered
                                               ? AgriColors.emerald500
                                                     .withValues(alpha: 0.3)
-                                              : Colors.black.withValues(alpha: 0.05),
+                                              : Colors.black.withValues(
+                                                  alpha: 0.05,
+                                                ),
                                           blurRadius: isHovered ? 24 : 8,
                                           offset: const Offset(0, 4),
                                         ),
@@ -1396,7 +1416,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: AgriColors.emerald500.withValues(alpha: 0.25),
+                            color: AgriColors.emerald500.withValues(
+                              alpha: 0.25,
+                            ),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -1556,7 +1578,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AgriColors.gold400.withValues(alpha: 0.4),
+                                  color: AgriColors.gold400.withValues(
+                                    alpha: 0.4,
+                                  ),
                                   blurRadius: 12,
                                 ),
                               ],
@@ -1663,6 +1687,399 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   // ═══════════════════════════════════════════════════════════════
   // FOOTER — dark premium footer
   // ═══════════════════════════════════════════════════════════════
+  Widget _buildAppDownloadSection() {
+    final sw = MediaQuery.of(context).size.width;
+    final isCompact = sw < 1100;
+
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: AgriColors.dark,
+        gradient: AgriColors.auroraGradient,
+      ),
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 20 : 64,
+        vertical: isCompact ? 64 : 120,
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1400),
+          child: isCompact
+              ? Column(
+                  children: [
+                    _buildDownloadContent(isCompact: true),
+                    const SizedBox(height: 64),
+                    _buildBannerGallery(isCompact: true),
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: _buildDownloadContent(isCompact: false),
+                    ),
+                    const SizedBox(width: 64),
+                    Expanded(
+                      flex: 7,
+                      child: _buildBannerGallery(isCompact: false),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDownloadContent({required bool isCompact}) {
+    return Column(
+      crossAxisAlignment: isCompact
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.rocket_launch_rounded,
+                size: 14,
+                color: AgriColors.lime400,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'GO MOBILE',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: 2.0,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+        GradientText(
+          text: 'AgriDirect\nEverywhere.',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: isCompact ? 48 : 72,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            height: 1.0,
+            letterSpacing: -2.5,
+          ),
+          gradient: const LinearGradient(
+            colors: [Colors.white, Color(0xFFA7F3D0)],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Connect with farmers, manage your shop, and track orders with the AgriDirect professional mobile suite.',
+          textAlign: isCompact ? TextAlign.center : TextAlign.start,
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            color: Colors.white.withValues(alpha: 0.7),
+            height: 1.6,
+          ),
+        ),
+        const SizedBox(height: 56),
+        _buildQrAndButtonDark(isCompact: isCompact),
+      ],
+    );
+  }
+
+  Widget _buildQrAndButtonDark({required bool isCompact}) {
+    final content = [
+      // Glassmorphic QR Card
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 40,
+              offset: const Offset(0, 20),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Builder(
+                builder: (context) {
+                  final apkUrl = Uri.base
+                      .resolve('/AgriDirect-Installer.apk')
+                      .toString();
+                  final qrUrl =
+                      'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${Uri.encodeComponent(apkUrl)}';
+                  return Image.network(
+                    qrUrl,
+                    width: 280,
+                    height: 280,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return SizedBox(
+                        width: 280,
+                        height: 280,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white24,
+                            value: progress.expectedTotalBytes != null
+                                ? progress.cumulativeBytesLoaded /
+                                    progress.expectedTotalBytes!
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.qr_code_2,
+                      size: 280,
+                      color: Colors.white24,
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'SCAN TO INSTALL',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                color: Colors.white.withValues(alpha: 0.6),
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(width: 32, height: 32),
+      // Action Column
+      Flexible(
+        child: Column(
+          crossAxisAlignment: isCompact
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Get it for Android',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'AgriDirect APK v1.0.0\nSafe & Verified Scan',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: Colors.white.withValues(alpha: 0.5),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            _downloadButton(),
+          ],
+        ),
+      ),
+    ];
+
+    return isCompact
+        ? Column(children: content)
+        : Row(mainAxisSize: MainAxisSize.min, children: content);
+  }
+
+  Widget _buildBannerGallery({required bool isCompact}) {
+    final banners = [
+      'assets/images/1.png',
+      'assets/images/2.png',
+      'assets/images/3.png',
+    ];
+
+    final galleryHeight = isCompact ? 400.0 : 600.0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final height = galleryHeight;
+
+        // Define banner dimensions
+        final bannerWidth = isCompact ? width * 0.85 : 800.0;
+        final bannerHeight = bannerWidth * (9 / 16);
+
+        // Sort indices for Z-order
+        final indices = List.generate(banners.length, (i) => i);
+        indices.sort((a, b) {
+          int posA = (a - _activeBannerIndex);
+          if (posA < -1) posA += 3;
+          if (posA > 1) posA -= 3;
+          int posB = (b - _activeBannerIndex);
+          if (posB < -1) posB += 3;
+          if (posB > 1) posB -= 3;
+          return posA.abs().compareTo(posB.abs());
+        });
+        final reversedIndices = indices.reversed.toList();
+
+        return Container(
+          height: galleryHeight,
+          width: width,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: reversedIndices.map((index) {
+              int position = (index - _activeBannerIndex);
+              if (position < -1) position += 3;
+              if (position > 1) position -= 3;
+
+              double scale = position == 0 ? 1.0 : 0.8;
+              double opacity = position == 0 ? 1.0 : 0.4;
+              
+              // Calculate horizontal position
+              double xOffset = (width - bannerWidth) / 2;
+              if (position != 0) {
+                xOffset += position * (isCompact ? 40 : 150);
+              }
+              
+              // Calculate vertical position (center it)
+              double yOffset = (height - bannerHeight) / 2;
+              if (position != 0) {
+                yOffset += 40; // Drop back-banners slightly
+              }
+
+              return AnimatedPositioned(
+                key: ValueKey('banner_pos_$index'),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutBack,
+                left: xOffset,
+                top: yOffset,
+                width: bannerWidth,
+                height: bannerHeight,
+                child: _buildBannerCard(
+                  banners[index],
+                  isCompact,
+                  isMain: position == 0,
+                  opacity: opacity,
+                  scale: scale,
+                  onTap: () {
+                    setState(() {
+                      _activeBannerIndex = index;
+                    });
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBannerCard(
+    String assetPath,
+    bool isCompact, {
+    bool isMain = false,
+    double opacity = 1.0,
+    double scale = 1.0,
+    VoidCallback? onTap,
+  }) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedScale(
+          scale: scale,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeOutBack,
+          child: AnimatedOpacity(
+            opacity: opacity,
+            duration: const Duration(milliseconds: 600),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(isCompact ? 16 : 24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isMain ? 0.5 : 0.3),
+                    blurRadius: isMain ? 60 : 40,
+                    offset: Offset(0, isMain ? 30 : 20),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(isCompact ? 16 : 24),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Image.asset(
+                    assetPath,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(color: Colors.white10),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _downloadButton({bool fullWidth = false}) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: _downloadAndroidApk,
+        child: Container(
+          width: fullWidth ? double.infinity : null,
+          height: 58,
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AgriColors.emerald400, AgriColors.emerald600],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AgriColors.emerald500.withValues(alpha: 0.3),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.android_rounded, color: Colors.white, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                'Download APK',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFooter() {
     final sw = MediaQuery.of(context).size.width;
     return Container(
@@ -1694,7 +2111,10 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const BrandLogo(size: BrandLogoSize.small, inverted: true),
+                        const BrandLogo(
+                          size: BrandLogoSize.small,
+                          inverted: true,
+                        ),
                         const SizedBox(height: 12),
                         Text(
                           'Connecting local farmers\ndirectly to your kitchen for a\nhealthier, more sustainable world.',
@@ -1851,7 +2271,10 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const BrandLogo(size: BrandLogoSize.small, inverted: true),
+                          const BrandLogo(
+                            size: BrandLogoSize.small,
+                            inverted: true,
+                          ),
                           const SizedBox(height: 16),
                           Text(
                             'Connecting local farmers\ndirectly to your kitchen for a\nhealthier, more sustainable world.',

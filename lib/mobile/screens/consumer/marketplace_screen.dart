@@ -5,14 +5,17 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'orders_screen.dart';
+import 'cart_screen.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/models/cached_product.dart';
 import '../../../shared/services/offline/offline_cache_service.dart';
+import '../../../shared/services/offline/network_status_service.dart';
 import '../../widgets/offline_browse_widget.dart';
 import '../../widgets/skeleton_loaders.dart';
 import '../../../shared/services/commerce/order_service.dart';
+import '../../../shared/services/commerce/cart_service.dart';
 import 'package:agridirect/shared/widgets/image_widgets.dart';
 import '../../../shared/services/user/user_service.dart';
 import '../../../shared/models/auth/user_address_model.dart';
@@ -20,6 +23,9 @@ import '../../../shared/services/integration/reverse_geocoding_service.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/services/core/supabase_config.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Marketplace Screen - Professional Digital Marketplace
 class MarketplaceScreen extends StatefulWidget {
@@ -31,7 +37,7 @@ class MarketplaceScreen extends StatefulWidget {
 
 class _MarketplaceScreenState extends State<MarketplaceScreen> {
   int _selectedFilter = 0;
-  final _filters = ['All Products', 'Vegetables', 'Fruits', 'Dairy', 'Grains'];
+  List<String> _filters = ['All Products'];
   bool _isOnline = true;
   late OfflineCacheService _cacheService;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -41,6 +47,59 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     super.initState();
     _initializeCacheService();
     _setupConnectivityListener();
+    _loadMarketplaceCategories();
+    SupabaseDataService.marketplaceCategoryNotifier.addListener(_onExternalCategoryFilter);
+  }
+
+  void _onExternalCategoryFilter() {
+    final cat = SupabaseDataService.marketplaceCategoryNotifier.value;
+    if (cat != null && mounted) {
+      // Find the index of the category in our filters
+      // Note: _filters might not be loaded yet, so we'll wait or handle it in _loadMarketplaceCategories
+      _applyExternalFilter();
+    }
+  }
+
+  void _applyExternalFilter() {
+    final cat = SupabaseDataService.marketplaceCategoryNotifier.value;
+    if (cat == null) return;
+
+    final index = _filters.indexWhere((f) => f.toLowerCase() == cat.toLowerCase());
+    if (index != -1) {
+      setState(() {
+        _selectedFilter = index;
+      });
+      // Reset the notifier so it doesn't re-trigger unexpectedly if we navigate back and forth
+      // SupabaseDataService.marketplaceCategoryNotifier.value = null;
+    }
+  }
+
+  Future<void> _loadMarketplaceCategories() async {
+    try {
+      final dbCategories = await SupabaseDataService().getMarketplaceCategories();
+      if (!mounted) return;
+
+      setState(() {
+        _filters = ['All Products', ...dbCategories];
+        if (_selectedFilter >= _filters.length) {
+          _selectedFilter = 0;
+        }
+        // If there's an external filter waiting, apply it now
+        _applyExternalFilter();
+      });
+    } catch (e) {
+      debugPrint('[Marketplace] ⚠️ Failed to load categories: $e');
+    }
+  }
+
+  bool _matchesSelectedCategory(ProductItem product) {
+    if (_selectedFilter == 0 || _selectedFilter >= _filters.length) {
+      return true;
+    }
+
+    final selectedCategory = _filters[_selectedFilter].trim().toLowerCase();
+    final productCategory = (product.categoryName ?? '').trim().toLowerCase();
+    return productCategory.isNotEmpty && productCategory == selectedCategory;
   }
 
   void _initializeCacheService() {
@@ -48,40 +107,73 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   void _setupConnectivityListener() {
-    Connectivity().checkConnectivity().then((result) {
-      final isOnline =
-          result.isNotEmpty && result.first != ConnectivityResult.none;
-      if (mounted) {
-        setState(() {
-          _isOnline = isOnline;
-        });
-      }
-    });
+    _refreshConnectivityStatus();
 
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
-      result,
-    ) {
-      final isOnline =
-          result.isNotEmpty && result.first != ConnectivityResult.none;
+      _,
+    ) async {
+      final wasOffline = !_isOnline;
+      final isOnline = await NetworkStatusService().isOnline();
       if (mounted) {
         setState(() {
           _isOnline = isOnline;
         });
+        // When transitioning offline → online, purge stale cache entries
+        if (wasOffline && isOnline) {
+          _refreshMarketplaceCacheFromServer();
+        }
       }
     });
+  }
+
+  Future<void> _refreshConnectivityStatus() async {
+    final isOnline = await NetworkStatusService().isOnline();
+    if (mounted) {
+      setState(() => _isOnline = isOnline);
+    }
+  }
+
+  /// On reconnect, compare cached products with live data and remove deleted ones.
+  Future<void> _refreshMarketplaceCacheFromServer() async {
+    try {
+      debugPrint('[Marketplace] 🔄 Refreshing cache after reconnect...');
+      final liveProducts = await SupabaseDataService().getNearbyProducts();
+      final liveIds = liveProducts
+          .map((p) => p.productId)
+          .whereType<String>()
+          .toSet();
+
+      final cachedProducts = _cacheService.getAllCachedProducts();
+      int removed = 0;
+
+      for (final cached in cachedProducts) {
+        // Only prune auto-cached items; keep manually-saved ones
+        if (cached.isManuallySaved) continue;
+        if (!liveIds.contains(cached.id)) {
+          await _cacheService.removeCachedProduct(cached.id);
+          removed++;
+        }
+      }
+
+      if (removed > 0) {
+        debugPrint(
+          '[Marketplace] 🧹 Purged $removed stale products from cache',
+        );
+      }
+      debugPrint('[Marketplace] ✅ Cache refresh complete');
+    } catch (e) {
+      debugPrint('[Marketplace] ⚠️ Cache refresh failed: $e');
+    }
   }
 
   @override
   void dispose() {
     _connectivitySubscription?.cancel();
+    SupabaseDataService.marketplaceCategoryNotifier.removeListener(_onExternalCategoryFilter);
     super.dispose();
   }
 
-  void _openOrders() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const OrdersScreen()));
-  }
+
 
   void _openProductView(ProductItem product) {
     Navigator.of(context).push(
@@ -114,7 +206,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textHeadline.withValues(alpha: 0.03),
+            color: AppColors.textHeadline.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -128,7 +220,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [const BrandLogo(), _buildHeaderCart()],
+                children: [const BrandLogo(), _buildHeaderCart(context)],
               ),
               const SizedBox(height: 24),
               Row(
@@ -140,7 +232,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                         color: AppColors.background,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: AppColors.textHeadline.withValues(alpha: 0.05),
+                          color: AppColors.textHeadline.withValues(alpha: 0.1),
                         ),
                       ),
                       child: TextField(
@@ -171,7 +263,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.2),
+                          color: AppColors.primary.withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -192,41 +284,71 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     );
   }
 
-  Widget _buildHeaderCart() {
-    return GestureDetector(
-      onTap: _openOrders,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: AppColors.textHeadline.withValues(alpha: 0.05),
-          ),
-        ),
-        child: Stack(
-          children: [
-            const Icon(
-              Icons.shopping_bag_outlined,
-              color: AppColors.textHeadline,
-              size: 24,
-            ),
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
+  Widget _buildHeaderCart(BuildContext context) {
+    return ListenableBuilder(
+      listenable: CartService(),
+      builder: (context, _) {
+        final count = CartService().itemCount;
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CartScreen()),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.textHeadline.withValues(alpha: 0.1),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.textHeadline.withValues(alpha: 0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(
+                  Icons.shopping_cart_outlined,
+                  color: AppColors.textHeadline,
+                  size: 24,
+                ),
+                if (count > 0)
+                  Positioned(
+                    top: -6,
+                    right: -6,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: AppColors.accent,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        '$count',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -253,14 +375,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.2),
+                          color: AppColors.primary.withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
                       ]
                     : [
                         BoxShadow(
-                          color: AppColors.textHeadline.withValues(alpha: 0.03),
+                          color: AppColors.textHeadline.withValues(alpha: 0.1),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
@@ -268,7 +390,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 border: Border.all(
                   color: isSelected
                       ? AppColors.primary
-                      : AppColors.textHeadline.withValues(alpha: 0.05),
+                      : AppColors.textHeadline.withValues(alpha: 0.1),
                 ),
               ),
               child: Text(
@@ -292,6 +414,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           .getAllCachedProducts()
           .where((p) => !p.isPreorder)
           .map(_cachedToProductItem)
+          .where(_matchesSelectedCategory)
           .toList();
 
       return Column(
@@ -302,7 +425,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           ),
           Expanded(
             child: cachedProducts.isEmpty
-                ? _buildNoCachedProductsState()
+                ? _buildNoCategoryMatchState(isOffline: true)
                 : Stack(
                     children: [
                       GridView.builder(
@@ -332,7 +455,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     return StreamBuilder<List<ProductItem>>(
       stream: SupabaseDataService().watchNearbyProducts(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return Padding(
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
             child: ProductGridSkeleton(itemCount: 6, enabled: true),
@@ -340,6 +464,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         }
 
         final products = snapshot.data ?? [];
+        final filteredProducts = products.where(_matchesSelectedCategory).toList();
+
+        if (filteredProducts.isEmpty) {
+          return _buildNoCategoryMatchState();
+        }
 
         // Auto-cache products when loaded
         if (products.isNotEmpty) {
@@ -351,7 +480,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               price: _parsePrice(product.price),
               description: product.description,
               imageUrl: product.imageUrl,
-              category: 'All',
+              category: product.categoryName,
               unit: product.unit,
               isPreorder: false,
               harvestDays: int.tryParse(product.harvestDays ?? '0') ?? 0,
@@ -376,13 +505,53 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                     MediaQuery.of(context).size.width /
                     (MediaQuery.of(context).size.height * 0.75),
               ),
-              itemCount: products.length,
-              itemBuilder: (_, i) => _buildProductCard(products[i]),
+              itemCount: filteredProducts.length,
+              itemBuilder: (_, i) => _buildProductCard(filteredProducts[i]),
             ),
             _buildFloatingFilters(),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildNoCategoryMatchState({bool isOffline = false}) {
+    final hasCategoryFilter = _selectedFilter > 0 && _selectedFilter < _filters.length;
+    final selectedCategory = hasCategoryFilter ? _filters[_selectedFilter] : null;
+
+    if (!hasCategoryFilter) {
+      return _buildNoCachedProductsState();
+    }
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.category_outlined, size: 56, color: AppColors.textSubtle.withValues(alpha: 0.5)),
+            const SizedBox(height: 14),
+            Text(
+              'No products in $selectedCategory yet.',
+              style: AppTextStyles.headline3.copyWith(color: AppColors.textHeadline),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isOffline
+                  ? 'Try reconnecting or switch back to All Products.'
+                  : 'Try another category or switch back to All Products.',
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: () => setState(() => _selectedFilter = 0),
+              child: const Text('Show All Products'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -403,6 +572,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       price: '₱${product.price.toStringAsFixed(2)}',
       unit: normalizedUnit.isEmpty ? 'kg' : normalizedUnit,
       imageUrl: product.imageUrl ?? '',
+      categoryName: product.category,
       rating: (product.rating ?? 0).toStringAsFixed(1),
       reviews: '0',
       harvestDays: product.harvestDays.toString(),
@@ -532,18 +702,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      product.farm.split(',').first.toUpperCase(),
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.primary,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
                       product.name,
                       style: AppTextStyles.headline3.copyWith(fontSize: 15),
                       maxLines: 1,
@@ -582,23 +740,37 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                             ),
                           ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.2),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
+                        GestureDetector(
+                          onTap: () {
+                            CartService().addItem(product);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${product.name} added to cart'),
+                                duration: const Duration(seconds: 1),
+                                backgroundColor: AppColors.primary,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.add_shopping_cart_rounded,
-                            size: 18,
-                            color: Colors.white,
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.add_shopping_cart_rounded,
+                              size: 18,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ],
@@ -630,6 +802,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   UserAddress? _address;
   String _paymentMethod = 'COD';
   bool _isLoadingAddress = true;
+  final OfflineCacheService _cacheService = OfflineCacheService();
 
   Future<void> _loadAddress() async {
     try {
@@ -651,767 +824,24 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   }
 
   Future<UserAddress?> _openAddressEditor([UserAddress? initialAddress]) async {
-    final streetController = TextEditingController(
-      text: initialAddress?.street ?? '',
-    );
-    final barangayController = TextEditingController(
-      text: initialAddress?.barangay ?? '',
-    );
-    final cityController = TextEditingController(
-      text: initialAddress?.city ?? '',
-    );
-    final provinceController = TextEditingController(
-      text: initialAddress?.province ?? '',
-    );
-    final zipCodeController = TextEditingController(
-      text: initialAddress?.zipCode ?? '',
-    );
-    final labelController = TextEditingController(
-      text: initialAddress?.label ?? 'Home',
-    );
-    final recipientNameController = TextEditingController(
-      text: initialAddress?.recipientName ?? '',
-    );
-    final recipientPhoneController = TextEditingController(
-      text: initialAddress?.recipientPhone ?? '',
-    );
-
-    bool isPinningLocation = false;
-    bool isSavingAddress = false;
-    bool isDefault = initialAddress?.isDefault ?? false;
-    String? pinError;
-    String? saveError;
-    double? latitude = initialAddress?.latitude;
-    double? longitude = initialAddress?.longitude;
-
-    final savedAddress = await showModalBottomSheet<UserAddress>(
+    return await showModalBottomSheet<UserAddress>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setAddressState) => Container(
-          height: MediaQuery.of(dialogContext).size.height * 0.9,
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              // Handle and Close
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const SizedBox(width: 40),
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.textHeadline.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      icon: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close_rounded,
-                          size: 20,
-                          color: AppColors.textHeadline,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        initialAddress == null
-                            ? 'Add New Address'
-                            : 'Edit Address',
-                        style: AppTextStyles.headline1.copyWith(fontSize: 24),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Where should we deliver your orders?',
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.textSubtle,
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-
-                      // Section: Recipient
-                      _buildSectionHeader('Recipient Information'),
-                      const SizedBox(height: 16),
-                      _buildAddressInputField(
-                        controller: labelController,
-                        label: 'Address Label',
-                        hint: 'e.g. Home, Office, Farm',
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildAddressInputField(
-                              controller: recipientNameController,
-                              label: 'Full Name',
-                              hint: 'Enter name',
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildAddressInputField(
-                              controller: recipientPhoneController,
-                              label: 'Mobile Number',
-                              hint: '09xx xxx xxxx',
-                              keyboardType: TextInputType.phone,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Section: Address
-                      _buildSectionHeader('Delivery Address'),
-                      const SizedBox(height: 16),
-                      _buildAddressInputField(
-                        controller: streetController,
-                        label: 'Street / Building',
-                        hint: 'House no., street name',
-                      ),
-                      const SizedBox(height: 16),
-                      _buildAddressInputField(
-                        controller: barangayController,
-                        label: 'Barangay',
-                        hint: 'Search barangay',
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildAddressInputField(
-                              controller: cityController,
-                              label: 'City / Town',
-                              hint: 'Enter city',
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildAddressInputField(
-                              controller: provinceController,
-                              label: 'Province',
-                              hint: 'Enter province',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: 140,
-                        child: _buildAddressInputField(
-                          controller: zipCodeController,
-                          label: 'ZIP Code',
-                          hint: 'Optional',
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Settings
-                      _buildSectionHeader('Settings'),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: AppColors.textHeadline.withValues(
-                              alpha: 0.05,
-                            ),
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Default Address',
-                                      style: AppTextStyles.bodyMedium.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Use this for future checkouts',
-                                      style: AppTextStyles.bodySmall.copyWith(
-                                        color: AppColors.textSubtle,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Switch.adaptive(
-                                  value: isDefault,
-                                  activeTrackColor: AppColors.primary,
-                                  onChanged: (val) =>
-                                      setAddressState(() => isDefault = val),
-                                ),
-                              ],
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              child: Divider(height: 1),
-                            ),
-                            InkWell(
-                              onTap: isPinningLocation
-                                  ? null
-                                  : () async {
-                                      setAddressState(() {
-                                        isPinningLocation = true;
-                                        pinError = null;
-                                      });
-
-                                      try {
-                                        final serviceEnabled =
-                                            await Geolocator.isLocationServiceEnabled();
-                                        if (!serviceEnabled) {
-                                          setAddressState(() {
-                                            pinError = 'GPS is disabled.';
-                                            isPinningLocation = false;
-                                          });
-                                          return;
-                                        }
-
-                                        var permission =
-                                            await Geolocator.checkPermission();
-                                        if (permission ==
-                                            LocationPermission.denied) {
-                                          permission =
-                                              await Geolocator.requestPermission();
-                                        }
-
-                                        if (permission ==
-                                                LocationPermission.denied ||
-                                            permission ==
-                                                LocationPermission
-                                                    .deniedForever) {
-                                          setAddressState(() {
-                                            pinError =
-                                                'Location access denied.';
-                                            isPinningLocation = false;
-                                          });
-                                          return;
-                                        }
-
-                                        final position =
-                                            await Geolocator.getCurrentPosition(
-                                              desiredAccuracy:
-                                                  LocationAccuracy.high,
-                                            );
-
-                                        final resolved =
-                                            await ReverseGeocodingService.resolveFromCoordinates(
-                                              latitude: position.latitude,
-                                              longitude: position.longitude,
-                                            );
-
-                                        setAddressState(() {
-                                          if (resolved.street.isNotEmpty) {
-                                            streetController.text =
-                                                resolved.street;
-                                          }
-                                          if (resolved.barangay.isNotEmpty) {
-                                            barangayController.text =
-                                                resolved.barangay;
-                                          }
-                                          if (resolved.city.isNotEmpty) {
-                                            cityController.text = resolved.city;
-                                          }
-                                          if (resolved.province.isNotEmpty) {
-                                            provinceController.text =
-                                                resolved.province;
-                                          }
-                                          latitude = position.latitude;
-                                          longitude = position.longitude;
-                                          isPinningLocation = false;
-                                        });
-                                      } catch (_) {
-                                        setAddressState(() {
-                                          pinError = 'Failed to locate you.';
-                                          isPinningLocation = false;
-                                        });
-                                      }
-                                    },
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withValues(
-                                        alpha: 0.1,
-                                      ),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.my_location_rounded,
-                                      size: 18,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          isPinningLocation
-                                              ? 'Locating...'
-                                              : 'Auto-fill from GPS',
-                                          style: AppTextStyles.bodyMedium
-                                              .copyWith(
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.primary,
-                                              ),
-                                        ),
-                                        Text(
-                                          'Use current location to fill form',
-                                          style: AppTextStyles.bodySmall
-                                              .copyWith(
-                                                fontSize: 11,
-                                                color: AppColors.textSubtle,
-                                              ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (isPinningLocation)
-                                    const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  else
-                                    const Icon(
-                                      Icons.chevron_right_rounded,
-                                      color: AppColors.textSubtle,
-                                    ),
-                                ],
-                              ),
-                            ),
-                            if (pinError != null) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                pinError!,
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.error,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                    ],
-                  ),
-                ),
-              ),
-              // Footer Button
-              Container(
-                padding: EdgeInsets.fromLTRB(
-                  24,
-                  16,
-                  24,
-                  24 + MediaQuery.of(dialogContext).viewInsets.bottom,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 20,
-                      offset: const Offset(0, -5),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (saveError != null) ...[
-                      Text(
-                        saveError!,
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.error,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    Container(
-                      width: double.infinity,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton(
-                        onPressed: isSavingAddress
-                            ? null
-                            : () async {
-                                final street = streetController.text.trim();
-                                final barangay = barangayController.text.trim();
-                                final city = cityController.text.trim();
-                                final province = provinceController.text.trim();
-                                final zipCode = zipCodeController.text.trim();
-                                final label = labelController.text.trim();
-                                final recipientName = recipientNameController
-                                    .text
-                                    .trim();
-                                final recipientPhone = recipientPhoneController
-                                    .text
-                                    .trim();
-
-                                if (street.isEmpty ||
-                                    barangay.isEmpty ||
-                                    city.isEmpty ||
-                                    province.isEmpty) {
-                                  setAddressState(
-                                    () => saveError =
-                                        'Please fill all required fields',
-                                  );
-                                  return;
-                                }
-
-                                setAddressState(() {
-                                  isSavingAddress = true;
-                                  saveError = null;
-                                });
-
-                                final savedAddress = await UserService()
-                                    .upsertAddress(
-                                      addressId: initialAddress?.addressId,
-                                      street: street,
-                                      barangay: barangay,
-                                      city: city,
-                                      province: province,
-                                      zipCode: zipCode,
-                                      label: label,
-                                      recipientName: recipientName,
-                                      recipientPhone: recipientPhone,
-                                      isDefault: isDefault,
-                                      latitude: latitude,
-                                      longitude: longitude,
-                                    );
-
-                                if (!mounted) return;
-                                if (savedAddress == null) {
-                                  setAddressState(() {
-                                    isSavingAddress = false;
-                                    saveError = 'Service error. Try again.';
-                                  });
-                                  return;
-                                }
-                                if (mounted && context.mounted) {
-                                  Navigator.pop(context, savedAddress);
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                        ),
-                        child: isSavingAddress
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                initialAddress == null
-                                    ? 'Save Address'
-                                    : 'Update Details',
-                                style: AppTextStyles.headline3.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    labelController.dispose();
-    recipientNameController.dispose();
-    recipientPhoneController.dispose();
-    streetController.dispose();
-    barangayController.dispose();
-    cityController.dispose();
-    provinceController.dispose();
-    zipCodeController.dispose();
-
-    return savedAddress;
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Text(
-      title.toUpperCase(),
-      style: AppTextStyles.labelSmall.copyWith(
-        letterSpacing: 1.2,
-        fontWeight: FontWeight.w800,
-        color: AppColors.textHeadline.withValues(alpha: 0.4),
-      ),
+      builder: (context) => AddressEditorSheet(initialAddress: initialAddress),
     );
   }
 
   Future<UserAddress?> _openAddressSelector() async {
-    final addresses = await UserService().getAllUserAddresses();
-
-    if (!mounted) return null;
-
     return await showModalBottomSheet<UserAddress>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 48,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.textHeadline.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Select Address',
-                  style: AppTextStyles.headline1.copyWith(fontSize: 22),
-                ),
-                IconButton(
-                  onPressed: () async {
-                    final newAddress = await _openAddressEditor();
-                    if (newAddress != null && context.mounted) {
-                      Navigator.pop(context, newAddress);
-                    }
-                  },
-                  icon: const Icon(
-                    Icons.add_circle_outline_rounded,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: addresses.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.location_off_outlined,
-                            size: 64,
-                            color: AppColors.textSubtle.withValues(alpha: 0.3),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No addresses found',
-                            style: AppTextStyles.bodyLarge.copyWith(
-                              color: AppColors.textSubtle,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.separated(
-                      itemCount: addresses.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final addr = addresses[index];
-                        final isSelected =
-                            _address?.addressId == addr.addressId;
-                        return InkWell(
-                          onTap: () => Navigator.pop(context, addr),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppColors.primary.withValues(alpha: 0.05)
-                                  : AppColors.surface,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : AppColors.textHeadline.withValues(
-                                        alpha: 0.05,
-                                      ),
-                                width: isSelected ? 2 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            addr.label,
-                                            style: AppTextStyles.headline3
-                                                .copyWith(fontSize: 16),
-                                          ),
-                                          if (addr.isDefault) ...[
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 6,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: AppColors.primary,
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: const Text(
-                                                'DEFAULT',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 8,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        addr.recipientName,
-                                        style: AppTextStyles.bodyMedium
-                                            .copyWith(
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                      ),
-                                      Text(
-                                        addr.fullAddress,
-                                        style: AppTextStyles.bodySmall.copyWith(
-                                          color: AppColors.textSubtle,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Column(
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.edit_outlined,
-                                        size: 20,
-                                      ),
-                                      onPressed: () async {
-                                        final updated =
-                                            await _openAddressEditor(addr);
-                                        if (updated != null &&
-                                            context.mounted) {
-                                          Navigator.pop(context, updated);
-                                        }
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.delete_outline_rounded,
-                                        size: 20,
-                                        color: AppColors.error,
-                                      ),
-                                      onPressed: () async {
-                                        final deleted = await _deleteAddress(
-                                          addr.addressId,
-                                        );
-                                        if (deleted && context.mounted) {
-                                          Navigator.pop(context);
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
+      builder: (context) =>
+          AddressSelectorSheet(currentAddressId: _address?.addressId),
     );
-  }
-
-  Future<bool> _deleteAddress(String addressId) async {
-    try {
-      final success = await UserService().deleteAddressById(addressId);
-      if (!mounted) return false;
-      if (success && _address?.addressId == addressId) {
-        setState(() => _address = null);
-      }
-      return success;
-    } catch (_) {
-      return false;
-    }
   }
 
   void _showCheckoutSheet() {
@@ -1459,7 +889,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                   color: AppColors.background,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: AppColors.textHeadline.withValues(alpha: 0.05),
+                    color: AppColors.textHeadline.withValues(alpha: 0.1),
                   ),
                 ),
                 child: Row(
@@ -1484,11 +914,54 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                               fontSize: 16,
                             ),
                           ),
-                          Text(
-                            'Quantity: $_quantity ${widget.product.unit}',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.textSubtle,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Quantity:',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.textSubtle,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  _buildQtyBtn(
+                                    icon: Icons.remove_rounded,
+                                    onTap: () {
+                                      if (_quantity > 1) {
+                                        setState(() => _quantity--);
+                                        setSheetState(() {});
+                                      }
+                                    },
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                    child: Text(
+                                      '$_quantity',
+                                      style: AppTextStyles.headline3.copyWith(
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  _buildQtyBtn(
+                                    icon: Icons.add_rounded,
+                                    onTap: () {
+                                      setState(() => _quantity++);
+                                      setSheetState(() {});
+                                    },
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    widget.product.unit,
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -1500,7 +973,9 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
 
               // Address Section
               Text(
-                'Shipping Address',
+                _paymentMethod == 'COP'
+                    ? 'Pickup Location (at Farm)'
+                    : 'Shipping Address',
                 style: AppTextStyles.headline3.copyWith(
                   fontSize: 14,
                   color: AppColors.textHeadline,
@@ -1514,7 +989,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: AppColors.textHeadline.withValues(alpha: 0.05),
+                    color: AppColors.textHeadline.withValues(alpha: 0.1),
                   ),
                 ),
                 child: _isLoadingAddress
@@ -1525,45 +1000,125 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       )
-                    : _address == null
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'No address set yet.',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.error,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          OutlinedButton.icon(
-                            onPressed: () async {
-                              final updatedAddress = await _openAddressEditor();
-                              if (!mounted) return;
-                              if (updatedAddress != null) {
-                                setState(() => _address = updatedAddress);
-                                setSheetState(() {});
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Shipping address updated.'),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                );
-                              }
-                            },
-                            icon: const Icon(Icons.add_location_alt_rounded),
-                            label: const Text('Add Address'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.primary,
-                              side: const BorderSide(color: AppColors.primary),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                    : _paymentMethod == 'COP'
+                        ? Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.2),
                               ),
                             ),
-                          ),
-                        ],
-                      )
-                    : Column(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Farmer Location',
+                                            style: AppTextStyles.labelSmall.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.primary,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            widget.product.farmerName ?? 'AgriDirect Farmer',
+                                            style: AppTextStyles.bodyMedium.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    _buildMapButton(),
+                                  ],
+                                ),
+                                const Divider(height: 24, thickness: 0.5),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      Icons.storefront_rounded,
+                                      size: 20,
+                                      color: AppColors.primary.withValues(alpha: 0.4),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            widget.product.farm,
+                                            style: AppTextStyles.bodySmall.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textHeadline,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Pickup point for your order.',
+                                            style: AppTextStyles.bodySmall.copyWith(
+                                              fontSize: 10,
+                                              color: AppColors.textSubtle,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          )
+                        : _address == null
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'No address set yet.',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.error,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  final updatedAddress = await _openAddressEditor();
+                                  if (!mounted) return;
+                                  if (updatedAddress != null) {
+                                    setState(() => _address = updatedAddress);
+                                    setSheetState(() {});
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Shipping address updated.'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.add_location_alt_rounded),
+                                label: const Text('Add Address'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
+                                  side: const BorderSide(color: AppColors.primary),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
@@ -1742,6 +1297,237 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     );
   }
 
+  void _showFarmerMapSheet() {
+    final lat = widget.product.latitude;
+    final lng = widget.product.longitude;
+
+    if (lat == null || lng == null) {
+      // Fallback: search by address string if coordinates are missing
+      _viewFarmOnMap();
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          children: [
+            // Drag Handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}',
+                          style: AppTextStyles.headline1.copyWith(fontSize: 20),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'GPS Coordinates (Pickup)',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSubtle,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.background,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Stack(
+                    children: [
+                      FlutterMap(
+                        options: MapOptions(
+                          initialCenter: LatLng(lat, lng),
+                          initialZoom: 15.5,
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                            subdomains: const ['a', 'b', 'c', 'd'],
+                          ),
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: LatLng(lat, lng),
+                                width: 120,
+                                height: 80,
+                                alignment: Alignment.bottomCenter,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary,
+                                        borderRadius: BorderRadius.circular(8),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.2),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Text(
+                                        '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Icon(
+                                      Icons.location_on_rounded,
+                                      color: AppColors.primary,
+                                      size: 36,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Positioned(
+                        bottom: 20,
+                        left: 20,
+                        right: 20,
+                        child: ElevatedButton.icon(
+                          onPressed: _viewFarmOnMap,
+                          icon: const Icon(Icons.navigation_rounded, size: 20),
+                          label: const Text('Navigate to Farm'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 8,
+                            shadowColor: AppColors.primary.withValues(alpha: 0.3),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _viewFarmOnMap() async {
+    String query = '';
+    if (widget.product.latitude != null && widget.product.longitude != null) {
+      query = '${widget.product.latitude},${widget.product.longitude}';
+    } else {
+      query = Uri.encodeComponent(widget.product.farm);
+    }
+    
+    final url = 'https://www.google.com/maps/search/?api=1&query=$query';
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Widget _buildMapButton() {
+    return InkWell(
+      onTap: _showFarmerMapSheet,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.map_outlined, size: 14, color: AppColors.primary),
+            const SizedBox(width: 4),
+            Text(
+              'View Map',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w800,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQtyBtn({required IconData icon, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: AppColors.textHeadline.withValues(alpha: 0.1),
+          ),
+        ),
+        child: Icon(icon, size: 16, color: AppColors.primary),
+      ),
+    );
+  }
+
   Widget _buildPaymentOption({
     required String title,
     required String subtitle,
@@ -1754,13 +1540,13 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.05)
+              ? AppColors.primary.withValues(alpha: 0.1)
               : AppColors.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
                 ? AppColors.primary
-                : AppColors.textHeadline.withValues(alpha: 0.05),
+                : AppColors.textHeadline.withValues(alpha: 0.1),
             width: 2,
           ),
         ),
@@ -1786,64 +1572,6 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     );
   }
 
-  Widget _buildAddressInputField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4),
-          child: Text(
-            label,
-            style: AppTextStyles.bodySmall.copyWith(
-              color: AppColors.textHeadline.withValues(alpha: 0.6),
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-            ),
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          keyboardType: keyboardType,
-          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textSubtle.withValues(alpha: 0.3),
-            ),
-            filled: true,
-            fillColor: AppColors.background,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: AppColors.textHeadline.withValues(alpha: 0.05),
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 1.5,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   Future<void> _handleOrderNow() async {
     if (widget.product.productId == null || widget.product.farmerId == null) {
@@ -1917,8 +1645,66 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         precacheImage(CachedNetworkImageProvider(imageUrl), context);
+
+        // Cache the product for offline browsing when opened while online
+        _cacheProductForOffline();
       });
     }
+  }
+
+  void _cacheProductForOffline() {
+    try {
+      final cacheService = OfflineCacheService();
+      final price =
+          double.tryParse(
+            widget.product.price.replaceAll(RegExp(r'[^0-9.]'), ''),
+          ) ??
+          0.0;
+
+      final cachedProduct = CachedProduct(
+        id: widget.product.productId ?? 'unknown',
+        farmerId: widget.product.farmerId ?? 'unknown',
+        name: widget.product.name,
+        price: price,
+        description: widget.product.description,
+        imageUrl: widget.product.imageUrl,
+        availableQuantity: widget.product.targetQuantity
+            ?.toInt(), // Or reserved if available
+        isPreorder: widget.product.targetQuantity != null,
+        harvestDays: int.tryParse(widget.product.harvestDays ?? '0') ?? 0,
+      );
+
+      cacheService.autoCacheProduct(cachedProduct);
+      debugPrint(
+        '📦 Auto-cached product ${widget.product.name} for offline browsing',
+      );
+    } catch (e) {
+      debugPrint('⚠️ Failed to auto-cache product: $e');
+    }
+  }
+
+  CachedProduct _buildCachedProduct() {
+    final price =
+        double.tryParse(
+          widget.product.price.replaceAll(RegExp(r'[^0-9.]'), ''),
+        ) ??
+        0.0;
+
+    return CachedProduct(
+      id: widget.product.productId ?? 'unknown',
+      farmerId: widget.product.farmerId ?? 'unknown',
+      name: widget.product.name,
+      price: price,
+      description: widget.product.description,
+      imageUrl: widget.product.imageUrl,
+      availableQuantity: widget.product.targetQuantity?.toInt(),
+      isPreorder: widget.product.targetQuantity != null,
+      harvestDays: int.tryParse(widget.product.harvestDays ?? '0') ?? 0,
+      farmName: widget.product.farm,
+      unit: widget.product.unit,
+      rating: double.tryParse(widget.product.rating ?? '0'),
+      farmerAvatarUrl: widget.product.farmerAvatarUrl,
+    );
   }
 
   double? _getRating() {
@@ -1984,7 +1770,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -2011,7 +1797,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -2093,7 +1879,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                           borderRadius: BorderRadius.circular(4),
                           color: _currentPage == entry.key
                               ? Colors.white
-                              : Colors.white.withValues(alpha: 0.5),
+                              : Colors.white.withValues(alpha: 0.4),
                         ),
                       );
                     }).toList(),
@@ -2205,6 +1991,15 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                     },
                   ),
                 const SizedBox(height: 28),
+                Row(
+                  children: [
+                    SaveForOfflineButton(
+                      product: _buildCachedProduct(),
+                      cacheService: _cacheService,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
 
                 // Product Description
                 Text(
@@ -2220,7 +2015,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: AppColors.textHeadline.withValues(alpha: 0.05),
+                      color: AppColors.textHeadline.withValues(alpha: 0.1),
                     ),
                   ),
                   child: Text(
@@ -2240,11 +2035,11 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: AppColors.textHeadline.withValues(alpha: 0.05),
+                      color: AppColors.textHeadline.withValues(alpha: 0.1),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -2318,9 +2113,10 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                                   .select('farmer_id')
                                   .eq('user_id', currentUserId)
                                   .maybeSingle();
-                              
-                              if (farmerRecord != null && 
-                                  farmerRecord['farmer_id'] == widget.product.farmerId) {
+
+                              if (farmerRecord != null &&
+                                  farmerRecord['farmer_id'] ==
+                                      widget.product.farmerId) {
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
@@ -2377,7 +2173,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.textHeadline.withValues(alpha: 0.05),
+                      color: AppColors.textHeadline.withValues(alpha: 0.1),
                     ),
                   ),
                   child: Row(
@@ -2427,6 +2223,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () {
+                          CartService().addItem(widget.product, _quantity);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
@@ -2434,6 +2231,10 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                               ),
                               duration: const Duration(seconds: 2),
                               backgroundColor: AppColors.primary,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                           );
                         },
@@ -2495,6 +2296,782 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class AddressSelectorSheet extends StatefulWidget {
+  final String? currentAddressId;
+  const AddressSelectorSheet({super.key, this.currentAddressId});
+
+  @override
+  State<AddressSelectorSheet> createState() => _AddressSelectorSheetState();
+}
+
+class _AddressSelectorSheetState extends State<AddressSelectorSheet> {
+  final UserService _userService = UserService();
+  List<UserAddress> _addresses = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAddresses();
+  }
+
+  Future<void> _loadAddresses() async {
+    try {
+      final list = await _userService.getAllUserAddresses();
+      if (mounted) setState(() => _addresses = list);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 48,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Text(
+                  'Select Address',
+                  style: AppTextStyles.headline1.copyWith(fontSize: 22),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () async {
+                    final newAddress = await showModalBottomSheet<UserAddress>(
+                      context: context,
+                      isScrollControlled: true,
+                      useRootNavigator: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => const AddressEditorSheet(),
+                    );
+                    if (newAddress != null && context.mounted) {
+                      Navigator.pop(context, newAddress);
+                    }
+                  },
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add New'),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _addresses.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.location_off_rounded,
+                          size: 64,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 16),
+                        const Text('No addresses found'),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    itemCount: _addresses.length,
+                    itemBuilder: (context, index) {
+                      final addr = _addresses[index];
+                      final isSelected =
+                          addr.addressId == widget.currentAddressId;
+                      return GestureDetector(
+                        onTap: () => Navigator.pop(context, addr),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppColors.primary.withValues(alpha: 0.1)
+                                : AppColors.background,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  addr.label.toLowerCase() == 'home'
+                                      ? Icons.home_rounded
+                                      : addr.label.toLowerCase() == 'office'
+                                      ? Icons.work_rounded
+                                      : Icons.location_on_rounded,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppColors.primary,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          addr.label,
+                                          style: AppTextStyles.headline3
+                                              .copyWith(fontSize: 16),
+                                        ),
+                                        if (addr.isDefault) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary
+                                                  .withValues(alpha: 0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              'DEFAULT',
+                                              style: TextStyle(
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.w800,
+                                                color: AppColors.primary,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    Text(
+                                      addr.street,
+                                      style: AppTextStyles.bodySmall,
+                                    ),
+                                    Text(
+                                      '${addr.barangay}, ${addr.city}',
+                                      style: AppTextStyles.bodySmall.copyWith(
+                                        color: AppColors.textSubtle,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                const Icon(
+                                  Icons.check_circle_rounded,
+                                  color: AppColors.primary,
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+}
+
+class AddressEditorSheet extends StatefulWidget {
+  final UserAddress? initialAddress;
+  const AddressEditorSheet({super.key, this.initialAddress});
+
+  @override
+  State<AddressEditorSheet> createState() => _AddressEditorSheetState();
+}
+
+class _AddressEditorSheetState extends State<AddressEditorSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _labels = ['Home', 'Office', 'Farm', 'Warehouse', 'Other'];
+  String _selectedLabel = 'Home';
+  final _recipientController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _streetController = TextEditingController();
+  final _barangayController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _provinceController = TextEditingController();
+  bool _isDefault = false;
+  bool _isSaving = false;
+  double? _latitude;
+  double? _longitude;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialAddress != null) {
+      if (_labels.contains(widget.initialAddress!.label)) {
+        _selectedLabel = widget.initialAddress!.label;
+      } else {
+        _selectedLabel = 'Other';
+      }
+      _recipientController.text = widget.initialAddress!.recipientName;
+      _phoneController.text = widget.initialAddress!.recipientPhone;
+      _streetController.text = widget.initialAddress!.street;
+      _barangayController.text = widget.initialAddress!.barangay;
+      _cityController.text = widget.initialAddress!.city;
+      _provinceController.text = widget.initialAddress!.province;
+      _isDefault = widget.initialAddress!.isDefault;
+      _latitude = widget.initialAddress!.latitude;
+      _longitude = widget.initialAddress!.longitude;
+    }
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSaving = true);
+    try {
+      final service = UserService();
+      final result = await service.upsertAddress(
+        addressId: widget.initialAddress?.addressId,
+        label: _selectedLabel,
+        recipientName: _recipientController.text,
+        recipientPhone: _phoneController.text,
+        street: _streetController.text,
+        barangay: _barangayController.text,
+        city: _cityController.text,
+        province: _provinceController.text,
+        zipCode: '0000', // Default placeholder
+        isDefault: _isDefault,
+        latitude: _latitude,
+        longitude: _longitude,
+      );
+
+      if (mounted && result != null) Navigator.pop(context, result);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    widget.initialAddress == null
+                        ? 'Add Address'
+                        : 'Edit Address',
+                    style: AppTextStyles.headline1.copyWith(fontSize: 22),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              // Label Dropdown
+              Text(
+                'Label (e.g. Home, Office)',
+                style: AppTextStyles.bodySmall.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedLabel,
+                items: _labels.map((label) {
+                  return DropdownMenuItem(value: label, child: Text(label));
+                }).toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _selectedLabel = v);
+                },
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: AppColors.background,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildField(
+                _recipientController,
+                'Recipient Name',
+                'Juan Dela Cruz',
+              ),
+              const SizedBox(height: 16),
+              _buildField(
+                _phoneController,
+                'Phone Number',
+                '09123456789',
+                keyboard: TextInputType.phone,
+              ),
+              const SizedBox(height: 16),
+              _buildField(
+                _streetController,
+                'Street / House No.',
+                '123 Agri St.',
+              ),
+              const SizedBox(height: 16),
+              _buildField(_barangayController, 'Barangay', 'Brgy. San Jose'),
+              const SizedBox(height: 16),
+              _buildField(_cityController, 'City', 'Cabanatuan'),
+              const SizedBox(height: 16),
+              _buildField(_provinceController, 'Province', 'Nueva Ecija'),
+              const SizedBox(height: 16),
+              // Pin Location Indicator
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: (_latitude != null && _longitude != null)
+                      ? AppColors.primary.withValues(alpha: 0.1)
+                      : AppColors.background,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: (_latitude != null && _longitude != null)
+                        ? AppColors.primary.withValues(alpha: 0.2)
+                        : Colors.transparent,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_rounded,
+                      color: (_latitude != null && _longitude != null)
+                          ? AppColors.primary
+                          : AppColors.textSubtle,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Delivery Pin',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: (_latitude != null && _longitude != null)
+                                  ? AppColors.primary
+                                  : AppColors.textHeadline,
+                            ),
+                          ),
+                          Text(
+                            (_latitude != null && _longitude != null)
+                                ? 'Location Pinned'
+                                : 'No exact location pinned yet.',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              fontSize: 11,
+                              color: AppColors.textSubtle,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    TextButton.icon(
+                      onPressed: () async {
+                        final result =
+                            await showModalBottomSheet<Map<String, dynamic>>(
+                              context: context,
+                              isScrollControlled: true,
+                              useRootNavigator: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) => const LocationPickerSheet(),
+                            );
+
+                        if (result != null && mounted) {
+                          setState(() {
+                            _latitude = result['lat'];
+                            _longitude = result['lng'];
+                            if (result['address'] != null) {
+                              final ResolvedFarmLocation addr =
+                                  result['address'];
+                              _streetController.text = addr.street;
+                              _barangayController.text = addr.barangay;
+                              _cityController.text = addr.city;
+                              _provinceController.text = addr.province;
+                            }
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.map_rounded, size: 18),
+                      label: Text(
+                        (_latitude != null && _longitude != null)
+                            ? 'Change on Map'
+                            : 'Select on Map',
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SwitchListTile(
+                title: const Text('Set as default address'),
+                value: _isDefault,
+                onChanged: (v) => setState(() => _isDefault = v),
+                activeThumbColor: AppColors.primary,
+                contentPadding: EdgeInsets.zero,
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          'Save Address',
+                          style: AppTextStyles.headline3.copyWith(
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildField(
+    TextEditingController controller,
+    String label,
+    String hint, {
+    TextInputType? keyboard,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboard,
+          decoration: InputDecoration(
+            hintText: hint,
+            filled: true,
+            fillColor: AppColors.background,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+        ),
+      ],
+    );
+  }
+}
+
+class LocationPickerSheet extends StatefulWidget {
+  const LocationPickerSheet({super.key});
+
+  @override
+  State<LocationPickerSheet> createState() => _LocationPickerSheetState();
+}
+
+class _LocationPickerSheetState extends State<LocationPickerSheet> {
+  final MapController _mapController = MapController();
+  LatLng _currentCenter = const LatLng(15.4828, 120.9714); // Default Cabanatuan
+  bool _isLoading = true;
+  bool _isResolving = false;
+  ResolvedFarmLocation? _resolvedLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    _moveToCurrentLocation();
+  }
+
+  Future<void> _moveToCurrentLocation() async {
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      final newCenter = LatLng(position.latitude, position.longitude);
+      if (mounted) {
+        setState(() {
+          _currentCenter = newCenter;
+          _isLoading = false;
+        });
+        _mapController.move(newCenter, 16);
+        _resolveAddress(newCenter);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _resolveAddress(LatLng point) async {
+    setState(() => _isResolving = true);
+    try {
+      final resolved = await ReverseGeocodingService.resolveFromCoordinates(
+        latitude: point.latitude,
+        longitude: point.longitude,
+      );
+      if (mounted) {
+        setState(() {
+          _resolvedLocation = resolved;
+          _isResolving = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isResolving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _currentCenter,
+                initialZoom: 16,
+                onPositionChanged: (pos, hasGesture) {
+                  if (hasGesture) {
+                    setState(() => _currentCenter = pos.center);
+                  }
+                },
+                onMapEvent: (event) {
+                  if (event is MapEventMoveEnd) {
+                    _resolveAddress(_currentCenter);
+                  }
+                },
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.agridirect.app',
+                ),
+              ],
+            ),
+          ),
+
+          // Center Marker
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 35),
+              child: Icon(
+                Icons.location_on_rounded,
+                color: AppColors.primary,
+                size: 40,
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Top Header
+          Positioned(
+            top: 20,
+            left: 20,
+            right: 20,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.white,
+                  child: IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.black),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+                Text(
+                  'Select Delivery Pin',
+                  style: AppTextStyles.headline3.copyWith(
+                    backgroundColor: Colors.white.withValues(alpha: 0.9),
+                  ),
+                ),
+                const SizedBox(width: 40), // Balance
+              ],
+            ),
+          ),
+
+          // Bottom Address Bar
+          Positioned(
+            bottom: 20,
+            left: 20,
+            right: 20,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                FloatingActionButton(
+                  onPressed: _moveToCurrentLocation,
+                  backgroundColor: Colors.white,
+                  mini: true,
+                  child: const Icon(
+                    Icons.my_location_rounded,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, -5),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on_rounded,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _isResolving
+                                      ? 'Resolving address...'
+                                      : (_resolvedLocation?.fullAddress ??
+                                            'Unknown Location'),
+                                  style: AppTextStyles.bodyMedium.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isResolving
+                              ? null
+                              : () {
+                                  Navigator.pop(context, {
+                                    'lat': _currentCenter.latitude,
+                                    'lng': _currentCenter.longitude,
+                                    'address': _resolvedLocation,
+                                  });
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: Text(
+                            'Confirm Pin Location',
+                            style: AppTextStyles.headline3.copyWith(
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          if (_isLoading) const Center(child: CircularProgressIndicator()),
         ],
       ),
     );

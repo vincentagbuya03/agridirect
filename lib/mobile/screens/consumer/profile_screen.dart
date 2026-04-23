@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/integration/weather_alert_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/styles/app_theme.dart';
@@ -56,7 +58,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
             _farmerName = farmers[0]['farm_name'] as String?;
           });
           final rawUrl = farmers[0]['image_url'] as String?;
-          final safeUrl = await SupabaseDB.getSafeUrl(
+          final safeUrl = await SupabaseDatabase.getSafeUrl(
             rawUrl,
             defaultBucket: 'uploads',
           );
@@ -75,7 +77,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
 
         if (users.isNotEmpty && mounted) {
           final rawUrl = users[0]['avatar_url'] as String?;
-          final safeUrl = await SupabaseDB.getSafeUrl(
+          final safeUrl = await SupabaseDatabase.getSafeUrl(
             rawUrl,
             defaultBucket: 'uploads',
           );
@@ -132,7 +134,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppColors.primaryLight.withValues(alpha: 0.5),
+                color: AppColors.primaryLight.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -280,7 +282,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textHeadline.withValues(alpha: 0.04),
+            color: AppColors.textHeadline.withValues(alpha: 0.15),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -310,7 +312,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: (isFarmer ? AppColors.accent : AppColors.primary)
-                    .withValues(alpha: 0.08),
+                    .withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -325,7 +327,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Profile', style: AppTextStyles.headline1),
-                      if (auth.registrationStatus == 'approved')
+                      if (auth.registrationStatus == 'approved' || auth.isSeller)
                         GestureDetector(
                           onTap: isFarmer
                               ? _handleSwitchToCustomer
@@ -548,12 +550,12 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                 ] else if (auth.registrationStatus == 'rejected') ...[
                   _buildRejectedRetryMenuItem(),
                   _buildDivider(),
-                ] else if (auth.registrationStatus == null ||
-                    auth.registrationStatus == '') ...[
+                ] else if (!auth.isSeller && (auth.registrationStatus == null ||
+                    auth.registrationStatus == '')) ...[
                   _buildStartSellingMenuItem(),
                   _buildDivider(),
                 ],
-                if (auth.registrationStatus == 'approved') ...[
+                if (auth.registrationStatus == 'approved' || auth.isSeller) ...[
                   _buildMenuItem(
                     icon: Icons.dashboard_rounded,
                     title: isFarmer
@@ -628,6 +630,18 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                   title: 'App Settings',
                   color: const Color(0xFF64748B),
                 ),
+                if (kDebugMode) ...[
+                  _buildDivider(),
+                  _buildMenuItem(
+                    icon: Icons.cloud_sync_rounded,
+                    title: 'Test Weather Alert',
+                    color: const Color(0xFF0EA5E9),
+                    subtitle: 'Simulate bad weather alert',
+                    onTap: () async {
+                      await WeatherAlertService().testWeatherNotification();
+                    },
+                  ),
+                ],
               ],
             ),
           ),
@@ -766,7 +780,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                 color: AppColors.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: AppColors.error.withValues(alpha: 0.25),
+                  color: AppColors.error.withValues(alpha: 0.2),
                 ),
               ),
               child: const Icon(
@@ -829,7 +843,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: color.withValues(alpha: 0.1)),
+                  border: Border.all(color: color.withValues(alpha: 0.2)),
                 ),
                 child: Icon(icon, size: 22, color: color),
               ),
@@ -860,7 +874,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
               Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 16,
-                color: AppColors.textSubtle.withValues(alpha: 0.4),
+                color: AppColors.textSubtle.withValues(alpha: 0.3),
               ),
             ],
           ),
@@ -873,7 +887,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
     return Divider(
       height: 1,
       thickness: 1,
-      color: AppColors.textSubtle.withValues(alpha: 0.08),
+      color: AppColors.textSubtle.withValues(alpha: 0.1),
       indent: 70,
       endIndent: 20,
     );

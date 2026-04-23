@@ -226,7 +226,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.error.withValues(alpha: 0.05),
+                  color: AppColors.error.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: AppColors.error.withValues(alpha: 0.2),
@@ -374,14 +374,14 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected
-                      ? AppColors.primary.withValues(alpha: 0.2)
+                      ? AppColors.primary.withValues(alpha: 0.3)
                       : Colors.transparent,
                   width: 1.5,
                 ),
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: AppColors.textHeadline.withValues(alpha: 0.06),
+                          color: AppColors.textHeadline.withValues(alpha: 0.05),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                         ),
@@ -537,7 +537,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
             color: Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -596,7 +596,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                               width: 8,
                               height: 8,
                               decoration: BoxDecoration(
-                                color: isOnline ? AppColors.success : AppColors.textSubtle.withValues(alpha: 0.3),
+                                color: isOnline ? AppColors.success : AppColors.textSubtle.withValues(alpha: 0.2),
                                 shape: BoxShape.circle,
                               ),
                             );
@@ -784,7 +784,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.03),
+                                    color: Colors.black.withValues(alpha: 0.05),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -864,7 +864,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     color: AppColors.background,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: AppColors.textSubtle.withValues(alpha: 0.1),
+                      color: AppColors.textSubtle.withValues(alpha: 0.2),
                     ),
                   ),
                   child: TextField(
@@ -944,7 +944,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.05),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Stack(

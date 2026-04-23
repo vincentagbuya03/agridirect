@@ -22,11 +22,23 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
   final String _filterSpecialty = 'All';
   int _currentPage = 1;
   static const int _rowsPerPage = 10;
+  late VoidCallback _dataRefreshListener;
 
   @override
   void initState() {
     super.initState();
+    _dataRefreshListener = () {
+      if (!mounted) return;
+      _loadData();
+    };
+    widget.adminService.dataVersionListenable.addListener(_dataRefreshListener);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    widget.adminService.dataVersionListenable.removeListener(_dataRefreshListener);
+    super.dispose();
   }
 
   void _loadData() {
@@ -449,7 +461,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                         color: AdminUi.brandSoft,
                         borderRadius: AdminUi.radiusSm,
                         border: Border.all(
-                          color: AdminUi.brand.withValues(alpha: 0.15),
+                          color: AdminUi.brand.withValues(alpha: 0.2),
                         ),
                       ),
                       child: Text(
@@ -763,10 +775,10 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Verification rates have increased by 14% since the new documentation protocols were implemented last month.',
+                    'Platform verification throughput remains stable. Real-time monitoring of document submission trends is active.',
                     style: AdminUi.body(
                       size: 13,
-                      color: Colors.white.withValues(alpha: 0.8),
+                      color: Colors.white.withValues(alpha: 0.9),
                     ),
                   ),
                   const Spacer(),
@@ -981,7 +993,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Close',
-      barrierColor: Colors.black.withValues(alpha: 0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, anim1, anim2) {
         return Align(
@@ -998,7 +1010,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 40,
                     offset: const Offset(-10, 0),
                   ),
@@ -1052,7 +1064,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
         Container(
           padding: const EdgeInsets.fromLTRB(32, 40, 32, 24),
           decoration: BoxDecoration(
-            color: AdminUi.sidebarBg.withValues(alpha: 0.5),
+            color: AdminUi.sidebarBg.withValues(alpha: 0.05),
             border: Border(bottom: BorderSide(color: AdminUi.border)),
           ),
           child: Column(
@@ -1285,7 +1297,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: AdminUi.brand.withValues(alpha: 0.6)),
+          Icon(icon, size: 18, color: AdminUi.brand.withValues(alpha: 0.5)),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -1327,7 +1339,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
+        color: color.withValues(alpha: 0.1),
         borderRadius: AdminUi.radiusMd,
         border: Border.all(color: color.withValues(alpha: 0.2)),
       ),

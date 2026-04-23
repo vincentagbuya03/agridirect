@@ -18,11 +18,23 @@ class _AdminModerationTabState extends State<AdminModerationTab> {
   String _filterStatus = 'pending';
   final String _filterReason = 'Any Reason';
   int? _selectedReportIndex;
+  late VoidCallback _dataRefreshListener;
 
   @override
   void initState() {
     super.initState();
+    _dataRefreshListener = () {
+      if (!mounted) return;
+      _loadData();
+    };
+    widget.adminService.dataVersionListenable.addListener(_dataRefreshListener);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    widget.adminService.dataVersionListenable.removeListener(_dataRefreshListener);
+    super.dispose();
   }
 
   void _loadData() {
@@ -403,9 +415,9 @@ class _AdminModerationTabState extends State<AdminModerationTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
+          color: color.withValues(alpha: 0.1),
           borderRadius: AdminUi.radiusMd,
-          border: Border.all(color: color.withValues(alpha: 0.15)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
           children: [
@@ -453,7 +465,7 @@ class _AdminModerationTabState extends State<AdminModerationTab> {
                     ],
                   ),
                 ),
-                Icon(Icons.warning_amber_rounded, size: 64, color: AdminUi.warning.withValues(alpha: 0.3)),
+                Icon(Icons.warning_amber_rounded, size: 64, color: AdminUi.warning.withValues(alpha: 0.2)),
               ],
             ),
           ),
@@ -474,13 +486,13 @@ class _AdminModerationTabState extends State<AdminModerationTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('AVERAGE RESOLVE TIME', style: AdminUi.label(size: 11, color: Colors.white.withValues(alpha: 0.7), weight: FontWeight.w700, letterSpacing: 0.5)),
+                      Text('AVERAGE RESOLVE TIME', style: AdminUi.label(size: 11, color: Colors.white.withValues(alpha: 0.8), weight: FontWeight.w700, letterSpacing: 0.5)),
                       const SizedBox(height: 8),
                       Text('14m', style: GoogleFonts.plusJakartaSans(fontSize: 40, fontWeight: FontWeight.w800, color: Colors.white)),
                     ],
                   ),
                 ),
-                Icon(Icons.speed_rounded, size: 64, color: Colors.white.withValues(alpha: 0.2)),
+                Icon(Icons.speed_rounded, size: 64, color: Colors.white.withValues(alpha: 0.3)),
               ],
             ),
           ),

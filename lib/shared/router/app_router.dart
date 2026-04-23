@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import '../services/auth/auth_service.dart';
 import '../services/auth/onboarding_service.dart';
@@ -32,146 +33,125 @@ export 'app_routes.dart';
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Creates and configures the GoRouter instance for the app.
-///
-/// All auth and onboarding redirect logic lives here.
-/// Mobile vs web routing is decided by screen width (≤ 800 = mobile).
 GoRouter createAppRouter() {
   final auth = AuthService();
 
   return GoRouter(
     navigatorKey: appNavigatorKey,
-    initialLocation: AppRoutes.home,
     refreshListenable: auth,
     redirect: (BuildContext context, GoRouterState state) async {
       final isLoggedIn = auth.isLoggedIn;
       final isAdmin = auth.isAdmin;
       final isFarmer = auth.isViewingAsFarmer;
       final location = state.matchedLocation;
-      final width = MediaQuery.of(context).size.width;
+      
+      // Use View.of for a more stable width check that doesn't trigger loops
+      final view = View.of(context);
+      final width = view.physicalSize.width / view.devicePixelRatio;
       final isMobile = width <= 800;
 
-      // Never redirect away while profile completion is actively saving.
-      if (auth.isLoading && location == AppRoutes.googleCompleteProfile) {
-        return null;
-      }
+      debugPrint('🔀 Router Redirect: [${isMobile ? "MOBILE" : "WEB"}] location=$location isLoggedIn=$isLoggedIn admin=$isAdmin');
 
-      // ── Mobile redirect logic ──────────────────────────────────────────────
-      if (isMobile) {
-        // ⚠️ NEW: If user needs profile completion, redirect them there!
-        if (auth.needsProfileCompletion &&
-            location != AppRoutes.googleCompleteProfile) {
-          return AppRoutes.googleCompleteProfile;
-        }
-
-        // If on profile completion screen but don't need it, redirect to home/login
-        if (location == AppRoutes.googleCompleteProfile &&
-            !auth.needsProfileCompletion) {
-          return isLoggedIn ? AppRoutes.home : AppRoutes.login;
-        }
-
-        // First-time launch → onboarding
-        if (location == AppRoutes.home) {
-          final done = await OnboardingService.isOnboardingComplete();
-          if (!done) return AppRoutes.onboarding;
-        }
-        const mobilePublic = [
-          AppRoutes.login,
-          AppRoutes.register,
-          AppRoutes.onboarding,
-          AppRoutes.faceCapture,
-          AppRoutes.googleCompleteProfile,
-          AppRoutes.resetPassword,
-          AppRoutes.resetPasswordWithCode,
-        ];
-        if (!isLoggedIn && !mobilePublic.contains(location)) {
-          return AppRoutes.login;
-        }
-        if (isLoggedIn &&
-            (location == AppRoutes.login || location == AppRoutes.register)) {
-          return AppRoutes.home;
+      // 1. ABSOLUTE PRIORITY: Admin Redirect
+      if (isLoggedIn && isAdmin) {
+        if (location != AppRoutes.admin &&
+            location != AppRoutes.loading &&
+            location != AppRoutes.webWelcome) {
+          debugPrint('↪️ Router: Force routing Admin to /admin');
+          return AppRoutes.admin;
         }
         return null;
       }
 
-      // ── Web redirect logic ─────────────────────────────────────────────────
-
-      // Allow password reset without auth
+      // 2. Public Routes (Always accessible)
       if (location == AppRoutes.resetPassword ||
-          location == AppRoutes.resetPasswordWithCode) {
+          location == AppRoutes.resetPasswordWithCode ||
+          location == AppRoutes.authCallback) {
         return null;
       }
 
-      const protectedWebRoutes = <String>{
-        AppRoutes.profile,
-        AppRoutes.farmerDashboard,
-        AppRoutes.addProduct,
-        AppRoutes.myDetails,
-        AppRoutes.messages,
-        AppRoutes.customerMessages,
-        AppRoutes.farmerMessages,
-        AppRoutes.admin,
-      };
-
-      if (!isLoggedIn && protectedWebRoutes.contains(location)) {
-        return AppRoutes.login;
-      }
-
-      if (location == AppRoutes.admin && !isAdmin) {
-        if (!isLoggedIn) return AppRoutes.login;
-        return isFarmer ? AppRoutes.farmerDashboard : AppRoutes.marketplace;
-      }
-
-      // ⚠️ NEW: If user needs profile completion (mobile or web), redirect them there!
+      // 3. Profile Completion Redirect
       if (auth.needsProfileCompletion &&
           location != AppRoutes.googleCompleteProfile) {
+        debugPrint('↪️ Router: Redirecting to complete profile');
         return AppRoutes.googleCompleteProfile;
       }
 
-      // If on profile completion screen but don't need it, redirect to home/login
-      if (location == AppRoutes.googleCompleteProfile &&
-          !auth.needsProfileCompletion) {
-        return isLoggedIn ? AppRoutes.home : AppRoutes.login;
-      }
+      // 4. Authenticated Users logic
+      if (isLoggedIn) {
+        // Skip auth pages
+        if (location == AppRoutes.login || 
+            location == AppRoutes.register || 
+            location == AppRoutes.webWelcome) {
+          debugPrint('↪️ Router: Logged in, going to loading');
+          return AppRoutes.loading;
+        }
+        
+        // If on home/base path, go to correct dashboard
+        if (location == AppRoutes.home) {
+          // On mobile, the home path (/) is already the dashboard
+          if (isMobile) return null;
+          
+          return isFarmer ? AppRoutes.farmerDashboard : AppRoutes.marketplace;
+        }
+      } else {
+        // 5. Unauthenticated Users logic
+        const protectedRoutes = {
+          AppRoutes.profile,
+          AppRoutes.farmerDashboard,
+          AppRoutes.addProduct,
+          AppRoutes.myDetails,
+          AppRoutes.messages,
+          AppRoutes.customerMessages,
+          AppRoutes.farmerMessages,
+          AppRoutes.admin,
+        };
 
-      // Admin always goes to /admin
-      if (isAdmin && location == AppRoutes.home) return AppRoutes.admin;
+        if (protectedRoutes.contains(location)) {
+          debugPrint('↪️ Router: Protected route, going to login');
+          return AppRoutes.login;
+        }
 
-      // Home → welcome (landing page) or the correct dashboard
-      if (location == AppRoutes.home) {
-        if (!isLoggedIn) {
-          if (isMobile) {
+        // Home redirect for unauthenticated
+        if (location == AppRoutes.home) {
+          if (kIsWeb) {
+            // For web, always show welcome screen if not logged in
+            return AppRoutes.webWelcome;
+          } else {
+            // For native mobile apps, show onboarding then login
             final done = await OnboardingService.isOnboardingComplete();
             if (!done) return AppRoutes.onboarding;
-          } else {
-            // On web, play the loading animation before opening the welcome page.
-            return AppRoutes.loading;
+            return AppRoutes.login;
           }
         }
-        if (isAdmin) return AppRoutes.admin;
-        if (isFarmer) return AppRoutes.farmerDashboard;
-        return AppRoutes.marketplace;
       }
 
-      // Profile requires login on web
-      if (location == AppRoutes.profile && !isLoggedIn) return AppRoutes.login;
-
-      // Farmer dashboard requires login
-      if (location == AppRoutes.farmerDashboard && !isLoggedIn) {
-        return AppRoutes.marketplace;
+      // 6. Web Session Restoration Guard
+      if (kIsWeb && !isLoggedIn) {
+        if (isMobile && location != AppRoutes.webWelcome && location != AppRoutes.login && location != AppRoutes.onboarding) {
+          debugPrint('↪️ Router: Unauthenticated web user on protected route, going to welcome');
+          return AppRoutes.webWelcome;
+        }
       }
 
-      // Logged-in users skip login/register pages
-      if (isLoggedIn &&
-          (location == AppRoutes.login || location == AppRoutes.register)) {
-        if (isAdmin) return AppRoutes.admin;
-        return isFarmer ? AppRoutes.farmerDashboard : AppRoutes.marketplace;
+      // Prevent redundant redirects if we are already where we need to be
+      if (isLoggedIn && (location == AppRoutes.login || location == AppRoutes.webWelcome || location == AppRoutes.onboarding)) {
+        // On mobile, the "Dashboard" is just the home route (/)
+        if (isMobile) {
+          debugPrint('↪️ Router: Logged in mobile user at entry page, sending to home');
+          return AppRoutes.home;
+        }
+        
+        final target = isAdmin ? AppRoutes.admin : (isFarmer ? AppRoutes.farmerDashboard : AppRoutes.marketplace);
+        debugPrint('↪️ Router: Logged in web user at entry page, sending to $target');
+        return target;
       }
 
       return null;
     },
 
     routes: [
-      // ── Home (acts as redirect hub) ───────────────────────────────────────
+      // ── Home (acts as redirect hub) ──────────────────────────────────────────
       GoRoute(
         path: AppRoutes.home,
         builder: (context, state) => LayoutBuilder(
@@ -194,40 +174,92 @@ GoRouter createAppRouter() {
         ),
       ),
 
-      // ── Web Tab Routes (all render WebNavigation; tab derived from path) ──
+      // ── Web Tab Routes (Responsive: WebNavigation on desktop, MobileNavigation on phone) ──
       GoRoute(
         path: AppRoutes.marketplace,
-        builder: (context, state) => WebNavigation(
-          onLogout: () {
-            AuthService().logout();
-            context.go(AppRoutes.home);
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 800) {
+              return WebNavigation(
+                onLogout: () {
+                  AuthService().logout();
+                  context.go(AppRoutes.home);
+                },
+              );
+            }
+            return MobileNavigation(
+              initialIndex: 1, // Marketplace tab
+              onLogout: () {
+                AuthService().logout();
+                context.go(AppRoutes.login);
+              },
+            );
           },
         ),
       ),
       GoRoute(
         path: AppRoutes.shop,
-        builder: (context, state) => WebNavigation(
-          onLogout: () {
-            AuthService().logout();
-            context.go(AppRoutes.home);
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 800) {
+              return WebNavigation(
+                onLogout: () {
+                  AuthService().logout();
+                  context.go(AppRoutes.home);
+                },
+              );
+            }
+            return MobileNavigation(
+              initialIndex: 1, // Shop maps to Marketplace on mobile
+              onLogout: () {
+                AuthService().logout();
+                context.go(AppRoutes.login);
+              },
+            );
           },
         ),
       ),
       GoRoute(
         path: AppRoutes.community,
-        builder: (context, state) => WebNavigation(
-          onLogout: () {
-            AuthService().logout();
-            context.go(AppRoutes.home);
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 800) {
+              return WebNavigation(
+                onLogout: () {
+                  AuthService().logout();
+                  context.go(AppRoutes.home);
+                },
+              );
+            }
+            return MobileNavigation(
+              initialIndex: 0, // Community maps to Home/News on mobile
+              onLogout: () {
+                AuthService().logout();
+                context.go(AppRoutes.login);
+              },
+            );
           },
         ),
       ),
       GoRoute(
         path: AppRoutes.profile,
-        builder: (context, state) => WebNavigation(
-          onLogout: () {
-            AuthService().logout();
-            context.go(AppRoutes.home);
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 800) {
+              return WebNavigation(
+                onLogout: () {
+                  AuthService().logout();
+                  context.go(AppRoutes.home);
+                },
+              );
+            }
+            return MobileNavigation(
+              initialIndex: 4, // Profile tab
+              onLogout: () {
+                AuthService().logout();
+                context.go(AppRoutes.login);
+              },
+            );
           },
         ),
       ),
@@ -328,18 +360,18 @@ GoRouter createAppRouter() {
 
             return LoadingScreen(
               onFinished: () {
-                if (isMobile) {
-                  context.go(AppRoutes.home);
-                  return;
-                }
-
                 if (!auth.isLoggedIn) {
-                  context.go(AppRoutes.webWelcome);
+                  context.go(isMobile ? AppRoutes.onboarding : AppRoutes.webWelcome);
                   return;
                 }
 
                 if (auth.isAdmin) {
                   context.go(AppRoutes.admin);
+                  return;
+                }
+
+                if (isMobile) {
+                  context.go(AppRoutes.home);
                   return;
                 }
 

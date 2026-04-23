@@ -16,16 +16,23 @@ class _AdminCategoriesTabState extends State<AdminCategoriesTab> with SingleTick
   late TabController _tabController;
   late Future<List<Map<String, dynamic>>> _categoriesFuture;
   late Future<List<Map<String, dynamic>>> _unitsFuture;
+  late VoidCallback _dataRefreshListener;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _dataRefreshListener = () {
+      if (!mounted) return;
+      _loadData();
+    };
+    widget.adminService.dataVersionListenable.addListener(_dataRefreshListener);
     _loadData();
   }
 
   @override
   void dispose() {
+    widget.adminService.dataVersionListenable.removeListener(_dataRefreshListener);
     _tabController.dispose();
     super.dispose();
   }
@@ -59,7 +66,7 @@ class _AdminCategoriesTabState extends State<AdminCategoriesTab> with SingleTick
                 ElevatedButton.icon(
                   onPressed: _loadData,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.15),
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -81,7 +88,7 @@ class _AdminCategoriesTabState extends State<AdminCategoriesTab> with SingleTick
                   border: Border.all(color: AdminUi.border),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -91,7 +98,7 @@ class _AdminCategoriesTabState extends State<AdminCategoriesTab> with SingleTick
                 child: Column(
                   children: [
                     Container(
-                      color: AdminUi.sidebarBg.withValues(alpha: 0.5),
+                      color: AdminUi.sidebarBg.withValues(alpha: 0.05),
                       child: TabBar(
                         controller: _tabController,
                         indicatorColor: AdminUi.brand,
@@ -153,7 +160,7 @@ class _AdminCategoriesTabState extends State<AdminCategoriesTab> with SingleTick
                       decoration: BoxDecoration(
                         color: AdminUi.brandSoft,
                         borderRadius: AdminUi.radiusMd,
-                        border: Border.all(color: AdminUi.brand.withValues(alpha: 0.1)),
+                        border: Border.all(color: AdminUi.brand.withValues(alpha: 0.2)),
                       ),
                       child: const Icon(Icons.category_rounded, size: 20, color: AdminUi.brand),
                     ),

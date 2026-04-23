@@ -48,7 +48,7 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
 
     try {
       // Step 0: Check if email is already registered
-      final emailTaken = await SupabaseDB.isEmailAlreadyRegistered(email);
+      final emailTaken = await SupabaseDatabase.isEmailAlreadyRegistered(email);
       if (emailTaken) {
         final resumed = await _resumeIncompleteManualProfile(
           email: email,
@@ -68,11 +68,18 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
         return;
       }
 
+      final temporaryPassword =
+          AuthService.generateOneTimeRegistrationPassword();
+      await AuthService.cachePendingRegistrationPassword(
+        email: email,
+        password: temporaryPassword,
+      );
+
       // Step 1: Create user via AuthService
       final String? userId = await AuthService().register(
         name: name,
         email: email,
-        password: AuthService.temporaryPassword,
+        password: temporaryPassword,
       );
 
       if (userId == null) {
@@ -132,7 +139,7 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
               userId: userId,
               email: email,
               name: name,
-              password: AuthService.temporaryPassword,
+              password: temporaryPassword,
               onVerificationSuccess: () {
                 widget.onRegistrationSuccess();
               },
@@ -170,15 +177,21 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
     required String fallbackName,
   }) async {
     try {
+      final temporaryPassword =
+          await AuthService.getPendingRegistrationPassword(email);
+      if (temporaryPassword == null || temporaryPassword.isEmpty) {
+        return false;
+      }
+
       final signInResult = await SupabaseConfig.client.auth.signInWithPassword(
         email: email,
-        password: AuthService.temporaryPassword,
+        password: temporaryPassword,
       );
 
       final user = signInResult.user;
       if (user == null) return false;
 
-      final profile = await SupabaseDB.getUserProfile(user.id);
+      final profile = await SupabaseDatabase.getUserProfile(user.id);
       final phone = (profile?['phone'] as String?)?.trim() ?? '';
 
       // Completed profile users should continue using normal login.
@@ -267,7 +280,7 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
                               width: 48,
                               height: 48,
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
+                                color: Colors.white.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: Colors.white.withValues(alpha: 0.2),
@@ -399,6 +412,76 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 48),
+                        // Farmer Redirect Section
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFBBF7D0)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: _primary.withValues(alpha: 0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.agriculture_rounded,
+                                      color: _primary,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Sell on AgriDirect',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: _dark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Farmer registration and listing management are exclusive to our mobile app.',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: const Color(0xFF166534),
+                                  height: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    // Redirect logic - could be a URL or showing a download modal
+                                    // For now, we'll assume there's a download section on the home page
+                                    Navigator.pop(context);
+                                  },
+                                  icon: const Icon(Icons.file_download_rounded, size: 18),
+                                  label: const Text('Download Mobile App'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: _primary,
+                                    side: const BorderSide(color: _primary),
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),

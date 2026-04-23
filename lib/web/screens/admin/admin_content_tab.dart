@@ -18,18 +18,39 @@ class _AdminContentTabState extends State<AdminContentTab> {
 
   // Real article data from Supabase
   late Future<List<Map<String, dynamic>>> _articlesFuture;
+  Map<String, dynamic> _stats = {'total': 0, 'published': 0, 'drafts': 0, 'views': '0'};
+  late VoidCallback _dataRefreshListener;
 
   @override
   void initState() {
     super.initState();
+    _dataRefreshListener = () {
+      if (!mounted) return;
+      _loadData();
+    };
+    widget.adminService.dataVersionListenable.addListener(_dataRefreshListener);
     _loadData();
   }
 
-  void _loadData() {
+  @override
+  void dispose() {
+    widget.adminService.dataVersionListenable.removeListener(_dataRefreshListener);
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
     setState(() {
-      _articlesFuture = widget.adminService.getAllFarmers(page: 0, pageSize: 10, isVerified: true); 
-      // Note: Using verified farmers as a proxy for "Authors" until a dedicated articles table is populated
+      _articlesFuture = widget.adminService.getAllArticles(
+        page: 0, 
+        pageSize: 10,
+        status: _activeFilter,
+      );
     });
+
+    final stats = await widget.adminService.getArticleStats();
+    if (mounted) {
+      setState(() => _stats = stats);
+    }
   }
 
   @override
@@ -79,7 +100,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
           onPressed: () async {
             final result = await showDialog<bool>(
               context: context,
-              builder: (context) => const CreateArticleDialog(),
+              builder: (context) => CreateArticleDialog(adminService: widget.adminService),
             );
             if (result == true && mounted) {
               _loadData();
@@ -126,11 +147,11 @@ class _AdminContentTabState extends State<AdminContentTab> {
             ),
             child: Row(
               children: [
-                _statItem('128', 'ARTICLES'),
+                _statItem(_stats['total'].toString(), 'ARTICLES'), 
                 Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
-                _statItem('42', 'AUTHORS'),
+                _statItem(_stats['published'].toString(), 'PUBLISHED'),
                 Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
-                _statItem('1.2M', 'VIEWS'),
+                _statItem(_stats['views'].toString(), 'VIEWS'),
               ],
             ),
           ),
@@ -142,7 +163,10 @@ class _AdminContentTabState extends State<AdminContentTab> {
   Widget _filterTab(String label) {
     final active = _activeFilter == label;
     return InkWell(
-      onTap: () => setState(() => _activeFilter = label),
+      onTap: () {
+        setState(() => _activeFilter = label);
+        _loadData();
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
@@ -167,7 +191,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
     return Column(
       children: [
         Text(value, style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white)),
-        Text(label, style: AdminUi.label(size: 9, color: Colors.white.withValues(alpha: 0.7), weight: FontWeight.w600, letterSpacing: 0.5)),
+        Text(label, style: AdminUi.label(size: 9, color: Colors.white.withValues(alpha: 0.8), weight: FontWeight.w600, letterSpacing: 0.5)),
       ],
     );
   }
@@ -191,7 +215,6 @@ class _AdminContentTabState extends State<AdminContentTab> {
             child: Row(
               children: [
                 _headerCell('TITLE', flex: 4),
-                _headerCell('AUTHOR', flex: 2),
                 _headerCell('STATUS', flex: 2),
                 _headerCell('PUBLISHED DATE', flex: 2),
                 _headerCell('CREATED DATE', flex: 2),
@@ -211,20 +234,13 @@ class _AdminContentTabState extends State<AdminContentTab> {
               }
               final items = snapshot.data ?? [];
               if (items.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Center(child: Text('No articles found')),
+                return Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Center(child: Text('No articles found for "$_activeFilter"', style: AdminUi.body(color: AdminUi.textMuted))),
                 );
               }
               return Column(
-                children: items.map((item) => _buildArticleRow({
-                  'title': item['farm_name'] ?? 'Agricultural Insight',
-                  'category': item['specialty'] ?? 'General',
-                  'author': item['users']?['name'] ?? 'Verified Farmer',
-                  'status': 'PUBLISHED',
-                  'publishedDate': 'RECENT',
-                  'createdDate': item['created_at']?.toString().substring(0, 10) ?? 'N/A',
-                })).toList(),
+                children: items.map((item) => _buildArticleRow(item)).toList(),
               );
             }
           ),
@@ -245,7 +261,8 @@ class _AdminContentTabState extends State<AdminContentTab> {
   }
 
   Widget _buildArticleRow(Map<String, dynamic> article) {
-    final isPublished = article['status'] == 'PUBLISHED';
+    final isPublished = article['is_published'] == true;
+    final articleId = article['article_id'].toString();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
@@ -264,31 +281,22 @@ class _AdminContentTabState extends State<AdminContentTab> {
                     color: AdminUi.brandSoft,
                     borderRadius: AdminUi.radiusSm,
                     border: Border.all(color: AdminUi.border),
+                    image: article['cover_image_url'] != null ? DecorationImage(
+                      image: NetworkImage(article['cover_image_url']),
+                      fit: BoxFit.cover,
+                    ) : null,
                   ),
-                  child: Icon(Icons.article_rounded, size: 22, color: AdminUi.brand),
+                  child: article['cover_image_url'] == null ? Icon(Icons.article_rounded, size: 22, color: AdminUi.brand) : null,
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(article['title'], style: AdminUi.label(size: 14, color: AdminUi.textPrimary, weight: FontWeight.w700)),
-                      Text('Category: ${article['category']}', style: AdminUi.body(size: 12, color: AdminUi.textSecondary)),
+                      Text(article['title'] ?? 'Untitled Article', style: AdminUi.label(size: 14, color: AdminUi.textPrimary, weight: FontWeight.w700)),
+                      Text(article['summary'] ?? 'No summary provided', style: AdminUi.body(size: 12, color: AdminUi.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ),
-          // Author
-          Expanded(
-            flex: 2,
-            child: Row(
-              children: [
-                const Icon(Icons.person_outline_rounded, size: 16, color: AdminUi.textMuted),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(article['author'], style: AdminUi.body(size: 13, color: AdminUi.textSecondary)),
                 ),
               ],
             ),
@@ -305,7 +313,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
                     borderRadius: AdminUi.radiusSm,
                   ),
                   child: Text(
-                    article['status'],
+                    isPublished ? 'PUBLISHED' : 'DRAFT',
                     style: AdminUi.label(size: 10, color: isPublished ? AdminUi.success : AdminUi.warning, weight: FontWeight.w800),
                   ),
                 ),
@@ -316,7 +324,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
           Expanded(
             flex: 2,
             child: Text(
-              article['publishedDate'] ?? '—',
+              article['published_at']?.toString().substring(0, 10) ?? '—',
               style: AdminUi.body(size: 13, color: AdminUi.textSecondary),
             ),
           ),
@@ -324,7 +332,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
           Expanded(
             flex: 2,
             child: Text(
-              article['createdDate'] ?? 'N/A',
+              article['created_at']?.toString().substring(0, 10) ?? 'N/A',
               style: AdminUi.body(size: 13, color: AdminUi.textMuted, weight: FontWeight.w500),
             ),
           ),
@@ -334,10 +342,32 @@ class _AdminContentTabState extends State<AdminContentTab> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _iconAction(Icons.edit_rounded, 'Edit'),
-                _iconAction(Icons.visibility_outlined, 'Preview'),
-                if (isPublished) _iconAction(Icons.visibility_off_outlined, 'Unpublish'),
-                _iconAction(Icons.delete_outline_rounded, 'Delete', color: AdminUi.danger),
+                _iconAction(Icons.edit_rounded, 'Edit', onTap: () {}),
+                _iconAction(
+                  isPublished ? Icons.visibility_off_outlined : Icons.publish_rounded, 
+                  isPublished ? 'Unpublish' : 'Publish',
+                  onTap: () async {
+                    final success = await widget.adminService.updateArticleStatus(articleId, !isPublished);
+                    if (success) _loadData();
+                  }
+                ),
+                _iconAction(Icons.delete_outline_rounded, 'Delete', color: AdminUi.danger, onTap: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Delete Article?'),
+                      content: const Text('This action cannot be undone.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    final success = await widget.adminService.deleteArticle(articleId);
+                    if (success) _loadData();
+                  }
+                }),
               ],
             ),
           ),
@@ -346,11 +376,11 @@ class _AdminContentTabState extends State<AdminContentTab> {
     );
   }
 
-  Widget _iconAction(IconData icon, String tooltip, {Color color = AdminUi.textMuted}) {
+  Widget _iconAction(IconData icon, String tooltip, {Color color = AdminUi.textMuted, required VoidCallback onTap}) {
     return Tooltip(
       message: tooltip,
       child: InkWell(
-        onTap: () {},
+        onTap: onTap,
         borderRadius: AdminUi.radiusSm,
         child: Padding(
           padding: const EdgeInsets.all(6),
@@ -367,7 +397,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text('Showing 3 of 128 Curated Articles', style: AdminUi.body(size: 13, color: AdminUi.textMuted)),
+        Text('Showing curated publications', style: AdminUi.body(size: 13, color: AdminUi.textMuted)),
         Row(
           children: [
             _pageButton('<', false),
@@ -441,16 +471,16 @@ class _AdminContentTabState extends State<AdminContentTab> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('MOST IMPACTFUL', style: AdminUi.label(size: 9, color: Colors.white.withValues(alpha: 0.7), weight: FontWeight.w700, letterSpacing: 0.5)),
+                          Text('REALTIME', style: AdminUi.label(size: 9, color: Colors.white.withValues(alpha: 0.8), weight: FontWeight.w700, letterSpacing: 0.5)),
                           const SizedBox(height: 2),
-                          Text('Climate Resilient Grapes', style: AdminUi.title(size: 16, color: Colors.white)),
+                          Text('Featured Publication', style: AdminUi.title(size: 16, color: Colors.white)),
                         ],
                       ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text('12.4K', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white)),
-                          Text('Total Engagement', style: AdminUi.label(size: 10, color: Colors.white.withValues(alpha: 0.7))),
+                          Text('ACTIVE', style: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white)),
+                          Text('Engagement Status', style: AdminUi.label(size: 10, color: Colors.white.withValues(alpha: 0.8))),
                         ],
                       ),
                     ],
@@ -476,7 +506,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
                 Text("Curator's Weekly Insight", style: AdminUi.title(size: 20)),
                 const SizedBox(height: 8),
                 Text(
-                  'Articles regarding regenerative agriculture have seen a 14% increase in reader retention this month. Consider prioritizing "Soil Health" themes for the upcoming editorial cycle.',
+                  'Reader engagement trends remain stable. The platform continues to prioritize high-quality agricultural education and sustainability content.',
                   style: AdminUi.body(size: 13, color: AdminUi.textSecondary),
                   maxLines: 4,
                   overflow: TextOverflow.ellipsis,

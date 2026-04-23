@@ -304,7 +304,7 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
                   width: 72, height: 72,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: _primary.withValues(alpha: 0.85),
+                    color: _primary.withValues(alpha: 0.2),
                   ),
                   child: Center(
                     child: Text('$_countdownSeconds',
@@ -356,8 +356,8 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     decoration: BoxDecoration(
                       color: _isInvalidQr
-                          ? _errorColor.withValues(alpha: 0.9)
-                          : (_qrDetected ? _primary.withValues(alpha: 0.9) : Colors.black54),
+                          ? _errorColor.withValues(alpha: 0.8)
+                          : (_qrDetected ? _primary.withValues(alpha: 0.8) : Colors.black54),
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: Row(
@@ -435,11 +435,11 @@ class _CardOverlayPainter extends CustomPainter {
 
     canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = Colors.black.withValues(alpha: 0.55));
+      Paint()..color = Colors.black.withValues(alpha: 0.6));
     canvas.drawRRect(cardRect, Paint()..blendMode = BlendMode.clear);
     canvas.restore();
 
-    Color borderColor = Colors.white.withValues(alpha: 0.7);
+    Color borderColor = Colors.white.withValues(alpha: 0.3);
     if (isForbidden) {
       borderColor = errorColor;
     } else if (cardDetected) {

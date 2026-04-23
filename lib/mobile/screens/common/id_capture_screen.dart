@@ -464,10 +464,10 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
                     height: 72,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _primary.withValues(alpha: 0.85),
+                      color: _primary.withValues(alpha: 0.2),
                       boxShadow: [
                         BoxShadow(
-                          color: _primary.withValues(alpha: 0.4),
+                          color: _primary.withValues(alpha: 0.1),
                           blurRadius: 20,
                           spreadRadius: 5,
                         ),
@@ -536,8 +536,8 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
                     ),
                     decoration: BoxDecoration(
                       color: _isForbiddenCardDetected 
-                          ? _errorColor.withValues(alpha: 0.9)
-                          : (_isValidIdDetected ? _primary.withValues(alpha: 0.9) : Colors.black54),
+                          ? _errorColor.withValues(alpha: 0.8)
+                          : (_isValidIdDetected ? _primary.withValues(alpha: 0.8) : Colors.black54),
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: Row(
@@ -640,13 +640,13 @@ class _CardOverlayPainter extends CustomPainter {
     canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = Colors.black.withValues(alpha: 0.55),
+      Paint()..color = Colors.black.withValues(alpha: 0.6),
     );
     canvas.drawRRect(cardRect, Paint()..blendMode = BlendMode.clear);
     canvas.restore();
 
     // 2) Card border — green if detected, red if forbidden, white if not
-    Color borderColor = Colors.white.withValues(alpha: 0.7);
+    Color borderColor = Colors.white.withValues(alpha: 0.3);
     if (isForbidden) {
       borderColor = errorColor;
     } else if (cardDetected) {

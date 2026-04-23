@@ -17,11 +17,23 @@ class _AdminOrdersTabState extends State<AdminOrdersTab> {
   late Future<List<Map<String, dynamic>>> _ordersFuture;
   String _searchQuery = '';
   String _filterStatus = 'all'; 
+  late VoidCallback _dataRefreshListener;
 
   @override
   void initState() {
     super.initState();
+    _dataRefreshListener = () {
+      if (!mounted) return;
+      _loadData();
+    };
+    widget.adminService.dataVersionListenable.addListener(_dataRefreshListener);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    widget.adminService.dataVersionListenable.removeListener(_dataRefreshListener);
+    super.dispose();
   }
 
   void _loadData() {
@@ -52,7 +64,7 @@ class _AdminOrdersTabState extends State<AdminOrdersTab> {
                 ElevatedButton.icon(
                   onPressed: _loadData,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.15),
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -71,7 +83,7 @@ class _AdminOrdersTabState extends State<AdminOrdersTab> {
                 border: Border.all(color: AdminUi.border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -208,7 +220,7 @@ class _AdminOrdersTabState extends State<AdminOrdersTab> {
 
   Widget _buildTableHeader() {
     return Container(
-      color: AdminUi.sidebarBg.withValues(alpha: 0.5),
+      color: AdminUi.sidebarBg.withValues(alpha: 0.05),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
       child: Row(
         children: [

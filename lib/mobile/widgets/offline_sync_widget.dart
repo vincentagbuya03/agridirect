@@ -104,7 +104,7 @@ class OfflineSyncStatusWidget extends StatelessWidget {
 
 class PendingProductsListWidget extends StatelessWidget {
   final List<OfflineProductQueue> products;
-  final VoidCallback? onRetryProduct;
+  final ValueChanged<String>? onRetryProduct;
 
   const PendingProductsListWidget({
     super.key,
@@ -142,8 +142,8 @@ class PendingProductsListWidget extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.05),
-                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                color: Colors.orange.withValues(alpha: 0.1),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -200,7 +200,7 @@ class PendingProductsListWidget extends StatelessWidget {
                       ),
                       if (product.syncError != null && onRetryProduct != null)
                         GestureDetector(
-                          onTap: onRetryProduct,
+                          onTap: () => onRetryProduct?.call(product.id),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -246,4 +246,3 @@ class PendingProductsListWidget extends StatelessWidget {
     );
   }
 }
-

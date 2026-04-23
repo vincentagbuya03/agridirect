@@ -340,7 +340,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: _primary.withValues(alpha: 0.08),
+            color: _primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
@@ -608,9 +608,9 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _primary.withValues(alpha: 0.05),
+        color: _primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _primary.withValues(alpha: 0.15)),
+        border: Border.all(color: _primary.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -970,7 +970,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: _primary.withValues(alpha: 0.3),
+                          color: _primary.withValues(alpha: 0.2),
                           width: 2,
                         ),
                       ),
@@ -1057,7 +1057,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                       ),
                       Positioned.fill(
                         child: Container(
-                          color: Colors.black.withValues(alpha: 0.15),
+                          color: Colors.black.withValues(alpha: 0.3),
                           child: Center(
                             child: Container(
                               padding: const EdgeInsets.symmetric(

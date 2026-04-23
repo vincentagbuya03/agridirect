@@ -8,6 +8,8 @@ import '../../widgets/animated_components.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/widgets/create_post_dialog.dart';
 import '../../../shared/widgets/comments_dialog.dart';
+import '../../../shared/services/integration/weather_service.dart';
+import '../../../shared/models/weather_model.dart';
 
 /// Web-only Community Hub — two-column layout with sidebar.
 /// Completely separate UI from the mobile community hub.
@@ -48,9 +50,20 @@ class _WebCommunityHubState extends State<WebCommunityHub>
       vsync: this,
     )..forward();
 
-    // Create controllers for 6 example posts
+    _postControllers = [];
+  }
+
+  void _syncPostControllers(int count) {
+    if (_postControllers.length == count) return;
+    
+    // Dispose old
+    for (final c in _postControllers) {
+      c.dispose();
+    }
+    
+    // Create new
     _postControllers = List.generate(
-      6,
+      count,
       (i) => AnimationController(
         duration: const Duration(milliseconds: 500),
         vsync: this,
@@ -58,10 +71,10 @@ class _WebCommunityHubState extends State<WebCommunityHub>
     );
 
     // Stagger animations
-    Future.delayed(const Duration(milliseconds: 300), () {
+    Future.delayed(const Duration(milliseconds: 100), () {
       for (int i = 0; i < _postControllers.length; i++) {
         Future.delayed(Duration(milliseconds: 80 * i), () {
-          if (mounted) {
+          if (mounted && i < _postControllers.length) {
             _postControllers[i].forward();
           }
         });
@@ -131,7 +144,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           gradient: AgriColors.primaryGradient,
           boxShadow: [
             BoxShadow(
-              color: AgriColors.emerald500.withValues(alpha: 0.4),
+              color: AgriColors.emerald500.withValues(alpha: 0.3),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
@@ -170,7 +183,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
         border: Border.all(color: _border.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -199,7 +212,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: isActive
-                          ? _primary.withValues(alpha: 0.08)
+                          ? _primary.withValues(alpha: 0.1)
                           : isHovered
                               ? _border.withValues(alpha: 0.5)
                               : Colors.transparent,
@@ -343,6 +356,11 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           );
         }
 
+        // Sync controllers once
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _syncPostControllers(posts.length);
+        });
+
         return ListView.builder(
           padding: const EdgeInsets.all(32),
           itemCount: posts.length,
@@ -396,7 +414,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
         boxShadow: isHovered
             ? [
                 BoxShadow(
-                  color: _primary.withValues(alpha: 0.1),
+                  color: _primary.withValues(alpha: 0.2),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -579,7 +597,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _primary.withValues(alpha: 0.08),
+                      color: _primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -649,188 +667,219 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildWeatherWidget() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.cloud_rounded, color: Color(0xFF3B82F6), size: 22),
+    return FutureBuilder<WeatherData?>(
+      future: WeatherService().getWeatherByCity('Manila'),
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        final temp = data?.temperature.toStringAsFixed(0) ?? '28';
+        final desc = data?.description ?? 'Partly Cloudy';
+        final location = data?.location ?? 'Manila';
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _border),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('28°C', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _dark)),
-                Text('Partly Cloudy · Manila', style: TextStyle(fontSize: 12, color: _muted)),
-              ],
-            ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.cloud_rounded, color: Color(0xFF3B82F6), size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('$temp°C', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _dark)),
+                    Text('$desc · $location', style: TextStyle(fontSize: 12, color: _muted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      }
     );
   }
 
   Widget _buildTrendingTopics() {
-    final topics = [
-      ('Pest Control Tips', 45),
-      ('Organic Farming', 32),
-      ('Water Management', 28),
-      ('Market Prices', 19),
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Trending Topics', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _dark)),
-          const SizedBox(height: 16),
-          ...topics.asMap().entries.map((entry) {
-            final i = entry.key;
-            final t = entry.value;
-            return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        gradient: i == 0 ? AgriColors.goldGradient : AgriColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${i + 1}',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: SupabaseDataService().getTrendingTopics(),
+      builder: (context, snapshot) {
+        final topics = snapshot.data ?? [];
+        
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Trending Topics', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _dark)),
+              const SizedBox(height: 16),
+              if (topics.isEmpty && snapshot.connectionState != ConnectionState.waiting)
+                Text('No trending topics yet', style: TextStyle(fontSize: 12, color: _muted))
+              else
+                ...topics.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final t = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            gradient: i == 0 ? AgriColors.goldGradient : AgriColors.primaryGradient,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${i + 1}',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(t['title'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _dark)),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text('${t['engagement']}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _primary)),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(t.$1, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _dark)),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: _primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text('${t.$2}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _primary)),
-                    ),
-                  ],
-                ),
-              );
-          }),
-        ],
-      ),
+                  );
+                }),
+            ],
+          ),
+        );
+      }
     );
   }
 
   Widget _buildPopularTags() {
-    final tags = ['#organic', '#pestcontrol', '#irrigation', '#harvest', '#fertilizer', '#seedlings', '#weather', '#market'];
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Popular Tags', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _dark)),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: tags.map((tag) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _surface,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _border),
-                ),
-                child: Text(tag, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _muted)),
-              );
-            }).toList(),
+    return FutureBuilder<List<String>>(
+      future: SupabaseDataService().getPopularTags(),
+      builder: (context, snapshot) {
+        final tags = snapshot.data ?? [];
+        
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _border),
           ),
-        ],
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Popular Tags', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _dark)),
+              const SizedBox(height: 14),
+              if (tags.isEmpty && snapshot.connectionState != ConnectionState.waiting)
+                Text('No tags found', style: TextStyle(fontSize: 12, color: _muted))
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: tags.map((tag) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: _border),
+                      ),
+                      child: Text(tag, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _muted)),
+                    );
+                  }).toList(),
+                ),
+            ],
+          ),
+        );
+      }
     );
   }
 
   Widget _buildTopContributors() {
-    final contributors = [
-      ('Samuel Green', '45 posts', _primary),
-      ('Anita Rao', '32 posts', const Color(0xFF3B82F6)),
-      ('John Doe', '28 posts', const Color(0xFFF59E0B)),
-    ];
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: SupabaseDataService().getTopContributors(),
+      builder: (context, snapshot) {
+        final contributors = snapshot.data ?? [];
+        final colors = [const Color(0xFF16A34A), const Color(0xFF3B82F6), const Color(0xFFF59E0B)];
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Top Contributors', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _dark)),
-          const SizedBox(height: 16),
-          ...contributors.map((c) => Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: c.$3.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Center(
-                        child: Text(
-                          c.$1.split(' ').map((w) => w[0]).take(2).join(),
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c.$3),
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Top Contributors', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _dark)),
+              const SizedBox(height: 16),
+              if (contributors.isEmpty && snapshot.connectionState != ConnectionState.waiting)
+                Text('No contributors yet', style: TextStyle(fontSize: 12, color: _muted))
+              else
+                ...contributors.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final c = entry.value;
+                  final color = colors[i % colors.length];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
+                              c['name'].toString().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join(),
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(c['name'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _dark)),
+                              Text(c['posts'], style: TextStyle(fontSize: 11, color: _muted)),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(c.$1, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _dark)),
-                          Text(c.$2, style: TextStyle(fontSize: 11, color: _muted)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              )),
-        ],
-      ),
+                  );
+                }),
+            ],
+          ),
+        );
+      }
     );
   }
 }

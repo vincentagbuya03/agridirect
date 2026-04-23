@@ -576,6 +576,52 @@ class NotificationService {
     }
   }
 
+  // Insert a notification into the database
+  Future<void> insertNotification({
+    required String userId,
+    required String title,
+    required String content,
+    String type = 'system',
+    String? linkType,
+    String? linkId,
+  }) async {
+    try {
+      // Use the Edge Function for consistency with the messaging feature.
+      // This automatically handles notification_type_id mapping and push notifications.
+      await supabase.functions.invoke(
+        'send-push-notification',
+        body: {
+          'targetUserId': userId,
+          'title': title,
+          'body': content,
+          'notificationCode': type,
+          'linkType': linkType,
+          'linkId': linkId,
+        },
+      );
+      debugPrint('✅ Notification triggered via Edge Function');
+    } catch (e) {
+      debugPrint('❌ Error triggering notification via Edge Function: $e');
+
+      // Fallback: Attempt direct insert if Edge Function fails
+      try {
+        await supabase.from('notifications').insert({
+          'user_id': userId,
+          'title': title,
+          'body': content,
+          'type': type,
+          'link_type': linkType,
+          'link_id': linkId,
+          'is_read': false,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+        debugPrint('✅ Notification saved to database (fallback)');
+      } catch (innerError) {
+        debugPrint('❌ Fallback insertion failed: $innerError');
+      }
+    }
+  }
+
   // Get notifications for user
   Future<List<Map<String, dynamic>>> getNotifications(
     String userId, {

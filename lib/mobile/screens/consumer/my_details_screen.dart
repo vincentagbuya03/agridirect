@@ -116,7 +116,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             _longitudeController.text = (farmer['farm_longitude'] ?? '')
                 .toString();
             _imageUrlController.text = farmer['image_url'] ?? '';
-            _farmerImageUrl = await SupabaseDB.getSafeUrl(farmer['image_url'] as String?, defaultBucket: 'uploads');
+            _farmerImageUrl = await SupabaseDatabase.getSafeUrl(farmer['image_url'] as String?, defaultBucket: 'uploads');
             await _precacheProfileImage(_farmerImageUrl);
           }
         }
@@ -141,7 +141,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
 
               final rawImageUrl = (user['image_url'] ?? user['avatar_url'] ?? '').toString();
               _imageUrlController.text = rawImageUrl;
-              _customerImageUrl = await SupabaseDB.getSafeUrl(rawImageUrl, defaultBucket: 'uploads');
+              _customerImageUrl = await SupabaseDatabase.getSafeUrl(rawImageUrl, defaultBucket: 'uploads');
               await _precacheProfileImage(_customerImageUrl);
             }
           }
@@ -297,7 +297,6 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               'bio': _bioController.text.trim(),
               'phone': _phoneController.text.trim(),
               'avatar_url': _imageUrlController.text.trim(),
-              'image_url': _imageUrlController.text.trim(),
             })
             .eq('user_id', _auth.userId);
       }
@@ -567,7 +566,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                     border: Border.all(color: AppColors.primary, width: 3),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.2),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         blurRadius: 16,
                         offset: const Offset(0, 8),
                       ),
@@ -607,7 +606,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.accent.withValues(alpha: 0.4),
+                            color: AppColors.accent.withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -648,9 +647,12 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           colors: isFarmer
               ? [
                   AppColors.primary.withValues(alpha: 0.1),
-                  AppColors.primary.withValues(alpha: 0.05),
+                  AppColors.primary.withValues(alpha: 0.1),
                 ]
-              : [Colors.blue.withValues(alpha: 0.1), Colors.blue.withValues(alpha: 0.05)],
+              : [
+                  Colors.blue.withValues(alpha: 0.1),
+                  Colors.blue.withValues(alpha: 0.1)
+                ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -941,8 +943,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                             children: [
                               TileLayer(
                                 urlTemplate:
-                                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                                subdomains: const ['a', 'b', 'c', 'd'],
                                 userAgentPackageName: 'com.agridirect.app',
+                                retinaMode: RetinaMode.isHighDensity(context),
                               ),
                               MarkerLayer(
                                 markers: [

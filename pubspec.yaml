@@ -70,6 +70,8 @@ dependencies:
   mobile_scanner: ^7.2.0
   google_mlkit_text_recognition: ^0.15.1
   google_mlkit_barcode_scanning: ^0.14.2
+  google_mlkit_image_labeling: ^0.14.2
+  flutter_native_splash: ^2.4.7
 
 dev_dependencies:
   flutter_test:
@@ -97,9 +99,11 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    - assets/icon/logo_v3.png
     - assets/images/
-    - assets/icon/
-    - assets/lottie/
+    - assets/lottie/Face Scan.json
+    - assets/lottie/Scan User ID.json
+    - assets/lottie/Security.json
     - .env
     - .env.web
 
@@ -132,6 +136,14 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon/logo_v2.png"
-  adaptive_icon_background: "#16A34A"
-  adaptive_icon_foreground: "assets/icon/logo_v2.png"
+  image_path: "assets/icon/logo_v3.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/logo_v3.png"
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  color_dark: "#FFFFFF"
+  image: "assets/icon/logo_v3.png"
+  android: true
+  ios: true
+  web: false

@@ -8,6 +8,7 @@ import '../../../shared/services/integration/email_service.dart';
 import '../../../shared/services/auth/otp_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/router/app_router.dart';
+import '../../../shared/widgets/brand_logo.dart';
 import 'web_otp_verification_screen.dart';
 
 /// Web Login / Register screen.
@@ -149,8 +150,8 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        const Color(0xFFEF4444).withValues(alpha: 0.1),
-                        const Color(0xFFFCA5A5).withValues(alpha: 0.15),
+                        const Color(0xFFEF4444).withValues(alpha: 0.2),
+                        const Color(0xFFFCA5A5).withValues(alpha: 0.1),
                       ],
                     ),
                     shape: BoxShape.circle,
@@ -223,7 +224,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      backgroundColor: _primary.withValues(alpha: 0.08),
+                      backgroundColor: _primary.withValues(alpha: 0.1),
                     ),
                     child: Text(
                       'Reset Password',
@@ -267,7 +268,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
 
     try {
       // Step 0: Check if email is already registered
-      final emailTaken = await SupabaseDB.isEmailAlreadyRegistered(email);
+      final emailTaken = await SupabaseDatabase.isEmailAlreadyRegistered(email);
       if (emailTaken) {
         if (mounted) {
           setState(() => _registerLoading = false);
@@ -405,7 +406,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                           shape: BoxShape.circle,
                           gradient: RadialGradient(
                             colors: [
-                              const Color(0xFF34D399).withValues(alpha: 0.12),
+                              const Color(0xFF34D399).withValues(alpha: 0.15),
                               Colors.transparent,
                             ],
                           ),
@@ -450,41 +451,10 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // Logo
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.15,
-                                      ),
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.2,
-                                        ),
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.eco_rounded,
-                                      color: Colors.white,
-                                      size: 26,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Text(
-                                    'AgriDirect',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 30,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                      letterSpacing: -0.5,
-                                    ),
-                                  ),
-                                ],
+                              // Official Brand Logo
+                              const BrandLogo(
+                                size: BrandLogoSize.medium,
+                                inverted: true,
                               ),
                               const SizedBox(height: 48),
 
@@ -492,10 +462,10 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                               Container(
                                 padding: const EdgeInsets.all(20),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.07),
+                                  color: Colors.white.withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(28),
                                   border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.1),
+                                    color: Colors.white.withValues(alpha: 0.15),
                                   ),
                                 ),
                                 child: SizedBox(
@@ -557,26 +527,26 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.inter(
                                   fontSize: 15,
-                                  color: Colors.white.withValues(alpha: 0.65),
+                                  color: Colors.white.withValues(alpha: 0.7),
                                   height: 1.7,
                                 ),
                               ),
                               const SizedBox(height: 32),
 
                               // Trust badges
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 12,
+                                alignment: WrapAlignment.center,
                                 children: [
                                   _buildTrustBadge(
                                     Icons.verified_rounded,
                                     '500+ Farmers',
                                   ),
-                                  const SizedBox(width: 12),
                                   _buildTrustBadge(
                                     Icons.eco_rounded,
                                     '100% Organic',
                                   ),
-                                  const SizedBox(width: 12),
                                   _buildTrustBadge(
                                     Icons.bolt_rounded,
                                     'Same Day',
@@ -598,39 +568,78 @@ class _WebLoginScreenState extends State<WebLoginScreen>
             flex: isCompact ? 1 : 4,
             child: Container(
               color: Colors.white,
-              child: Center(
-                child: SingleChildScrollView(
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 440),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isCompact ? 24 : 44,
-                      vertical: 48,
-                    ),
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 400),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        transitionBuilder: (child, animation) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0.03, 0),
-                                end: Offset.zero,
-                              ).animate(animation),
-                              child: child,
+              child: Stack(
+                children: [
+                  Center(
+                    child: SingleChildScrollView(
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 440),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isCompact ? 24 : 44,
+                          vertical: 48,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FadeTransition(
+                              opacity: _fadeAnimation,
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 400),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                transitionBuilder: (child, animation) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: SlideTransition(
+                                      position: Tween<Offset>(
+                                        begin: const Offset(0.03, 0),
+                                        end: Offset.zero,
+                                      ).animate(animation),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: _isRegister
+                                    ? _buildRegisterForm()
+                                    : _buildLoginForm(),
+                              ),
                             ),
-                          );
-                        },
-                        child: _isRegister
-                            ? _buildRegisterForm()
-                            : _buildLoginForm(),
+                            const SizedBox(height: 24),
+                            Text(
+                              'v2.0 - Build Stabilized',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                color: Colors.grey.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
+                  Positioned(
+                    top: 24,
+                    left: 24,
+                    child: TextButton.icon(
+                      onPressed: () => context.go(AppRoutes.home),
+                      icon: const Icon(Icons.arrow_back, size: 20),
+                      label: Text(
+                        'Back to Home',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _mutedDark,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -643,9 +652,9 @@ class _WebLoginScreenState extends State<WebLoginScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -657,7 +666,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
             style: GoogleFonts.inter(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: Colors.white.withValues(alpha: 0.85),
+              color: Colors.white.withValues(alpha: 0.8),
             ),
           ),
         ],
@@ -671,24 +680,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Greeting
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                _primary.withValues(alpha: 0.1),
-                _primary.withValues(alpha: 0.08),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Icon(
-            Icons.waving_hand_rounded,
-            color: _primary,
-            size: 26,
-          ),
-        ),
+        const BrandLogo(size: BrandLogoSize.medium, useIconOnly: true),
         const SizedBox(height: 24),
         Text(
           'Welcome back',
@@ -781,7 +773,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
             gradient: LinearGradient(
               colors: [
                 _primary.withValues(alpha: 0.1),
-                _primary.withValues(alpha: 0.08),
+                _primary.withValues(alpha: 0.05),
               ],
             ),
             borderRadius: BorderRadius.circular(16),
@@ -942,7 +934,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
         style: ElevatedButton.styleFrom(
           backgroundColor: _primary,
           foregroundColor: Colors.white,
-          disabledBackgroundColor: _primary.withValues(alpha: 0.6),
+          disabledBackgroundColor: _primary.withValues(alpha: 0.5),
           elevation: 0,
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(

@@ -30,7 +30,7 @@ class VerificationGuideWidget extends StatelessWidget {
               ),
             ),
           ),
-          
+
           Expanded(
             child: DefaultTabController(
               length: 3,
@@ -56,7 +56,7 @@ class VerificationGuideWidget extends StatelessWidget {
                       ],
                     ),
                   ),
-                  
+
                   TabBar(
                     isScrollable: true,
                     tabAlignment: TabAlignment.start,
@@ -74,28 +74,32 @@ class VerificationGuideWidget extends StatelessWidget {
                       Tab(text: 'ID Back / QR'),
                     ],
                   ),
-                  
+
                   Expanded(
                     child: TabBarView(
                       children: [
                         _GuidePage(
                           title: 'Face Biometric Scan',
-                          description: 'We need to verify that you are the real owner of the ID.',
+                          description:
+                              'We need to verify that you are the real owner of the ID.',
                           lottiePath: 'assets/lottie/Face Scan.json',
                           steps: [
                             _GuideStep(
                               title: 'Good Lighting',
-                              description: 'Make sure your face is well-lit and not in shadow.',
+                              description:
+                                  'Make sure your face is well-lit and not in shadow.',
                               isCorrect: true,
                             ),
                             _GuideStep(
                               title: 'Center your Face',
-                              description: 'Align your face within the circular frame provided.',
+                              description:
+                                  'Align your face within the circular frame provided.',
                               isCorrect: true,
                             ),
                             _GuideStep(
                               title: 'Remove Accessories',
-                              description: 'Remove sunglasses, masks, or hats that cover your face.',
+                              description:
+                                  'Remove sunglasses, masks, or hats that cover your face.',
                               isCorrect: false,
                               wrongLabel: 'Don\'t cover your face',
                             ),
@@ -103,22 +107,26 @@ class VerificationGuideWidget extends StatelessWidget {
                         ),
                         _GuidePage(
                           title: 'ID Front Capture',
-                          description: 'Capture a clear photo of the front side of your ID.',
+                          description:
+                              'Capture a clear photo of the front side of your ID.',
                           lottiePath: 'assets/lottie/Scan User ID.json',
                           steps: [
                             _GuideStep(
                               title: 'Flat Surface',
-                              description: 'Place your ID on a flat, dark surface for contrast.',
+                              description:
+                                  'Place your ID on a flat, dark surface for contrast.',
                               isCorrect: true,
                             ),
                             _GuideStep(
                               title: 'Avoid Glare',
-                              description: 'Ensure there are no bright reflections on the ID card.',
+                              description:
+                                  'Ensure there are no bright reflections on the ID card.',
                               isCorrect: true,
                             ),
                             _GuideStep(
                               title: 'Blurry Photo',
-                              description: 'Text must be readable. Don\'t move while capturing.',
+                              description:
+                                  'Text must be readable. Don\'t move while capturing.',
                               isCorrect: false,
                               wrongLabel: 'Don\'t submit blurry images',
                             ),
@@ -126,22 +134,26 @@ class VerificationGuideWidget extends StatelessWidget {
                         ),
                         _GuidePage(
                           title: 'QR Code / ID Back',
-                          description: 'Scan the QR code on the back of your National ID.',
+                          description:
+                              'Scan the QR code on the back of your National ID.',
                           lottiePath: 'assets/lottie/Scan User ID.json',
                           steps: [
                             _GuideStep(
                               title: 'Steady Focus',
-                              description: 'Hold your phone steady until the QR is recognized.',
+                              description:
+                                  'Hold your phone steady until the QR is recognized.',
                               isCorrect: true,
                             ),
                             _GuideStep(
                               title: 'Distance',
-                              description: 'Keep the QR code about 10-15cm away from the camera.',
+                              description:
+                                  'Keep the QR code about 10-15cm away from the camera.',
                               isCorrect: true,
                             ),
                             _GuideStep(
                               title: 'Moving Camera',
-                              description: 'Movement will cause the scanner to fail extraction.',
+                              description:
+                                  'Movement will cause the scanner to fail extraction.',
                               isCorrect: false,
                               wrongLabel: 'Avoid shaky hands',
                             ),
@@ -150,7 +162,7 @@ class VerificationGuideWidget extends StatelessWidget {
                       ],
                     ),
                   ),
-                  
+
                   Padding(
                     padding: const EdgeInsets.all(24),
                     child: SizedBox(
@@ -226,7 +238,7 @@ class _GuidePage extends StatelessWidget {
                         Icon(
                           Icons.error_outline_rounded,
                           size: 40,
-                          color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+                          color: const Color(0xFFEF4444),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -299,7 +311,9 @@ class _GuideStep extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: isCorrect ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+              color: isCorrect
+                  ? const Color(0xFF22C55E)
+                  : const Color(0xFFEF4444),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -318,15 +332,19 @@ class _GuideStep extends StatelessWidget {
                   style: GoogleFonts.plusJakartaSans(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
-                    color: isCorrect ? const Color(0xFF166534) : const Color(0xFF991B1B),
+                    color: isCorrect
+                        ? const Color(0xFF166534)
+                        : const Color(0xFF991B1B),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   description,
-                  style: GoogleFonts.plusJakartaSans(
+                    style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
-                    color: isCorrect ? const Color(0xFF166534).withValues(alpha: 0.7) : const Color(0xFF991B1B).withValues(alpha: 0.7),
+                    color: isCorrect
+                        ? const Color(0xFF166534).withValues(alpha: 0.7)
+                        : const Color(0xFF991B1B).withValues(alpha: 0.7),
                   ),
                 ),
               ],

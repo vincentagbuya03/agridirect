@@ -362,7 +362,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -709,7 +709,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     backgroundColor: primary,
                     disabledBackgroundColor: primary.withValues(alpha: 0.5),
                     elevation: 4,
-                    shadowColor: primary.withValues(alpha: 0.4),
+                    shadowColor: primary.withValues(alpha: 0.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -755,7 +755,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -838,7 +838,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
                         border: Border.all(
-                          color: primary.withValues(alpha: 0.5),
+                          color: primary.withValues(alpha: 0.1),
                           width: 2,
                           style: BorderStyle.solid,
                         ),
@@ -882,7 +882,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.6),
+                            color: Colors.black.withValues(alpha: 0.5),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
@@ -907,7 +907,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 border: Border.all(
-                  color: primary.withValues(alpha: 0.3),
+                  color: primary.withValues(alpha: 0.1),
                   width: 2,
                 ),
                 borderRadius: BorderRadius.circular(16),
@@ -1063,7 +1063,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 height: 48,
                 decoration: BoxDecoration(
                   color: const Color(0xFFF8FAFC),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.1)),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
@@ -1132,11 +1132,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
       child: Container(
         decoration: BoxDecoration(
           color: value
-              ? primary.withValues(alpha: 0.05)
+              ? primary.withValues(alpha: 0.1)
               : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: value ? primary.withValues(alpha: 0.3) : Colors.grey[200]!,
+            color: value ? primary.withValues(alpha: 0.1) : Colors.grey[200]!,
             width: 1,
           ),
         ),

@@ -35,7 +35,7 @@ class BrandLogo extends StatelessWidget {
       case BrandLogoSize.medium:
         return 42;
       case BrandLogoSize.large:
-        return 100;
+        return 120;
     }
   }
 
@@ -46,7 +46,7 @@ class BrandLogo extends StatelessWidget {
       case BrandLogoSize.medium:
         return 24;
       case BrandLogoSize.large:
-        return 38;
+        return 42;
     }
   }
 
@@ -100,78 +100,28 @@ class BrandLogo extends StatelessWidget {
       width: _logoSize,
       height: _logoSize,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary,
-            AppColors.primary.withValues(alpha: 0.85),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: AppColors.textHeadline.withValues(alpha: 0.1),
+          width: 1,
         ),
-        borderRadius: BorderRadius.circular(_logoSize * 0.3),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.25),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.1),
-            blurRadius: 1,
-            spreadRadius: -2,
-            offset: const Offset(0, 1),
+            color: AppColors.primary.withValues(alpha: 0.2),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          // Glass shine effect
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(_logoSize * 0.3),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.white.withValues(alpha: 0.2),
-                      Colors.transparent,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-              ),
-            ),
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.all(_logoSize * 0.22),
+          child: Image.asset(
+            'assets/icon/logo_v3.png',
+            fit: BoxFit.contain,
           ),
-          // Inner border
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(_logoSize * 0.3),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  width: 1.5,
-                ),
-              ),
-            ),
-          ),
-          Center(
-            child: Padding(
-              padding: EdgeInsets.all(_logoSize * 0.15),
-              child: Image.asset(
-                'assets/icon/logo_v2.png',
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(
-                    Icons.eco_rounded,
-                    color: Colors.white,
-                    size: _logoSize * 0.55,
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

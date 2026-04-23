@@ -13,12 +13,15 @@ class ProductItem {
   final String unit;
   final String imageUrl;
   final List<String> imageUrls;
+  final String? categoryName;
   final String? rating;
   final String? reviews;
   final String? harvestDays;
   final String? description;
   final double? reservedQuantity;
   final double? targetQuantity;
+  final double? latitude;
+  final double? longitude;
 
   const ProductItem({
     this.productId,
@@ -31,12 +34,15 @@ class ProductItem {
     required this.unit,
     required this.imageUrl,
     this.imageUrls = const [],
+    this.categoryName,
     this.rating,
     this.reviews,
     this.harvestDays,
     this.description,
     this.reservedQuantity,
     this.targetQuantity,
+    this.latitude,
+    this.longitude,
   });
 }
 
@@ -64,6 +70,7 @@ class ForumPostItem {
   final int likes;
   final int comments;
   final bool isLiked;
+  final bool isPinned;
 
   const ForumPostItem({
     required this.id,
@@ -75,6 +82,7 @@ class ForumPostItem {
     required this.likes,
     required this.comments,
     required this.isLiked,
+    this.isPinned = false,
   });
 }
 
@@ -83,6 +91,7 @@ class ArticleItem {
   final String excerpt;
   final String author;
   final String readTime;
+  final String time;
   final String? imageUrl;
 
   const ArticleItem({
@@ -90,8 +99,32 @@ class ArticleItem {
     required this.excerpt,
     this.author = 'AgriDirect',
     this.readTime = '4 min read',
+    this.time = 'Recently',
     this.imageUrl,
   });
+}
+
+class CartItem {
+  final String productId;
+  final String name;
+  final String farm;
+  final String price;
+  final String unit;
+  final String imageUrl;
+  int quantity;
+
+  CartItem({
+    required this.productId,
+    required this.name,
+    required this.farm,
+    required this.price,
+    required this.unit,
+    required this.imageUrl,
+    this.quantity = 1,
+  });
+
+  double get priceValue => double.tryParse(price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+  double get total => priceValue * quantity;
 }
 
 class DashboardMetric {

@@ -174,7 +174,7 @@ class _GoogleCompleteProfileScreenState
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.2),
+                            color: AppColors.primary.withValues(alpha: 0.1),
                           ),
                         ),
                         child: Row(
@@ -294,7 +294,7 @@ class _GoogleCompleteProfileScreenState
             if (_isLoading)
               Positioned.fill(
                 child: Container(
-                  color: Colors.white.withValues(alpha: 0.84),
+                  color: Colors.white.withValues(alpha: 0.8),
                   child: Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -306,7 +306,7 @@ class _GoogleCompleteProfileScreenState
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 24,
                             offset: const Offset(0, 10),
                           ),

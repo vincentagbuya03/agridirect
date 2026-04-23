@@ -45,7 +45,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final emailTaken = await SupabaseDB.isEmailAlreadyRegistered(email);
+      final emailTaken = await SupabaseDatabase.isEmailAlreadyRegistered(email);
       if (emailTaken) {
         final resumed = await _resumeIncompleteManualProfile(
           email: email,
@@ -66,11 +66,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         return;
       }
 
-      // Use the standard temporary password for initial account creation
+      final temporaryPassword =
+          AuthService.generateOneTimeRegistrationPassword();
+      await AuthService.cachePendingRegistrationPassword(
+        email: email,
+        password: temporaryPassword,
+      );
+
       final String? userId = await AuthService().register(
         name: name,
         email: email,
-        password: AuthService.temporaryPassword,
+        password: temporaryPassword,
       );
 
       if (userId == null) {
@@ -134,8 +140,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               userId: userId,
               email: email,
               name: name,
-              password: AuthService
-                  .temporaryPassword, // Pass the temp password for verification check
+              password: temporaryPassword,
               onVerificationSuccess: () {
                 widget.onRegistrationSuccess();
               },
@@ -173,15 +178,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     required String fallbackName,
   }) async {
     try {
+      final temporaryPassword =
+          await AuthService.getPendingRegistrationPassword(email);
+      if (temporaryPassword == null || temporaryPassword.isEmpty) {
+        return false;
+      }
+
       final signInResult = await SupabaseConfig.client.auth.signInWithPassword(
         email: email,
-        password: AuthService.temporaryPassword,
+        password: temporaryPassword,
       );
 
       final user = signInResult.user;
       if (user == null) return false;
 
-      final profile = await SupabaseDB.getUserProfile(user.id);
+      final profile = await SupabaseDatabase.getUserProfile(user.id);
       final phone = (profile?['phone'] as String?)?.trim() ?? '';
 
       // If phone already exists, this is likely a fully completed account.

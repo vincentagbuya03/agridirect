@@ -126,7 +126,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _primary.withValues(alpha: 0.05),
+                color: _primary.withValues(alpha: 0.1),
               ),
             ),
           ),
@@ -138,7 +138,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _accent.withValues(alpha: 0.03),
+                color: _accent.withValues(alpha: 0.1),
               ),
             ),
           ),
@@ -183,7 +183,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: _dark.withValues(alpha: 0.04),
+            color: _dark.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -302,7 +302,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                           boxShadow: isCurrent
                               ? [
                                   BoxShadow(
-                                    color: _primary.withValues(alpha: 0.2),
+                                    color: _primary.withValues(alpha: 0.3),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -410,12 +410,12 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                       children: [
                         _buildLabel('Sex'),
                         const SizedBox(height: 10),
-                          _buildTextField(
-                            _sexController,
-                            'Gender',
-                            prefixIcon: Icons.wc_rounded,
-                            readOnly: _idType == 'national_id' && _qrData != null,
-                          ),
+                        _buildTextField(
+                          _sexController,
+                          'Gender',
+                          prefixIcon: Icons.wc_rounded,
+                          readOnly: _idType == 'national_id' && _qrData != null,
+                        ),
                       ],
                     ),
                   ),
@@ -486,9 +486,9 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: _primary.withValues(alpha: 0.05),
+                  color: _primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: _primary.withValues(alpha: 0.1)),
+                  border: Border.all(color: _primary.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -598,7 +598,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: _primary.withValues(alpha: 0.1),
+                              color: _primary.withValues(alpha: 0.2),
                               blurRadius: 10,
                             ),
                           ],
@@ -754,7 +754,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: _primary.withValues(alpha: 0.08),
+            color: _primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: _primary, size: 20),
@@ -784,10 +784,10 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: _border.withValues(alpha: 0.7)),
+        border: Border.all(color: _border.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: _dark.withValues(alpha: 0.04),
+            color: _dark.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -816,7 +816,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
           color: isSelected ? _primary : _surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? _primary : _border.withValues(alpha: 0.6),
+            color: isSelected ? _primary : _border.withValues(alpha: 0.5),
           ),
           boxShadow: isSelected
               ? [
@@ -866,7 +866,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
           color: selected ? _primary : _surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: selected ? _primary : _border.withValues(alpha: 0.6),
+            color: selected ? _primary : _border.withValues(alpha: 0.5),
           ),
           boxShadow: selected
               ? [
@@ -976,7 +976,10 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         Row(
           children: [
             Expanded(
-              child: _buildSectionTitle('Biometric Scan', Icons.face_unlock_rounded),
+              child: _buildSectionTitle(
+                'Biometric Scan',
+                Icons.face_unlock_rounded,
+              ),
             ),
             const SizedBox(width: 8),
             TextButton.icon(
@@ -1042,7 +1045,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                             Icon(
                               Icons.face_retouching_natural,
                               size: 72,
-                              color: _primary.withValues(alpha: 0.4),
+                              color: _primary.withValues(alpha: 0.5),
                             ),
                             const SizedBox(height: 12),
                             Text(
@@ -1094,7 +1097,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
             border: Border.all(color: _border),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),
@@ -1155,7 +1158,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                       child: Icon(
                         Icons.camera_front_rounded,
                         size: 32,
-                        color: _primary.withValues(alpha: 0.6),
+                        color: _primary.withValues(alpha: 0.5),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1195,7 +1198,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
             border: Border.all(color: _border),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),
@@ -1279,7 +1282,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                             ? Icons.qr_code_scanner_rounded
                             : Icons.camera_rear_rounded,
                         size: 32,
-                        color: _primary.withValues(alpha: 0.6),
+                        color: _primary.withValues(alpha: 0.5),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1424,7 +1427,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                         child: Text(
                           'Draw your signature here',
                           style: GoogleFonts.plusJakartaSans(
-                            color: _muted.withValues(alpha: 0.3),
+                            color: _muted.withValues(alpha: 0.5),
                             fontWeight: FontWeight.w600,
                             fontStyle: FontStyle.italic,
                           ),
@@ -1490,7 +1493,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: _certificationAccepted
-              ? _primary.withValues(alpha: 0.05)
+              ? _primary.withValues(alpha: 0.1)
               : _surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
@@ -1608,7 +1611,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
       style: GoogleFonts.plusJakartaSans(
         fontSize: 12,
         fontWeight: FontWeight.w700,
-        color: _dark.withValues(alpha: 0.9),
+        color: _dark.withValues(alpha: 0.8),
         letterSpacing: 0.2,
       ),
     );
@@ -1662,7 +1665,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
           hintText: hint,
           hintStyle: GoogleFonts.plusJakartaSans(
             fontSize: 14,
-            color: _muted.withValues(alpha: 0.4),
+            color: _muted.withValues(alpha: 0.5),
             fontWeight: FontWeight.w500,
           ),
           border: InputBorder.none,
@@ -1671,13 +1674,13 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
             vertical: 16,
           ),
           suffixIcon: suffixIcon != null
-              ? Icon(suffixIcon, size: 20, color: _muted.withValues(alpha: 0.6))
+              ? Icon(suffixIcon, size: 20, color: _muted.withValues(alpha: 0.5))
               : null,
           prefixIcon: prefixIcon != null
               ? Icon(
                   prefixIcon,
                   size: 20,
-                  color: _primary.withValues(alpha: 0.8),
+                  color: _primary.withValues(alpha: 0.5),
                 )
               : null,
         ),
@@ -1864,20 +1867,19 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
           _sexController.text =
               subject['sex'] ?? subject['Gender'] ?? subject['gender'] ?? '';
 
-          _placeOfBirthController.text = subject['POB'] ??
+          _placeOfBirthController.text =
+              subject['POB'] ??
               subject['pob'] ??
               subject['BirthPlace'] ??
               subject['placeOfBirth'] ??
               '';
 
           // Extract and populate PCN automatically
-          _pcnController.text = (subject['PCN'] ??
-                  subject['pcn'] ??
-                  subject['CardNumber'] ??
-                  '')
-              .toString();
- 
-           // Parse DOB with fallback keys
+          _pcnController.text =
+              (subject['PCN'] ?? subject['pcn'] ?? subject['CardNumber'] ?? '')
+                  .toString();
+
+          // Parse DOB with fallback keys
           final dob =
               subject['DOB'] ?? subject['dob'] ?? subject['BirthDate'] ?? '';
           if (dob.toString().isNotEmpty) {
@@ -1962,7 +1964,9 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         _showError('Please enter your place of birth');
         return;
       }
-      if (_idType == 'national_id' && _pcnController.text.trim().isEmpty && _qrData == null) {
+      if (_idType == 'national_id' &&
+          _pcnController.text.trim().isEmpty &&
+          _qrData == null) {
         _showError('Please enter your PCN for National ID verification');
         return;
       }
@@ -2011,7 +2015,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     _registration.specialty = _specialtyController.text.trim();
     _registration.cropTypes = _selectedCrops.toList();
 
-    // Combine selected chips with other manual input
     List<String> combinedLivestock = _selectedLivestock.toList();
     if (_livestockController.text.trim().isNotEmpty) {
       combinedLivestock.add(_livestockController.text.trim());
@@ -2031,7 +2034,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
       final auth = AuthService();
 
       // Submit registration to Supabase
-      await SupabaseDB.submitFarmerRegistration(
+      await SupabaseDatabase.submitFarmerRegistration(
         userId: auth.userId,
         registration: _registration,
         faceImageBytes: _faceImageBytes,
@@ -2245,8 +2248,10 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                                 children: [
                                   TileLayer(
                                     urlTemplate:
-                                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                                    subdomains: const ['a', 'b', 'c', 'd'],
                                     userAgentPackageName: 'com.agridirect.app',
+                                    retinaMode: RetinaMode.isHighDensity(context),
                                   ),
                                   MarkerLayer(
                                     markers: [

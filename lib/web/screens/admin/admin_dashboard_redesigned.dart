@@ -241,7 +241,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                 children: [
                   Text(
                     _authService.userName.isEmpty
-                        ? 'Julian Thorne'
+                        ? 'Administrator'
                         : _authService.userName,
                     style: AdminUi.label(
                       size: 14,
@@ -250,7 +250,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                     ),
                   ),
                   Text(
-                    'Senior Curator',
+                    'System Curator',
                     style: AdminUi.label(size: 11, color: AdminUi.textMuted),
                   ),
                 ],
@@ -282,7 +282,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
               children: [
                 const BrandLogo(size: BrandLogoSize.medium),
                 Text(
-                  'Digital Arboretum v1.0',
+                  'AgriDirect Admin v1.0',
                   style: AdminUi.label(
                     size: 11,
                     color: AdminUi.textMuted,
@@ -324,7 +324,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'SYSTEM HEALTH:',
+                        'SYSTEM STATUS:',
                         style: AdminUi.label(
                           size: 11,
                           color: Colors.white,
@@ -337,7 +337,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                   Padding(
                     padding: const EdgeInsets.only(left: 22),
                     child: Text(
-                      'OPTIMAL',
+                      'OPERATIONAL',
                       style: AdminUi.label(
                         size: 13,
                         color: Colors.white,
@@ -349,10 +349,10 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                   Padding(
                     padding: const EdgeInsets.only(left: 22),
                     child: Text(
-                      'All nodes operational. Latency 24ms.',
+                      'All platform services are running normally.',
                       style: AdminUi.label(
                         size: 10,
-                        color: Colors.white.withValues(alpha: 0.7),
+                        color: Colors.white.withValues(alpha: 0.8),
                       ),
                     ),
                   ),
@@ -433,7 +433,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
       children: [
         AdminDashboardHeader(
           title: 'Overview',
-          subtitle: 'Growth metrics and logistics for the Digital Arboretum.',
+          subtitle: 'Growth metrics and logistics for the AgriDirect platform.',
           actions: [
             ElevatedButton(
               onPressed: () {},
@@ -460,29 +460,28 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                     label: 'Total Revenue',
                     value: '₱${_counts['revenue']?.toStringAsFixed(0)}',
                     icon: Icons.payments_rounded,
-                    trend:
-                        '+${((_counts['revenue'] / 100000) * 100).toStringAsFixed(1)}%',
+                    trend: 'Realtime',
                   ),
                   const SizedBox(width: 24),
                   AdminMetricCard(
                     label: 'Active Farmers',
                     value: '${_counts['farmers']}',
                     icon: Icons.agriculture_rounded,
-                    trend: '+${_counts['farmers']}',
+                    trend: 'Updated',
                   ),
                   const SizedBox(width: 24),
                   AdminMetricCard(
                     label: 'Total Products',
                     value: '${_counts['products']}',
                     icon: Icons.inventory_2_rounded,
-                    badge: 'New',
+                    badge: 'Catalog',
                   ),
                   const SizedBox(width: 24),
                   AdminMetricCard(
                     label: 'Pending Verifications',
                     value: '${_counts['pending']}',
                     icon: Icons.verified_user_rounded,
-                    badge: 'Urgent',
+                    badge: _counts['pending'] > 0 ? 'Urgent' : null,
                   ),
                 ],
               ),
@@ -523,7 +522,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                 children: [
                   Text('Sales Trends', style: AdminUi.title(size: 20)),
                   Text(
-                    'Revenue performance across all curated categories.',
+                    'Revenue performance across all platform categories.',
                     style: AdminUi.body(size: 13),
                   ),
                 ],
@@ -570,7 +569,13 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: ['01 OCT', '08 OCT', '15 OCT', '22 OCT', '30 OCT']
+            children: [
+              _getShortDate(Duration(days: 28)),
+              _getShortDate(Duration(days: 21)),
+              _getShortDate(Duration(days: 14)),
+              _getShortDate(Duration(days: 7)),
+              'TODAY',
+            ]
                 .map(
                   (d) => Text(
                     d,
@@ -582,6 +587,12 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
         ],
       ),
     );
+  }
+
+  String _getShortDate(Duration subtract) {
+    final date = DateTime.now().subtract(subtract);
+    final months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]}';
   }
 
   Widget _buildAdminLogsCard() {
@@ -822,7 +833,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
             'Real-time health of the AgriDirect ecosystem nodes.',
             style: AdminUi.body(
               size: 12,
-              color: Colors.white.withValues(alpha: 0.6),
+              color: Colors.white.withValues(alpha: 0.7),
             ),
           ),
           const SizedBox(height: 32),
@@ -874,7 +885,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
           label,
           style: AdminUi.label(
             size: 10,
-            color: Colors.white.withValues(alpha: 0.5),
+            color: Colors.white.withValues(alpha: 0.6),
             weight: FontWeight.w700,
           ),
         ),
@@ -904,7 +915,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: AdminUi.radiusSm,
             ),
             child: Text(
@@ -923,7 +934,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
             subtext,
             style: AdminUi.label(
               size: 10,
-              color: Colors.white.withValues(alpha: 0.4),
+              color: Colors.white.withValues(alpha: 0.5),
             ),
           ),
         ],

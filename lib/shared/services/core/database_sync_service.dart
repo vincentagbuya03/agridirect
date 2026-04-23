@@ -25,7 +25,6 @@ class DatabaseSyncService extends ChangeNotifier {
   RealtimeChannel? _registrationChannel;
   RealtimeChannel? _productChannel;
 
-  String? _activeUserId;
   String? _activeFarmerId;
 
   // Sync configuration
@@ -65,7 +64,6 @@ class DatabaseSyncService extends ChangeNotifier {
       return;
     }
 
-    _activeUserId = userId;
     unawaited(
       _configureRealtimeSync(
         userId: userId,
@@ -125,7 +123,6 @@ class DatabaseSyncService extends ChangeNotifier {
     _registrationChannel = null;
     _productChannel = null;
 
-    _activeUserId = null;
     _activeFarmerId = null;
   }
 

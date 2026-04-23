@@ -18,6 +18,7 @@ class WebPasswordResetWithCodeScreen extends StatefulWidget {
 class _WebPasswordResetWithCodeScreenState
     extends State<WebPasswordResetWithCodeScreen> {
   final _emailController = TextEditingController();
+  final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -25,6 +26,7 @@ class _WebPasswordResetWithCodeScreenState
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   bool _codeSent = false;
+  bool _codeVerified = false;
   bool _resetSuccess = false;
 
   static const Color _primary = Color(0xFF16A34A);
@@ -33,6 +35,7 @@ class _WebPasswordResetWithCodeScreenState
   @override
   void dispose() {
     _emailController.dispose();
+    _codeController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -79,6 +82,30 @@ class _WebPasswordResetWithCodeScreenState
     }
   }
 
+  Future<void> _handleVerifyCode() async {
+    final email = _emailController.text.trim();
+    final code = _codeController.text.trim();
+
+    if (email.isEmpty || code.isEmpty) {
+      _showSnackBar('Please fill in all fields', isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await PasswordResetService.verifyResetCode(email: email, code: code);
+      setState(() {
+        _isLoading = false;
+        _codeVerified = true;
+      });
+      _showSnackBar('Code verified! Set your new password.', isError: false);
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showSnackBar('Invalid code: $e', isError: true);
+    }
+  }
+
   Future<void> _handleResetPassword() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -107,8 +134,9 @@ class _WebPasswordResetWithCodeScreenState
     setState(() => _isLoading = true);
 
     try {
-      await PasswordResetService.resetPasswordWithLatestCode(
+      await PasswordResetService.resetPasswordWithCode(
         email: email,
+        code: _codeController.text.trim(),
         newPassword: password,
       );
 
@@ -142,21 +170,53 @@ class _WebPasswordResetWithCodeScreenState
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 768;
+    final screenSize = MediaQuery.sizeOf(context);
+    final shortestSide = screenSize.shortestSide;
+    final isHandset = shortestSide < 600;
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: SingleChildScrollView(
-          child: Container(
-            width: isMobile ? double.infinity : 480,
-            padding: EdgeInsets.all(isMobile ? 24 : 48),
-            child: _resetSuccess
-                ? _buildSuccessView()
-                : _codeSent
-                ? _buildCreatePasswordForm()
-                : _buildSendCodeForm(),
-          ),
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final horizontalPadding = isHandset ? 16.0 : 24.0;
+            final cardPadding = isHandset ? 24.0 : 40.0;
+
+            return Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: horizontalPadding,
+                  vertical: 24,
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(cardPadding),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x140F172A),
+                          blurRadius: 32,
+                          offset: Offset(0, 16),
+                        ),
+                      ],
+                    ),
+                    child: _resetSuccess
+                        ? _buildSuccessView()
+                        : _codeVerified
+                        ? _buildCreatePasswordForm()
+                        : _codeSent
+                        ? _buildVerifyCodeForm()
+                        : _buildSendCodeForm(),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -217,6 +277,59 @@ class _WebPasswordResetWithCodeScreenState
     );
   }
 
+  Widget _buildVerifyCodeForm() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.pin_rounded, color: _primary, size: 64),
+        const SizedBox(height: 32),
+        Text(
+          'Verify Code',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Please enter the 6-digit verification code sent to your email.',
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 36),
+        _buildTextField(
+          _codeController,
+          'Verification Code',
+          Icons.pin_rounded,
+          maxLength: 6,
+          hint: 'Enter 6-digit code',
+        ),
+        const SizedBox(height: 28),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            onPressed: _isLoading ? null : _handleVerifyCode,
+            child: _isLoading
+                ? const AppShimmerLoader(color: Colors.white)
+                : const Text(
+                    'Verify Code',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildCreatePasswordForm() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -232,7 +345,7 @@ class _WebPasswordResetWithCodeScreenState
         ),
         const SizedBox(height: 12),
         const Text(
-          'The latest valid reset code is used automatically when you set your new password.',
+          'Your identity is verified. Please set your new secure password.',
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 36),
@@ -309,6 +422,7 @@ class _WebPasswordResetWithCodeScreenState
     bool obscure = false,
     VoidCallback? onToggle,
     int? maxLength,
+    String? hint,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,6 +435,7 @@ class _WebPasswordResetWithCodeScreenState
           maxLength: maxLength,
           decoration: InputDecoration(
             prefixIcon: Icon(icon, size: 20),
+            hintText: hint,
             suffixIcon: onToggle != null
                 ? IconButton(
                     icon: Icon(

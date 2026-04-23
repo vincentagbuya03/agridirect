@@ -102,13 +102,14 @@ class _WebNavigationState extends State<WebNavigation> {
     debugPrint('   isAdmin: ${_auth.isAdmin}');
     debugPrint('   isViewingAsFarmer: ${_auth.isViewingAsFarmer}');
 
-    // If user is not logged in, show the marketplace (browsable without login)
+    // If user is not logged in, we still show the selected screen but restrict actions
     if (!_auth.isLoggedIn) {
-      debugPrint('   → Showing marketplace (not logged in)');
-      return WebMarketplaceHome(
-        onNavigate: _navigateTo,
-        currentIndex: _currentIndex,
-      );
+      debugPrint('   → Showing guest dashboard (current tab: $_currentIndex)');
+      final screens = _screens;
+      if (_currentIndex >= screens.length) {
+        _currentIndex = 0;
+      }
+      return Scaffold(body: screens[_currentIndex]);
     }
 
     // If user is admin, show admin dashboard

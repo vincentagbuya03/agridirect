@@ -171,7 +171,7 @@ class CircularAvatarWithFallback extends StatelessWidget {
 
 /// A widget that displays a Supabase storage image safely,
 /// automatically handling signed URL generation if needed.
-class SafeNetworkImage extends StatelessWidget {
+class SafeNetworkImage extends StatefulWidget {
   final String? imageUrl;
   final String? defaultBucket;
   final double? width;
@@ -192,38 +192,61 @@ class SafeNetworkImage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    if (imageUrl == null || imageUrl!.isEmpty) {
-      return errorWidget ?? const Icon(Icons.error);
-    }
+  State<SafeNetworkImage> createState() => _SafeNetworkImageState();
+}
 
-    // Optimization: if it's already a signed URL (contains 'token=' or 'sign/'), 
-    // or not a supabase URL, we can skip the future.
-    if (imageUrl!.contains('token=') || !imageUrl!.contains('supabase.co')) {
-      return CachedNetworkImage(
-        imageUrl: imageUrl!,
-        width: width,
-        height: height,
-        fit: fit,
-        placeholder: (context, url) => placeholder ?? const SizedBox.shrink(),
-        errorWidget: (context, url, error) => errorWidget ?? const Icon(Icons.error),
-      );
+class _SafeNetworkImageState extends State<SafeNetworkImage> {
+  Future<String>? _urlFuture;
+  String? _lastImageUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _initFuture();
+  }
+
+  @override
+  void didUpdateWidget(SafeNetworkImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _initFuture();
+    }
+  }
+
+  void _initFuture() {
+    _lastImageUrl = widget.imageUrl;
+    if (_lastImageUrl == null || _lastImageUrl!.isEmpty) {
+      _urlFuture = null;
+    } else if (_lastImageUrl!.contains('token=') || !_lastImageUrl!.contains('supabase.co')) {
+      _urlFuture = Future.value(_lastImageUrl);
+    } else {
+      _urlFuture = SupabaseDatabase.getSafeUrl(_lastImageUrl, defaultBucket: widget.defaultBucket);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_lastImageUrl == null || _lastImageUrl!.isEmpty) {
+      return widget.errorWidget ?? const Icon(Icons.error);
     }
 
     return FutureBuilder<String>(
-      future: SupabaseDB.getSafeUrl(imageUrl, defaultBucket: defaultBucket),
+      future: _urlFuture,
       builder: (context, snapshot) {
         final url = snapshot.data ?? '';
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return widget.placeholder ?? const SizedBox.shrink();
+        }
         if (url.isEmpty) {
-          return placeholder ?? const SizedBox.shrink();
+          return widget.errorWidget ?? const Icon(Icons.error);
         }
         return CachedNetworkImage(
           imageUrl: url,
-          width: width,
-          height: height,
-          fit: fit,
-          placeholder: (context, url) => placeholder ?? const SizedBox.shrink(),
-          errorWidget: (context, url, error) => errorWidget ?? const Icon(Icons.error),
+          width: widget.width,
+          height: widget.height,
+          fit: widget.fit,
+          placeholder: (context, url) => widget.placeholder ?? const SizedBox.shrink(),
+          errorWidget: (context, url, error) => widget.errorWidget ?? const Icon(Icons.error),
         );
       },
     );
