@@ -7,12 +7,49 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/services/commerce/cart_service.dart';
+import '../../../shared/services/user/user_service.dart';
+import '../../../shared/models/auth/user_address_model.dart';
 import 'cart_screen.dart';
+import 'farmer_public_profile_screen.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../shared/services/core/supabase_config.dart';
 
 /// Home Screen - Premium Customer Interface
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  UserAddress? _defaultAddress;
+  bool _addressLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDefaultAddress();
+  }
+
+  Future<void> _loadDefaultAddress() async {
+    try {
+      final address = await UserService().getUserAddress();
+      if (mounted) {
+        setState(() {
+          _defaultAddress = address;
+          _addressLoaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _addressLoaded = true);
+    }
+  }
+
+  String get _displayCity {
+    if (!_addressLoaded) return 'Loading...';
+    return _defaultAddress?.city ?? 'Set Location';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,41 +144,44 @@ class HomeScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'DELIVERING TO',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on_rounded,
+                  GestureDetector(
+                    onTap: () => _showAddressPicker(context),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'DELIVERING TO',
+                          style: AppTextStyles.labelSmall.copyWith(
                             color: AppColors.primary,
-                            size: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'San Carlos City',
-                            style: AppTextStyles.headline3.copyWith(
-                              fontSize: 18,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.location_on_rounded,
+                              color: AppColors.primary,
+                              size: 18,
                             ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 20,
-                            color: AppColors.textHeadline,
-                          ),
-                        ],
-                      ),
-                    ],
+                            const SizedBox(width: 6),
+                            Text(
+                              _displayCity,
+                              style: AppTextStyles.headline3.copyWith(
+                                fontSize: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 20,
+                              color: AppColors.textHeadline,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                   Row(
                     children: [
@@ -508,7 +548,14 @@ class HomeScreen extends StatelessWidget {
           return const Center(child: AppShimmerLoader());
         }
 
-        final farmers = snapshot.data ?? [];
+        final currentUserId = SupabaseConfig.currentUser?.id;
+        final farmers = (snapshot.data ?? [])
+            .where((f) => f['farmerUserId'] != currentUserId)
+            .toList();
+        
+        if (farmers.isEmpty) {
+          return const SizedBox.shrink();
+        }
         return SizedBox(
           height: 344,
           child: ListView.separated(
@@ -529,118 +576,219 @@ class HomeScreen extends StatelessWidget {
 
   Widget _buildFarmerCard(BuildContext context, Map<String, dynamic> f) {
     return Container(
-      width: 260,
-      decoration: AppDecorations.cardDecoration.copyWith(
-        borderRadius: BorderRadius.circular(24),
+      width: 280,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Stack(
             children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
+              Hero(
+                tag: 'farmer_${f['farmerId']}',
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(28),
+                  ),
+                  child: SizedBox(
+                    height: 160,
+                    width: double.infinity,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _buildFarmerImage(f['imageUrl']?.toString()),
+                        // Premium Gradient Overlay
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.4),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                child: _buildFarmerImage(f['imageUrl']?.toString()),
               ),
+              // Rating Badge
               Positioned(
-                top: 12,
-                left: 12,
+                top: 16,
+                left: 16,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
+                    horizontal: 12,
+                    vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Row(
                     children: [
                       const Icon(
                         Icons.star_rounded,
-                        size: 14,
+                        size: 16,
                         color: AppColors.accent,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         f['rating'] ?? '4.5',
-                        style: AppTextStyles.labelSmall.copyWith(
+                        style: GoogleFonts.plusJakartaSans(
                           fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          color: AppColors.textHeadline,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.favorite_border_rounded,
-                    size: 18,
-                    color: AppColors.textSubtle,
+              // Verified Badge
+              if (f['badge'] == 'VERIFIED')
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.secondary.withValues(alpha: 0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.verified_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        f['name'] ?? 'Farmer Name',
-                        style: AppTextStyles.headline3.copyWith(fontSize: 16),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (f['badge'] == 'VERIFIED')
-                      const Icon(
-                        Icons.verified_rounded,
-                        size: 18,
-                        color: AppColors.secondary,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 6),
                 Text(
-                  '${f['distance']} • ${f['specialty']}',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSubtle,
+                  f['name'] ?? 'Farmer Name',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textHeadline,
+                    letterSpacing: -0.5,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                      foregroundColor: AppColors.primary,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      textStyle: AppTextStyles.labelSmall.copyWith(
-                        fontWeight: FontWeight.w800,
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_rounded,
+                      size: 14,
+                      color: AppColors.primary.withValues(alpha: 0.7),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      f['distance'] ?? 'Nearby',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: AppColors.textSubtle,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    child: const Text('View Profile'),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.textSubtle.withValues(alpha: 0.3),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        f['specialty'] ?? 'Fresh Produce',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: AppColors.textSubtle,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary,
+                          AppColors.primary.withValues(alpha: 0.8),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.25),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton(
+                      onPressed: () => _showFarmerProfile(context, f),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        shadowColor: Colors.transparent,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: Text(
+                        'View Profile',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -877,6 +1025,176 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  // ── Farmer Profile Bottom Sheet ──
+  void _showFarmerProfile(BuildContext context, Map<String, dynamic> f) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FarmerPublicProfileScreen(farmer: f),
+      ),
+    );
+  }
+
+
+  // ── Address Picker Bottom Sheet ──
+  void _showAddressPicker(BuildContext context) async {
+    final addresses = await UserService().getAllUserAddresses();
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.textSubtle.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Deliver To', style: AppTextStyles.headline2.copyWith(fontSize: 20)),
+            const SizedBox(height: 16),
+            if (addresses.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Column(
+                  children: [
+                    Icon(Icons.location_off_rounded, size: 48, color: AppColors.textSubtle.withValues(alpha: 0.4)),
+                    const SizedBox(height: 12),
+                    Text('No saved addresses', style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSubtle)),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        context.push(AppRoutes.myDetails);
+                      },
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Add Address'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: addresses.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, i) {
+                    final addr = addresses[i];
+                    final isSelected = _defaultAddress?.addressId == addr.addressId;
+                    return InkWell(
+                      onTap: () async {
+                        await UserService().setDefaultAddress(addr.addressId);
+                        if (mounted) {
+                          setState(() => _defaultAddress = addr);
+                        }
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.primary.withValues(alpha: 0.06) : AppColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSelected ? AppColors.primary : AppColors.textHeadline.withValues(alpha: 0.08),
+                            width: isSelected ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                addr.label.toLowerCase() == 'home' ? Icons.home_rounded : Icons.work_rounded,
+                                color: AppColors.primary, size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(addr.label, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                                      if (addr.isDefault) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text('Default', style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary, fontSize: 10)),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${addr.barangay}, ${addr.city}',
+                                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isSelected)
+                              const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 22),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            if (addresses.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    context.push(AppRoutes.myDetails);
+                  },
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Manage Addresses'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

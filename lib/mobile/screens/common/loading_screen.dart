@@ -17,7 +17,6 @@ class _LoadingScreenState extends State<LoadingScreen>
     with TickerProviderStateMixin {
   // Main entrance animation
   late final AnimationController _entranceController;
-  late final Animation<double> _logoFade;
   late final Animation<double> _logoScale;
   late final Animation<Offset> _logoSlide;
   late final Animation<double> _taglineFade;
@@ -44,11 +43,6 @@ class _LoadingScreenState extends State<LoadingScreen>
     _entranceController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3500),
-    );
-
-    _logoFade = CurvedAnimation(
-      parent: _entranceController,
-      curve: const Interval(0.0, 0.4, curve: Curves.easeOut),
     );
 
     _logoScale = Tween<double>(begin: 0.8, end: 1.0).animate(
@@ -142,10 +136,11 @@ class _LoadingScreenState extends State<LoadingScreen>
           _exitController,
         ]),
         builder: (context, _) {
-          return FadeTransition(
-            opacity: _exitFade,
-            child: ScaleTransition(
-              scale: _exitScale,
+          final safeExitOpacity = _exitFade.value.clamp(0.0, 1.0);
+          return Transform.scale(
+            scale: _exitScale.value,
+            child: ColoredBox(
+              color: Colors.black.withValues(alpha: 1.0 - safeExitOpacity),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -220,24 +215,35 @@ class _LoadingScreenState extends State<LoadingScreen>
           builder: (context, constraints) {
             final t = _particleController.value * speed;
             final dx = math.sin(t * 2 * math.pi + phase) * 30;
-            final dy = (t * constraints.maxHeight + (baseY * constraints.maxHeight)) % constraints.maxHeight;
-            
+            final dy =
+                (t * constraints.maxHeight + (baseY * constraints.maxHeight)) %
+                constraints.maxHeight;
+
             // Fade particles in and out at top/bottom
-            double particleOpacity = 0.1 + 0.2 * math.sin(t * 2 * math.pi + phase);
-            if (dy < 100) particleOpacity *= (dy / 100);
-            if (dy > constraints.maxHeight - 100) particleOpacity *= ((constraints.maxHeight - dy) / 100);
+            double particleOpacity =
+                0.1 + 0.2 * math.sin(t * 2 * math.pi + phase);
+            if (dy < 100) {
+              particleOpacity *= (dy / 100);
+            }
+            if (dy > constraints.maxHeight - 100) {
+              particleOpacity *= ((constraints.maxHeight - dy) / 100);
+            }
 
             return Stack(
               children: [
                 Positioned(
-                  left: (baseX * constraints.maxWidth + dx) % constraints.maxWidth,
+                  left:
+                      (baseX * constraints.maxWidth + dx) %
+                      constraints.maxWidth,
                   top: dy,
                   child: Container(
                     width: particleSize,
                     height: particleSize,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: particleOpacity.clamp(0.0, 1.0)),
+                      color: Colors.white.withValues(
+                        alpha: particleOpacity.clamp(0.0, 1.0),
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.white.withValues(alpha: 0.2),
@@ -260,39 +266,35 @@ class _LoadingScreenState extends State<LoadingScreen>
       alignment: Alignment.center,
       children: [
         // Pulsing glow
-        FadeTransition(
-          opacity: _glowOpacity,
-          child: ScaleTransition(
-            scale: _glowScale,
-            child: Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF13EC5B).withValues(alpha: 0.3),
-                    blurRadius: 60,
-                    spreadRadius: 10,
-                  ),
-                ],
-              ),
+        ScaleTransition(
+          scale: _glowScale,
+          child: Container(
+            width: 140,
+            height: 140,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(
+                    0xFF13EC5B,
+                  ).withValues(alpha: 0.3 * _glowOpacity.value.clamp(0.0, 1.0)),
+                  blurRadius: 60,
+                  spreadRadius: 10,
+                ),
+              ],
             ),
           ),
         ),
-        
+
         // Logo
         SlideTransition(
           position: _logoSlide,
-          child: FadeTransition(
-            opacity: _logoFade,
-            child: ScaleTransition(
-              scale: _logoScale,
-              child: const BrandLogo(
-                size: BrandLogoSize.large,
-                showText: true,
-                color: Colors.white,
-              ),
+          child: ScaleTransition(
+            scale: _logoScale,
+            child: const BrandLogo(
+              size: BrandLogoSize.large,
+              showText: true,
+              color: Colors.white,
             ),
           ),
         ),
@@ -301,176 +303,193 @@ class _LoadingScreenState extends State<LoadingScreen>
   }
 
   Widget _buildTagline() {
-    return FadeTransition(
-      opacity: _taglineFade,
-      child: Column(
-        children: [
-          Text(
-            'FARM-FRESH DIRECT',
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Colors.white.withValues(alpha: 0.9),
-              letterSpacing: 4.0,
-              shadows: [
-                Shadow(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  offset: const Offset(0, 2),
-                  blurRadius: 4,
-                ),
+    final safeTaglineOpacity = _taglineFade.value.clamp(0.0, 1.0);
+    return Column(
+      children: [
+        Text(
+          'FARM-FRESH DIRECT',
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Colors.white.withValues(alpha: 0.9 * safeTaglineOpacity),
+            letterSpacing: 4.0,
+            shadows: [
+              Shadow(
+                color: Colors.black.withValues(alpha: 0.5 * safeTaglineOpacity),
+                offset: const Offset(0, 2),
+                blurRadius: 4,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: 40,
+          height: 1.5,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.transparent,
+                const Color(0xFF13EC5B).withValues(alpha: safeTaglineOpacity),
+                Colors.transparent,
               ],
             ),
+            borderRadius: BorderRadius.circular(1),
           ),
-          const SizedBox(height: 8),
-          Container(
-            width: 40,
-            height: 1.5,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Colors.transparent, Color(0xFF13EC5B), Colors.transparent],
-              ),
-              borderRadius: BorderRadius.circular(1),
-            ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Directly from producers to your doorstep',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            color: Colors.white.withValues(alpha: 0.7 * safeTaglineOpacity),
+            fontStyle: FontStyle.italic,
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Directly from producers to your doorstep',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: Colors.white.withValues(alpha: 0.7),
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildLoader() {
-    return FadeTransition(
-      opacity: _loaderFade,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Sleek progress bar
-          Container(
-            width: 200,
-            height: 6,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
-                width: 1,
-              ),
+    final safeLoaderOpacity = _loaderFade.value.clamp(0.0, 1.0);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Sleek progress bar
+        Container(
+          width: 200,
+          height: 6,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.1 * safeLoaderOpacity),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.2 * safeLoaderOpacity),
+              width: 1,
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Stack(
-                children: [
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final progress = _entranceController.value.clamp(0.0, 1.0);
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 100),
-                        width: constraints.maxWidth * progress,
-                        height: double.infinity,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [
-                              Color(0xFF059669),
-                              Color(0xFF13EC5B),
-                              Color(0xFF7BFFAB),
-                            ],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF13EC5B).withValues(alpha: 0.5),
-                              blurRadius: 10,
-                            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Stack(
+              children: [
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final progress = _entranceController.value.clamp(0.0, 1.0);
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 100),
+                      width: constraints.maxWidth * progress,
+                      height: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(
+                              0xFF059669,
+                            ).withValues(alpha: safeLoaderOpacity),
+                            const Color(
+                              0xFF13EC5B,
+                            ).withValues(alpha: safeLoaderOpacity),
+                            const Color(
+                              0xFF7BFFAB,
+                            ).withValues(alpha: safeLoaderOpacity),
                           ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFF13EC5B,
+                            ).withValues(alpha: 0.5 * safeLoaderOpacity),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                // Shine effect on the progress bar
+                Positioned.fill(
+                  child: AnimatedBuilder(
+                    animation: _glowController,
+                    builder: (context, child) {
+                      return FractionallySizedBox(
+                        alignment: Alignment(
+                          -1.0 + (_glowController.value * 3.0),
+                          0,
+                        ),
+                        widthFactor: 0.3,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.white.withValues(alpha: 0.0),
+                                Colors.white.withValues(
+                                  alpha: 0.3 * safeLoaderOpacity,
+                                ),
+                                Colors.white.withValues(alpha: 0.0),
+                              ],
+                            ),
+                          ),
                         ),
                       );
                     },
-                  ),
-                  // Shine effect on the progress bar
-                  Positioned.fill(
-                    child: AnimatedBuilder(
-                      animation: _glowController,
-                      builder: (context, child) {
-                        return FractionallySizedBox(
-                          alignment: Alignment(-1.0 + (_glowController.value * 3.0), 0),
-                          widthFactor: 0.3,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.white.withValues(alpha: 0.0),
-                                  Colors.white.withValues(alpha: 0.3),
-                                  Colors.white.withValues(alpha: 0.0),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'SECURE ECOSYSTEM',
-            style: GoogleFonts.inter(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: Colors.white.withValues(alpha: 0.6),
-              letterSpacing: 2.0,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomText() {
-    return FadeTransition(
-      opacity: _loaderFade,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.verified_user_outlined,
-                  size: 14,
-                  color: Color(0xFF13EC5B),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'TRUSTED BY 10,000+ FARMERS',
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.8),
-                    letterSpacing: 0.5,
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'SECURE ECOSYSTEM',
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            color: Colors.white.withValues(alpha: 0.6 * safeLoaderOpacity),
+            letterSpacing: 2.0,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomText() {
+    final safeLoaderOpacity = _loaderFade.value.clamp(0.0, 1.0);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05 * safeLoaderOpacity),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.1 * safeLoaderOpacity),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.verified_user_outlined,
+                size: 14,
+                color: const Color(
+                  0xFF13EC5B,
+                ).withValues(alpha: safeLoaderOpacity),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'TRUSTED BY 10,000+ FARMERS',
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withValues(
+                    alpha: 0.8 * safeLoaderOpacity,
+                  ),
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

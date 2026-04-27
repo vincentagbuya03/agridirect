@@ -414,6 +414,68 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     super.dispose();
   }
 
+  List<Map<String, dynamic>> _generateDynamicInsights() {
+    final insights = <Map<String, dynamic>>[];
+    
+    // 1. Weather-based insight
+    if (_weatherData != null) {
+      final desc = _weatherData!.description.toLowerCase();
+      if (desc.contains('rain') || desc.contains('storm') || desc.contains('cloud')) {
+        insights.add({
+          'title': 'Harvest Timing',
+          'description': 'Upcoming precipitation detected. Consider accelerating harvest for moisture-sensitive crops.',
+          'icon': Icons.opacity_rounded,
+          'color': const Color(0xFF3B82F6),
+        });
+      } else {
+        insights.add({
+          'title': 'Irrigation Alert',
+          'description': 'Clear weather forecast. Monitor soil moisture levels to ensure optimal growth during the dry spell.',
+          'icon': Icons.water_drop_rounded,
+          'color': const Color(0xFF3B82F6),
+        });
+      }
+    }
+
+    // 2. Sales-based insight
+    final trend = _stats['revenueTrend'] as String? ?? '0%';
+    if (trend.startsWith('+')) {
+      insights.add({
+        'title': 'Market Trend',
+        'description': 'Your revenue is up $trend this week. Demand for your seasonal produce is peaking in the local market.',
+        'icon': Icons.trending_up_rounded,
+        'color': AppColors.success,
+      });
+    } else {
+      insights.add({
+        'title': 'Market Advice',
+        'description': 'Sales are steady. Try featuring your top products to attract more weekend buyers.',
+        'icon': Icons.lightbulb_outline_rounded,
+        'color': AppColors.accent,
+      });
+    }
+
+    // 3. Inventory-based insight
+    final listings = _stats['activeListings'] as int? ?? 0;
+    if (listings < 3) {
+      insights.add({
+        'title': 'Inventory Opportunity',
+        'description': 'You only have $listings active listings. Expanding your catalog can increase visibility by up to 40%.',
+        'icon': Icons.add_business_rounded,
+        'color': AppColors.primary,
+      });
+    } else {
+      insights.add({
+        'title': 'Stall Performance',
+        'description': 'Your $listings listings are performing well. Keep descriptions updated to maintain high conversion.',
+        'icon': Icons.auto_awesome_rounded,
+        'color': AppColors.primary,
+      });
+    }
+
+    return insights;
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -795,7 +857,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '+12.5%',
+                  _stats['revenueTrend'] ?? '0%',
                   style: AppTextStyles.labelSmall.copyWith(
                     color: AppColors.success,
                     fontWeight: FontWeight.w800,
@@ -809,7 +871,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             height: 160,
             child: CustomPaint(
               size: const Size(double.infinity, 160),
-              painter: _AnalyticsChartPainter(AppColors.primary),
+              painter: _AnalyticsChartPainter(
+                AppColors.primary,
+                (_stats['weeklyData'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList() ?? List.filled(7, 0.0),
+              ),
             ),
           ),
           Row(
@@ -960,28 +1025,17 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           child: ListView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
-            children: [
-              _buildInsightCard(
-                'Crop Health',
-                'Corn fields showing signs of nitrogen deficiency in Sector B.',
-                Icons.grass_rounded,
-                AppColors.primary,
-              ),
-              const SizedBox(width: 16),
-              _buildInsightCard(
-                'Market Trend',
-                'Tomato prices expected to rise by 15% in the next week.',
-                Icons.trending_up_rounded,
-                AppColors.accent,
-              ),
-              const SizedBox(width: 16),
-              _buildInsightCard(
-                'Maintenance',
-                'Irrigation system check recommended for Zone 4 tomorrow.',
-                Icons.plumbing_rounded,
-                const Color(0xFF3B82F6),
-              ),
-            ],
+            children: _generateDynamicInsights().map((insight) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: _buildInsightCard(
+                  insight['title'],
+                  insight['description'],
+                  insight['icon'],
+                  insight['color'],
+                ),
+              );
+            }).toList(),
           ),
         ),
       ],
@@ -1153,7 +1207,8 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
 class _AnalyticsChartPainter extends CustomPainter {
   final Color color;
-  _AnalyticsChartPainter(this.color);
+  final List<double> data;
+  _AnalyticsChartPainter(this.color, this.data);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1173,15 +1228,16 @@ class _AnalyticsChartPainter extends CustomPainter {
     final path = Path();
     final fillPath = Path();
 
-    final points = [
-      Offset(0, size.height * 0.7),
-      Offset(size.width * 0.15, size.height * 0.8),
-      Offset(size.width * 0.3, size.height * 0.6),
-      Offset(size.width * 0.45, size.height * 0.75),
-      Offset(size.width * 0.6, size.height * 0.4),
-      Offset(size.width * 0.75, size.height * 0.5),
-      Offset(size.width, size.height * 0.2),
-    ];
+    final maxVal = data.fold<double>(0, (prev, element) => element > prev ? element : prev);
+    final displayMax = maxVal == 0 ? 1.0 : maxVal;
+
+    final points = List.generate(data.length, (i) {
+      final x = (size.width / (data.length - 1)) * i;
+      // Invert Y: 0 is top, size.height is bottom. 
+      // We want high values at the top (near 0) and low values at bottom (near size.height).
+      final y = size.height - (size.height * (data[i] / displayMax) * 0.8) - (size.height * 0.1);
+      return Offset(x, y);
+    });
 
     path.moveTo(points[0].dx, points[0].dy);
     fillPath.moveTo(points[0].dx, points[0].dy);

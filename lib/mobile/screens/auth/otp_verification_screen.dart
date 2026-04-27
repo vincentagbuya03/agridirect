@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../shared/router/app_routes.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'dart:async';
 import '../../../shared/services/integration/email_service.dart';
 import '../../../shared/services/auth/otp_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/styles/app_theme.dart';
-import 'registration_completion_screen.dart';
 
 /// OTP Verification Screen - Premium Design
 class OTPVerificationScreen extends StatefulWidget {
@@ -127,26 +130,25 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
         password: widget.password,
       );
 
-      final hasSession = signInResult.user != null;
+      final hasSession = signInResult.session != null;
 
       if (hasSession && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => RegistrationCompletionScreen(
-              userId: widget.userId,
-              email: widget.email,
-              name: widget.name,
-              onFinalizeSuccess: widget.onVerificationSuccess,
-            ),
+        // 🔵 CRITICAL: Update AuthService immediately so the router sees the new state
+        await AuthService().initialize(event: AuthChangeEvent.signedIn);
+        
+        if (mounted) {
+          context.go(AppRoutes.loading);
+        }
+      } else if (mounted) {
+        // Fallback if we don't have the password (e.g. resumed session on a different device)
+        // The user is verified in the DB, so logging in will now work.
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Verification successful! Please log in to complete your profile.'),
+            backgroundColor: AppColors.primary,
           ),
         );
-      } else {
-        setState(() {
-          _errorMessage =
-              'Verification succeeded, but we could not open profile setup. Please try again.';
-          _isVerifying = false;
-        });
+        context.go(AppRoutes.login);
       }
     } catch (e) {
       setState(() {

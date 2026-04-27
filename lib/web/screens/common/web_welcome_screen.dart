@@ -1837,13 +1837,13 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                             color: Colors.white24,
                             value: progress.expectedTotalBytes != null
                                 ? progress.cumulativeBytesLoaded /
-                                    progress.expectedTotalBytes!
+                                      progress.expectedTotalBytes!
                                 : null,
                           ),
                         ),
                       );
                     },
-                    errorBuilder: (_, __, ___) => const Icon(
+                    errorBuilder: (_, _, _) => const Icon(
                       Icons.qr_code_2,
                       size: 280,
                       color: Colors.white24,
@@ -1934,7 +1934,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
         });
         final reversedIndices = indices.reversed.toList();
 
-        return Container(
+        return SizedBox(
           height: galleryHeight,
           width: width,
           child: Stack(
@@ -1947,13 +1947,13 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
 
               double scale = position == 0 ? 1.0 : 0.8;
               double opacity = position == 0 ? 1.0 : 0.4;
-              
+
               // Calculate horizontal position
               double xOffset = (width - bannerWidth) / 2;
               if (position != 0) {
                 xOffset += position * (isCompact ? 40 : 150);
               }
-              
+
               // Calculate vertical position (center it)
               double yOffset = (height - bannerHeight) / 2;
               if (position != 0) {
@@ -2025,7 +2025,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   child: Image.asset(
                     assetPath,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
+                    errorBuilder: (_, _, _) =>
                         Container(color: Colors.white10),
                   ),
                 ),

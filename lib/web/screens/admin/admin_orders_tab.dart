@@ -334,7 +334,7 @@ class _AdminOrdersTabState extends State<AdminOrdersTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '#${orderId.toString().substring(0, 8).toUpperCase()}',
+                          '#${orderId.toString().length > 8 ? orderId.toString().substring(0, 8).toUpperCase() : orderId.toString().toUpperCase()}',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,

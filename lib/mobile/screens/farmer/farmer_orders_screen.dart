@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/services/commerce/order_service.dart';
+import '../../../shared/models/order/order_model.dart';
+import 'farmer_order_details_screen.dart';
 import '../../../shared/styles/app_theme.dart';
 
 /// Farmer Orders Screen - Professional Enterprise UI
@@ -92,7 +95,9 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: AppColors.textHeadline.withValues(alpha: 0.3),
+        ),
       ),
       child: Icon(icon, color: AppColors.textHeadline, size: 20),
     );
@@ -105,7 +110,9 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: AppColors.textHeadline.withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         children: List.generate(_tabs.length, (i) {
@@ -119,13 +126,15 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                 decoration: BoxDecoration(
                   color: isSelected ? AppColors.primary : Colors.transparent,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: isSelected ? [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    )
-                  ] : null,
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: Text(
                   _tabs[i],
@@ -145,7 +154,9 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
 
   Widget _buildOrdersList() {
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: SupabaseDataService().getFarmerOrders(status: _tabs[_selectedTab]),
+      future: SupabaseDataService().getFarmerOrders(
+        status: _tabs[_selectedTab],
+      ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: AppShimmerLoader());
@@ -154,7 +165,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
         final orders = snapshot.data ?? [];
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
           physics: const BouncingScrollPhysics(),
           children: [
             if (_selectedTab == 0) _buildSummaryChart(orders),
@@ -169,8 +180,33 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   }
 
   Widget _buildSummaryChart(List<Map<String, dynamic>> orders) {
+    final now = DateTime.now();
+    final todayOrders = orders.where((o) {
+      final date = o['createdAt'] as DateTime;
+      return date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day;
+    }).toList();
+
+    final todayRevenue = todayOrders.fold(
+      0.0,
+      (sum, o) => sum + (o['rawTotal'] as double),
+    );
+    final pendingCount = orders
+        .where((o) => o['status'].toString().toUpperCase() == 'PENDING')
+        .length;
+    final activeCount = orders
+        .where(
+          (o) => [
+            'CONFIRMED',
+            'SHIPPED',
+            'PROCESSING',
+          ].contains(o['status'].toString().toUpperCase()),
+        )
+        .length;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 24),
+      margin: const EdgeInsets.only(bottom: 24, top: 2),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -201,12 +237,16 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                   letterSpacing: 1,
                 ),
               ),
-              const Icon(Icons.auto_graph_rounded, color: Colors.white, size: 20),
+              const Icon(
+                Icons.auto_graph_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
-            '₱2,450.00',
+            '₱${todayRevenue.toStringAsFixed(2)}',
             style: AppTextStyles.headline1.copyWith(
               color: Colors.white,
               fontSize: 32,
@@ -215,12 +255,62 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
           const SizedBox(height: 20),
           Row(
             children: [
-              _buildMetricChip(Icons.pending_actions_rounded, '${orders.where((o) => o['status'] == 'PENDING').length} Pending'),
+              _buildMetricChip(
+                Icons.pending_actions_rounded,
+                '$pendingCount Pending',
+              ),
               const SizedBox(width: 12),
-              _buildMetricChip(Icons.local_shipping_rounded, '${orders.where((o) => o['status'] == 'PROCESSING').length} Active'),
+              _buildMetricChip(
+                Icons.local_shipping_rounded,
+                '$activeCount Active',
+              ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerAvatar(String imageUrl) {
+    if (imageUrl.trim().isEmpty) {
+      return Container(
+        width: 44,
+        height: 44,
+        color: AppColors.background,
+        child: const Icon(
+          Icons.person_rounded,
+          color: AppColors.textSubtle,
+          size: 24,
+        ),
+      );
+    }
+
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      width: 44,
+      height: 44,
+      fit: BoxFit.cover,
+      placeholder: (context, _) => Container(
+        width: 44,
+        height: 44,
+        color: AppColors.background,
+        child: const Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+      errorWidget: (context, url, error) => Container(
+        width: 44,
+        height: 44,
+        color: AppColors.background,
+        child: const Icon(
+          Icons.person_rounded,
+          color: AppColors.textSubtle,
+          size: 24,
+        ),
       ),
     );
   }
@@ -250,138 +340,256 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   }
 
   Widget _buildOrderCard(Map<String, dynamic> order) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: AppDecorations.cardDecoration.copyWith(
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 2),
-                      ),
-                      child: ClipOval(
-                        child: CachedNetworkImage(
-                          imageUrl: order['customerImage'],
-                          width: 44,
-                          height: 44,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            order['customerName'],
-                            style: AppTextStyles.headline3.copyWith(fontSize: 16),
-                          ),
-                          Text(
-                            'Order #${order['orderId']} • ${order['timeAgo']}',
-                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: (order['statusColor'] as Color).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        order['status'],
-                        style: AppTextStyles.labelSmall.copyWith(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: order['statusColor'],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.background,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FarmerOrderDetailsScreen(
+              order: Order(
+                orderId: order['rawOrderId'].toString(),
+                orderNumber: order['orderId'].toString().replaceFirst('#', ''),
+                customerId: order['customerId'] ?? '',
+                farmerId: '',
+                status: order['status'],
+                createdAt: order['createdAt'] as DateTime,
+                updatedAt: order['createdAt'] as DateTime,
+                deliveryAddressId: order['deliveryAddressId'],
+                total: order['rawTotal'] as double?,
+                subtotal: order['subtotal'] as double?,
+                deliveryFee: order['deliveryFee'] as double?,
+                paymentMethod: order['paymentMethod'],
+              ),
+              customerName: order['customerName'] ?? 'Customer',
+              customerImage: order['customerImage']?.toString() ?? '',
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        decoration: AppDecorations.cardDecoration.copyWith(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Items Ordered', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontSize: 10)),
-                          const SizedBox(height: 4),
-                          Text(order['items'], style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
-                        ],
+                      Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            width: 2,
+                          ),
+                        ),
+                        child: ClipOval(
+                          child: _buildCustomerAvatar(
+                            order['customerImage']?.toString() ?? '',
+                          ),
+                        ),
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text('Total Value', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontSize: 10)),
-                          const SizedBox(height: 4),
-                          Text(order['total'], style: AppTextStyles.headline3.copyWith(color: AppColors.primary, fontSize: 16)),
-                        ],
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              order['customerName'],
+                              style: AppTextStyles.headline3.copyWith(
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              'Order #${order['orderId']} • ${order['timeAgo']}',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSubtle,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: (order['statusColor'] as Color).withValues(
+                            alpha: 0.1,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          order['status'],
+                          style: AppTextStyles.labelSmall.copyWith(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: order['statusColor'],
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppColors.textHeadline.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(24),
-                bottomRight: Radius.circular(24),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Items Ordered',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSubtle,
+                                fontSize: 10,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              order['items'],
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Total Value',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSubtle,
+                                fontSize: 10,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              order['total'],
+                              style: AppTextStyles.headline3.copyWith(
+                                color: AppColors.primary,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (order['specialInstructions'] != null &&
+                      order['specialInstructions'].toString().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.orange.withValues(alpha: 0.1),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 14,
+                                  color: Colors.orange,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Special Instructions',
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    color: Colors.orange.shade800,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              order['specialInstructions'],
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textHeadline,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildActionButton(
-                    Icons.check_circle_outline_rounded,
-                    'Update Status',
-                    () {},
-                    isPrimary: true,
-                  ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.textHeadline.withValues(alpha: 0.05),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(24),
+                  bottomRight: Radius.circular(24),
                 ),
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
-                    borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildActionButton(
+                      Icons.check_circle_outline_rounded,
+                      'Update Status',
+                      () => _showStatusUpdateSheet(order),
+                      isPrimary: true,
+                    ),
                   ),
-                  child: const Icon(Icons.more_vert_rounded, size: 20, color: AppColors.textSubtle),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: AppColors.textHeadline.withValues(alpha: 0.3),
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.more_vert_rounded,
+                      size: 20,
+                      color: AppColors.textSubtle,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildActionButton(IconData icon, String label, VoidCallback onTap, {bool isPrimary = false}) {
+  Widget _buildActionButton(
+    IconData icon,
+    String label,
+    VoidCallback onTap, {
+    bool isPrimary = false,
+  }) {
     return Material(
       color: isPrimary ? AppColors.primary : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
@@ -391,13 +599,21 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            border: isPrimary ? null : Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
+            border: isPrimary
+                ? null
+                : Border.all(
+                    color: AppColors.textHeadline.withValues(alpha: 0.3),
+                  ),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: isPrimary ? Colors.white : AppColors.textHeadline),
+              Icon(
+                icon,
+                size: 16,
+                color: isPrimary ? Colors.white : AppColors.textHeadline,
+              ),
               const SizedBox(width: 8),
               Text(
                 label,
@@ -425,7 +641,11 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                 color: AppColors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.receipt_long_outlined, size: 64, color: AppColors.primary.withValues(alpha: 0.3)),
+              child: Icon(
+                Icons.receipt_long_outlined,
+                size: 64,
+                color: AppColors.primary.withValues(alpha: 0.3),
+              ),
             ),
             const SizedBox(height: 24),
             Text(
@@ -436,12 +656,100 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
             Text(
               'When you receive orders, they will appear here for management.',
               textAlign: TextAlign.center,
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSubtle,
+              ),
             ),
           ],
         ),
       ),
     );
   }
-}
 
+  void _showStatusUpdateSheet(Map<String, dynamic> order) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Update Order Status', style: AppTextStyles.headline2),
+            const SizedBox(height: 8),
+            Text(
+              'Select the new status for Order #${order['orderId']}',
+              style: AppTextStyles.bodySmall,
+            ),
+            const SizedBox(height: 24),
+            _statusTile(
+              'CONFIRMED',
+              Icons.check_circle_outline,
+              Colors.blue,
+              order,
+            ),
+            _statusTile('PROCESSING', Icons.loop_rounded, Colors.blue, order),
+            _statusTile(
+              'SHIPPED',
+              Icons.local_shipping_outlined,
+              Colors.blue,
+              order,
+            ),
+            _statusTile(
+              'DELIVERED',
+              Icons.done_all_rounded,
+              Colors.green,
+              order,
+            ),
+            _statusTile('CANCELLED', Icons.cancel_outlined, Colors.red, order),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statusTile(
+    String status,
+    IconData icon,
+    Color color,
+    Map<String, dynamic> order,
+  ) {
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(
+        status,
+        style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold),
+      ),
+      onTap: () async {
+        Navigator.pop(context);
+        try {
+          await OrderService().updateOrderStatus(
+            order['rawOrderId'].toString(),
+            status,
+          );
+          if (mounted) {
+            setState(() {}); // Refresh list
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Order status updated to $status'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to update status: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      },
+    );
+  }
+}

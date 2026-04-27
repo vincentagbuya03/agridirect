@@ -86,9 +86,13 @@ class _WebLoginScreenState extends State<WebLoginScreen>
     setState(() => _loginLoading = true);
     final success = await AuthService().login(email: email, password: password);
     if (mounted) setState(() => _loginLoading = false);
-    if (success) {
-      widget.onLoginSuccess();
-    } else {
+    if (success && mounted) {
+      if (AuthService().needsProfileCompletion) {
+        context.go(AppRoutes.completeProfile);
+      } else {
+        widget.onLoginSuccess();
+      }
+    } else if (!success) {
       _showLoginErrorDialog(AuthService().errorMessage ?? 'Login failed');
     }
   }

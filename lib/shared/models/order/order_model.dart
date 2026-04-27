@@ -27,8 +27,14 @@ class Order {
   final DateTime updatedAt;
 
   // Computed fields from view
+  @JsonKey(name: 'subtotal')
+  final double? subtotal;
+  @JsonKey(name: 'delivery_fee')
+  final double? deliveryFee;
   @JsonKey(name: 'total_amount')
   final double? total;
+  @JsonKey(name: 'payment_method')
+  final String? paymentMethod;
   final int? itemCount;
 
   // Added farm details from view
@@ -46,7 +52,10 @@ class Order {
     this.deliveryAddressId,
     required this.createdAt,
     required this.updatedAt,
+    this.subtotal,
+    this.deliveryFee,
     this.total,
+    this.paymentMethod,
     this.itemCount,
     this.farmName,
     this.farmerAvatarUrl,
@@ -64,7 +73,10 @@ class Order {
     String? deliveryAddressId,
     DateTime? createdAt,
     DateTime? updatedAt,
+    double? subtotal,
+    double? deliveryFee,
     double? total,
+    String? paymentMethod,
     int? itemCount,
     String? farmName,
     String? farmerAvatarUrl,
@@ -78,7 +90,10 @@ class Order {
       deliveryAddressId: deliveryAddressId ?? this.deliveryAddressId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      subtotal: subtotal ?? this.subtotal,
+      deliveryFee: deliveryFee ?? this.deliveryFee,
       total: total ?? this.total,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
       itemCount: itemCount ?? this.itemCount,
       farmName: farmName ?? this.farmName,
       farmerAvatarUrl: farmerAvatarUrl ?? this.farmerAvatarUrl,

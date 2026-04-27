@@ -79,21 +79,37 @@ class MessageService {
       return [];
     }
 
-    final rows = await _client
-        .from('conversations')
-        .select()
-        .eq(asFarmer ? 'farmer_id' : 'customer_id', actorId)
-        .order('last_message_at', ascending: false);
+    // 🔵 Use a single joined query to fetch all details at once.
+    // This ensures we always get the "real name" from the linked users table.
+    final query = _client.from('conversations').select('''
+          conversation_id,
+          customer_id,
+          farmer_id,
+          last_message_at,
+          customer:customers (
+            customer_id,
+            user:users (user_id, name, email, avatar_url)
+          ),
+          farmer:farmers (
+            farmer_id,
+            user_id,
+            farm_name,
+            specialty,
+            image_url,
+            user:users (user_id, name, email, avatar_url)
+          )
+        ''');
 
-    final conversations = List<Map<String, dynamic>>.from(rows);
-    if (conversations.isEmpty) {
-      return [];
-    }
+    final response = await query.eq(asFarmer ? 'farmer_id' : 'customer_id', actorId)
+                                .order('last_message_at', ascending: false);
 
-    final conversationIds = conversations
-        .map((row) => row['conversation_id'].toString())
-        .toList();
+    final conversations = List<Map<String, dynamic>>.from(response);
+    if (conversations.isEmpty) return [];
 
+    final conversationIds =
+        conversations.map((row) => row['conversation_id'].toString()).toList();
+
+    // Fetch the last message for each conversation
     final messageRows = List<Map<String, dynamic>>.from(
       await _client
           .from('messages')
@@ -103,81 +119,6 @@ class MessageService {
           .inFilter('conversation_id', conversationIds)
           .order('created_at', ascending: false),
     );
-
-    final farmerIds = conversations
-        .map((row) => row['farmer_id'].toString())
-        .toSet()
-        .toList();
-    final customerIds = conversations
-        .map((row) => row['customer_id'].toString())
-        .toSet()
-        .toList();
-
-    final farmerRows = farmerIds.isEmpty
-        ? const <Map<String, dynamic>>[]
-        : List<Map<String, dynamic>>.from(
-            await _client
-                .from('farmers')
-                .select('farmer_id, user_id, farm_name, specialty, image_url')
-                .inFilter('farmer_id', farmerIds),
-          );
-
-    final customerRows = customerIds.isEmpty
-        ? const <Map<String, dynamic>>[]
-        : List<Map<String, dynamic>>.from(
-            await _client
-                .from('customers')
-                .select('customer_id, user_id')
-                .inFilter('customer_id', customerIds),
-          );
-
-    // Some historical rows can miss customer.user_id/farmer.user_id, so derive
-    // counterpart user IDs from recent message sender IDs as a fallback.
-    final otherSenderByConversation = <String, String>{};
-    for (final row in messageRows) {
-      final conversationId = row['conversation_id']?.toString();
-      final senderId = row['sender_id']?.toString();
-      if (conversationId == null || senderId == null || senderId.isEmpty) {
-        continue;
-      }
-      if (senderId == context.userId) {
-        continue;
-      }
-      otherSenderByConversation.putIfAbsent(conversationId, () => senderId);
-    }
-
-    final inferredOtherUserIds = conversations
-        .map(
-          (row) => otherSenderByConversation[row['conversation_id'].toString()],
-        )
-        .whereType<String>()
-        .where((id) => id.isNotEmpty)
-        .toSet();
-
-    final userIds = <String>{
-      ...farmerRows.map((row) => row['user_id'].toString()),
-      ...customerRows.map((row) => row['user_id'].toString()),
-      ...inferredOtherUserIds,
-    }.toList();
-
-    final userRows = userIds.isEmpty
-        ? const <Map<String, dynamic>>[]
-        : List<Map<String, dynamic>>.from(
-            await _client
-                .from('users')
-                .select('user_id, name, email, avatar_url')
-                .inFilter('user_id', userIds),
-          );
-
-    final farmerById = {
-      for (final row in farmerRows) row['farmer_id'].toString(): row,
-    };
-    final customerById = {
-      for (final row in customerRows) row['customer_id'].toString(): row,
-    };
-    final userById = {
-      for (final row in userRows) row['user_id'].toString(): row,
-    };
 
     final lastMessageByConversation = <String, ChatMessage>{};
     final unreadCountByConversation = <String, int>{};
@@ -197,44 +138,44 @@ class MessageService {
 
     return conversations.map((row) {
       final conversationId = row['conversation_id'].toString();
-      final farmer = farmerById[row['farmer_id'].toString()];
-      final customer = customerById[row['customer_id'].toString()];
-
+      
       late String otherUserId;
       late String displayName;
       late String subtitle;
       String? avatarUrl;
 
       if (asFarmer) {
-        final fallbackUserId = otherSenderByConversation[conversationId];
-        final resolvedUserId =
-            customer?['user_id']?.toString().isNotEmpty == true
-            ? customer!['user_id'].toString()
-            : (fallbackUserId ?? '');
-        final customerUser = userById[resolvedUserId] ?? const {};
-        otherUserId = resolvedUserId;
-        displayName =
-            (customerUser['name'] as String?)?.trim().isNotEmpty == true
-            ? customerUser['name'].toString()
-            : (customerUser['email'] as String?) ?? 'Customer';
+        // We are the farmer, the "other" is the customer
+        final customerData = row['customer'] as Map<String, dynamic>?;
+        final userData = customerData?['user'] as Map<String, dynamic>?;
+        
+        otherUserId = userData?['user_id']?.toString() ?? '';
+        displayName = (userData?['name'] as String?)?.trim().isNotEmpty == true
+            ? userData!['name'].toString()
+            : (userData?['email'] as String?) ?? 'Customer';
         subtitle = 'Customer';
-        avatarUrl = customerUser['avatar_url'] as String?;
+        avatarUrl = userData?['avatar_url'] as String?;
       } else {
-        final fallbackUserId = otherSenderByConversation[conversationId];
-        otherUserId = farmer?['user_id']?.toString().isNotEmpty == true
-            ? farmer!['user_id'].toString()
-            : (fallbackUserId ?? '');
-        displayName =
-            (farmer?['farm_name'] as String?)?.trim().isNotEmpty == true
-            ? farmer!['farm_name'].toString()
+        // We are the customer, the "other" is the farmer
+        final farmerData = row['farmer'] as Map<String, dynamic>?;
+        final userData = farmerData?['user'] as Map<String, dynamic>?;
+        
+        otherUserId = farmerData?['user_id']?.toString() ?? '';
+        displayName = (farmerData?['farm_name'] as String?)?.trim().isNotEmpty == true
+            ? farmerData!['farm_name'].toString()
+            : (userData?['name'] as String?) ?? 'Farmer';
+        subtitle = (farmerData?['specialty'] as String?)?.trim().isNotEmpty == true
+            ? farmerData!['specialty'].toString()
             : 'Farmer';
-        subtitle = (farmer?['specialty'] as String?)?.trim().isNotEmpty == true
-            ? farmer!['specialty'].toString()
-            : 'Farmer';
-        avatarUrl = farmer?['image_url'] as String?;
+        avatarUrl = farmerData?['image_url'] as String?;
       }
 
       final lastMessage = lastMessageByConversation[conversationId];
+      String displayMessage = lastMessage?.messageText ?? 'No messages yet';
+      
+      if (displayMessage.startsWith('[PRODUCT_INQUIRY:')) {
+        displayMessage = 'Product Inquiry';
+      }
 
       return MessageConversation(
         conversationId: conversationId,
@@ -242,7 +183,7 @@ class MessageService {
         otherDisplayName: displayName,
         otherSubtitle: subtitle,
         otherAvatarUrl: avatarUrl,
-        lastMessage: lastMessage?.messageText ?? 'No messages yet',
+        lastMessage: displayMessage,
         lastMessageAt: lastMessage?.createdAt,
         unreadCount: unreadCountByConversation[conversationId] ?? 0,
       );
@@ -305,6 +246,23 @@ class MessageService {
     })();
   }
 
+  /// Get one-time messages for a conversation (for duplicate detection etc.)
+  Future<List<ChatMessage>> getMessages({required String conversationId}) async {
+    try {
+      final response = await _client
+          .from('messages')
+          .select()
+          .eq('conversation_id', conversationId)
+          .order('created_at', ascending: true);
+
+      final items = response as List;
+      return items.map((map) => ChatMessage.fromMap(Map<String, dynamic>.from(map))).toList();
+    } catch (e) {
+      debugPrint('Error fetching messages: $e');
+      return [];
+    }
+  }
+
   Future<String> startConversationWithFarmer(String farmerId) async {
     final context = await _resolveActorContext();
     if (context.customerId == null) {
@@ -336,6 +294,39 @@ class MessageService {
 
     return inserted['conversation_id'].toString();
   }
+
+  Future<String> startConversationWithCustomer(String customerId) async {
+    final context = await _resolveActorContext();
+    if (context.farmerId == null) {
+      throw Exception(
+        'A farmer profile is required to start a conversation with a customer.',
+      );
+    }
+
+    final existing = await _client
+        .from('conversations')
+        .select('conversation_id')
+        .eq('customer_id', customerId)
+        .eq('farmer_id', context.farmerId!)
+        .maybeSingle();
+
+    if (existing != null) {
+      return existing['conversation_id'].toString();
+    }
+
+    final inserted = await _client
+        .from('conversations')
+        .insert({
+          'customer_id': customerId,
+          'farmer_id': context.farmerId,
+          'last_message_at': DateTime.now().toIso8601String(),
+        })
+        .select('conversation_id')
+        .single();
+
+    return inserted['conversation_id'].toString();
+  }
+
 
   Future<void> sendMessage({
     required String conversationId,
@@ -452,11 +443,29 @@ class MessageService {
       throw Exception('You need to be logged in to use messages.');
     }
 
-    final customer = await _client
+    var customer = await _client
         .from('customers')
         .select('customer_id')
         .eq('user_id', userId)
         .maybeSingle();
+
+    if (customer == null) {
+      debugPrint('🔧 Auto-healing missing customer profile for $userId');
+      try {
+        await _client.from('customers').upsert({
+          'user_id': userId,
+          'is_active': true,
+        }, onConflict: 'user_id');
+        
+        customer = await _client
+            .from('customers')
+            .select('customer_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+      } catch (e) {
+        debugPrint('❌ Failed to auto-heal customer profile: $e');
+      }
+    }
 
     final farmer = await _client
         .from('farmers')

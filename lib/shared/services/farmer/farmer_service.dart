@@ -316,6 +316,7 @@ class FarmerService {
           'yearlySales': 0.0,
           'revenueTrend': '0%',
           'listingsTrend': '0%',
+          'weeklyData': List.filled(7, 0.0),
         };
       }
 
@@ -325,46 +326,92 @@ class FarmerService {
       final productsResponse = await _supabase
           .from('products')
           .select('product_id')
-          .eq('farmer_id', farmerId);
+          .eq('farmer_id', farmerId)
+          .eq('is_active', true);
       final activeListings = (productsResponse as List).length;
 
-      // 2. Get Total Revenue
-      // We'll sum total_amount from orders. 
-      // Status 'completed' or status that implies payment received.
+      // 2. Get Sales Data for the last 14 days (to calculate trends)
+      final now = DateTime.now();
+      final fourteenDaysAgo = now.subtract(const Duration(days: 14)).toIso8601String();
+      
       final ordersResponse = await _supabase
+          .from('orders')
+          .select('total_amount, created_at')
+          .eq('farmer_id', farmerId)
+          .gte('created_at', fourteenDaysAgo)
+          .not('order_status_id', 'in', '(5, 6)'); // Exclude cancelled/failed orders
+
+      final orders = ordersResponse as List<dynamic>;
+      
+      // Calculate weekly data for chart (last 7 days)
+      List<double> weeklyData = List.filled(7, 0.0);
+      double currentWeekRevenue = 0;
+      double previousWeekRevenue = 0;
+      
+      final sevenDaysAgo = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
+      
+      for (var order in orders) {
+        final createdAt = DateTime.tryParse(order['created_at'] ?? '');
+        if (createdAt == null) continue;
+        
+        final amount = (order['total_amount'] as num?)?.toDouble() ?? 0.0;
+        
+        // Check if it belongs to current week (last 7 days)
+        if (createdAt.isAfter(sevenDaysAgo)) {
+          currentWeekRevenue += amount;
+          // Calculate index (0 is 6 days ago, 6 is today)
+          final dayIndex = createdAt.difference(sevenDaysAgo).inDays;
+          if (dayIndex >= 0 && dayIndex < 7) {
+            weeklyData[dayIndex] += amount;
+          }
+        } else {
+          // Belongs to previous week (8-14 days ago)
+          previousWeekRevenue += amount;
+        }
+      }
+
+      // 3. Get Total Revenue (Lifetime)
+      final lifetimeResponse = await _supabase
           .from('orders')
           .select('total_amount')
           .eq('farmer_id', farmerId)
-          .not('order_status_id', 'eq', 5); // Assuming 5 is cancelled, let's be more specific if possible.
+          .not('order_status_id', 'in', '(5, 6)');
       
-      // Actually, let's use the view v_orders if it exists and has status text
       double totalRevenue = 0;
-      final orders = ordersResponse as List<dynamic>;
-      for (var order in orders) {
+      for (var order in lifetimeResponse as List) {
         totalRevenue += (order['total_amount'] as num?)?.toDouble() ?? 0;
       }
 
-      // 3. Get Yearly Sales (sales in the current year)
-      final now = DateTime.now();
+      // 4. Get Yearly Sales
       final startOfYear = DateTime(now.year, 1, 1).toIso8601String();
-      final yearlyOrdersResponse = await _supabase
+      final yearlyResponse = await _supabase
           .from('orders')
           .select('total_amount')
           .eq('farmer_id', farmerId)
-          .gte('created_at', startOfYear);
+          .gte('created_at', startOfYear)
+          .not('order_status_id', 'in', '(5, 6)');
       
       double yearlySales = 0;
-      final yearlyOrders = yearlyOrdersResponse as List<dynamic>;
-      for (var order in yearlyOrders) {
+      for (var order in yearlyResponse as List) {
         yearlySales += (order['total_amount'] as num?)?.toDouble() ?? 0;
+      }
+
+      // Calculate trends
+      String revenueTrend = '+0%';
+      if (previousWeekRevenue > 0) {
+        final percent = ((currentWeekRevenue - previousWeekRevenue) / previousWeekRevenue * 100);
+        revenueTrend = '${percent >= 0 ? '+' : ''}${percent.toStringAsFixed(1)}%';
+      } else if (currentWeekRevenue > 0) {
+        revenueTrend = '+100%';
       }
 
       return {
         'totalRevenue': totalRevenue,
         'activeListings': activeListings,
         'yearlySales': yearlySales,
-        'revenueTrend': '+0%', // Trends would require historical data comparison
-        'listingsTrend': '0%',
+        'revenueTrend': revenueTrend,
+        'listingsTrend': '0%', // Trends for listings would need product history
+        'weeklyData': weeklyData,
       };
     } catch (e) {
       debugPrint('Error fetching farmer stats: $e');
@@ -374,6 +421,7 @@ class FarmerService {
         'yearlySales': 0.0,
         'revenueTrend': '0%',
         'listingsTrend': '0%',
+        'weeklyData': List.filled(7, 0.0),
       };
     }
   }

@@ -88,14 +88,25 @@ class ReverseGeocodingService {
         'neighbourhood',
       ]);
 
-      final barangay = _firstNonEmpty(address, ['suburb', 'village']);
+      final barangay = _firstNonEmpty(address, [
+        'suburb',
+        'village',
+        'neighbourhood',
+        'quarter',
+        'hamlet',
+      ]);
       final city = _firstNonEmpty(address, [
         'city',
         'town',
         'municipality',
+        'city_district',
+      ]);
+      final province = _firstNonEmpty(address, [
+        'state',
+        'region',
+        'state_district',
         'county',
       ]);
-      final province = _firstNonEmpty(address, ['state', 'region']);
 
       final parts = [
         street,

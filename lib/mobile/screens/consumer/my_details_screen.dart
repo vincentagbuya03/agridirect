@@ -97,12 +97,19 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
 
       _emailController.text = _auth.userEmail;
 
+      final userId = _auth.userId.isEmpty ? SupabaseConfig.currentUser?.id : _auth.userId;
+      
+      if (userId == null || userId.isEmpty) {
+        debugPrint('⚠️ Cannot load details: userId is empty');
+        return;
+      }
+
       if (_auth.isViewingAsFarmer) {
         // Load farmer details
         final farmers = await SupabaseConfig.client
             .from('farmers')
             .select()
-            .eq('user_id', _auth.userId)
+            .eq('user_id', userId)
             .limit(1);
 
         if (farmers.isNotEmpty) {
@@ -129,7 +136,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           final users = await SupabaseConfig.client
               .from('users')
               .select()
-              .eq('user_id', _auth.userId)
+              .eq('user_id', userId)
               .limit(1);
 
           if (users.isNotEmpty) {
@@ -273,6 +280,11 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     if (!_infoKey.currentState!.validate()) return;
 
     try {
+      final userId = _auth.userId.isEmpty ? SupabaseConfig.currentUser?.id : _auth.userId;
+      if (userId == null || userId.isEmpty) {
+        throw Exception('User session expired. Please log in again.');
+      }
+
       setState(() => _isSaving = true);
 
       if (_auth.isViewingAsFarmer) {
@@ -287,7 +299,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               'farm_longitude': _parseCoordinate(_longitudeController.text),
               'image_url': _imageUrlController.text.trim(),
             })
-            .eq('user_id', _auth.userId);
+            .eq('user_id', userId);
       } else {
         // Update customer details in users table
         await SupabaseConfig.client
@@ -298,7 +310,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               'phone': _phoneController.text.trim(),
               'avatar_url': _imageUrlController.text.trim(),
             })
-            .eq('user_id', _auth.userId);
+            .eq('user_id', userId);
       }
 
       // Refresh auth-cached profile fields (e.g., displayed name in profile header).

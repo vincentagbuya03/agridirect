@@ -50,7 +50,7 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
         if (mounted) {
           // Check if new user needs profile completion
           if (_auth.needsProfileCompletion) {
-            context.go(AppRoutes.googleCompleteProfile);
+            context.go(AppRoutes.completeProfile);
           } else {
             // Redirect to appropriate home page
             context.go(AppRoutes.home);

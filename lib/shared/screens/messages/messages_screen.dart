@@ -4,8 +4,12 @@ import 'package:agridirect/shared/widgets/image_widgets.dart';
 import 'package:agridirect/shared/styles/app_theme.dart';
 
 import '../../services/auth/auth_service.dart';
+import '../../services/core/supabase_config.dart';
 import '../../services/community/message_service.dart';
 import '../../services/community/notification_service.dart';
+import '../../services/core/supabase_data_service.dart';
+import '../../data/app_data.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({
@@ -13,11 +17,16 @@ class MessagesScreen extends StatefulWidget {
     this.initialFarmerId,
     this.initialConversationId,
     this.asFarmer,
+    this.initialProduct,
+    this.initialCustomerId,
   });
 
   final String? initialFarmerId;
+  final String? initialCustomerId;
   final String? initialConversationId;
   final bool? asFarmer;
+  final ProductItem? initialProduct;
+
 
   @override
   State<MessagesScreen> createState() => _MessagesScreenState();
@@ -60,7 +69,44 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   Future<void> _handleInitialConversation() async {
     final farmerId = widget.initialFarmerId;
-    if (farmerId == null || _asFarmerInbox) {
+    final customerId = widget.initialCustomerId;
+
+    if (_asFarmerInbox) {
+      if (customerId == null) return;
+
+      setState(() {
+        _startingInitialConversation = true;
+        _errorText = null;
+      });
+
+      try {
+        final conversationId = await _messageService.startConversationWithCustomer(
+          customerId,
+        );
+
+        if (!mounted) return;
+
+        setState(() {
+          _selectedConversationId = conversationId;
+          NotificationService().setActiveConversation(conversationId);
+        });
+      } catch (error) {
+        if (!mounted) return;
+        setState(() {
+          _errorText = error.toString().replaceFirst('Exception: ', '');
+        });
+      } finally {
+        if (mounted) {
+          setState(() {
+            _startingInitialConversation = false;
+          });
+        }
+      }
+      return;
+    }
+
+    // Customer inbox flow (starting chat with farmer)
+    if (farmerId == null) {
       return;
     }
 
@@ -82,6 +128,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
         _selectedConversationId = conversationId;
         NotificationService().setActiveConversation(conversationId);
       });
+
+      // 🔴 AUTO-SEND PRODUCT INQUIRY (if not already sent)
+      if (widget.initialProduct != null) {
+        _sendAutomaticInquiry(conversationId, widget.initialProduct!);
+      }
     } catch (error) {
       if (!mounted) {
         return;
@@ -96,6 +147,27 @@ class _MessagesScreenState extends State<MessagesScreen> {
           _startingInitialConversation = false;
         });
       }
+    }
+  }
+
+  Future<void> _sendAutomaticInquiry(String conversationId, ProductItem product) async {
+    try {
+      // 1. Get recent messages for this conversation
+      final messages = await _messageService.getMessages(conversationId: conversationId);
+      
+      // 2. Check if an inquiry for THIS product already exists
+      final tag = '[PRODUCT_INQUIRY:${product.productId}]';
+      final alreadySent = messages.any((m) => m.messageText.contains(tag));
+      
+      if (!alreadySent) {
+        // 3. Send the special inquiry tag
+        await _messageService.sendMessage(
+          conversationId: conversationId,
+          messageText: tag,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error sending automatic inquiry: $e');
     }
   }
 
@@ -121,10 +193,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
     // Create optimistic message
     final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+    final currentUserId = SupabaseConfig.currentUser?.id ?? _auth.userId;
     final optimisticMsg = ChatMessage(
       messageId: tempId,
       conversationId: conversationId,
-      senderId: _auth.userId,
+      senderId: currentUserId,
       messageText: text,
       isRead: false,
       createdAt: DateTime.now(),
@@ -140,7 +213,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
         conversationId: conversationId,
         messageText: text,
       );
-      // We don't remove it here yet; the StreamBuilder will handle the cleanup 
+      // We don't remove it here yet; the StreamBuilder will handle the cleanup
       // when it sees the message from the server.
       if (mounted) {
         // No manual refresh needed as watchInbox stream handles it
@@ -153,6 +226,114 @@ class _MessagesScreenState extends State<MessagesScreen> {
         });
       }
     }
+  }
+
+  void _showConversationInfo(MessageConversation conversation) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.textSubtle.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 32),
+            SafeCircleAvatar(
+              imageUrl: conversation.otherAvatarUrl,
+              radius: 50,
+              defaultBucket: 'uploads',
+              backgroundColor: AppColors.primaryLight,
+              child: Text(
+                conversation.otherDisplayName.isNotEmpty
+                    ? conversation.otherDisplayName[0].toUpperCase()
+                    : '?',
+                style: AppTextStyles.headline1.copyWith(
+                  color: AppColors.primary,
+                  fontSize: 36,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              conversation.otherDisplayName,
+              style: AppTextStyles.headline2.copyWith(fontSize: 24),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              conversation.otherSubtitle,
+              style: AppTextStyles.bodyLarge.copyWith(
+                color: AppColors.textSubtle,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 16),
+            _buildInfoTile(
+              icon: Icons.person_outline_rounded,
+              title: 'View Profile',
+              onTap: () {
+                Navigator.pop(context);
+                // TODO: Navigate to profile
+              },
+            ),
+            _buildInfoTile(
+              icon: Icons.notifications_off_outlined,
+              title: 'Mute Notifications',
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+            _buildInfoTile(
+              icon: Icons.block_flipped,
+              title: 'Block User',
+              isDestructive: true,
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoTile({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    return ListTile(
+      onTap: onTap,
+      leading: Icon(
+        icon,
+        color: isDestructive ? AppColors.error : AppColors.textHeadline,
+      ),
+      title: Text(
+        title,
+        style: AppTextStyles.bodyLarge.copyWith(
+          color: isDestructive ? AppColors.error : AppColors.textHeadline,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+      contentPadding: EdgeInsets.zero,
+    );
   }
 
   @override
@@ -269,13 +450,15 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 if (snapshot.hasError) {
                   return _buildEmptyState(
                     title: 'Something went wrong',
-                    subtitle: 'We couldn\'t load your messages. Please try again.',
+                    subtitle:
+                        'We couldn\'t load your messages. Please try again.',
                     actionLabel: 'Retry',
                     onPressed: _refreshInbox,
                   );
                 }
 
-                final conversations = snapshot.data ?? const <MessageConversation>[];
+                final conversations =
+                    snapshot.data ?? const <MessageConversation>[];
 
                 if (conversations.isEmpty) {
                   _selectedConversationId = null;
@@ -295,25 +478,53 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   (conversation) =>
                       conversation.conversationId == _selectedConversationId,
                 );
-                if (!hasSelectedConversation) {
-                  _selectedConversationId = isWide
-                      ? conversations.first.conversationId
-                      : null;
-                  if (isWide && _selectedConversationId != null) {
+
+                // Only auto-select or reset if we don't have a valid selection
+                // and we aren't currently waiting for a new conversation to initialize.
+                if (!hasSelectedConversation && !_startingInitialConversation) {
+                  if (isWide && conversations.isNotEmpty) {
+                    _selectedConversationId = conversations.first.conversationId;
                     NotificationService().setActiveConversation(
                       _selectedConversationId,
                     );
+                  } else if (!isWide) {
+                    // On mobile, if the selected ID is no longer in the list,
+                    // we only reset to null if it wasn't a brand new conversation
+                    // being initialized.
+                    _selectedConversationId = null;
                   }
                 }
 
-                final current = conversations.firstWhere(
-                  (conversation) =>
-                      conversation.conversationId == _selectedConversationId,
-                  orElse: () => conversations.first,
-                );
+                // If we have a selected ID but it's not in the list yet (brand new),
+                // we might need a fallback or a mock "current" for the chat panel.
+                MessageConversation? current;
+                if (_selectedConversationId != null) {
+                  final found = conversations.where(
+                    (c) => c.conversationId == _selectedConversationId,
+                  );
+                  if (found.isNotEmpty) {
+                    current = found.first;
+                  }
+                }
+
+                // Fallback for wide screen if still null
+                if (current == null && isWide && conversations.isNotEmpty) {
+                  current = conversations.first;
+                  _selectedConversationId = current.conversationId;
+                }
+
+                if (current == null && _selectedConversationId == null) {
+                  return _buildConversationList(conversations);
+                }
+
+                // If we have a selected ID but it hasn't hit the inbox list yet,
+                // we show a loading state for the chat panel or a mock state.
+                if (current == null && _selectedConversationId != null) {
+                  return const Center(child: AppShimmerLoader());
+                }
 
                 final conversationList = _buildConversationList(conversations);
-                final chatPanel = _buildChatPanel(current);
+                final chatPanel = _buildChatPanel(current!);
 
                 if (isWide) {
                   return Row(
@@ -404,15 +615,20 @@ class _MessagesScreenState extends State<MessagesScreen> {
                               ? conversation.otherDisplayName[0].toUpperCase()
                               : '?',
                           style: AppTextStyles.headline3.copyWith(
-                            color: isSelected ? AppColors.primary : AppColors.textSubtle,
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.textSubtle,
                             fontSize: 20,
                           ),
                         ),
                       ),
                       ValueListenableBuilder<Set<String>>(
-                        valueListenable: NotificationService().onlineUsersNotifier,
+                        valueListenable:
+                            NotificationService().onlineUsersNotifier,
                         builder: (context, onlineUsers, _) {
-                          final isOnline = onlineUsers.contains(conversation.otherUserId);
+                          final isOnline = onlineUsers.contains(
+                            conversation.otherUserId,
+                          );
                           if (!isOnline) return const SizedBox.shrink();
 
                           return Positioned(
@@ -589,14 +805,21 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     Row(
                       children: [
                         ValueListenableBuilder<Set<String>>(
-                          valueListenable: NotificationService().onlineUsersNotifier,
+                          valueListenable:
+                              NotificationService().onlineUsersNotifier,
                           builder: (context, onlineUsers, _) {
-                            final isOnline = onlineUsers.contains(conversation.otherUserId);
+                            final isOnline = onlineUsers.contains(
+                              conversation.otherUserId,
+                            );
                             return Container(
                               width: 8,
                               height: 8,
                               decoration: BoxDecoration(
-                                color: isOnline ? AppColors.success : AppColors.textSubtle.withValues(alpha: 0.2),
+                                color: isOnline
+                                    ? AppColors.success
+                                    : AppColors.textSubtle.withValues(
+                                        alpha: 0.2,
+                                      ),
                                 shape: BoxShape.circle,
                               ),
                             );
@@ -604,9 +827,12 @@ class _MessagesScreenState extends State<MessagesScreen> {
                         ),
                         const SizedBox(width: 6),
                         ValueListenableBuilder<Set<String>>(
-                          valueListenable: NotificationService().onlineUsersNotifier,
+                          valueListenable:
+                              NotificationService().onlineUsersNotifier,
                           builder: (context, onlineUsers, _) {
-                            final isOnline = onlineUsers.contains(conversation.otherUserId);
+                            final isOnline = onlineUsers.contains(
+                              conversation.otherUserId,
+                            );
                             return Text(
                               isOnline ? 'Active now' : 'Offline',
                               style: AppTextStyles.labelSmall.copyWith(
@@ -622,7 +848,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 ),
               ),
               IconButton(
-                onPressed: () {},
+                onPressed: () => _showConversationInfo(conversation),
                 icon: const Icon(
                   Icons.info_outline_rounded,
                   color: AppColors.textSubtle,
@@ -632,7 +858,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
           ),
         ),
 
-        // Message List
         Expanded(
           child: Container(
             color: AppColors.background,
@@ -645,18 +870,25 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
                 // Merge optimistic messages for this conversation
                 final localForThisChat = _optimisticMessages
-                    .where((m) => m.conversationId == conversation.conversationId)
+                    .where(
+                      (m) => m.conversationId == conversation.conversationId,
+                    )
                     .toList();
 
                 if (localForThisChat.isNotEmpty) {
                   final merged = List<ChatMessage>.from(messages);
                   for (final local in localForThisChat) {
                     // Avoid duplicates if the stream already caught up
-                    final isAlreadyInStream = messages.any((m) =>
-                        m.messageText == local.messageText &&
-                        m.senderId == local.senderId &&
-                        m.createdAt.difference(local.createdAt).inSeconds.abs() <
-                            10);
+                    final isAlreadyInStream = messages.any(
+                      (m) =>
+                          m.messageText == local.messageText &&
+                          m.senderId == local.senderId &&
+                          m.createdAt
+                                  .difference(local.createdAt)
+                                  .inSeconds
+                                  .abs() <
+                              10,
+                    );
 
                     if (isAlreadyInStream) {
                       // Cleanup optimistic list if it's already in the DB stream
@@ -729,7 +961,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final message = messages[messages.length - 1 - index];
-                    final isMine = message.senderId == _auth.userId;
+                    final currentUserId = SupabaseConfig.currentUser?.id;
+                    final isMine =
+                        message.senderId == currentUserId ||
+                        (currentUserId != null &&
+                            message.senderId == _auth.userId);
                     final showTime =
                         index == 0 ||
                         messages[messages.length - 1 - index].createdAt
@@ -790,15 +1026,17 @@ class _MessagesScreenState extends State<MessagesScreen> {
                                   ),
                                 ],
                               ),
-                              child: Text(
-                                message.messageText,
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: isMine
-                                      ? Colors.white
-                                      : AppColors.textHeadline,
-                                  height: 1.5,
-                                ),
-                              ),
+                              child: message.messageText.startsWith('[PRODUCT_INQUIRY:')
+                                  ? _buildInquiryCard(message.messageText, isMine)
+                                  : Text(
+                                      message.messageText,
+                                      style: AppTextStyles.bodyMedium.copyWith(
+                                        color: isMine
+                                            ? Colors.white
+                                            : AppColors.textHeadline,
+                                        height: 1.5,
+                                      ),
+                                    ),
                             ),
                           ),
                           if (isMine)
@@ -1024,5 +1262,96 @@ class _MessagesScreenState extends State<MessagesScreen> {
     final minute = dateTime.minute.toString().padLeft(2, '0');
     final period = dateTime.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $period';
+  }
+
+  Widget _buildInquiryCard(String text, bool isMine) {
+    final productId = text
+        .replaceFirst('[PRODUCT_INQUIRY:', '')
+        .replaceFirst(']', '')
+        .trim();
+
+    return FutureBuilder<ProductItem?>(
+      future: SupabaseDataService().getProductById(productId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox(
+            width: 200,
+            height: 80,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+
+        final product = snapshot.data!;
+        return Container(
+          width: 240,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isMine ? Colors.white.withValues(alpha: 0.1) : Colors.grey[50],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CachedNetworkImage(
+                      imageUrl: product.imageUrl,
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.name,
+                          style: AppTextStyles.headline3.copyWith(
+                            fontSize: 14,
+                            color: isMine ? Colors.white : AppColors.textHeadline,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          product.price,
+                          style: AppTextStyles.bodySmall.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: isMine ? Colors.white70 : AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    // Navigate to product view if needed
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    minimumSize: const Size(0, 32),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('View Product', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

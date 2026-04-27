@@ -18,7 +18,7 @@ class AppRoutes {
 
   // ── Mobile-specific ──
   static const String farmerRegister = '/farmer-register';
-  static const String googleCompleteProfile = '/google-complete-profile';
+  static const String completeProfile = '/complete-profile';
   static const String addProduct = '/add-product';
   static const String myDetails = '/my-details';
   static const String farmersMap = '/farmers-map';

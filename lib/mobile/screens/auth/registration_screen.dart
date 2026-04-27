@@ -234,7 +234,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       setState(() => _isGoogleLoading = false);
       if (success) {
         if (AuthService().needsProfileCompletion) {
-          context.push(AppRoutes.googleCompleteProfile);
+          context.push(AppRoutes.completeProfile);
         } else {
           widget.onRegistrationSuccess();
         }

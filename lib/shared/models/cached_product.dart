@@ -52,6 +52,9 @@ class CachedProduct extends HiveObject {
   @HiveField(15)
   late String? farmerAvatarUrl;
 
+  @HiveField(16)
+  late String? farmerImageUrl;
+
   CachedProduct({
     required this.id,
     required this.farmerId,
@@ -69,6 +72,7 @@ class CachedProduct extends HiveObject {
     this.rating,
     this.farmName,
     this.farmerAvatarUrl,
+    this.farmerImageUrl,
   }) {
     this.cachedAt = cachedAt ?? DateTime.now();
   }

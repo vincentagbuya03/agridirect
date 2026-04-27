@@ -7,7 +7,7 @@ import '../../mobile/mobile_navigation.dart';
 import '../../mobile/screens/auth/login_screen.dart';
 import '../../mobile/screens/auth/registration_screen.dart';
 import '../../mobile/screens/auth/farmer_registration_screen.dart';
-import '../../mobile/screens/auth/google_complete_profile_screen.dart';
+import '../../mobile/screens/auth/complete_profile_screen.dart';
 import '../../mobile/screens/common/onboarding_screen.dart';
 import '../../mobile/screens/common/face_capture_screen.dart';
 import '../../mobile/screens/farmer/add_product_screen.dart';
@@ -26,6 +26,7 @@ import '../../web/screens/common/web_welcome_screen.dart';
 import '../screens/messages/messages_screen.dart';
 import '../../mobile/screens/common/loading_screen.dart';
 
+import '../data/app_data.dart';
 import 'app_routes.dart';
 
 export 'app_routes.dart';
@@ -50,7 +51,7 @@ GoRouter createAppRouter() {
       final width = view.physicalSize.width / view.devicePixelRatio;
       final isMobile = width <= 800;
 
-      debugPrint('🔀 Router Redirect: [${isMobile ? "MOBILE" : "WEB"}] location=$location isLoggedIn=$isLoggedIn admin=$isAdmin');
+      // debugPrint('🔀 Router Redirect: [${isMobile ? "MOBILE" : "WEB"}] location=$location isLoggedIn=$isLoggedIn admin=$isAdmin needsProfile=${auth.needsProfileCompletion}');
 
       // 1. ABSOLUTE PRIORITY: Admin Redirect
       if (isLoggedIn && isAdmin) {
@@ -70,20 +71,28 @@ GoRouter createAppRouter() {
         return null;
       }
 
-      // 3. Profile Completion Redirect
-      if (auth.needsProfileCompletion &&
-          location != AppRoutes.googleCompleteProfile) {
-        debugPrint('↪️ Router: Redirecting to complete profile');
-        return AppRoutes.googleCompleteProfile;
-      }
-
-      // 4. Authenticated Users logic
+      // 3. Authenticated Users logic
       if (isLoggedIn) {
+        // Allow unverified users to stay on login or register
+        if (!auth.isEmailVerified && 
+            location != AppRoutes.login && 
+            location != AppRoutes.register) {
+          return AppRoutes.login;
+        }
+
+        // 4. Profile Completion Redirect
+        if (auth.needsProfileCompletion &&
+            location != AppRoutes.completeProfile) {
+          return AppRoutes.completeProfile;
+        }
+
         // Skip auth pages
         if (location == AppRoutes.login || 
             location == AppRoutes.register || 
             location == AppRoutes.webWelcome) {
-          debugPrint('↪️ Router: Logged in, going to loading');
+          if (!auth.isEmailVerified) {
+             return null; // Stay on login or register to allow fresh start or resume
+          }
           return AppRoutes.loading;
         }
         
@@ -105,10 +114,13 @@ GoRouter createAppRouter() {
           AppRoutes.customerMessages,
           AppRoutes.farmerMessages,
           AppRoutes.admin,
+          AppRoutes.completeProfile,
+          AppRoutes.marketplace,
+          AppRoutes.shop,
+          AppRoutes.community,
         };
 
         if (protectedRoutes.contains(location)) {
-          debugPrint('↪️ Router: Protected route, going to login');
           return AppRoutes.login;
         }
 
@@ -158,16 +170,16 @@ GoRouter createAppRouter() {
           builder: (context, constraints) {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
-                onLogout: () {
-                  AuthService().logout();
-                  context.go(AppRoutes.home);
+                onLogout: () async {
+                  await AuthService().logout();
+                  if (context.mounted) context.go(AppRoutes.login);
                 },
               );
             }
             return MobileNavigation(
               onLogout: () {
-                AuthService().logout();
                 context.go(AppRoutes.login);
+                AuthService().logout();
               },
             );
           },
@@ -182,16 +194,16 @@ GoRouter createAppRouter() {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
                 onLogout: () {
+                  context.go(AppRoutes.login);
                   AuthService().logout();
-                  context.go(AppRoutes.home);
                 },
               );
             }
             return MobileNavigation(
               initialIndex: 1, // Marketplace tab
-              onLogout: () {
-                AuthService().logout();
-                context.go(AppRoutes.login);
+              onLogout: () async {
+                await AuthService().logout();
+                if (context.mounted) context.go(AppRoutes.login);
               },
             );
           },
@@ -204,16 +216,16 @@ GoRouter createAppRouter() {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
                 onLogout: () {
+                  context.go(AppRoutes.login);
                   AuthService().logout();
-                  context.go(AppRoutes.home);
                 },
               );
             }
             return MobileNavigation(
               initialIndex: 1, // Shop maps to Marketplace on mobile
-              onLogout: () {
-                AuthService().logout();
-                context.go(AppRoutes.login);
+              onLogout: () async {
+                await AuthService().logout();
+                if (context.mounted) context.go(AppRoutes.login);
               },
             );
           },
@@ -226,16 +238,16 @@ GoRouter createAppRouter() {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
                 onLogout: () {
+                  context.go(AppRoutes.login);
                   AuthService().logout();
-                  context.go(AppRoutes.home);
                 },
               );
             }
             return MobileNavigation(
               initialIndex: 0, // Community maps to Home/News on mobile
-              onLogout: () {
-                AuthService().logout();
-                context.go(AppRoutes.login);
+              onLogout: () async {
+                await AuthService().logout();
+                if (context.mounted) context.go(AppRoutes.login);
               },
             );
           },
@@ -248,16 +260,16 @@ GoRouter createAppRouter() {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
                 onLogout: () {
+                  context.go(AppRoutes.login);
                   AuthService().logout();
-                  context.go(AppRoutes.home);
                 },
               );
             }
             return MobileNavigation(
               initialIndex: 4, // Profile tab
-              onLogout: () {
-                AuthService().logout();
-                context.go(AppRoutes.login);
+              onLogout: () async {
+                await AuthService().logout();
+                if (context.mounted) context.go(AppRoutes.login);
               },
             );
           },
@@ -270,18 +282,16 @@ GoRouter createAppRouter() {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
                 onLogout: () {
+                  context.go(AppRoutes.login);
                   AuthService().logout();
-                  context.go(AppRoutes.home);
                 },
               );
             }
 
-            final auth = AuthService();
-            auth.switchToFarmerMode();
             return MobileNavigation(
-              onLogout: () {
-                AuthService().logout();
-                context.go(AppRoutes.login);
+              onLogout: () async {
+                await AuthService().logout();
+                if (context.mounted) context.go(AppRoutes.login);
               },
             );
           },
@@ -329,13 +339,30 @@ GoRouter createAppRouter() {
           final farmerId = extra is Map<String, dynamic>
               ? extra['farmerId'] as String?
               : null;
+          final product = extra is Map<String, dynamic>
+              ? extra['product'] as ProductItem?
+              : null;
 
-          return MessagesScreen(initialFarmerId: farmerId, asFarmer: false);
+          return MessagesScreen(
+            initialFarmerId: farmerId,
+            asFarmer: false,
+            initialProduct: product,
+          );
         },
       ),
       GoRoute(
         path: AppRoutes.farmerMessages,
-        builder: (context, state) => MessagesScreen(asFarmer: true),
+        builder: (context, state) {
+          final extra = state.extra;
+          final customerId = extra is Map<String, dynamic>
+              ? extra['customerId'] as String?
+              : null;
+
+          return MessagesScreen(
+            asFarmer: true,
+            initialCustomerId: customerId,
+          );
+        },
       ),
 
       // ── Web Welcome (landing page for first-time visitors) ────────────────
@@ -416,13 +443,13 @@ GoRouter createAppRouter() {
               return Scaffold(
                 body: Center(
                   child: WebRegistrationScreen(
-                    onRegistrationSuccess: () => context.go(AppRoutes.login),
+                    onRegistrationSuccess: () => context.go(AppRoutes.loading),
                   ),
                 ),
               );
             }
             return RegistrationScreen(
-              onRegistrationSuccess: () => context.go(AppRoutes.login),
+              onRegistrationSuccess: () => context.go(AppRoutes.loading),
             );
           },
         ),
@@ -430,8 +457,8 @@ GoRouter createAppRouter() {
 
       // ── Google Complete Profile ───────────────────────────────────────────
       GoRoute(
-        path: AppRoutes.googleCompleteProfile,
-        builder: (context, state) => GoogleCompleteProfileScreen(
+        path: AppRoutes.completeProfile,
+        builder: (context, state) => CompleteProfileScreen(
           onComplete: () => context.go(AppRoutes.home),
         ),
       ),
@@ -468,9 +495,9 @@ GoRouter createAppRouter() {
       GoRoute(
         path: AppRoutes.admin,
         builder: (context, state) => AdminDashboardRedesigned(
-          onLogout: () {
-            AuthService().logout();
-            context.go(AppRoutes.home);
+          onLogout: () async {
+            await AuthService().logout();
+            if (context.mounted) context.go(AppRoutes.login);
           },
         ),
       ),

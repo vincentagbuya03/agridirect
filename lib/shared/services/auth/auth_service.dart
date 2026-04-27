@@ -32,9 +32,10 @@ class AuthService extends ChangeNotifier {
 
   // Pending Google sign-in state (new user needs to complete profile)
   bool _needsProfileCompletion = false;
-  String _pendingGoogleUserId = '';
-  String _pendingGoogleEmail = '';
-  String _pendingGoogleName = '';
+  String _pendingUserId = '';
+  String _pendingEmail = '';
+  String _pendingName = '';
+  bool _isEmailVerified = false; 
 
   static bool _isKnownAdminEmail(String email) =>
       email.trim().toLowerCase() == 'noreplyagridirect@gmail.com';
@@ -66,9 +67,10 @@ class AuthService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get needsProfileCompletion => _needsProfileCompletion;
-  String get pendingGoogleEmail => _pendingGoogleEmail;
-  String get pendingGoogleName => _pendingGoogleName;
+  String get pendingEmail => _pendingEmail;
+  String get pendingName => _pendingName;
   String? get registrationStatus => _registrationStatus;
+  bool get isEmailVerified => _isEmailVerified;
   SupabaseClient get client => _client;
 
   static String _sellerKey(String userId) => 'auth.isSeller.$userId';
@@ -190,11 +192,30 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  void _clearPendingGoogleProfileState() {
+  void _resetSessionState({bool clearPendingProfileState = true}) {
+    _regStatusSubscription?.cancel();
+    _regStatusSubscription = null;
+    _isLoggedIn = false;
+    _isSeller = false;
+    _isViewingAsFarmer = false;
+    _isAdmin = false;
+    _userName = '';
+    _userEmail = '';
+    _userId = '';
+    _userAvatarUrl = '';
+    _isEmailVerified = false;
+    _registrationStatus = null;
+
+    if (clearPendingProfileState) {
+      _clearpendingProfileState();
+    }
+  }
+
+  void _clearpendingProfileState() {
     _needsProfileCompletion = false;
-    _pendingGoogleUserId = '';
-    _pendingGoogleEmail = '';
-    _pendingGoogleName = '';
+    _pendingUserId = '';
+    _pendingEmail = '';
+    _pendingName = '';
   }
 
   Future<bool> _resolveAdminStatus(
@@ -293,17 +314,22 @@ class AuthService extends ChangeNotifier {
 
   /// Initialize auth on app startup
   /// Only logs in if user exists AND email is confirmed
-  Future<void> initialize() async {
+  Future<void> initialize({AuthChangeEvent? event}) async {
     // Prevent stale route/UI state after app relaunch.
-    _clearPendingGoogleProfileState();
+    _clearpendingProfileState();
 
     final user = _client.auth.currentUser;
 
-    // Only proceed if user exists AND email is confirmed
-    if (user != null && user.emailConfirmedAt != null) {
+    // Proceed if user exists - our custom verification flow handles the confirmed status
+    if (user != null) {
       _userId = user.id;
-      _userEmail = user.email ?? '';
-      debugPrint('🔵 AuthService.initialize: email=${user.email} userId=${user.id}');
+      final sessionEmail = user.email;
+      
+      // Use session email if available, otherwise stay with current email or wait for profile
+      if (sessionEmail != null && sessionEmail.isNotEmpty) {
+        _userEmail = sessionEmail;
+      }
+      
       _isLoggedIn = true;
       _isSeller = false;
       _isViewingAsFarmer = false;
@@ -352,7 +378,7 @@ class AuthService extends ChangeNotifier {
             email: user.email ?? '',
             name: metaName,
             phoneNumber: metaPhone,
-            emailVerified: true,
+            emailVerified: user.appMetadata['provider'] == 'google',
           );
           profile = await SupabaseDatabase.getUserProfile(user.id);
         } catch (e) {
@@ -363,16 +389,25 @@ class AuthService extends ChangeNotifier {
       // Check if profile is incomplete (missing required fields like phone)
       if (profile != null) {
         final phone = profile['phone'] as String?;
+        final isVerified = (profile['email_verified'] as bool?) ?? false;
         final isIncompleteProfile = phone == null || phone.isEmpty;
+        
+        _isEmailVerified = isVerified;
 
-        if (isIncompleteProfile) {
-          // User needs to complete their profile
+        if (isIncompleteProfile && isVerified) {
+          // User needs to complete their profile (e.g. after login or social sign-in)
           _needsProfileCompletion = true;
-          _pendingGoogleUserId = user.id;
-          _pendingGoogleEmail = user.email ?? '';
-          _pendingGoogleName = (profile['name'] as String?) ?? '';
+          _pendingUserId = user.id;
+          _pendingEmail = user.email ?? '';
+          _pendingName = (profile['name'] as String?) ?? '';
         }
       }
+      // If profile has an email and our current email is empty, recover it
+      final dbEmail = (profile?['email'] as String?) ?? '';
+      if (_userEmail.isEmpty && dbEmail.isNotEmpty) {
+        _userEmail = dbEmail;
+      }
+
       // If profile name is empty, fall back to auth metadata name and fix DB
       String resolvedName = (profile?['name'] as String?) ?? '';
       if (resolvedName.isEmpty) {
@@ -458,6 +493,11 @@ class AuthService extends ChangeNotifier {
       try {
         await _client.auth.signOut();
       } catch (_) {}
+      _resetSessionState();
+      notifyListeners();
+    } else {
+      _resetSessionState();
+      notifyListeners();
     }
   }
 
@@ -511,6 +551,7 @@ class AuthService extends ChangeNotifier {
       try {
         await _client.auth.signOut();
       } catch (_) {}
+      _resetSessionState();
 
       // Keep name for profile completion
       _userName = name;
@@ -533,6 +574,7 @@ class AuthService extends ChangeNotifier {
     if (_isLoading) return false;
     _isLoading = true;
     _errorMessage = null;
+    _clearpendingProfileState();
     notifyListeners();
 
     try {
@@ -588,7 +630,7 @@ class AuthService extends ChangeNotifier {
             email: email,
             name: metaName,
             phoneNumber: metaPhone,
-            emailVerified: true,
+            emailVerified: response.user!.appMetadata['provider'] == 'google' || response.user!.emailConfirmedAt != null,
           ).timeout(const Duration(seconds: 10));
           
           profile = await SupabaseDatabase.getUserProfile(_userId).timeout(
@@ -615,6 +657,21 @@ class AuthService extends ChangeNotifier {
         }
       }
       _userName = resolvedName;
+
+      // Check if profile is incomplete (missing phone)
+      final phone = profile?['phone'] as String?;
+      final isVerified = (profile?['email_verified'] as bool?) ?? false;
+      _isEmailVerified = isVerified;
+      
+      if ((phone == null || phone.isEmpty) && isVerified) {
+        debugPrint('🟠 AuthService.login: Profile incomplete and verified, setting flag');
+        _needsProfileCompletion = true;
+        _pendingUserId = _userId;
+        _pendingEmail = _userEmail;
+        _pendingName = _userName;
+      } else {
+        _clearpendingProfileState();
+      }
 
       // Ensure admin profile exists for known admin emails
       try {
@@ -670,6 +727,7 @@ class AuthService extends ChangeNotifier {
   Future<bool> updateUserPasswordAndPhone({
     required String phoneNumber,
     required String password,
+    String? email,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -690,7 +748,7 @@ class AuthService extends ChangeNotifier {
       // 2. Update name and phone in database
       await SupabaseDatabase.createUserIfNotExists(
         userId: user.id,
-        email: user.email ?? '',
+        email: email ?? user.email ?? _userEmail,
         name: _userName,
         phoneNumber: phoneNumber,
       );
@@ -728,7 +786,7 @@ class AuthService extends ChangeNotifier {
   }
 
   void switchToFarmerMode() {
-    if (_isSeller) {
+    if (_isSeller && !_isViewingAsFarmer) {
       _isViewingAsFarmer = true;
       _persistCachedUserState();
       notifyListeners();
@@ -891,9 +949,9 @@ class AuthService extends ChangeNotifier {
 
       if (isIncompleteProfile) {
         _needsProfileCompletion = true;
-        _pendingGoogleUserId = user.id;
-        _pendingGoogleEmail = user.email ?? '';
-        _pendingGoogleName =
+        _pendingUserId = user.id;
+        _pendingEmail = user.email ?? '';
+        _pendingName =
             user.userMetadata?['full_name'] ?? googleUser.displayName ?? '';
         _isLoading = false;
         notifyListeners();
@@ -947,7 +1005,7 @@ class AuthService extends ChangeNotifier {
     return 'Google Sign-In failed.';
   }
 
-  Future<bool> completeGoogleProfile({
+  Future<bool> completeProfile({
     required String phoneNumber,
     required String password,
   }) async {
@@ -964,25 +1022,25 @@ class AuthService extends ChangeNotifier {
       }
 
       await SupabaseDatabase.createUserIfNotExists(
-        userId: _pendingGoogleUserId,
-        email: _pendingGoogleEmail,
-        name: _pendingGoogleName,
+        userId: _pendingUserId,
+        email: _pendingEmail,
+        name: _pendingName,
         phoneNumber: phoneNumber,
-        emailVerified: true,
+        emailVerified: true, // If we reach here, they must be verified or have a session
       );
 
       await _client.auth.updateUser(UserAttributes(password: password));
 
-      final roles = await SupabaseDatabase.getUserRoles(_pendingGoogleUserId);
-      _userId = _pendingGoogleUserId;
-      _userEmail = _pendingGoogleEmail;
-      _userName = _pendingGoogleName;
+      final roles = await SupabaseDatabase.getUserRoles(_pendingUserId);
+      _userId = _pendingUserId;
+      _userEmail = _pendingEmail;
+      _userName = _pendingName;
       _needsProfileCompletion = false;
       _isSeller = roles.contains('seller') || roles.contains('farmer');
       _isAdmin = await _resolveAdminStatus(
-        _pendingGoogleUserId,
+        _pendingUserId,
         roles,
-        email: _pendingGoogleEmail,
+        email: _pendingEmail,
       );
       _isLoggedIn = true;
 
@@ -1025,18 +1083,8 @@ class AuthService extends ChangeNotifier {
         await GoogleSignIn().signOut();
       } catch (_) {}
 
-      _regStatusSubscription?.cancel();
-      _regStatusSubscription = null;
       await _client.auth.signOut();
-      _isLoggedIn = false;
-      _userId = '';
-      _userName = '';
-      _userEmail = '';
-      _isSeller = false;
-      _isViewingAsFarmer = false;
-      _isAdmin = false;
-      _registrationStatus = null;
-      _clearPendingGoogleProfileState();
+      _resetSessionState();
       if (previousUserId.isNotEmpty) {
         await _clearCachedUserState(previousUserId);
       }

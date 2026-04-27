@@ -87,6 +87,56 @@ class OrderService {
     }
   }
 
+  /// Get order items
+  Future<List<OrderItem>> getOrderItems(String orderId) async {
+    try {
+      // Joining with products to get name and image
+      final response = await _supabase
+          .from('order_items')
+          .select('*, products(name, products:product_images(image_url))')
+          .eq('order_id', orderId);
+
+      return (response as List<dynamic>).map((item) {
+        final product = item['products'] as Map<String, dynamic>?;
+        final images = product?['products'] as List<dynamic>?;
+        final imageUrl = images != null && images.isNotEmpty
+            ? images.first['image_url'] as String?
+            : null;
+
+        return OrderItem(
+          orderItemId: item['order_item_id'].toString(),
+          orderId: item['order_id'].toString(),
+          productId: item['product_id'].toString(),
+          quantity: (item['quantity'] as num).toDouble(),
+          unitPrice: (item['unit_price'] as num).toDouble(),
+          createdAt: DateTime.parse(item['created_at']),
+          productName: product?['name']?.toString(),
+          productImage: imageUrl,
+          subtotal: (item['subtotal'] as num?)?.toDouble(),
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Failed to fetch order items: $e');
+      return [];
+    }
+  }
+
+  /// Get delivery address for an order
+  Future<Map<String, dynamic>?> getDeliveryAddress(String addressId) async {
+    try {
+      final response = await _supabase
+          .from('delivery_addresses')
+          .select()
+          .eq('address_id', addressId)
+          .maybeSingle();
+
+      return response;
+    } catch (e) {
+      debugPrint('Failed to fetch delivery address: $e');
+      return null;
+    }
+  }
+
   /// Create new order
   Future<Order> createOrder({
     required String farmerId,
@@ -112,17 +162,6 @@ class OrderService {
         (sum, item) => sum + (item.quantity * item.unitPrice),
       );
 
-      final productIds = items.map((item) => item.productId).toSet().toList();
-      final productsResponse = await _supabase
-          .from('products')
-          .select('product_id, name')
-          .inFilter('product_id', productIds);
-
-      final productNameById = <String, String>{
-        for (final row in (productsResponse as List<dynamic>))
-          (row['product_id'] as String): (row['name'] as String? ?? 'Product'),
-      };
-
       // Generate unique order number
       final orderNumber = 'ORD-${DateTime.now().millisecondsSinceEpoch}';
 
@@ -138,6 +177,7 @@ class OrderService {
             'subtotal': subtotal,
             'total_amount': subtotal,
             'payment_method': normalizedMethod,
+            'delivery_method': normalizedMethod == 'COP' ? 'pickup' : 'delivery',
             'delivery_fee': 0.0,
             if (specialInstructions != null &&
                 specialInstructions.trim().isNotEmpty)
@@ -154,7 +194,6 @@ class OrderService {
             (item) => {
               'order_id': orderId,
               'product_id': item.productId,
-              'product_name': productNameById[item.productId] ?? 'Product',
               'quantity': item.quantity,
               'unit_price': item.unitPrice,
               'subtotal': item.quantity * item.unitPrice,
@@ -363,26 +402,6 @@ class OrderService {
       ...result,
       'product': {'product_id': productId, 'name': product['name']},
     };
-  }
-
-  // ============================================================================
-  // ORDER ITEMS OPERATIONS
-  // ============================================================================
-
-  /// Get order items
-  Future<List<OrderItem>> getOrderItems(String orderId) async {
-    try {
-      final response = await _supabase
-          .from('v_order_items')
-          .select()
-          .eq('order_id', orderId);
-
-      return (response as List<dynamic>)
-          .map((json) => OrderItem.fromJson(json as Map<String, dynamic>))
-          .toList();
-    } catch (e) {
-      throw Exception('Failed to fetch order items: $e');
-    }
   }
 
   Future<String> _getCurrentCustomerId() async {

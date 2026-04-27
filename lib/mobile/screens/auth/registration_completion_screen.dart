@@ -65,11 +65,12 @@ class _RegistrationCompletionScreenState
     setState(() => _isLoading = true);
 
     try {
-      // 1. Update the user password in Supabase Auth
-      // User is already logged in with temporary password at this point
+      // 1. Update the user password and phone in database
+      // Pass the email to ensure it's not wiped in the upsert
       final success = await AuthService().updateUserPasswordAndPhone(
         phoneNumber: phone,
         password: password,
+        email: widget.email,
       );
 
       if (mounted) {
@@ -127,44 +128,8 @@ class _RegistrationCompletionScreenState
               Text('Complete Your Profile', style: AppTextStyles.headline1),
               const SizedBox(height: 8),
               Text(
-                'Your email is verified. Add your phone number and set your password to continue.',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textSubtle,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.2),
-                    ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.verified_rounded,
-                      color: AppColors.primary,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        widget.email,
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textHeadline,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
+                'Set up your secure password and phone number to start using AgriDirect.',
+                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
               ),
               const SizedBox(height: 40),
 
@@ -172,29 +137,26 @@ class _RegistrationCompletionScreenState
               const SizedBox(height: 8),
               _buildTextField(
                 controller: _phoneController,
-                hintText: 'e.g. +639123456789',
-                prefixIcon: Icons.phone_outlined,
+                hintText: 'Enter phone number',
+                prefixIcon: Icons.phone_android_rounded,
                 keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 24),
 
-              _buildInputLabel('Password'),
+              _buildInputLabel('Create Password'),
               const SizedBox(height: 8),
               _buildTextField(
                 controller: _passwordController,
-                hintText: 'Create a password',
+                hintText: 'Enter strong password',
                 prefixIcon: Icons.lock_outline_rounded,
                 obscureText: _obscurePassword,
                 suffixIcon: IconButton(
                   icon: Icon(
-                    _obscurePassword
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
+                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                     size: 20,
                     color: AppColors.textSubtle,
                   ),
-                  onPressed: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
+                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                 ),
               ),
               const SizedBox(height: 24),
@@ -203,20 +165,16 @@ class _RegistrationCompletionScreenState
               const SizedBox(height: 8),
               _buildTextField(
                 controller: _confirmPasswordController,
-                hintText: 'Confirm your password',
-                prefixIcon: Icons.lock_outline_rounded,
+                hintText: 'Re-enter password',
+                prefixIcon: Icons.lock_reset_rounded,
                 obscureText: _obscureConfirmPassword,
                 suffixIcon: IconButton(
                   icon: Icon(
-                    _obscureConfirmPassword
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
+                    _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                     size: 20,
                     color: AppColors.textSubtle,
                   ),
-                  onPressed: () => setState(
-                    () => _obscureConfirmPassword = !_obscureConfirmPassword,
-                  ),
+                  onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                 ),
               ),
               const SizedBox(height: 48),
@@ -226,27 +184,19 @@ class _RegistrationCompletionScreenState
                 height: 56,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _handleFinalize,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                  style: AppDecorations.primaryButton.copyWith(
+                    shape: WidgetStateProperty.all(
+                      RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
                   ),
                   child: _isLoading
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: AppShimmerLoader(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
+                      ? const AppShimmerLoader(size: 24)
                       : Text(
-                          'Complete Setup',
+                          'Finish Registration',
                           style: AppTextStyles.bodyLarge.copyWith(
+                            fontSize: 16,
                             color: Colors.white,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                 ),
@@ -307,4 +257,3 @@ class _RegistrationCompletionScreenState
     );
   }
 }
-

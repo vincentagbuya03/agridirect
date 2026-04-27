@@ -74,6 +74,37 @@ class OTPService {
     }
   }
 
+  /// Get the remaining time for the latest active OTP of a specific type.
+  /// Returns null when no active code exists.
+  Future<int?> getActiveOTPTimeRemaining({
+    required String userId,
+    required String type,
+  }) async {
+    try {
+      final normalizedType = _normalizeVerificationType(type);
+      final response = await _client
+          .from('verification_codes')
+          .select('expires_at')
+          .eq('user_id', userId)
+          .eq('verification_type', normalizedType)
+          .filter('used_at', 'is', null)
+          .gt('expires_at', DateTime.now().toUtc().toIso8601String())
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      final expiresAt = DateTime.parse(response['expires_at'] as String);
+      final secondsRemaining = expiresAt.difference(DateTime.now()).inSeconds;
+
+      return secondsRemaining > 0 ? secondsRemaining : 0;
+    } catch (e) {
+      debugPrint('❌ Error getting active OTP time remaining: $e');
+      return null;
+    }
+  }
+
   /// Verify OTP code using the Database RPC
   /// If successful, the DB automatically marks the user's email as verified.
   Future<Map<String, dynamic>> verifyOTP({

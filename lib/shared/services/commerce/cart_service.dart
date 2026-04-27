@@ -23,6 +23,7 @@ class CartService extends ChangeNotifier {
       _items[index].quantity += quantity;
     } else {
       _items.add(CartItem(
+        farmerId: product.farmerId ?? '',
         productId: product.productId!,
         name: product.name,
         farm: product.farm,

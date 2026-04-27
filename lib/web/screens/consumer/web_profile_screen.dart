@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/router/app_router.dart';
@@ -128,12 +129,18 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
-                    onTap: () {
-                      // Note: In a real app we'd use url_launcher to open a real download link
+                    onTap: () async {
                       Navigator.of(ctx).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Redirecting to download...')),
-                      );
+                      final uri = Uri.parse('/AgriDirect-Installer.apk');
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, webOnlyWindowName: '_self');
+                      } else {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Could not start download.')),
+                          );
+                        }
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 14),

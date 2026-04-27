@@ -135,7 +135,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     }
 
     try {
-      await AuthService().initialize();
+      await AuthService().initialize(event: AuthChangeEvent.initialSession);
     } catch (e) {
       debugPrint('⚠️ Auth initialization error: $e');
     }
@@ -258,14 +258,14 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
 
       if (event == AuthChangeEvent.signedIn) {
         debugPrint('🔵 User signed in, initializing auth service...');
-        await _auth.initialize();
+        await _auth.initialize(event: event);
       } else if (event == AuthChangeEvent.signedOut) {
         debugPrint('🟠 User signed out, cleaning up...');
-        await _auth.initialize();
+        await _auth.initialize(event: event);
       } else if (event == AuthChangeEvent.tokenRefreshed ||
           event == AuthChangeEvent.userUpdated ||
           event == AuthChangeEvent.initialSession) {
-        await _auth.initialize();
+        await _auth.initialize(event: event);
       }
     });
   }

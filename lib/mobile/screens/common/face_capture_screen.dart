@@ -34,6 +34,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
     options: FaceDetectorOptions(
       enableContours: false,
       enableLandmarks: true,
+      enableClassification: true,
       performanceMode: FaceDetectorMode.fast,
     ),
   );
@@ -138,12 +139,14 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
           imageHeight: image.height.toDouble(),
         );
 
+        final isClear = _hasClearFace(face);
+
         setState(() {
           _faceDetected = true;
-          _faceCentered = isCentered;
+          _faceCentered = isCentered && isClear;
         });
 
-        if (isCentered) {
+        if (isCentered && isClear) {
           if (!_countdownActive) {
             _startCountdown();
           }
@@ -153,11 +156,16 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
             _progress = (3 - _countdownSeconds) / 3.0;
           });
         } else {
-          // Face detected but not centered — reset countdown
+          // Face detected but not centered or clear — reset countdown
           _resetCountdown();
           setState(() {
-            _statusText = 'Center your face';
-            _guidanceText = _getCenteringGuidance(face, image.width.toDouble(), image.height.toDouble());
+            if (!isCentered) {
+              _statusText = 'Center your face';
+              _guidanceText = _getCenteringGuidance(face, image.width.toDouble(), image.height.toDouble());
+            } else {
+              _statusText = 'Face obscured';
+              _guidanceText = _getClearFaceGuidance(face);
+            }
             _progress = 0.0;
           });
         }
@@ -245,12 +253,76 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
     final dx = faceCenterX - ovalCenterX;
     final dy = faceCenterY - ovalCenterY;
 
-    // Front camera is mirrored, so directions are flipped for X
+    // Front camera is mirrored in the preview (Transform.scale), 
+    // and the raw image buffer from the stream is also usually mirrored for front cameras.
+    // If the person appears on the LEFT of the screen, they need to move RIGHT.
+    // Given the mirrored preview, we flip the horizontal guidance logic.
     if (dx.abs() > dy.abs()) {
-      return dx > 0 ? 'Move your face left' : 'Move your face right';
+      return dx > 0 ? 'Move your face right' : 'Move your face left';
     } else {
       return dy > 0 ? 'Move your face up' : 'Move your face down';
     }
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Face clarity check (glasses/masks)
+  // ────────────────────────────────────────────────────────────
+  bool _hasClearFace(Face face) {
+    // Check if eyes are open and clearly visible.
+    // If wearing sunglasses or heavy frames with glare, ML Kit might return null or low probability.
+    // We increase this threshold significantly (0.85) to force users to remove glasses
+    // since even clear glasses usually drop the probability below 0.8 due to reflections/frames.
+    final leftEye = face.leftEyeOpenProbability;
+    final rightEye = face.rightEyeOpenProbability;
+
+    if (leftEye == null || rightEye == null) return false;
+    if (leftEye < 0.85 || rightEye < 0.85) return false;
+
+    // Check if essential landmarks are detected to prevent masks/coverings.
+    final nose = face.landmarks[FaceLandmarkType.noseBase];
+    final bottomMouth = face.landmarks[FaceLandmarkType.bottomMouth];
+    final leftCheek = face.landmarks[FaceLandmarkType.leftCheek];
+    final rightCheek = face.landmarks[FaceLandmarkType.rightCheek];
+    
+    if (nose == null || bottomMouth == null || leftCheek == null || rightCheek == null) {
+      return false;
+    }
+
+    // Ensure face is mostly straight (not tilted away)
+    // Euler X is up/down tilt, Y is left/right turn, Z is sideways tilt
+    if ((face.headEulerAngleX ?? 0).abs() > 10 || 
+        (face.headEulerAngleY ?? 0).abs() > 15 || 
+        (face.headEulerAngleZ ?? 0).abs() > 15) {
+      return false;
+    }
+
+    return true;
+  }
+
+  String _getClearFaceGuidance(Face face) {
+    if ((face.headEulerAngleX ?? 0).abs() > 10 || 
+        (face.headEulerAngleY ?? 0).abs() > 15 || 
+        (face.headEulerAngleZ ?? 0).abs() > 15) {
+      return 'Look straight at the camera';
+    }
+
+    final leftEye = face.leftEyeOpenProbability;
+    final rightEye = face.rightEyeOpenProbability;
+
+    if (leftEye == null || rightEye == null || leftEye < 0.85 || rightEye < 0.85) {
+      return 'Please remove glasses and keep eyes open';
+    }
+
+    final nose = face.landmarks[FaceLandmarkType.noseBase];
+    final bottomMouth = face.landmarks[FaceLandmarkType.bottomMouth];
+    final leftCheek = face.landmarks[FaceLandmarkType.leftCheek];
+    final rightCheek = face.landmarks[FaceLandmarkType.rightCheek];
+    
+    if (nose == null || bottomMouth == null || leftCheek == null || rightCheek == null) {
+      return 'Please remove any mask or face covering';
+    }
+
+    return 'Please remove glasses or face coverings';
   }
 
   // ────────────────────────────────────────────────────────────
@@ -370,12 +442,9 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
           // Camera preview
           if (_isCameraReady && _controller != null)
             Center(
-              child: Transform.scale(
-                scaleX: -1, // mirror front camera
-                child: AspectRatio(
-                  aspectRatio: 1 / _controller!.value.aspectRatio,
-                  child: CameraPreview(_controller!),
-                ),
+              child: AspectRatio(
+                aspectRatio: 1 / _controller!.value.aspectRatio,
+                child: CameraPreview(_controller!),
               ),
             )
           else

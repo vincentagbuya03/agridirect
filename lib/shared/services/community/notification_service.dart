@@ -181,7 +181,7 @@ class NotificationService {
   }
 
   // Save FCM token to database
-  Future<void> _saveFCMTokenToDatabase(String token) async {
+  Future<void> _saveFCMTokenToDatabase(String token, {int retryCount = 0}) async {
     try {
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) {
@@ -222,6 +222,12 @@ class NotificationService {
 
       debugPrint('FCM token saved to database');
     } catch (e) {
+      // If it's a foreign key error (users profile not created yet), retry once after a delay
+      if (e.toString().contains('23503') && retryCount < 1) {
+        debugPrint('⚠️ User profile not found yet, retrying FCM token save in 2s...');
+        await Future.delayed(const Duration(seconds: 2));
+        return _saveFCMTokenToDatabase(token, retryCount: retryCount + 1);
+      }
       debugPrint('Error saving FCM token: $e');
     }
   }

@@ -7,6 +7,7 @@ class ProductItem {
   final String? farmerId;
   final String? farmerName;
   final String? farmerAvatarUrl;
+  final String? farmerImageUrl;
   final String name;
   final String farm;
   final String price;
@@ -28,6 +29,7 @@ class ProductItem {
     this.farmerId,
     this.farmerName,
     this.farmerAvatarUrl,
+    this.farmerImageUrl,
     required this.name,
     required this.farm,
     required this.price,
@@ -62,6 +64,7 @@ class CategoryItem {
 
 class ForumPostItem {
   final String id;
+  final String? userId;
   final String userName;
   final String time;
   final String title;
@@ -74,6 +77,7 @@ class ForumPostItem {
 
   const ForumPostItem({
     required this.id,
+    this.userId,
     required this.userName,
     required this.time,
     required this.title,
@@ -105,6 +109,7 @@ class ArticleItem {
 }
 
 class CartItem {
+  final String farmerId;
   final String productId;
   final String name;
   final String farm;
@@ -114,6 +119,7 @@ class CartItem {
   int quantity;
 
   CartItem({
+    required this.farmerId,
     required this.productId,
     required this.name,
     required this.farm,

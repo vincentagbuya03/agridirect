@@ -118,7 +118,11 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
     if (mounted) {
       setState(() => _isLoading = false);
       if (success) {
-        widget.onLoginSuccess();
+        if (AuthService().needsProfileCompletion) {
+          context.push(AppRoutes.completeProfile);
+        } else {
+          widget.onLoginSuccess();
+        }
       } else {
         _showErrorModal(
           'Login Failed',
@@ -142,7 +146,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
       setState(() => _isGoogleLoading = false);
       if (success) {
         if (AuthService().needsProfileCompletion) {
-          context.push(AppRoutes.googleCompleteProfile);
+          context.push(AppRoutes.completeProfile);
         } else {
           widget.onLoginSuccess();
         }

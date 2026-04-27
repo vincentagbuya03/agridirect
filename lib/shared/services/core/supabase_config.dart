@@ -116,70 +116,48 @@ class SupabaseDatabase {
       debugPrint('🔵 createUserIfNotExists called');
       debugPrint('🔵 userId: $userId');
 
-      // Check if user already exists
-      final existing = await _client
-          .from('users')
-          .select('user_id')
-          .eq('user_id', userId)
-          .maybeSingle();
+      // 🔵 Always use upsert to avoid "duplicate key" errors in race conditions
+      final userData = {
+        'user_id': userId,
+        'email': email,
+        'name': name,
+        'email_verified': emailVerified,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      
+      if (phoneNumber != null && phoneNumber.isNotEmpty) {
+        userData['phone'] = phoneNumber;
+      }
 
-      if (existing == null) {
-        debugPrint('🔵 User does not exist, inserting...');
-        final userData = {
-          'user_id': userId,
-          'email': email,
-          'name': name,
-          'email_verified': emailVerified,
-          'created_at': DateTime.now().toIso8601String(),
-        };
-        if (phoneNumber != null && phoneNumber.isNotEmpty) {
-          userData['phone'] = phoneNumber;
-        }
-        await _client.from('users').insert(userData);
-        debugPrint('✅ User inserted successfully');
+      debugPrint('🔵 Upserting user profile for $userId');
+      await _client.from('users').upsert(userData, onConflict: 'user_id');
 
-        // Auto-create customer profile
-        await _client.from('customers').insert({
+      // Ensure customer profile exists using upsert
+      await _client.from('customers').upsert({
+        'user_id': userId,
+        'is_active': true,
+      }, onConflict: 'user_id');
+
+      // Auto-assign customer role
+      try {
+        await addUserRole(userId: userId, roleName: 'customer');
+      } catch (e) {
+        debugPrint('⚠️ Warning: Failed to assign customer role: $e');
+      }
+
+      // Auto-create admin if this is an admin email
+      final cleanEmail = email.trim().toLowerCase();
+      if (cleanEmail == 'noreplyagridirect@gmail.com') {
+        await _client.from('admins').upsert({
           'user_id': userId,
+          'role_level': 3,
           'is_active': true,
-        });
-
-        // Auto-assign customer role
+        }, onConflict: 'user_id');
+        
         try {
-          await addUserRole(userId: userId, roleName: 'customer');
+          await addUserRole(userId: userId, roleName: 'admin');
         } catch (e) {
-          debugPrint('⚠️ Warning: Failed to assign customer role: $e');
-        }
-
-        // Auto-create admin if this is an admin email
-        final cleanEmail = email.trim().toLowerCase();
-        if (cleanEmail == 'noreplyagridirect@gmail.com') {
-          await _client.from('admins').insert({
-            'user_id': userId,
-            'role_level': 3,
-            'is_active': true,
-          });
-          try {
-            await addUserRole(userId: userId, roleName: 'admin');
-          } catch (e) {
-            debugPrint('⚠️ Warning: Failed to assign admin role: $e');
-          }
-        }
-      } else if (emailVerified) {
-        await _client
-            .from('users')
-            .update({'email_verified': true})
-            .eq('user_id', userId);
-      } else {
-        final updateData = <String, String>{};
-        if (name.isNotEmpty) {
-          updateData['name'] = name;
-        }
-        if (phoneNumber != null && phoneNumber.isNotEmpty) {
-          updateData['phone'] = phoneNumber;
-        }
-        if (updateData.isNotEmpty) {
-          await _client.from('users').update(updateData).eq('user_id', userId);
+          debugPrint('⚠️ Warning: Failed to assign admin role: $e');
         }
       }
     } catch (e) {

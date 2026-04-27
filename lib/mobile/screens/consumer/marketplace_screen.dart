@@ -487,6 +487,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               farmName: product.farm,
               rating: double.tryParse(product.rating ?? '0') ?? 0.0,
               farmerAvatarUrl: product.farmerAvatarUrl,
+              farmerImageUrl: product.farmerImageUrl,
             );
             _cacheService.autoCacheProduct(cachedProduct);
           }
@@ -577,6 +578,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       reviews: '0',
       harvestDays: product.harvestDays.toString(),
       farmerAvatarUrl: product.farmerAvatarUrl,
+      farmerImageUrl: product.farmerImageUrl,
       description: product.description,
     );
   }
@@ -803,6 +805,13 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   String _paymentMethod = 'COD';
   bool _isLoadingAddress = true;
   final OfflineCacheService _cacheService = OfflineCacheService();
+  final _instructionsController = TextEditingController();
+
+  @override
+  void dispose() {
+    _instructionsController.dispose();
+    super.dispose();
+  }
 
   Future<void> _loadAddress() async {
     try {
@@ -861,10 +870,11 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
             left: 24,
             right: 24,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Center(
                 child: Container(
                   width: 48,
@@ -1246,6 +1256,33 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 20),
+              Text(
+                'Special Instructions (Optional)',
+                style: AppTextStyles.headline3.copyWith(
+                  fontSize: 14,
+                  color: AppColors.textHeadline,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _instructionsController,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  hintText: 'e.g. Leave at the gate, call upon arrival...',
+                  hintStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                  filled: true,
+                  fillColor: AppColors.background,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.textHeadline.withValues(alpha: 0.1)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.textHeadline.withValues(alpha: 0.1)),
+                  ),
+                ),
+              ),
               const SizedBox(height: 32),
 
               // Order Summary
@@ -1268,7 +1305,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: (_address == null || _isOrdering)
+                  onPressed: (_paymentMethod == 'COD' && _address == null || _isOrdering)
                       ? null
                       : () {
                           Navigator.pop(sheetContext);
@@ -1294,8 +1331,9 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _showFarmerMapSheet() {
     final lat = widget.product.latitude;
@@ -1603,7 +1641,8 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
           ),
         ],
         paymentMethod: _paymentMethod,
-        deliveryAddressId: _address?.addressId,
+        deliveryAddressId: _paymentMethod == 'COP' ? null : _address?.addressId,
+        specialInstructions: _instructionsController.text.trim(),
       );
 
       if (!mounted) return;
@@ -1754,7 +1793,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     final displayFarmName = (widget.product.farm).trim().isNotEmpty
         ? widget.product.farm.trim()
         : 'Unnamed Farm';
-    final farmerAvatarUrl = (widget.product.farmerAvatarUrl ?? '').trim();
+    final farmerAvatarUrl = (widget.product.farmerImageUrl ?? widget.product.farmerAvatarUrl ?? '').trim();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -2136,7 +2175,10 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                           if (!context.mounted) return;
                           context.push(
                             AppRoutes.customerMessages,
-                            extra: {'farmerId': widget.product.farmerId},
+                            extra: {
+                              'farmerId': widget.product.farmerId,
+                              'product': widget.product,
+                            },
                           );
                         },
                         child: Container(
@@ -2557,6 +2599,17 @@ class _AddressEditorSheetState extends State<AddressEditorSheet> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_latitude == null || _longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select your exact delivery location on the map'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
     try {
       final service = UserService();
@@ -2678,12 +2731,12 @@ class _AddressEditorSheetState extends State<AddressEditorSheet> {
                 decoration: BoxDecoration(
                   color: (_latitude != null && _longitude != null)
                       ? AppColors.primary.withValues(alpha: 0.1)
-                      : AppColors.background,
+                      : AppColors.error.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: (_latitude != null && _longitude != null)
                         ? AppColors.primary.withValues(alpha: 0.2)
-                        : Colors.transparent,
+                        : AppColors.error.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
@@ -2711,10 +2764,11 @@ class _AddressEditorSheetState extends State<AddressEditorSheet> {
                           Text(
                             (_latitude != null && _longitude != null)
                                 ? 'Location Pinned'
-                                : 'No exact location pinned yet.',
+                                : 'Required: Please pin your location',
                             style: AppTextStyles.bodySmall.copyWith(
                               fontSize: 11,
-                              color: AppColors.textSubtle,
+                              fontWeight: (_latitude == null) ? FontWeight.bold : null,
+                              color: (_latitude == null) ? AppColors.error : AppColors.textSubtle,
                             ),
                           ),
                         ],
@@ -2910,6 +2964,13 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
               options: MapOptions(
                 initialCenter: _currentCenter,
                 initialZoom: 16,
+                onTap: (tapPosition, point) {
+                  setState(() {
+                    _currentCenter = point;
+                  });
+                  _mapController.move(point, _mapController.camera.zoom);
+                  _resolveAddress(point);
+                },
                 onPositionChanged: (pos, hasGesture) {
                   if (hasGesture) {
                     setState(() => _currentCenter = pos.center);
@@ -3023,8 +3084,9 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                                 Text(
                                   _isResolving
                                       ? 'Resolving address...'
-                                      : (_resolvedLocation?.fullAddress ??
-                                            'Unknown Location'),
+                                      : (_resolvedLocation?.fullAddress.isNotEmpty == true
+                                          ? _resolvedLocation!.fullAddress
+                                          : 'Location: ${_currentCenter.latitude.toStringAsFixed(4)}, ${_currentCenter.longitude.toStringAsFixed(4)}'),
                                   style: AppTextStyles.bodyMedium.copyWith(
                                     fontWeight: FontWeight.w600,
                                   ),
