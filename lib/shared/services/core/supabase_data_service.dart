@@ -16,6 +16,8 @@ class SupabaseDataService {
   static const String _featuredFarmersCacheKey = 'cache_featured_farmers_v1';
   static const String _forumPostsCacheKey = 'cache_forum_posts_v1';
   static const String _articlesCacheKey = 'cache_articles_v1';
+  static const int _reportContentTypePost = 1;
+  static const int _reportContentTypeArticle = 5;
 
   final _client = SupabaseConfig.client;
 
@@ -789,6 +791,7 @@ class SupabaseDataService {
             .map(
               (post) => {
                 'id': post.id,
+                'user_id': post.userId,
                 'user_name': post.userName,
                 'time': post.time,
                 'title': post.title,
@@ -810,6 +813,7 @@ class SupabaseDataService {
           .map(
             (item) => ForumPostItem(
               id: item['id']?.toString() ?? '',
+              userId: item['user_id']?.toString(),
               userName: item['user_name']?.toString() ?? 'Anonymous',
               time: item['time']?.toString() ?? 'Recently',
               title: item['title']?.toString() ?? '',
@@ -903,6 +907,19 @@ class SupabaseDataService {
     } catch (e) {
       debugPrint('Error toggling post like: $e');
     }
+  }
+
+  Future<void> reportForumPost({
+    required String postId,
+    required String reason,
+    String? description,
+  }) async {
+    await _submitContentReport(
+      contentId: postId,
+      contentTypeId: _reportContentTypePost,
+      reason: reason,
+      description: description,
+    );
   }
 
   /// Upload a forum post image
@@ -1052,11 +1069,22 @@ class SupabaseDataService {
   /// Get all published articles
   Future<List<ArticleItem>> getArticles() async {
     try {
-      final response = await _client
-          .from('v_articles')
-          .select()
-          .eq('published', true)
-          .order('created_at', ascending: false);
+      var query = _client.from('v_articles').select().eq('published', true);
+
+      // Determine user role and filter audience
+      final userId = _client.auth.currentUser?.id;
+      if (userId != null) {
+        final isFarmer = await SupabaseDatabase.hasRole(userId: userId, roleName: 'seller');
+        if (isFarmer) {
+          query = query.inFilter('audience', ['ALL', 'FARMER']);
+        } else {
+          query = query.inFilter('audience', ['ALL', 'CUSTOMER']);
+        }
+      } else {
+        query = query.inFilter('audience', ['ALL', 'CUSTOMER']);
+      }
+
+      final response = await query.order('created_at', ascending: false);
 
       final articles = (response as List)
           .map((item) => _mapToArticleItem(item))
@@ -1067,8 +1095,10 @@ class SupabaseDataService {
         articles
             .map(
               (article) => {
+                'id': article.id,
                 'title': article.title,
                 'excerpt': article.excerpt,
+                'content': article.content,
                 'author': article.author,
                 'read_time': article.readTime,
                 'time': article.time,
@@ -1085,6 +1115,7 @@ class SupabaseDataService {
       return cached
           .map(
             (item) => ArticleItem(
+              id: item['id']?.toString(),
               title: item['title']?.toString() ?? '',
               excerpt: item['excerpt']?.toString() ?? '',
               author: item['author']?.toString() ?? 'AgriDirect',
@@ -1096,6 +1127,19 @@ class SupabaseDataService {
           .where((article) => article.title.isNotEmpty)
           .toList();
     }
+  }
+
+  Future<void> reportArticle({
+    required String articleId,
+    required String reason,
+    String? description,
+  }) async {
+    await _submitContentReport(
+      contentId: articleId,
+      contentTypeId: _reportContentTypeArticle,
+      reason: reason,
+      description: description,
+    );
   }
 
   /// Add a new article
@@ -1132,10 +1176,11 @@ class SupabaseDataService {
     final createdAt = DateTime.tryParse(item['created_at'] ?? '');
     final timeAgo = createdAt != null ? _formatTimeAgo(createdAt) : 'Recently';
 
+    // Use read_time from DB if available, otherwise calculate it
     String readTimeStr = item['read_time']?.toString() ?? '';
     if (readTimeStr.isEmpty) {
       final textContent =
-          '${item['title'] ?? ''} ${item['excerpt'] ?? item['content'] ?? item['body'] ?? ''}';
+          '${item['title'] ?? ''} ${item['summary'] ?? item['excerpt'] ?? item['body'] ?? item['content'] ?? ''}';
       final wordCount = textContent
           .trim()
           .split(RegExp(r'\s+'))
@@ -1146,13 +1191,52 @@ class SupabaseDataService {
     }
 
     return ArticleItem(
+      id: item['article_id']?.toString(),
       title: item['title'] ?? '',
-      excerpt: item['excerpt'] ?? item['content'] ?? '',
-      imageUrl: item['image_url'],
+      excerpt: item['summary'] ?? item['excerpt'] ?? '',
+      content: item['body'] ?? item['content'],
+      imageUrl: item['cover_image_url'] ?? item['image_url'],
       author: item['author_name'] ?? 'AgriDirect',
       readTime: readTimeStr,
       time: timeAgo,
+      audience: item['audience'],
     );
+  }
+
+  Future<void> _submitContentReport({
+    required String contentId,
+    required int contentTypeId,
+    required String reason,
+    String? description,
+  }) async {
+    final reporterId = _client.auth.currentUser?.id;
+    if (reporterId == null || reporterId.isEmpty) {
+      throw Exception('User not authenticated');
+    }
+
+    final existing = await _client
+        .from('reported_content')
+        .select('report_id')
+        .eq('content_id', contentId)
+        .eq('content_type_id', contentTypeId)
+        .eq('reporter_id', reporterId)
+        .inFilter('status', ['pending', 'reviewing'])
+        .maybeSingle();
+
+    if (existing != null) {
+      throw Exception('You already reported this content.');
+    }
+
+    await _client.from('reported_content').insert({
+      'content_id': contentId,
+      'content_type_id': contentTypeId,
+      'reason': reason,
+      'description': description?.trim().isEmpty ?? true
+          ? null
+          : description!.trim(),
+      'status': 'pending',
+      'reporter_id': reporterId,
+    });
   }
 
   // ══════════════════════════════════════════════════════════════════════════

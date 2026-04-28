@@ -160,16 +160,27 @@ class WeatherForecast {
       
       // Parse main alerts
       if (emergency['is_emergency'] == true) {
-        alerts.add(
-          WeatherAlert(
-            title: emergency['title'] ?? '⚠️ Advance Warning',
-            description: emergency['message'] ?? 'Upcoming weather changes detected.',
-            type: emergency['category']?.toLowerCase() ?? 'wind',
-            severity: 0.9,
-            timestamp: emergency['check_time'] ?? DateTime.now().toString(),
-            recommendation: 'Plan your farm activities accordingly to minimize crop loss.',
-          ),
+        // Validate against actual forecast data to prevent false alarms from backend mock data
+        final hasSevereWeather = forecasts.any((f) => 
+            (f.rainProbability != null && f.rainProbability! > 0.3) || 
+            f.windSpeed > 25 || 
+            f.temperature > 38 || 
+            f.description.toLowerCase().contains('rain') ||
+            f.description.toLowerCase().contains('storm')
         );
+
+        if (hasSevereWeather) {
+          alerts.add(
+            WeatherAlert(
+              title: emergency['title'] ?? '⚠️ Advance Warning',
+              description: emergency['message'] ?? 'Upcoming weather changes detected.',
+              type: emergency['category']?.toLowerCase() ?? 'wind',
+              severity: 0.9,
+              timestamp: emergency['check_time'] ?? DateTime.now().toString(),
+              recommendation: 'Plan your farm activities accordingly to minimize crop loss.',
+            ),
+          );
+        }
       }
 
       // Parse daily advisories

@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/supabase_config.dart';
 import '../community/analytics_service.dart';
 import '../offline/network_status_service.dart';
+import 'onboarding_service.dart';
 
 /// Auth Service using Supabase
 /// Handles user registration, login, logout, and seller mode
@@ -77,11 +78,17 @@ class AuthService extends ChangeNotifier {
   static String _adminKey(String userId) => 'auth.isAdmin.$userId';
   static String _nameKey(String userId) => 'auth.userName.$userId';
   static String _avatarKey(String userId) => 'auth.userAvatarUrl.$userId';
+  static String _emailKey(String userId) => 'auth.userEmail.$userId';
+  static String _emailVerifiedKey(String userId) => 'auth.isEmailVerified.$userId';
   static String _viewModeKey(String userId) => 'auth.isViewingAsFarmer.$userId';
   static String _regStatusKey(String userId) =>
       'auth.registrationStatus.$userId';
   static String _pendingRegistrationKey(String email) =>
       'auth.pendingRegistration.${email.trim().toLowerCase()}';
+
+  // Global keys for offline session recovery
+  static const String _isLoggedInKeyGlobal = 'auth.isLoggedIn.global';
+  static const String _lastUserIdKeyGlobal = 'auth.lastUserId.global';
 
   static String generateOneTimeRegistrationPassword() {
     const chars =
@@ -134,6 +141,8 @@ class AuthService extends ChangeNotifier {
       _isSeller = prefs.getBool(_sellerKey(userId)) ?? _isSeller;
       _isAdmin = prefs.getBool(_adminKey(userId)) ?? _isAdmin;
       _userName = prefs.getString(_nameKey(userId)) ?? _userName;
+      _userEmail = prefs.getString(_emailKey(userId)) ?? _userEmail;
+      _isEmailVerified = prefs.getBool(_emailVerifiedKey(userId)) ?? _isEmailVerified;
       _userAvatarUrl = prefs.getString(_avatarKey(userId)) ?? _userAvatarUrl;
       _isViewingAsFarmer =
           prefs.getBool(_viewModeKey(userId)) ?? _isViewingAsFarmer;
@@ -161,18 +170,24 @@ class AuthService extends ChangeNotifier {
     if (_userId.isEmpty) return;
     try {
       final prefs = await SharedPreferences.getInstance();
+      // Persist global login state for offline recovery
+      await prefs.setBool(_isLoggedInKeyGlobal, _isLoggedIn);
+      await prefs.setString(_lastUserIdKeyGlobal, _userId);
+      
+      // Ensure onboarding is marked complete if we have a session
+      await OnboardingService.completeOnboarding();
+
       await prefs.setBool(_sellerKey(_userId), _isSeller);
       await prefs.setBool(_adminKey(_userId), _isAdmin);
       await prefs.setString(_nameKey(_userId), _userName);
+      await prefs.setString(_emailKey(_userId), _userEmail);
+      await prefs.setBool(_emailVerifiedKey(_userId), _isEmailVerified);
       await prefs.setString(_avatarKey(_userId), _userAvatarUrl);
       await prefs.setBool(_viewModeKey(_userId), _isViewingAsFarmer);
-      // Only update if not null, OR if explicitly nulling out (like on logout)
+      
       if (_registrationStatus != null) {
         await prefs.setString(_regStatusKey(_userId), _registrationStatus!);
       }
-      // Note: We don't remove the key on null here anymore to prevent 
-      // temporary fetch failures from wiping the local cache.
-      // Explicit removal happens in the logout() method.
     } catch (e) {
       debugPrint('Failed to persist cached auth state: $e');
     }
@@ -187,6 +202,8 @@ class AuthService extends ChangeNotifier {
       await prefs.remove(_avatarKey(userId));
       await prefs.remove(_viewModeKey(userId));
       await prefs.remove(_regStatusKey(userId));
+      await prefs.remove(_emailKey(userId));
+      await prefs.remove(_emailVerifiedKey(userId));
     } catch (e) {
       debugPrint('Failed to clear cached auth state: $e');
     }
@@ -321,15 +338,51 @@ class AuthService extends ChangeNotifier {
     final user = _client.auth.currentUser;
 
     // Proceed if user exists - our custom verification flow handles the confirmed status
-    if (user != null) {
-      _userId = user.id;
-      final sessionEmail = user.email;
-      
-      // Use session email if available, otherwise stay with current email or wait for profile
-      if (sessionEmail != null && sessionEmail.isNotEmpty) {
-        _userEmail = sessionEmail;
+    if (user == null) {
+      // 🟢 OFFLINE RECOVERY LOGIC
+      // If we are offline and were previously logged in, stay logged in to allow browsing cached data.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final wasLoggedIn = prefs.getBool(_isLoggedInKeyGlobal) ?? false;
+        final lastUserId = prefs.getString(_lastUserIdKeyGlobal);
+
+        if (wasLoggedIn && lastUserId != null) {
+          final isOnline = await NetworkStatusService().isOnline().timeout(
+            const Duration(seconds: 3),
+            onTimeout: () => false, // 🟢 Assume OFFLINE on timeout for safer recovery
+          );
+
+          if (!isOnline) {
+            debugPrint('🟠 AuthService: Offline recovery for $lastUserId');
+            _userId = lastUserId;
+            _isLoggedIn = true;
+            await _restoreCachedUserState(lastUserId);
+            notifyListeners();
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('Offline recovery check failed: $e');
       }
-      
+
+      // If we reach here, it's either online and user is null (real logout)
+      // or we have no cached session to recover.
+      _resetSessionState();
+      notifyListeners();
+      return;
+    }
+
+    // If we have a user from Supabase, proceed normally
+    _userId = user.id;
+    final sessionEmail = user.email;
+    
+    // Use session email if available
+    if (sessionEmail != null && sessionEmail.isNotEmpty) {
+      _userEmail = sessionEmail;
+    }
+
+    // Check if email is confirmed
+    if (user.emailConfirmedAt != null) {
       _isLoggedIn = true;
       _isSeller = false;
       _isViewingAsFarmer = false;
@@ -354,9 +407,7 @@ class AuthService extends ChangeNotifier {
         _userName = cachedName.isNotEmpty
             ? cachedName
             : (user.userMetadata?['name'] as String?) ?? '';
-        _isSeller = _isSeller;
-        _isAdmin = _isAdmin;
-        _isViewingAsFarmer = _isSeller ? _isViewingAsFarmer : false;
+        // Keep roles as they were from cache
         await _persistCachedUserState();
         notifyListeners();
         return;
@@ -402,6 +453,7 @@ class AuthService extends ChangeNotifier {
           _pendingName = (profile['name'] as String?) ?? '';
         }
       }
+      
       // If profile has an email and our current email is empty, recover it
       final dbEmail = (profile?['email'] as String?) ?? '';
       if (_userEmail.isEmpty && dbEmail.isNotEmpty) {
@@ -447,55 +499,39 @@ class AuthService extends ChangeNotifier {
           _isViewingAsFarmer = false;
         }
 
-        // Fetch registration status and start watching
+        // Fetch registration status and watch
         final reg = await SupabaseDatabase.getFarmerRegistration(user.id);
         if (reg != null) {
           _registrationStatus = reg['status'] as String?;
-          // Double protection: if database confirms approved OR verified, ensure seller flag is set
           if (_registrationStatus == 'approved' || reg['is_verified'] == true) {
             _isSeller = true;
           }
-        } else {
-          debugPrint('Registration status fetch returned null, keeping cached: $_registrationStatus');
         }
         _startWatchingRegistrationStatus(user.id);
       } catch (e) {
-        debugPrint(
-          'Error fetching roles/status on initialize, using cache: $e',
-        );
+        debugPrint('Error fetching roles/status on initialize: $e');
       }
 
-      // If seller status exists locally but sync may have failed, retry
+      // Sync seller role if missing
       if (_isSeller) {
         try {
-          // Check if farmer record exists in database
-          final exists = await SupabaseDatabase.hasRole(
-            userId: user.id,
-            roleName: 'seller',
-          );
+          final exists = await SupabaseDatabase.hasRole(userId: user.id, roleName: 'seller');
           if (!exists) {
-            debugPrint(
-              'Seller marked locally but missing in DB, retrying sync...',
-            );
             await SupabaseDatabase.addUserRole(userId: user.id, roleName: 'seller');
           }
         } catch (e) {
-          debugPrint('Retry seller sync failed (offline?): $e');
-          // Keep isSeller=true locally even if sync fails
+          debugPrint('Retry seller sync failed: $e');
         }
       }
 
       await _persistCachedUserState();
       await AnalyticsService().startSession(userId: user.id);
       notifyListeners();
-    } else if (user != null && user.emailConfirmedAt == null) {
+    } else {
       // User exists but email not confirmed - sign them out
       try {
         await _client.auth.signOut();
       } catch (_) {}
-      _resetSessionState();
-      notifyListeners();
-    } else {
       _resetSessionState();
       notifyListeners();
     }
@@ -1082,6 +1118,11 @@ class AuthService extends ChangeNotifier {
       try {
         await GoogleSignIn().signOut();
       } catch (_) {}
+
+      // Clear global login state
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_isLoggedInKeyGlobal);
+      await prefs.remove(_lastUserIdKeyGlobal);
 
       await _client.auth.signOut();
       _resetSessionState();

@@ -91,21 +91,38 @@ class ForumPostItem {
 }
 
 class ArticleItem {
+  final String? id;
   final String title;
   final String excerpt;
+  final String? content;
+  final List<String>? keyInsights;
   final String author;
   final String readTime;
   final String time;
   final String? imageUrl;
+  final String? audience;
 
   const ArticleItem({
+    this.id,
     required this.title,
     required this.excerpt,
-    this.author = 'AgriDirect',
-    this.readTime = '4 min read',
-    this.time = 'Recently',
+    this.content,
+    this.keyInsights,
+    required this.author,
+    required this.readTime,
+    required this.time,
     this.imageUrl,
+    this.audience,
   });
+
+  /// Dynamically calculates the read time based on word count
+  /// Average reading speed: 200 words per minute
+  String get calculatedReadTime {
+    final fullText = '${excerpt} ${content ?? ''}';
+    final words = fullText.split(RegExp(r'\s+')).length;
+    final minutes = (words / 200).ceil();
+    return '$minutes min read';
+  }
 }
 
 class CartItem {

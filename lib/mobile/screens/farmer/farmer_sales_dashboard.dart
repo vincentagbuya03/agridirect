@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/integration/weather_service.dart';
 import '../../../shared/models/weather_model.dart';
 import '../../../shared/styles/app_theme.dart';
@@ -695,45 +696,74 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
   Widget _buildWeatherQuickGlance() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Icon(
-            _getAlertIcon(_weatherData!.description.toLowerCase()),
-            color: AppColors.primary,
-            size: 24,
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _getAlertIcon(_weatherData!.description.toLowerCase()),
+              color: Colors.white,
+              size: 24,
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   _weatherData!.location,
-                  style: AppTextStyles.labelSmall.copyWith(
+                  style: GoogleFonts.plusJakartaSans(
                     color: AppColors.textHeadline,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   _weatherData!.description,
-                  style: AppTextStyles.bodySmall.copyWith(
+                  style: GoogleFonts.plusJakartaSans(
                     color: AppColors.textSubtle,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
                   ),
                 ),
               ],
             ),
           ),
-          Text(
-            '${_weatherData!.temperature.toStringAsFixed(0)}°',
-            style: AppTextStyles.headline2.copyWith(
-              color: AppColors.primary,
-              fontSize: 24,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              '${_weatherData!.temperature.toStringAsFixed(0)}°C',
+              style: GoogleFonts.plusJakartaSans(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w900,
+                fontSize: 20,
+              ),
             ),
           ),
         ],
@@ -905,28 +935,36 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       return Container();
     }
 
-    // Check for both current alerts and advance forecast alerts
     final currentAlerts = _weatherData!.alerts;
     final forecastAlerts = _weatherForecast?.alerts ?? [];
     
     final isAlert = currentAlerts.isNotEmpty || forecastAlerts.isNotEmpty;
     final color = isAlert ? AppColors.warning : AppColors.primary;
+    final gradientColors = isAlert 
+        ? [AppColors.warning.withValues(alpha: 0.15), AppColors.warning.withValues(alpha: 0.05)]
+        : [AppColors.primary.withValues(alpha: 0.15), AppColors.primary.withValues(alpha: 0.05)];
 
-    // Use the most relevant alert (Emergency first, then Advance Warning)
     final activeAlert = currentAlerts.isNotEmpty 
         ? currentAlerts.first 
         : (forecastAlerts.isNotEmpty ? forecastAlerts.first : null);
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [color.withValues(alpha: 0.1), color.withValues(alpha: 0.1)],
+          colors: gradientColors,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.1),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -934,63 +972,113 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
+                  color: color.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
                   isAlert ? Icons.warning_amber_rounded : Icons.wb_sunny_rounded,
                   color: color,
-                  size: 20,
+                  size: 24,
                 ),
               ),
-              const SizedBox(width: 12),
-              Text(
-                isAlert ? (activeAlert?.title ?? 'Weather Alert') : 'Weather Intelligence',
-                style: AppTextStyles.headline3.copyWith(
-                  fontSize: 16,
-                  color: color,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI Intelligence',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: color.withValues(alpha: 0.8),
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    Text(
+                      isAlert ? (activeAlert?.title ?? 'Weather Alert') : 'Optimal Conditions',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textHeadline,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const Spacer(),
               IconButton(
                 onPressed: _loadWeatherData,
-                icon: Icon(Icons.refresh_rounded, size: 20, color: color),
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                  child: Icon(Icons.refresh_rounded, size: 18, color: color),
+                ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text(
             isAlert
                 ? (activeAlert?.description ?? '')
                 : 'Current conditions are optimal for harvesting. Expect low humidity throughout the day.',
-            style: AppTextStyles.bodyMedium.copyWith(height: 1.5, fontWeight: isAlert ? FontWeight.w600 : FontWeight.normal),
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              color: AppColors.textHeadline.withValues(alpha: 0.8),
+              height: 1.6,
+              fontWeight: isAlert ? FontWeight.w600 : FontWeight.w500,
+            ),
           ),
           if (isAlert && activeAlert!.recommendation != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.tips_and_updates_outlined,
-                    size: 16,
-                    color: AppColors.accent,
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.tips_and_updates_rounded,
+                      size: 16,
+                      color: AppColors.accent,
+                    ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       activeAlert.recommendation ?? '',
-                      style: AppTextStyles.bodySmall.copyWith(
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textHeadline,
+                        height: 1.4,
                       ),
                     ),
                   ),
@@ -1119,8 +1207,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           _buildSectionHeader('Weekly Forecast'),
           const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.all(20),
-            decoration: AppDecorations.cardDecoration,
+            padding: const EdgeInsets.all(24),
+            decoration: AppDecorations.cardDecoration.copyWith(
+              borderRadius: BorderRadius.circular(32),
+            ),
             child: ForecastSkeleton(itemCount: 5, enabled: true),
           ),
         ],
@@ -1135,63 +1225,75 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         _buildSectionHeader('Weekly Forecast'),
         const SizedBox(height: 16),
         Container(
-          padding: const EdgeInsets.all(20),
-          decoration: AppDecorations.cardDecoration,
+          padding: const EdgeInsets.all(24),
+          decoration: AppDecorations.cardDecoration.copyWith(
+            borderRadius: BorderRadius.circular(32),
+          ),
           child: Column(
             children: _weatherForecast!.getDailyForecast().take(5).map((f) {
-              // Check if this day has a specific advisory from the backend
               final dayAdvisory = _weatherForecast!.dailyAdvisories.firstWhere(
                 (a) => a.day.startsWith(f.dayName) || f.dayName.startsWith(a.day),
                 orElse: () => DailyAdvisory(day: '', condition: '', message: '', isSevere: false),
               );
               final hasAdvisory = dayAdvisory.day.isNotEmpty;
 
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: hasAdvisory ? AppColors.error.withValues(alpha: 0.05) : AppColors.background,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: hasAdvisory ? AppColors.error.withValues(alpha: 0.3) : Colors.transparent,
+                  ),
+                ),
                 child: Row(
                   children: [
-                    Expanded(
-                      flex: 2,
-                      child: Row(
+                    SizedBox(
+                      width: 50,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            f.dayName,
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              fontWeight: FontWeight.w600,
+                            f.dayName.substring(0, 3).toUpperCase(),
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
                               color: hasAdvisory ? AppColors.error : AppColors.textHeadline,
                             ),
                           ),
-                          if (hasAdvisory) ...[
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.warning_amber_rounded,
-                              size: 14,
-                              color: AppColors.error,
-                            ),
-                          ],
                         ],
                       ),
                     ),
-                    Icon(
-                      _getAlertIcon(f.description.toLowerCase()),
-                      size: 20,
-                      color: hasAdvisory ? AppColors.error : AppColors.primary,
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: hasAdvisory ? AppColors.error.withValues(alpha: 0.1) : AppColors.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _getAlertIcon(f.description.toLowerCase()),
+                        size: 18,
+                        color: hasAdvisory ? AppColors.error : AppColors.primary,
+                      ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 16),
                     Expanded(
-                      flex: 3,
                       child: Text(
                         f.description,
-                        style: AppTextStyles.bodySmall.copyWith(
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
                           color: hasAdvisory ? AppColors.error : AppColors.textSubtle,
-                          fontWeight: hasAdvisory ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight: hasAdvisory ? FontWeight.w700 : FontWeight.w600,
                         ),
                       ),
                     ),
                     Text(
                       '${f.temperature.toStringAsFixed(0)}°',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        fontWeight: FontWeight.w700,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textHeadline,
                       ),
                     ),
                   ],

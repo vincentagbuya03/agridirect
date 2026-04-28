@@ -184,14 +184,18 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                       return Text('All items well stocked', style: AdminUi.body(size: 13, color: AdminUi.textMuted));
                     }
                     return Column(
-                      children: lowStock.take(2).map((p) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _alertItem(
-                          p['name'] ?? 'Unknown', 
-                          '${p['stock_quantity'] ?? 0} units left', 
-                          (p['stock_quantity'] ?? 0) == 0 ? AdminUi.danger : AdminUi.warning
-                        ),
-                      )).toList(),
+                      children: lowStock.take(2).map((p) {
+                        final stock = p['stock_quantity'] ?? 0;
+                        final unit = p['unit_abbr'] ?? "units";
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _alertItem(
+                            p['name'] ?? 'Unknown', 
+                            '$stock $unit left', 
+                            stock == 0 ? AdminUi.danger : AdminUi.warning
+                          ),
+                        );
+                      }).toList(),
                     );
                   }
                 ),
@@ -384,11 +388,14 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
               ),
               Expanded(
                 flex: 1,
-                child: Text('₱${price.toStringAsFixed(2)}', style: AdminUi.label(size: 13, color: AdminUi.textPrimary)),
+                child: Text(
+                  '₱${price.toStringAsFixed(2)}${product['unit_abbr'] != null ? " / ${product['unit_abbr']}" : ""}', 
+                  style: AdminUi.label(size: 13, color: AdminUi.textPrimary)
+                ),
               ),
               Expanded(
                 flex: 1,
-                child: Text('$stock units', style: AdminUi.body(size: 13, color: AdminUi.textSecondary)),
+                child: Text('$stock ${product['unit_abbr'] ?? "units"}', style: AdminUi.body(size: 13, color: AdminUi.textSecondary)),
               ),
               Expanded(
                 flex: 1,

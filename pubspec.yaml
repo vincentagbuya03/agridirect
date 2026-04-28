@@ -104,6 +104,9 @@ flutter:
     - assets/lottie/Face Scan.json
     - assets/lottie/Scan User ID.json
     - assets/lottie/Security.json
+    - assets/lottie/onboarding_farm.json
+    - assets/lottie/onboarding_market.json
+    - assets/lottie/onboarding_tech.json
     - .env
     - .env.web
 

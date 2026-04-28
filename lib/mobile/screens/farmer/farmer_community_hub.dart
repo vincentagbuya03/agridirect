@@ -513,6 +513,41 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                       letterSpacing: 1,
                     ),
                   ),
+                  if (article.audience == 'FARMER') ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'FARMERS ONLY',
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.warning,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ] else if (article.audience == 'CUSTOMER') ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'CUSTOMERS ONLY',
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.primary,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Text(article.title, style: AppTextStyles.headline3.copyWith(fontSize: 16), maxLines: 2, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 8),

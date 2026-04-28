@@ -374,29 +374,6 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
 
 }
 
-// ── Tab Bar Delegate ──
-class _TabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
-  _TabBarDelegate(this.tabBar);
-
-  @override
-  double get minExtent => tabBar.preferredSize.height;
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
-
-  @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Colors.white,
-      child: tabBar,
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _TabBarDelegate oldDelegate) => false;
-}
-
 // ── Products Tab ──
 class _ProductsTab extends StatelessWidget {
   final String farmerId;
@@ -568,29 +545,6 @@ class _ProductsTab extends StatelessWidget {
       ),
     );
   }
-
-  Widget _emptyState(IconData icon, String title, String subtitle) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 56, color: AppColors.textSubtle.withValues(alpha: 0.4)),
-            const SizedBox(height: 16),
-            Text(title,
-                style: AppTextStyles.headline3
-                    .copyWith(color: AppColors.textHeadline)),
-            const SizedBox(height: 8),
-            Text(subtitle,
-                style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.textSubtle),
-                textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // ── Posts Tab ──
@@ -741,29 +695,6 @@ class _PostsTab extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _emptyState(IconData icon, String title, String subtitle) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 56, color: AppColors.textSubtle.withValues(alpha: 0.4)),
-            const SizedBox(height: 16),
-            Text(title,
-                style: AppTextStyles.headline3
-                    .copyWith(color: AppColors.textHeadline)),
-            const SizedBox(height: 8),
-            Text(subtitle,
-                style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.textSubtle),
-                textAlign: TextAlign.center),
-          ],
-        ),
       ),
     );
   }

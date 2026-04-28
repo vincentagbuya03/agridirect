@@ -52,8 +52,6 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
     }
   }
 
-  double get _progressPercent => _currentStepIndex < 0 ? 0 : (_currentStepIndex / (_steps.length - 1));
-
   @override
   void initState() {
     super.initState();
@@ -106,37 +104,44 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeroCard(),
-                  const SizedBox(height: 28),
-                  _buildSectionLabel('Timeline'),
-                  const SizedBox(height: 14),
-                  _buildTimeline(),
-                  const SizedBox(height: 28),
-                  _buildCustomerCard(),
-                  const SizedBox(height: 28),
-                  _buildSectionLabel('Order Items'),
-                  const SizedBox(height: 14),
-                  _buildItemsList(),
-                  const SizedBox(height: 28),
-                  _buildSectionLabel('Price Breakdown'),
-                  const SizedBox(height: 14),
-                  _buildPriceBreakdown(),
-                  const SizedBox(height: 28),
-                  _buildSectionLabel('Delivery Location'),
-                  const SizedBox(height: 14),
-                  _buildDeliverySection(),
-                  const SizedBox(height: 20),
-                ],
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 400),
+        child: _isLoading
+            ? const Center(
+                key: ValueKey('loading'),
+                child: CircularProgressIndicator(color: AppColors.primary),
+              )
+            : SingleChildScrollView(
+                key: const ValueKey('content'),
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeroCard(),
+                    const SizedBox(height: 28),
+                    _buildSectionLabel('Timeline'),
+                    const SizedBox(height: 14),
+                    _buildTimeline(),
+                    const SizedBox(height: 28),
+                    _buildCustomerCard(),
+                    const SizedBox(height: 28),
+                    _buildSectionLabel('Order Items'),
+                    const SizedBox(height: 14),
+                    _buildItemsList(),
+                    const SizedBox(height: 28),
+                    _buildSectionLabel('Price Breakdown'),
+                    const SizedBox(height: 14),
+                    _buildPriceBreakdown(),
+                    const SizedBox(height: 28),
+                    _buildSectionLabel('Delivery Location'),
+                    const SizedBox(height: 14),
+                    _buildDeliverySection(),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
-            ),
+      ),
       bottomNavigationBar: _isLoading ? null : _buildBottomBar(),
     );
   }
@@ -217,10 +222,14 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
           final done = _currentStepIndex >= i && _currentStepIndex >= 0;
           final current = _currentStepIndex == i;
           final isLast = i == _steps.length - 1;
-          return IntrinsicHeight(
-            child: Row(
-              children: [
-                Column(
+          
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left Column: Circle and Line
+              SizedBox(
+                width: 36,
+                child: Column(
                   children: [
                     Container(
                       width: 36, height: 36,
@@ -238,45 +247,48 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                       ),
                     ),
                     if (!isLast)
-                      Expanded(
-                        child: Container(
-                          width: 2,
-                          color: done && _currentStepIndex > i
-                              ? AppColors.primary
-                              : AppColors.textSubtle.withValues(alpha: 0.1),
-                        ),
+                      Container(
+                        width: 2,
+                        height: 28, // Fixed height connector matches the text padding
+                        color: done && _currentStepIndex > i
+                            ? AppColors.primary
+                            : AppColors.textSubtle.withValues(alpha: 0.1),
                       ),
                   ],
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: isLast ? 0 : 28),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _steps[i]['title'] as String,
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            fontWeight: current ? FontWeight.w800 : FontWeight.w600,
-                            color: done ? AppColors.textHeadline : AppColors.textSubtle,
-                          ),
+              ),
+              const SizedBox(width: 16),
+              // Right Column: Text Content
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: isLast ? 0 : 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _steps[i]['title'] as String,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: current ? FontWeight.w800 : FontWeight.w600,
+                          color: done ? AppColors.textHeadline : AppColors.textSubtle,
                         ),
-                        Text(
-                          _steps[i]['desc'] as String,
-                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
-                        ),
-                      ],
-                    ),
+                      ),
+                      Text(
+                        _steps[i]['desc'] as String,
+                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                      ),
+                    ],
                   ),
                 ),
-                if (done && i == 0)
-                  Text(
+              ),
+              if (done && i == 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
                     _formatTime(widget.order.createdAt),
                     style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
                   ),
-              ],
-            ),
+                ),
+            ],
           );
         }),
       ),
@@ -549,6 +561,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
         if (lat != null && lng != null) ...[
           const SizedBox(height: 16),
           Container(
+            key: ValueKey('map_${lat}_${lng}'),
             height: 200,
             width: double.infinity,
             decoration: BoxDecoration(

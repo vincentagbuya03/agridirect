@@ -132,8 +132,8 @@ GoRouter createAppRouter() {
           } else {
             // For native mobile apps, show onboarding then login
             final done = await OnboardingService.isOnboardingComplete();
-            if (!done) return AppRoutes.onboarding;
-            return AppRoutes.login;
+            if (done) return AppRoutes.login;
+            return AppRoutes.onboarding;
           }
         }
       }
@@ -177,9 +177,9 @@ GoRouter createAppRouter() {
               );
             }
             return MobileNavigation(
-              onLogout: () {
-                context.go(AppRoutes.login);
-                AuthService().logout();
+              onLogout: () async {
+                await AuthService().logout();
+                if (context.mounted) context.go(AppRoutes.login);
               },
             );
           },
@@ -193,9 +193,9 @@ GoRouter createAppRouter() {
           builder: (context, constraints) {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
-                onLogout: () {
-                  context.go(AppRoutes.login);
-                  AuthService().logout();
+                onLogout: () async {
+                  await AuthService().logout();
+                  if (context.mounted) context.go(AppRoutes.login);
                 },
               );
             }
@@ -215,9 +215,9 @@ GoRouter createAppRouter() {
           builder: (context, constraints) {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
-                onLogout: () {
-                  context.go(AppRoutes.login);
-                  AuthService().logout();
+                onLogout: () async {
+                  await AuthService().logout();
+                  if (context.mounted) context.go(AppRoutes.login);
                 },
               );
             }
@@ -237,9 +237,9 @@ GoRouter createAppRouter() {
           builder: (context, constraints) {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
-                onLogout: () {
-                  context.go(AppRoutes.login);
-                  AuthService().logout();
+                onLogout: () async {
+                  await AuthService().logout();
+                  if (context.mounted) context.go(AppRoutes.login);
                 },
               );
             }
@@ -259,9 +259,9 @@ GoRouter createAppRouter() {
           builder: (context, constraints) {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
-                onLogout: () {
-                  context.go(AppRoutes.login);
-                  AuthService().logout();
+                onLogout: () async {
+                  await AuthService().logout();
+                  if (context.mounted) context.go(AppRoutes.login);
                 },
               );
             }
@@ -281,9 +281,9 @@ GoRouter createAppRouter() {
           builder: (context, constraints) {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
-                onLogout: () {
-                  context.go(AppRoutes.login);
-                  AuthService().logout();
+                onLogout: () async {
+                  await AuthService().logout();
+                  if (context.mounted) context.go(AppRoutes.login);
                 },
               );
             }

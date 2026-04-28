@@ -287,7 +287,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
               title: 'View Profile',
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Navigate to profile
+                // Navigate to profile feature to be added
               },
             ),
             _buildInfoTile(

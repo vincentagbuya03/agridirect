@@ -1044,7 +1044,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
 
     showModalBottomSheet(
-      context: context,
+      context: this.context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => Container(
@@ -1097,7 +1097,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: addresses.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (context, index) => const SizedBox(height: 10),
                   itemBuilder: (_, i) {
                     final addr = addresses[i];
                     final isSelected = _defaultAddress?.addressId == addr.addressId;

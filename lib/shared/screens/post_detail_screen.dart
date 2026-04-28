@@ -3,6 +3,7 @@ import '../../shared/styles/app_theme.dart';
 import '../../shared/data/app_data.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/comments_dialog.dart';
+import '../widgets/report_content_dialog.dart';
 import '../services/core/supabase_data_service.dart';
 
 class PostDetailScreen extends StatefulWidget {
@@ -41,6 +42,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       _isUpdatingLike = true;
       _post = ForumPostItem(
         id: _post.id,
+        userId: _post.userId,
         userName: _post.userName,
         time: _post.time,
         title: _post.title,
@@ -70,6 +72,31 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  Future<void> _openReportDialog() async {
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (context) => ReportContentDialog(
+        contentLabel: 'post',
+        contentTitle: _post.title,
+        onSubmit: (reason, details) {
+          return SupabaseDataService().reportForumPost(
+            postId: _post.id,
+            reason: reason,
+            description: details,
+          );
+        },
+      ),
+    );
+
+    if (submitted == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Report submitted. Our team will review it soon.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -89,7 +116,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.more_vert, color: AppColors.textHeadline),
-            onPressed: () {},
+            onPressed: _openReportDialog,
           ),
         ],
       ),

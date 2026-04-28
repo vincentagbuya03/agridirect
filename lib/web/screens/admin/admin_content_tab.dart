@@ -13,12 +13,13 @@ class AdminContentTab extends StatefulWidget {
 }
 
 class _AdminContentTabState extends State<AdminContentTab> {
+  String _activeTab = 'Publications'; // 'Publications' or 'Community'
   String _activeFilter = 'All Content';
   final String _sortBy = 'Latest Published';
 
-  // Real article data from Supabase
-  late Future<List<Map<String, dynamic>>> _articlesFuture;
-  Map<String, dynamic> _stats = {'total': 0, 'published': 0, 'drafts': 0, 'views': '0'};
+  // Real data from Supabase
+  late Future<List<Map<String, dynamic>>> _dataFuture;
+  Map<String, dynamic> _stats = {'total': 0, 'published': 0, 'drafts': 0, 'pinned': 0, 'views': '0'};
   late VoidCallback _dataRefreshListener;
 
   @override
@@ -40,14 +41,24 @@ class _AdminContentTabState extends State<AdminContentTab> {
 
   Future<void> _loadData() async {
     setState(() {
-      _articlesFuture = widget.adminService.getAllArticles(
-        page: 0, 
-        pageSize: 10,
-        status: _activeFilter,
-      );
+      if (_activeTab == 'Publications') {
+        _dataFuture = widget.adminService.getAllArticles(
+          page: 0, 
+          pageSize: 10,
+          status: _activeFilter,
+        );
+      } else {
+        _dataFuture = widget.adminService.getCommunityPosts(
+          page: 0,
+          pageSize: 10,
+        );
+      }
     });
 
-    final stats = await widget.adminService.getArticleStats();
+    final stats = _activeTab == 'Publications' 
+      ? await widget.adminService.getArticleStats()
+      : await widget.adminService.getCommunityPostStats();
+      
     if (mounted) {
       setState(() => _stats = stats);
     }
@@ -65,7 +76,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
             const SizedBox(height: 24),
             _buildFilterAndStats(),
             const SizedBox(height: 24),
-            _buildArticlesTable(),
+            _buildContentTable(),
             const SizedBox(height: 16),
             _buildPaginationRow(),
             const SizedBox(height: 40),
@@ -90,8 +101,19 @@ class _AdminContentTabState extends State<AdminContentTab> {
               Text('Content Arboretum', style: AdminUi.display(context, size: 28)),
               const SizedBox(height: 4),
               Text(
-                'Manage and curate horticultural publications across the platform.',
+                _activeTab == 'Publications' 
+                  ? 'Manage and curate horticultural publications across the platform.'
+                  : 'Moderate community discussions and manage farmer-contributed content.',
                 style: AdminUi.body(size: 15, color: AdminUi.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              // Tab Selector
+              Row(
+                children: [
+                  _tabItem('Publications'),
+                  const SizedBox(width: 8),
+                  _tabItem('Community'),
+                ],
               ),
             ],
           ),
@@ -117,22 +139,58 @@ class _AdminContentTabState extends State<AdminContentTab> {
   // ═══════════════════════════════════════════════════════════════════════════
   // FILTER TABS + STATS BADGE
   // ═══════════════════════════════════════════════════════════════════════════
+  Widget _tabItem(String label) {
+    final active = _activeTab == label;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _activeTab = label;
+          _activeFilter = 'All Content';
+        });
+        _loadData();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? AdminUi.brand : Colors.transparent,
+          borderRadius: AdminUi.radiusMd,
+          border: active ? null : Border.all(color: AdminUi.border),
+        ),
+        child: Text(
+          label,
+          style: AdminUi.label(
+            size: 13,
+            color: active ? Colors.white : AdminUi.textSecondary,
+            weight: active ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilterAndStats() {
+    final isArticles = _activeTab == 'Publications';
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: AdminUi.cardDecoration(),
       child: Row(
         children: [
-          // Filter by: label
-          Text('Filter by:', style: AdminUi.body(size: 13, color: AdminUi.textSecondary)),
-          const SizedBox(width: 16),
-          // Filter tabs
-          _filterTab('All Content'),
-          _filterTab('Published'),
-          _filterTab('Drafts'),
-          _filterTab('Archived'),
-          const SizedBox(width: 24),
-          // Sorted by
+          if (isArticles) ...[
+            Text('Filter by:', style: AdminUi.body(size: 13, color: AdminUi.textSecondary)),
+            const SizedBox(width: 16),
+            _filterTab('All Content'),
+            _filterTab('Published'),
+            _filterTab('Drafts'),
+            _filterTab('Archived'),
+            const SizedBox(width: 24),
+          ] else ...[
+            Text('Moderate:', style: AdminUi.body(size: 13, color: AdminUi.textSecondary)),
+            const SizedBox(width: 16),
+            _filterTab('All Content'),
+            _filterTab('Pinned'),
+            const SizedBox(width: 24),
+          ],
+          
           Text('Sorted by:', style: AdminUi.body(size: 12, color: AdminUi.textMuted)),
           const SizedBox(width: 8),
           Text(_sortBy, style: AdminUi.label(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w600)),
@@ -146,12 +204,18 @@ class _AdminContentTabState extends State<AdminContentTab> {
               borderRadius: AdminUi.radiusMd,
             ),
             child: Row(
-              children: [
+              children: isArticles ? [
                 _statItem(_stats['total'].toString(), 'ARTICLES'), 
                 Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
                 _statItem(_stats['published'].toString(), 'PUBLISHED'),
                 Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
                 _statItem(_stats['views'].toString(), 'VIEWS'),
+              ] : [
+                _statItem(_stats['total'].toString(), 'POSTS'), 
+                Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
+                _statItem(_stats['pinned'].toString(), 'PINNED'),
+                Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
+                _statItem(_stats['recent']?.toString() ?? '0', 'NEW (24H)'),
               ],
             ),
           ),
@@ -199,7 +263,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
   // ═══════════════════════════════════════════════════════════════════════════
   // ARTICLES TABLE
   // ═══════════════════════════════════════════════════════════════════════════
-  Widget _buildArticlesTable() {
+  Widget _buildContentTable() {
     return Container(
       decoration: AdminUi.cardDecoration(),
       clipBehavior: Clip.antiAlias,
@@ -213,18 +277,26 @@ class _AdminContentTabState extends State<AdminContentTab> {
               border: Border(bottom: BorderSide(color: AdminUi.border)),
             ),
             child: Row(
-              children: [
+              children: _activeTab == 'Publications' ? [
                 _headerCell('TITLE', flex: 4),
+                _headerCell('AUDIENCE', flex: 2),
                 _headerCell('STATUS', flex: 2),
                 _headerCell('PUBLISHED DATE', flex: 2),
                 _headerCell('CREATED DATE', flex: 2),
+                _headerCell('ACTIONS', flex: 2, align: TextAlign.right),
+              ] : [
+                _headerCell('COMMUNITY POST', flex: 4),
+                _headerCell('AUTHOR', flex: 2),
+                _headerCell('ENGAGEMENT', flex: 2),
+                _headerCell('PINNED', flex: 2),
+                _headerCell('POSTED ON', flex: 2),
                 _headerCell('ACTIONS', flex: 2, align: TextAlign.right),
               ],
             ),
           ),
           // Rows
           FutureBuilder<List<Map<String, dynamic>>>(
-            future: _articlesFuture,
+            future: _dataFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Padding(
@@ -236,11 +308,11 @@ class _AdminContentTabState extends State<AdminContentTab> {
               if (items.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.all(40),
-                  child: Center(child: Text('No articles found for "$_activeFilter"', style: AdminUi.body(color: AdminUi.textMuted))),
+                  child: Center(child: Text('No ${_activeTab.toLowerCase()} found.', style: AdminUi.body(color: AdminUi.textMuted))),
                 );
               }
               return Column(
-                children: items.map((item) => _buildArticleRow(item)).toList(),
+                children: items.map((item) => _activeTab == 'Publications' ? _buildArticleRow(item) : _buildCommunityRow(item)).toList(),
               );
             }
           ),
@@ -301,6 +373,41 @@ class _AdminContentTabState extends State<AdminContentTab> {
               ],
             ),
           ),
+          // Audience
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: (article['audience'] == 'FARMER') 
+                      ? AdminUi.brand.withValues(alpha: 0.1) 
+                      : (article['audience'] == 'CUSTOMER')
+                        ? AdminUi.warning.withValues(alpha: 0.1)
+                        : AdminUi.textMuted.withValues(alpha: 0.1),
+                    borderRadius: AdminUi.radiusSm,
+                  ),
+                  child: Text(
+                    (article['audience'] == 'FARMER') 
+                      ? 'FARMERS' 
+                      : (article['audience'] == 'CUSTOMER')
+                        ? 'CUSTOMERS'
+                        : 'BOTH',
+                    style: AdminUi.label(
+                      size: 10, 
+                      color: (article['audience'] == 'FARMER') 
+                        ? AdminUi.brand 
+                        : (article['audience'] == 'CUSTOMER')
+                          ? AdminUi.warning
+                          : AdminUi.textSecondary, 
+                      weight: FontWeight.w800
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           // Status
           Expanded(
             flex: 2,
@@ -342,7 +449,18 @@ class _AdminContentTabState extends State<AdminContentTab> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _iconAction(Icons.edit_rounded, 'Edit', onTap: () {}),
+                _iconAction(Icons.edit_rounded, 'Edit', onTap: () async {
+                  final result = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => CreateArticleDialog(
+                      adminService: widget.adminService,
+                      initialData: article,
+                    ),
+                  );
+                  if (result == true && mounted) {
+                    _loadData();
+                  }
+                }),
                 _iconAction(
                   isPublished ? Icons.visibility_off_outlined : Icons.publish_rounded, 
                   isPublished ? 'Unpublish' : 'Publish',
@@ -365,6 +483,130 @@ class _AdminContentTabState extends State<AdminContentTab> {
                   );
                   if (confirm == true) {
                     final success = await widget.adminService.deleteArticle(articleId);
+                    if (success) _loadData();
+                  }
+                }),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommunityRow(Map<String, dynamic> post) {
+    final postId = post['post_id'].toString();
+    final isPinned = post['is_pinned'] == true;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+      child: Row(
+        children: [
+          // Content
+          Expanded(
+            flex: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(post['title'] ?? 'Untitled Post', style: AdminUi.label(size: 14, color: AdminUi.textPrimary, weight: FontWeight.w700)),
+                const SizedBox(height: 2),
+                Text(post['body'] ?? '', style: AdminUi.body(size: 12, color: AdminUi.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
+          // Author
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 10,
+                  backgroundColor: AdminUi.brandSoft,
+                  child: Text((post['user_name'] ?? 'U')[0], style: TextStyle(fontSize: 8, color: AdminUi.brand, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 8),
+                Text(post['user_name'] ?? 'Unknown', style: AdminUi.body(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w500)),
+              ],
+            ),
+          ),
+          // Engagement
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                Icon(Icons.thumb_up_alt_outlined, size: 12, color: AdminUi.textMuted),
+                const SizedBox(width: 4),
+                Text(post['likes_count']?.toString() ?? '0', style: AdminUi.body(size: 12, color: AdminUi.textSecondary)),
+                const SizedBox(width: 12),
+                Icon(Icons.chat_bubble_outline_rounded, size: 12, color: AdminUi.textMuted),
+                const SizedBox(width: 4),
+                Text(post['comments_count']?.toString() ?? '0', style: AdminUi.body(size: 12, color: AdminUi.textSecondary)),
+              ],
+            ),
+          ),
+          // Pinned Status
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                if (isPinned)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AdminUi.brand.withValues(alpha: 0.1),
+                      borderRadius: AdminUi.radiusSm,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.push_pin_rounded, size: 10, color: AdminUi.brand),
+                        const SizedBox(width: 4),
+                        Text('PINNED', style: AdminUi.label(size: 9, color: AdminUi.brand, weight: FontWeight.w800)),
+                      ],
+                    ),
+                  )
+                else
+                  Text('—', style: AdminUi.body(size: 13, color: AdminUi.textMuted)),
+              ],
+            ),
+          ),
+          // Date
+          Expanded(
+            flex: 2,
+            child: Text(
+              post['created_at']?.toString().substring(0, 10) ?? '—',
+              style: AdminUi.body(size: 13, color: AdminUi.textMuted),
+            ),
+          ),
+          // Actions
+          Expanded(
+            flex: 2,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                _iconAction(
+                  isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, 
+                  isPinned ? 'Unpin' : 'Pin to top',
+                  color: isPinned ? AdminUi.brand : AdminUi.textMuted,
+                  onTap: () async {
+                    final success = await widget.adminService.togglePinCommunityPost(postId, !isPinned);
+                    if (success) _loadData();
+                  }
+                ),
+                _iconAction(Icons.delete_outline_rounded, 'Delete', color: AdminUi.danger, onTap: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Delete Post?'),
+                      content: const Text('This will permanently remove this community post.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    final success = await widget.adminService.deleteCommunityPost(postId);
                     if (success) _loadData();
                   }
                 }),

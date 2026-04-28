@@ -69,6 +69,116 @@ class AdminService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<String?> getCurrentAdminId() => _resolveCurrentAdminId();
+
+  String _formatContentTypeLabel(String code) {
+    switch (code) {
+      case 'post':
+        return 'Post';
+      case 'comment':
+        return 'Comment';
+      case 'product':
+        return 'Product';
+      case 'review':
+        return 'Review';
+      case 'article':
+        return 'Article';
+      default:
+        return 'Content';
+    }
+  }
+
+  Future<Map<int, Map<String, dynamic>>> _getContentTypeMap() async {
+    final response = await _client
+        .from('content_types')
+        .select('content_type_id, code, description');
+
+    return {
+      for (final row in (response as List))
+        (row['content_type_id'] as int): Map<String, dynamic>.from(row as Map),
+    };
+  }
+
+  Future<Map<String, String>> _getUserNamesById(List<String> userIds) async {
+    if (userIds.isEmpty) return {};
+
+    final response = await _client
+        .from('users')
+        .select('user_id, name')
+        .inFilter('user_id', userIds);
+
+    return {
+      for (final row in (response as List))
+        row['user_id']?.toString() ?? '':
+            row['name']?.toString() ?? 'Unknown user',
+    };
+  }
+
+  Future<Map<String, Map<String, dynamic>>> _getForumPostsById(
+    List<String> postIds,
+  ) async {
+    if (postIds.isEmpty) return {};
+
+    final response = await _client
+        .from('v_forum_posts')
+        .select('post_id, user_id, author_name, title, body')
+        .inFilter('post_id', postIds);
+
+    return {
+      for (final row in (response as List))
+        row['post_id']?.toString() ?? '': Map<String, dynamic>.from(row as Map),
+    };
+  }
+
+  Future<Map<String, Map<String, dynamic>>> _getArticlesById(
+    List<String> articleIds,
+  ) async {
+    if (articleIds.isEmpty) return {};
+
+    final response = await _client
+        .from('admin_articles')
+        .select('article_id, title, summary, body, admin_id')
+        .inFilter('article_id', articleIds);
+
+    final rows = (response as List)
+        .map((row) => Map<String, dynamic>.from(row as Map))
+        .toList();
+    final adminIds = rows
+        .map((row) => row['admin_id']?.toString())
+        .where((id) => id != null && id.isNotEmpty)
+        .cast<String>()
+        .toSet()
+        .toList();
+
+    final adminToUserId = <String, String>{};
+    if (adminIds.isNotEmpty) {
+      final adminResponse = await _client
+          .from('admins')
+          .select('admin_id, user_id')
+          .inFilter('admin_id', adminIds);
+
+      for (final row in (adminResponse as List)) {
+        final adminId = row['admin_id']?.toString();
+        final userId = row['user_id']?.toString();
+        if (adminId != null && adminId.isNotEmpty && userId != null && userId.isNotEmpty) {
+          adminToUserId[adminId] = userId;
+        }
+      }
+    }
+
+    final userNames = await _getUserNamesById(adminToUserId.values.toSet().toList());
+    final result = <String, Map<String, dynamic>>{};
+    for (final row in rows) {
+      final adminId = row['admin_id']?.toString();
+      final userId = adminId == null ? null : adminToUserId[adminId];
+      row['user_id'] = userId;
+      row['author_name'] = userId == null ? 'AgriDirect' : (userNames[userId] ?? 'AgriDirect');
+      result[row['article_id']?.toString() ?? ''] = row;
+    }
+
+    return result;
+  }
+
 
   Map<String, dynamic>? _normalizeUserRelation(dynamic rawUsers) {
     if (rawUsers is Map<String, dynamic>) {
@@ -433,7 +543,7 @@ class AdminService extends ChangeNotifier {
       final response = await _client
           .from('v_products')
           .select(
-            'product_id, name, farm_name, price, average_rating, review_count, is_preorder, farmer_id, created_at, is_active, is_featured, category_name',
+            'product_id, name, farm_name, price, average_rating, review_count, is_preorder, farmer_id, created_at, is_active, is_featured, category_name, stock_quantity, image_url, unit_abbr',
           )
           .order('created_at', ascending: false)
           .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -516,14 +626,74 @@ class AdminService extends ChangeNotifier {
       final response = await _client
           .from('reported_content')
           .select(
-            'report_id, content_type_id, reason, description, status, created_at',
+            'report_id, content_id, content_type_id, reporter_id, reason, description, status, resolution_notes, created_at, resolved_at',
           )
           .eq('status', status)
           .order('created_at', ascending: false);
 
+      final reports = List<Map<String, dynamic>>.from(response);
+      final contentTypes = await _getContentTypeMap();
+      final reporterNames = await _getUserNamesById(
+        reports
+            .map((report) => report['reporter_id']?.toString())
+            .where((id) => id != null && id.isNotEmpty)
+            .cast<String>()
+            .toSet()
+            .toList(),
+      );
+
+      final postIds = <String>[];
+      final articleIds = <String>[];
+
+      for (final report in reports) {
+        final contentId = report['content_id']?.toString();
+        final contentTypeId = report['content_type_id'] as int?;
+        final typeCode = contentTypes[contentTypeId]?['code'];
+
+        if (contentId == null || contentId.isEmpty) continue;
+        if (typeCode == 'post') postIds.add(contentId);
+        if (typeCode == 'article') articleIds.add(contentId);
+      }
+
+      final postsById = await _getForumPostsById(postIds);
+      final articlesById = await _getArticlesById(articleIds);
+
       _isLoading = false;
       notifyListeners();
-      return List<Map<String, dynamic>>.from(response);
+      return reports.map((report) {
+        final enriched = Map<String, dynamic>.from(report);
+        final contentTypeId = report['content_type_id'] as int?;
+        final type = contentTypes[contentTypeId];
+        final typeCode = type?['code']?.toString() ?? 'unknown';
+        final contentId = report['content_id']?.toString() ?? '';
+        final reporterId = report['reporter_id']?.toString() ?? '';
+
+        enriched['content_type_code'] = typeCode;
+        enriched['content_type_label'] = _formatContentTypeLabel(typeCode);
+        enriched['reporter_name'] =
+            reporterNames[reporterId] ?? 'Unknown user';
+
+        if (typeCode == 'post') {
+          final post = postsById[contentId];
+          enriched['content_title'] = post?['title'] ?? 'Forum post';
+          enriched['content_preview'] = post?['body'] ?? '';
+          enriched['content_owner_name'] = post?['author_name'] ?? 'Unknown';
+          enriched['content_owner_user_id'] = post?['user_id']?.toString();
+        } else if (typeCode == 'article') {
+          final article = articlesById[contentId];
+          enriched['content_title'] = article?['title'] ?? 'Article';
+          enriched['content_preview'] =
+              article?['summary'] ?? article?['body'] ?? '';
+          enriched['content_owner_name'] = article?['author_name'] ?? 'AgriDirect';
+          enriched['content_owner_user_id'] = article?['user_id']?.toString();
+        } else {
+          enriched['content_title'] = 'Reported content';
+          enriched['content_preview'] = report['description'] ?? '';
+          enriched['content_owner_name'] = 'Unknown';
+        }
+
+        return enriched;
+      }).toList();
     } catch (e) {
       _errorMessage = 'Failed to load reports: $e';
       _isLoading = false;
@@ -663,10 +833,40 @@ class AdminService extends ChangeNotifier {
           .eq('report_id', reportId);
 
       await _logAdminAction('resolve_report', resolutionNotes, null);
-      notifyListeners();
+      _notifyDataChanged();
       return true;
     } catch (e) {
       _errorMessage = 'Failed to resolve report: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> dismissReport({
+    required String reportId,
+    required String adminId,
+    String? resolutionNotes,
+  }) async {
+    try {
+      await _client
+          .from('reported_content')
+          .update({
+            'status': 'dismissed',
+            'resolved_by': adminId,
+            'resolution_notes': resolutionNotes,
+            'resolved_at': DateTime.now().toIso8601String(),
+          })
+          .eq('report_id', reportId);
+
+      await _logAdminAction(
+        'dismiss_report',
+        resolutionNotes ?? 'Dismissed report',
+        null,
+      );
+      _notifyDataChanged();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to dismiss report: $e';
       notifyListeners();
       return false;
     }
@@ -1656,24 +1856,42 @@ class AdminService extends ChangeNotifier {
   // ADMIN LOGS
   // ========================================================================
 
-  /// Get admin activity logs
+  /// Get admin activity logs with admin names
   Future<List<Map<String, dynamic>>> getAdminLogs({
     int page = 0,
     int pageSize = 50,
+    String? actionFilter,
   }) async {
     try {
       _isLoading = true;
       notifyListeners();
 
-      final response = await _client
+      var query = _client
           .from('admin_logs')
-          .select('log_id, action, details, ip_address, created_at, admin_id')
+          .select('log_id, action, details, ip_address, created_at, admin_id, target_user_id, admins!inner(user_id, users!inner(name, email))');
+
+      if (actionFilter != null && actionFilter != 'all') {
+        query = query.eq('action', actionFilter);
+      }
+
+      final response = await query
           .order('created_at', ascending: false)
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
+      // Flatten admin name into each log entry
+      final enriched = (response as List).map((log) {
+        final admin = log['admins'];
+        final user = admin?['users'];
+        return {
+          ...Map<String, dynamic>.from(log),
+          'admin_name': user?['name'] ?? 'System',
+          'admin_email': user?['email'] ?? '',
+        };
+      }).toList();
+
       _isLoading = false;
       notifyListeners();
-      return List<Map<String, dynamic>>.from(response);
+      return List<Map<String, dynamic>>.from(enriched);
     } catch (e) {
       _errorMessage = 'Failed to load admin logs: $e';
       _isLoading = false;
@@ -2254,6 +2472,7 @@ class AdminService extends ChangeNotifier {
     String? category,
     String? coverImageUrl,
     bool isPublished = false,
+    String audience = 'ALL',
   }) async {
     try {
       final adminId = await _resolveCurrentAdminId();
@@ -2268,6 +2487,7 @@ class AdminService extends ChangeNotifier {
         'is_published': isPublished,
         'admin_id': adminId,
         'published_at': isPublished ? DateTime.now().toIso8601String() : null,
+        'audience': audience,
       });
 
       await _logAdminAction('create_article', 'Created article: $title', null);
@@ -2275,6 +2495,58 @@ class AdminService extends ChangeNotifier {
       return true;
     } catch (e) {
       _errorMessage = 'Failed to create article: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Update an existing article
+  Future<bool> updateArticle({
+    required String articleId,
+    required String title,
+    required String summary,
+    required String body,
+    String? category,
+    String? coverImageUrl,
+    String? audience,
+  }) async {
+    try {
+      final updateData = {
+        'title': title,
+        'summary': summary,
+        'body': body,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      if (category != null) updateData['category'] = category;
+      if (coverImageUrl != null) updateData['cover_image_url'] = coverImageUrl;
+      if (audience != null) updateData['audience'] = audience;
+
+      await _client.from('admin_articles').update(updateData).eq('article_id', articleId);
+
+      await _logAdminAction('update_article', 'Updated article: $title', null);
+      _notifyDataChanged();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to update article: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Update article audience
+  Future<bool> updateArticleAudience(String articleId, String audience) async {
+    try {
+      await _client.from('admin_articles').update({
+        'audience': audience,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('article_id', articleId);
+
+      await _logAdminAction('update_article_audience', 'Updated audience to $audience', null);
+      _notifyDataChanged();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to update audience: $e';
       notifyListeners();
       return false;
     }
@@ -2357,6 +2629,87 @@ class AdminService extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error uploading article cover: $e');
       return null;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // COMMUNITY POSTS MANAGEMENT
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// Get all community forum posts with pagination
+  Future<List<Map<String, dynamic>>> getCommunityPosts({
+    int page = 0,
+    int pageSize = 10,
+    String? searchQuery,
+  }) async {
+    try {
+      var query = _client.from('v_forum_posts').select('*');
+
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        query = query.or('title.ilike.%$searchQuery%,body.ilike.%$searchQuery%,user_name.ilike.%$searchQuery%');
+      }
+
+      final response = await query
+          .order('created_at', ascending: false)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      _errorMessage = 'Failed to load community posts: $e';
+      return [];
+    }
+  }
+
+  /// Delete a community post
+  Future<bool> deleteCommunityPost(String postId) async {
+    try {
+      await _client.from('forum_posts').delete().eq('post_id', postId);
+      await _logAdminAction('delete_forum_post', 'Deleted forum post: $postId', null);
+      _notifyDataChanged();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to delete post: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Toggle pin status of a community post
+  Future<bool> togglePinCommunityPost(String postId, bool isPinned) async {
+    try {
+      await _client.from('forum_posts').update({
+        'is_pinned': isPinned,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('post_id', postId);
+
+      await _logAdminAction('pin_forum_post', '${isPinned ? 'Pinned' : 'Unpinned'} forum post: $postId', null);
+      _notifyDataChanged();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to update pin status: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Get community post stats
+  Future<Map<String, dynamic>> getCommunityPostStats() async {
+    try {
+      final results = await Future.wait([
+        _client.from('forum_posts').select('post_id'),
+        _client.from('forum_posts').select('post_id').eq('is_pinned', true),
+      ]);
+
+      final total = (results[0] as List).length;
+      final pinned = (results[1] as List).length;
+
+      return {
+        'total': total,
+        'pinned': pinned,
+        'recent': 0, // Could be calculated as posts in last 24h
+      };
+    } catch (e) {
+      return {'total': 0, 'pinned': 0, 'recent': 0};
     }
   }
 }
