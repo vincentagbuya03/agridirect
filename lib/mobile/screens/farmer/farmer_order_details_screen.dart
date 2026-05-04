@@ -561,7 +561,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
         if (lat != null && lng != null) ...[
           const SizedBox(height: 16),
           Container(
-            key: ValueKey('map_${lat}_${lng}'),
+            key: ValueKey('map_${lat}_$lng'),
             height: 200,
             width: double.infinity,
             decoration: BoxDecoration(

@@ -85,6 +85,7 @@ CREATE TABLE public.conversations (
   created_at timestamp with time zone DEFAULT now(),
   customer_id uuid NOT NULL,
   CONSTRAINT conversations_pkey PRIMARY KEY (conversation_id),
+  CONSTRAINT conversations_customer_farmer_unique UNIQUE (customer_id, farmer_id),
   CONSTRAINT fk_conversations_customer_id FOREIGN KEY (customer_id) REFERENCES public.customers(customer_id),
   CONSTRAINT fk_conversations_farmer FOREIGN KEY (farmer_id) REFERENCES public.farmers(farmer_id)
 );

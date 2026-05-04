@@ -20,8 +20,10 @@ class AppRoutes {
   static const String farmerRegister = '/farmer-register';
   static const String completeProfile = '/complete-profile';
   static const String addProduct = '/add-product';
+  static const String editProduct = '/edit-product';
   static const String myDetails = '/my-details';
   static const String farmersMap = '/farmers-map';
+  static const String customerOrders = '/customer-orders';
 
   // ── Web-specific ──
   static const String webWelcome = '/web-welcome';

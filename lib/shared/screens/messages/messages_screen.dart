@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:agridirect/shared/widgets/image_widgets.dart';
 import 'package:agridirect/shared/styles/app_theme.dart';
@@ -1028,7 +1029,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
                               ),
                               child: message.messageText.startsWith('[PRODUCT_INQUIRY:')
                                   ? _buildInquiryCard(message.messageText, isMine)
-                                  : Text(
+                                  : message.messageText.startsWith('[ORDER_NOTICE:')
+                                      ? _buildOrderNoticeCard(message.messageText, isMine)
+                                      : Text(
                                       message.messageText,
                                       style: AppTextStyles.bodyMedium.copyWith(
                                         color: isMine
@@ -1264,6 +1267,137 @@ class _MessagesScreenState extends State<MessagesScreen> {
     return '$hour:$minute $period';
   }
 
+  Widget _buildOrderNoticeCard(String text, bool isMine) {
+    // Format: [ORDER_NOTICE:ORDER_ID:TYPE:PAYMENT]
+    final parts = text.replaceFirst('[ORDER_NOTICE:', '').replaceFirst(']', '').split(':');
+    final orderId = parts.isNotEmpty ? parts[0] : 'Unknown';
+    final type = parts.length > 1 ? parts[1].replaceAll('_', ' ') : 'ORDER';
+    final payment = parts.length > 2 ? parts[2] : 'COD';
+
+    return Container(
+      width: 260,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isMine ? Colors.white.withValues(alpha: 0.1) : AppColors.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isMine ? Colors.white24 : AppColors.primary.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isMine ? Colors.white24 : AppColors.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.shopping_bag_outlined,
+                  size: 18,
+                  color: isMine ? Colors.white : AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'New $type',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: isMine ? Colors.white70 : AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    Text(
+                      '#${orderId.substring(orderId.length > 8 ? orderId.length - 8 : 0).toUpperCase()}',
+                      style: AppTextStyles.headline3.copyWith(
+                        fontSize: 14,
+                        color: isMine ? Colors.white : AppColors.textHeadline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildNoticeDetail(
+            Icons.payments_outlined,
+            'Payment Method',
+            payment == 'COD' ? 'Cash on Delivery' : 'Cash on Pickup',
+            isMine,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {
+                // Navigate to order details
+                if (_asFarmerInbox) {
+                  context.push('/farmer/orders/$orderId');
+                } else {
+                  context.push('/orders/$orderId');
+                }
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
+              ),
+              child: const Text('View Order Details', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoticeDetail(IconData icon, String label, String value, bool isMine) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 14,
+          color: isMine ? Colors.white60 : AppColors.textSubtle,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isMine ? Colors.white60 : AppColors.textSubtle,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isMine ? Colors.white : AppColors.textHeadline,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildInquiryCard(String text, bool isMine) {
     final productId = text
         .replaceFirst('[PRODUCT_INQUIRY:', '')
@@ -1283,35 +1417,59 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
         final product = snapshot.data!;
         return Container(
-          width: 240,
-          padding: const EdgeInsets.all(8),
+          width: 260,
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isMine ? Colors.white.withValues(alpha: 0.1) : Colors.grey[50],
-            borderRadius: BorderRadius.circular(12),
+            color: isMine ? Colors.white.withValues(alpha: 0.1) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isMine ? Colors.white24 : AppColors.textHeadline.withValues(alpha: 0.05),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: CachedNetworkImage(
-                      imageUrl: product.imageUrl,
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: CachedNetworkImage(
+                        imageUrl: product.imageUrl,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
+                          'Product Inquiry',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: isMine ? Colors.white70 : AppColors.primary,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
                           product.name,
                           style: AppTextStyles.headline3.copyWith(
-                            fontSize: 14,
+                            fontSize: 15,
                             color: isMine ? Colors.white : AppColors.textHeadline,
                           ),
                           maxLines: 1,
@@ -1319,9 +1477,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
                         ),
                         Text(
                           product.price,
-                          style: AppTextStyles.bodySmall.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: isMine ? Colors.white70 : AppColors.primary,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: isMine ? Colors.white : AppColors.primary,
                           ),
                         ),
                       ],
@@ -1329,23 +1487,23 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: () {
-                    // Navigate to product view if needed
+                    context.push('/marketplace/product/${product.productId}');
                   },
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    minimumSize: const Size(0, 32),
+                    backgroundColor: isMine ? Colors.white : AppColors.primary,
+                    foregroundColor: isMine ? AppColors.primary : Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                     ),
+                    elevation: 0,
                   ),
-                  child: const Text('View Product', style: TextStyle(fontSize: 12)),
+                  child: const Text('View Product', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ),
             ],

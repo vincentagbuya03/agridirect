@@ -35,11 +35,11 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   final Set<int> _hoveredPosts = {};
   int _hoveredNav = -1;
 
-  static const Color _primary = Color(0xFF16A34A);
-  static const Color _dark = Color(0xFF111827);
-  static const Color _muted = Color(0xFF6B7280);
-  static const Color _border = Color(0xFFE5E7EB);
-  static const Color _surface = Color(0xFFFAFAFA);
+  static const Color _primary = Color(0xFF10B981); // Unified Emerald
+  static const Color _dark = Color(0xFF0F172A);
+  static const Color _muted = Color(0xFF64748B);
+  static const Color _border = Color(0xFFE2E8F0);
+  static const Color _surface = Color(0xFFF8FAFC);
 
   @override
   void initState() {
@@ -173,26 +173,32 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
   // ─── Site Header (consistent across all pages) ───
   Widget _buildNavBar() {
-    final navItems = ['Home', 'Shop', 'Community'];
+    final navItems = ['Dashboard', 'Products', 'Orders', 'Community'];
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+      margin: const EdgeInsets.fromLTRB(32, 24, 32, 12),
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: _border.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            color: _dark.withValues(alpha: 0.03),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Row(
         children: [
           // Logo with pulsing glow
-          const BrandLogo(size: BrandLogoSize.medium),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => widget.onNavigate(0),
+              child: const BrandLogo(size: BrandLogoSize.medium),
+            ),
+          ),
           const SizedBox(width: 48),
           // Nav items
           ...List.generate(navItems.length, (i) {
@@ -207,22 +213,23 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                 child: GestureDetector(
                   onTap: () => widget.onNavigate(i),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    duration: const Duration(milliseconds: 300),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       color: isActive
                           ? _primary.withValues(alpha: 0.1)
                           : isHovered
-                              ? _border.withValues(alpha: 0.5)
+                              ? _border.withValues(alpha: 0.3)
                               : Colors.transparent,
                     ),
                     child: Text(
                       navItems[i],
                       style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                        fontSize: 15,
+                        fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                         color: isActive ? _primary : isHovered ? _dark : _muted,
+                        letterSpacing: 0.2,
                       ),
                     ),
                   ),
@@ -235,22 +242,27 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
-              onTap: () => widget.onNavigate(3),
+              onTap: () => widget.onNavigate(4), // Profile is index 4
               child: Container(
-                width: 44,
-                height: 44,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: _primary,
-                    width: 1.5,
+                  gradient: const LinearGradient(
+                    colors: [_primary, Color(0xFF059669)],
                   ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _primary.withValues(alpha: 0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                child: Icon(
-                  Icons.person_rounded,
-                  color: _primary,
-                  size: 22,
+                child: const Icon(
+                  Icons.person_outline_rounded,
+                  color: Colors.white,
+                  size: 24,
                 ),
               ),
             ),

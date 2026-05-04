@@ -647,19 +647,40 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 borderRadius: BorderRadius.circular(28),
                 child: Stack(
                   children: [
-                    // Inner grid pattern
-                    CustomPaint(
-                      size: const Size(340, 360),
-                      painter: DotPatternPainter(
-                        opacity: 0.08,
-                        color: AgriColors.emerald300,
+                    // Background image of fresh produce
+                    Positioned.fill(
+                      child: Image.asset(
+                        'assets/images/fresh_organic_hero.png',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            decoration: const BoxDecoration(
+                              gradient: AgriColors.primaryGradient,
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.eco_rounded,
+                                color: Colors.white24,
+                                size: 80,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
-                    // Large leaf icon
-                    Center(
-                      child: AnimatedLeafIcon(
-                        size: 140,
-                        color: AgriColors.emerald400.withValues(alpha: 0.15),
+                    // Gradient overlay to make text readable
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.1),
+                              Colors.black.withValues(alpha: 0.4),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                     // Overlaid info
@@ -668,8 +689,8 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       left: 24,
                       right: 24,
                       child: GlassCard(
-                        backgroundColor: Colors.white.withValues(alpha: 0.15),
-                        borderColor: Colors.white.withValues(alpha: 0.2),
+                        backgroundColor: Colors.white.withValues(alpha: 0.25),
+                        borderColor: Colors.white.withValues(alpha: 0.3),
                         borderRadius: 16,
                         padding: const EdgeInsets.all(16),
                         child: Row(
@@ -705,7 +726,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                     style: GoogleFonts.inter(
                                       fontSize: 11,
                                       color: Colors.white.withValues(
-                                        alpha: 0.6,
+                                        alpha: 0.8,
                                       ),
                                     ),
                                   ),
@@ -829,98 +850,112 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   // STATS BAR — animated counters in glassmorphism strip
   // ═══════════════════════════════════════════════════════════════
   Widget _buildStatsBar() {
+    final sw = MediaQuery.of(context).size.width;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 40),
+      padding: EdgeInsets.symmetric(vertical: sw < 768 ? 40 : 60),
       color: AgriColors.surface,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final sw = constraints.maxWidth;
-              if (sw < 600) {
-                // Mobile: Two columns
-                return Column(
+          child: sw < 768
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _statItem(
+                              200,
+                              '+',
+                              'Farmers',
+                              Icons.agriculture_rounded,
+                              isMobile: true,
+                            ),
+                          ),
+                          Expanded(
+                            child: _statItem(
+                              5000,
+                              '+',
+                              'Products',
+                              Icons.inventory_2_rounded,
+                              isMobile: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _statItem(
+                              24,
+                              'hrs',
+                              'Delivery',
+                              Icons.local_shipping_rounded,
+                              isMobile: true,
+                            ),
+                          ),
+                          Expanded(
+                            child: _statItem(
+                              98,
+                              '%',
+                              'Happy',
+                              Icons.thumb_up_rounded,
+                              isMobile: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _statItem(
-                          200,
-                          '+',
-                          'Local Farmers',
-                          Icons.agriculture_rounded,
-                        ),
-                        _statItem(
-                          5000,
-                          '+',
-                          'Products',
-                          Icons.inventory_2_rounded,
-                        ),
-                      ],
+                    _statItem(
+                      200,
+                      '+',
+                      'Local Farmers',
+                      Icons.agriculture_rounded,
                     ),
-                    const SizedBox(height: 32),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _statItem(
-                          24,
-                          'hrs',
-                          'Fast Delivery',
-                          Icons.local_shipping_rounded,
-                        ),
-                        _statItem(
-                          98,
-                          '%',
-                          'Satisfaction',
-                          Icons.thumb_up_rounded,
-                        ),
-                      ],
+                    _statDivider(),
+                    _statItem(5000, '+', 'Products', Icons.inventory_2_rounded),
+                    _statDivider(),
+                    _statItem(
+                      24,
+                      'hrs',
+                      'Fast Delivery',
+                      Icons.local_shipping_rounded,
                     ),
+                    _statDivider(),
+                    _statItem(98, '%', 'Satisfaction', Icons.thumb_up_rounded),
                   ],
-                );
-              }
-              // Desktop: All in one row
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _statItem(
-                    200,
-                    '+',
-                    'Local Farmers',
-                    Icons.agriculture_rounded,
-                  ),
-                  _statDivider(),
-                  _statItem(5000, '+', 'Products', Icons.inventory_2_rounded),
-                  _statDivider(),
-                  _statItem(
-                    24,
-                    'hrs',
-                    'Fast Delivery',
-                    Icons.local_shipping_rounded,
-                  ),
-                  _statDivider(),
-                  _statItem(98, '%', 'Satisfaction', Icons.thumb_up_rounded),
-                ],
-              );
-            },
-          ),
+                ),
         ),
       ),
     );
   }
 
-  Widget _statItem(int value, String suffix, String label, IconData icon) {
+  Widget _statItem(
+    int value,
+    String suffix,
+    String label,
+    IconData icon, {
+    bool isMobile = false,
+  }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment:
+          isMobile ? MainAxisAlignment.center : MainAxisAlignment.start,
       children: [
         Container(
-          width: 48,
-          height: 48,
+          width: isMobile ? 40 : 48,
+          height: isMobile ? 40 : 48,
           decoration: BoxDecoration(
             gradient: AgriColors.primaryGradient,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(isMobile ? 12 : 14),
             boxShadow: [
               BoxShadow(
                 color: AgriColors.emerald500.withValues(alpha: 0.2),
@@ -929,26 +964,33 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               ),
             ],
           ),
-          child: Icon(icon, color: Colors.white, size: 22),
+          child: Icon(icon, color: Colors.white, size: isMobile ? 18 : 22),
         ),
-        const SizedBox(width: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AnimatedCounter(
-              target: value,
-              suffix: suffix,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: AgriColors.dark,
+        SizedBox(width: isMobile ? 12 : 16),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedCounter(
+                target: value,
+                suffix: suffix,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: isMobile ? 22 : 28,
+                  fontWeight: FontWeight.w800,
+                  color: AgriColors.dark,
+                ),
               ),
-            ),
-            Text(
-              label,
-              style: GoogleFonts.inter(fontSize: 13, color: AgriColors.muted),
-            ),
-          ],
+              Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: isMobile ? 11 : 13,
+                  color: AgriColors.muted,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -1072,14 +1114,21 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   final crossAxisCount = constraints.maxWidth < 768
                       ? 1
                       : (constraints.maxWidth < 1024 ? 2 : 3);
-                  return GridView.count(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 24,
-                    mainAxisSpacing: 24,
-                    childAspectRatio: constraints.maxWidth < 768 ? 2.8 : 1.3,
+                  return GridView.builder(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 24,
+                      mainAxisSpacing: 24,
+                      childAspectRatio: constraints.maxWidth < 480 
+                          ? 2.0 
+                          : constraints.maxWidth < 768 
+                              ? 2.8 
+                              : 1.3,
+                    ),
+                    itemCount: features.length,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    children: List.generate(features.length, (i) {
+                    itemBuilder: (context, i) {
                       final f = features[i];
                       final isHovered = _hoveredFeature == i;
                       return MouseRegion(
@@ -1168,7 +1217,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                           ),
                         ),
                       );
-                    }),
+                    },
                   );
                 },
               ),
@@ -1260,17 +1309,13 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     ),
                   ),
                   const SizedBox(height: 60),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: List.generate(steps.length, (i) {
-                      final step = steps[i];
-                      final isHovered = _hoveredStep == i;
-                      return Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            left: i == 0 ? 0 : 16,
-                            right: i == steps.length - 1 ? 0 : 16,
-                          ),
+                  if (sw < 768)
+                    Column(
+                      children: List.generate(steps.length, (i) {
+                        final step = steps[i];
+                        final isHovered = _hoveredStep == i;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 40),
                           child: MouseRegion(
                             cursor: SystemMouseCursors.click,
                             onEnter: (_) => setState(() => _hoveredStep = i),
@@ -1284,56 +1329,8 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                               ),
                               child: Column(
                                 children: [
-                                  // Step number circle
-                                  AnimatedContainer(
-                                    duration: const Duration(milliseconds: 300),
-                                    width: 72,
-                                    height: 72,
-                                    decoration: BoxDecoration(
-                                      gradient: isHovered
-                                          ? AgriColors.primaryGradient
-                                          : null,
-                                      color: isHovered ? null : Colors.white,
-                                      shape: BoxShape.circle,
-                                      border: isHovered
-                                          ? null
-                                          : Border.all(
-                                              color: AgriColors.emerald200,
-                                              width: 2,
-                                            ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: isHovered
-                                              ? AgriColors.emerald500
-                                                    .withValues(alpha: 0.3)
-                                              : Colors.black.withValues(
-                                                  alpha: 0.05,
-                                                ),
-                                          blurRadius: isHovered ? 24 : 8,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Center(
-                                      child: isHovered
-                                          ? Icon(
-                                              step.icon,
-                                              color: Colors.white,
-                                              size: 28,
-                                            )
-                                          : Text(
-                                              '${i + 1}',
-                                              style:
-                                                  GoogleFonts.plusJakartaSans(
-                                                    fontSize: 26,
-                                                    fontWeight: FontWeight.w800,
-                                                    color:
-                                                        AgriColors.emerald600,
-                                                  ),
-                                            ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 28),
+                                  _buildStepIcon(i, step, isHovered),
+                                  const SizedBox(height: 20),
                                   Text(
                                     step.title,
                                     textAlign: TextAlign.center,
@@ -1357,10 +1354,63 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    }),
-                  ),
+                        );
+                      }),
+                    )
+                  else
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: List.generate(steps.length, (i) {
+                        final step = steps[i];
+                        final isHovered = _hoveredStep == i;
+                        return Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              left: i == 0 ? 0 : 16,
+                              right: i == steps.length - 1 ? 0 : 16,
+                            ),
+                            child: MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              onEnter: (_) => setState(() => _hoveredStep = i),
+                              onExit: (_) => setState(() => _hoveredStep = -1),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                transform: Matrix4.translationValues(
+                                  0,
+                                  isHovered ? -8 : 0,
+                                  0,
+                                ),
+                                child: Column(
+                                  children: [
+                                    _buildStepIcon(i, step, isHovered),
+                                    const SizedBox(height: 28),
+                                    Text(
+                                      step.title,
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700,
+                                        color: AgriColors.dark,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      step.description,
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        color: AgriColors.muted,
+                                        height: 1.6,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
                 ],
               ),
             ),
@@ -1399,7 +1449,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               const SizedBox(height: 20),
               // Big quote block
               Container(
-                padding: const EdgeInsets.all(48),
+                padding: EdgeInsets.all(sw < 480 ? 24 : 48),
                 decoration: BoxDecoration(
                   color: AgriColors.surface,
                   borderRadius: BorderRadius.circular(28),
@@ -1449,8 +1499,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     const SizedBox(height: 28),
                     Container(height: 1, color: AgriColors.border),
                     const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 14,
+                      runSpacing: 14,
                       children: [
                         Container(
                           width: 48,
@@ -1470,9 +1523,10 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                             ),
                           ),
                         ),
-                        const SizedBox(width: 14),
                         Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: sw < 480 
+                              ? CrossAxisAlignment.center 
+                              : CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Sarah Jenkins',
@@ -1491,16 +1545,19 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                             ),
                           ],
                         ),
-                        const SizedBox(width: 24),
+                        if (sw >= 600) const SizedBox(width: 10),
                         // Stars
-                        ...List.generate(
-                          5,
-                          (_) => const Padding(
-                            padding: EdgeInsets.only(right: 2),
-                            child: Icon(
-                              Icons.star_rounded,
-                              size: 20,
-                              color: Color(0xFFF59E0B),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: List.generate(
+                            5,
+                            (_) => const Padding(
+                              padding: EdgeInsets.only(right: 2),
+                              child: Icon(
+                                Icons.star_rounded,
+                                size: 20,
+                                color: Color(0xFFF59E0B),
+                              ),
                             ),
                           ),
                         ),
@@ -1976,7 +2033,13 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   scale: scale,
                   onTap: () {
                     setState(() {
-                      _activeBannerIndex = index;
+                      // If clicking the front image, cycle to the next one
+                      // If clicking a back image, bring it to the front
+                      if (position == 0) {
+                        _activeBannerIndex = (index + 1) % banners.length;
+                      } else {
+                        _activeBannerIndex = index;
+                      }
                     });
                   },
                 ),
@@ -2534,6 +2597,53 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
           text,
           style: GoogleFonts.inter(fontSize: 13, color: AgriColors.mutedLight),
         ),
+      ),
+    );
+  }
+
+  // ── Helper: Step Icon Circle ──
+  Widget _buildStepIcon(int index, _Step step, bool isHovered) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(
+        gradient: isHovered ? AgriColors.primaryGradient : null,
+        color: isHovered ? null : Colors.white,
+        shape: BoxShape.circle,
+        border: isHovered
+            ? null
+            : Border.all(
+                color: AgriColors.emerald200,
+                width: 2,
+              ),
+        boxShadow: [
+          BoxShadow(
+            color: isHovered
+                ? AgriColors.emerald500.withValues(alpha: 0.3)
+                : Colors.black.withValues(
+                    alpha: 0.05,
+                  ),
+            blurRadius: isHovered ? 24 : 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Center(
+        child: isHovered
+            ? Icon(
+                step.icon,
+                color: Colors.white,
+                size: 28,
+              )
+            : Text(
+                '${index + 1}',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: AgriColors.emerald600,
+                ),
+              ),
       ),
     );
   }

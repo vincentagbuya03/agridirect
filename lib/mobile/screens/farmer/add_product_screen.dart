@@ -486,7 +486,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                     const TextInputType.numberWithOptions(
                                       decimal: true,
                                     ),
-                                prefixIcon: Icons.attach_money_rounded,
+                                prefixIcon: Icons.sell_outlined,
+                                prefixText: '₱ ',
                                 validator: (value) {
                                   if (value?.isEmpty ?? true) return 'Required';
                                   if (double.tryParse(value!) == null) {
@@ -520,7 +521,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                     const TextInputType.numberWithOptions(
                                       decimal: true,
                                     ),
-                                prefixIcon: Icons.attach_money_rounded,
+                                prefixIcon: Icons.sell_outlined,
+                                prefixText: '₱ ',
                                 validator: (value) {
                                   if (value?.isEmpty ?? true) return 'Required';
                                   if (double.tryParse(value!) == null) {
@@ -960,6 +962,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     IconData? prefixIcon,
+    String? prefixText,
     String? Function(String?)? validator,
   }) {
     return Column(
@@ -990,6 +993,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
             prefixIcon: prefixIcon != null
                 ? Icon(prefixIcon, color: Colors.grey[500], size: 20)
                 : null,
+            prefixText: prefixText,
+            prefixStyle: GoogleFonts.plusJakartaSans(
+              color: const Color(0xFF0F172A),
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,

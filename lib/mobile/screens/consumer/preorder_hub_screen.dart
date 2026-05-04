@@ -10,8 +10,10 @@ import '../../../shared/router/app_router.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/models/cached_product.dart';
 import '../../../shared/services/offline/offline_cache_service.dart';
+import '../../../shared/services/offline/network_status_service.dart';
 import '../../widgets/offline_browse_widget.dart';
 import '../../widgets/skeleton_loaders.dart';
+import '../../../shared/services/auth/auth_service.dart';
 
 /// Pre-Order Hub - Premium Reservation Interface
 class PreOrderHubScreen extends StatefulWidget {
@@ -23,7 +25,9 @@ class PreOrderHubScreen extends StatefulWidget {
 
 class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
   int _selectedFilter = 0;
-  final _filters = ['All Crops', 'Vegetables', 'Fruits', 'Organic', 'Grains'];
+  List<String> _filters = ['All Crops'];
+  final _searchController = TextEditingController();
+  late Future<List<ProductItem>> _preOrdersFuture;
   bool _isOnline = true;
   late OfflineCacheService _cacheService;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -33,6 +37,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
     super.initState();
     _initializeCacheService();
     _setupConnectivityListener();
+    _preOrdersFuture = _loadPreOrders();
   }
 
   void _initializeCacheService() {
@@ -40,32 +45,58 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
   }
 
   void _setupConnectivityListener() {
-    Connectivity().checkConnectivity().then((result) {
-      final isOnline =
-          result.isNotEmpty && result.first != ConnectivityResult.none;
-      if (mounted) {
-        setState(() {
-          _isOnline = isOnline;
-        });
-      }
-    });
+    _refreshConnectivityStatus();
 
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
-      result,
-    ) {
-      final isOnline =
-          result.isNotEmpty && result.first != ConnectivityResult.none;
+      _,
+    ) async {
+      final wasOffline = !_isOnline;
+      final isOnline = await NetworkStatusService().isOnline();
       if (mounted) {
         setState(() {
           _isOnline = isOnline;
+          if (wasOffline && isOnline) {
+            _preOrdersFuture = _loadPreOrders();
+          }
         });
       }
     });
   }
 
+  Future<void> _refreshConnectivityStatus() async {
+    final isOnline = await NetworkStatusService().isOnline();
+    if (mounted) {
+      setState(() => _isOnline = isOnline);
+    }
+  }
+
+  Future<List<ProductItem>> _loadPreOrders() async {
+    final products = await SupabaseDataService().getPreOrderProducts();
+    final categories =
+        products
+            .map((p) => p.categoryName?.trim())
+            .where((category) => category != null && category.isNotEmpty)
+            .cast<String>()
+            .toSet()
+            .toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    if (mounted) {
+      setState(() {
+        _filters = ['All Crops', ...categories];
+        if (_selectedFilter >= _filters.length) {
+          _selectedFilter = 0;
+        }
+      });
+    }
+
+    return _sortPreOrders(products);
+  }
+
   @override
   void dispose() {
     _connectivitySubscription?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -81,7 +112,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
+        onPressed: _showSavedSeedsInfo,
         backgroundColor: AppColors.textHeadline,
         elevation: 12,
         icon: const Icon(
@@ -158,6 +189,8 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
                         ),
                       ),
                       child: TextField(
+                        controller: _searchController,
+                        onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
                           hintText: 'Search upcoming harvests...',
                           hintStyle: AppTextStyles.bodyMedium.copyWith(
@@ -273,10 +306,15 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
   Widget _buildPreOrderList() {
     if (!_isOnline) {
       // Offline mode with cached preorder products
+      final currentUserId = AuthService().userId;
       final cachedPreorders = _cacheService
           .getAllCachedProducts()
           .where((p) => p.isPreorder)
           .map(_cachedToProductItem)
+          .where((p) {
+            final isNotMine = currentUserId.isEmpty || p.farmerId != currentUserId;
+            return _matchesCurrentFilters(p) && isNotMine;
+          })
           .toList();
 
       return Column(
@@ -287,40 +325,18 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
           ),
           Expanded(
             child: cachedPreorders.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.offline_bolt_rounded,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No Cached Pre-orders',
-                          style: AppTextStyles.headline3.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Load pre-orders while online to view them offline.',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: Colors.grey[500],
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  )
+                ? _buildEmptyState(isOffline: true)
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
                     physics: const BouncingScrollPhysics(),
                     itemCount: cachedPreorders.length + 1,
                     separatorBuilder: (_, i) => const SizedBox(height: 24),
                     itemBuilder: (_, i) {
-                      if (i == 0) return _buildPreOrderSectionHeader();
+                      if (i == 0) {
+                        return _buildPreOrderSectionHeader(
+                          cachedPreorders.length,
+                        );
+                      }
                       return _buildPremiumPreOrderCard(cachedPreorders[i - 1]);
                     },
                   ),
@@ -330,7 +346,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
     }
 
     return FutureBuilder<List<ProductItem>>(
-      future: SupabaseDataService().getPreOrderProducts(),
+      future: _preOrdersFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Padding(
@@ -339,11 +355,22 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
           );
         }
 
-        final preOrders = snapshot.data ?? [];
+        if (snapshot.hasError) {
+          return _buildErrorState(snapshot.error.toString());
+        }
+
+        final currentUserId = AuthService().userId;
+        final preOrders = (snapshot.data ?? [])
+            .where((p) {
+              final isNotMine = currentUserId.isEmpty || p.farmerId != currentUserId;
+              return _matchesCurrentFilters(p) && isNotMine;
+            })
+            .toList();
 
         // Auto-cache preorder products
-        if (preOrders.isNotEmpty) {
-          for (final product in preOrders) {
+        final allPreOrders = snapshot.data ?? [];
+        if (allPreOrders.isNotEmpty) {
+          for (final product in allPreOrders) {
             final cachedProduct = CachedProduct(
               id: product.productId ?? 'unknown_${product.name}',
               farmerId: product.farmerId ?? '',
@@ -351,6 +378,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
               price: _parsePrice(product.price),
               description: product.description,
               imageUrl: product.imageUrl,
+              category: product.categoryName,
               unit: product.unit,
               isPreorder: true,
               harvestDays: int.tryParse(product.harvestDays ?? '0') ?? 0,
@@ -362,18 +390,63 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
           }
         }
 
-        return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
-          physics: const BouncingScrollPhysics(),
-          itemCount: preOrders.length + 1,
-          separatorBuilder: (_, i) => const SizedBox(height: 24),
-          itemBuilder: (_, i) {
-            if (i == 0) return _buildPreOrderSectionHeader();
-            return _buildPremiumPreOrderCard(preOrders[i - 1]);
-          },
+        if (preOrders.isEmpty) {
+          return _buildEmptyState();
+        }
+
+        return RefreshIndicator(
+          onRefresh: _refreshPreOrders,
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            itemCount: preOrders.length + 1,
+            separatorBuilder: (_, _) => const SizedBox(height: 24),
+            itemBuilder: (_, i) {
+              if (i == 0) return _buildPreOrderSectionHeader(preOrders.length);
+              return _buildPremiumPreOrderCard(preOrders[i - 1]);
+            },
+          ),
         );
       },
     );
+  }
+
+  Future<void> _refreshPreOrders() async {
+    setState(() {
+      _preOrdersFuture = _loadPreOrders();
+    });
+    await _preOrdersFuture;
+  }
+
+  List<ProductItem> _sortPreOrders(List<ProductItem> products) {
+    final sorted = [...products];
+    sorted.sort((a, b) {
+      final aDays = int.tryParse(a.harvestDays ?? '') ?? 9999;
+      final bDays = int.tryParse(b.harvestDays ?? '') ?? 9999;
+      return aDays.compareTo(bDays);
+    });
+    return sorted;
+  }
+
+  bool _matchesCurrentFilters(ProductItem product) {
+    final query = _searchController.text.trim().toLowerCase();
+    final matchesSearch =
+        query.isEmpty ||
+        product.name.toLowerCase().contains(query) ||
+        product.farm.toLowerCase().contains(query) ||
+        (product.categoryName ?? '').toLowerCase().contains(query);
+
+    if (!matchesSearch) return false;
+
+    if (_selectedFilter == 0 || _selectedFilter >= _filters.length) {
+      return true;
+    }
+
+    final selectedCategory = _filters[_selectedFilter].trim().toLowerCase();
+    final productCategory = (product.categoryName ?? '').trim().toLowerCase();
+    return productCategory.isNotEmpty && productCategory == selectedCategory;
   }
 
   double _parsePrice(String rawPrice) {
@@ -394,6 +467,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
       price: '₱${product.price.toStringAsFixed(2)}',
       unit: normalizedUnit.isEmpty ? 'kg' : normalizedUnit,
       imageUrl: product.imageUrl ?? '',
+      categoryName: product.category,
       rating: (product.rating ?? 0).toStringAsFixed(1),
       reviews: '0',
       harvestDays: product.harvestDays.toString(),
@@ -403,7 +477,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
     );
   }
 
-  Widget _buildPreOrderSectionHeader() {
+  Widget _buildPreOrderSectionHeader(int count) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Row(
@@ -427,7 +501,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
           ),
           const Spacer(),
           Text(
-            'SEE ALL',
+            '$count LIVE',
             style: AppTextStyles.labelSmall.copyWith(
               color: AppColors.primary,
               fontWeight: FontWeight.w800,
@@ -466,6 +540,18 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
                   height: 220,
                   width: double.infinity,
                   fit: BoxFit.cover,
+                  placeholder: (context, url) =>
+                      Container(color: AppColors.background),
+                  errorWidget: (context, url, error) => Container(
+                    color: AppColors.background,
+                    child: const Center(
+                      child: Icon(
+                        Icons.image_outlined,
+                        color: AppColors.textSubtle,
+                        size: 42,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               Positioned(
@@ -611,9 +697,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
                     ],
                   ),
                   child: ElevatedButton(
-                    onPressed: () {
-                      context.push(AppRoutes.preorderDetails, extra: product);
-                    },
+                    onPressed: () => _openPreOrderDetails(product),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -692,6 +776,115 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
     final numeric = trimmed.replaceAll(RegExp(r'[^0-9.]'), '');
     if (numeric.isEmpty) return '₱0';
     return '₱$numeric';
+  }
+
+  void _openPreOrderDetails(ProductItem product) {
+    final productId = product.productId;
+    if (productId == null || productId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This pre-order is missing product details.'),
+        ),
+      );
+      return;
+    }
+
+    context.push(AppRoutes.preorderDetails, extra: product);
+  }
+
+  Widget _buildEmptyState({bool isOffline = false}) {
+    final hasSearch = _searchController.text.trim().isNotEmpty;
+    final hasCategory =
+        _selectedFilter > 0 && _selectedFilter < _filters.length;
+
+    final title = isOffline
+        ? 'No Cached Pre-orders'
+        : hasSearch || hasCategory
+        ? 'No Matching Pre-orders'
+        : 'No Pre-orders Yet';
+
+    final message = isOffline
+        ? 'Load pre-orders while online to view them offline.'
+        : hasSearch || hasCategory
+        ? 'Try another search or switch back to All Crops.'
+        : 'Upcoming harvests from farmers will appear here.';
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isOffline ? Icons.offline_bolt_rounded : Icons.spa_outlined,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: AppTextStyles.headline3.copyWith(color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+            if (hasSearch || hasCategory) ...[
+              const SizedBox(height: 16),
+              OutlinedButton(
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() => _selectedFilter = 0);
+                },
+                child: const Text('Show All Crops'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'Could not load pre-orders',
+              style: AppTextStyles.headline3.copyWith(color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error.replaceFirst('Exception: ', ''),
+              style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _refreshPreOrders,
+              child: const Text('Try Again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSavedSeedsInfo() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Saved pre-orders are available offline after browsing.'),
+      ),
+    );
   }
 
   Widget _buildHotTag(bool isHot) {

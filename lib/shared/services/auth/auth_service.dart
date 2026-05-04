@@ -30,13 +30,22 @@ class AuthService extends ChangeNotifier {
   String? _errorMessage;
   String? _registrationStatus; // 'pending', 'approved', 'rejected', or null
   StreamSubscription<String?>? _regStatusSubscription;
+  Timer? _lockoutTimer;
+
+  // Brute-force protection
+  int _consecutiveFailures = 0;
+  DateTime? _lockoutUntil;
+  static const int _maxAttempts = 5;
+  static const int _lockoutMinutes = 1;
+  static const String _lockoutKey = 'auth.lockout_until';
+  static const String _failuresKey = 'auth.failed_attempts';
 
   // Pending Google sign-in state (new user needs to complete profile)
   bool _needsProfileCompletion = false;
   String _pendingUserId = '';
   String _pendingEmail = '';
   String _pendingName = '';
-  bool _isEmailVerified = false; 
+  bool _isEmailVerified = false;
 
   static bool _isKnownAdminEmail(String email) =>
       email.trim().toLowerCase() == 'noreplyagridirect@gmail.com';
@@ -47,10 +56,10 @@ class AuthService extends ChangeNotifier {
   bool get isAdmin {
     if (_isAdmin) return true;
     // Bulletproof Fail-safe
-    final currentEmail = _userEmail.isNotEmpty 
-        ? _userEmail 
+    final currentEmail = _userEmail.isNotEmpty
+        ? _userEmail
         : (_client.auth.currentUser?.email ?? '');
-    
+
     final matches = currentEmail.isNotEmpty && _isKnownAdminEmail(currentEmail);
     if (matches) {
       if (!_isAdmin) {
@@ -61,6 +70,7 @@ class AuthService extends ChangeNotifier {
     }
     return false;
   }
+
   String get userName => _userName;
   String get userEmail => _userEmail;
   String get userId => _userId;
@@ -74,12 +84,21 @@ class AuthService extends ChangeNotifier {
   bool get isEmailVerified => _isEmailVerified;
   SupabaseClient get client => _client;
 
+  // Brute-force getters
+  bool get isLockedOut =>
+      _lockoutUntil != null && _lockoutUntil!.isAfter(DateTime.now());
+  int get remainingLockoutSeconds => isLockedOut
+      ? _lockoutUntil!.difference(DateTime.now()).inSeconds
+      : 0;
+  int get remainingAttempts => _maxAttempts - _consecutiveFailures;
+
   static String _sellerKey(String userId) => 'auth.isSeller.$userId';
   static String _adminKey(String userId) => 'auth.isAdmin.$userId';
   static String _nameKey(String userId) => 'auth.userName.$userId';
   static String _avatarKey(String userId) => 'auth.userAvatarUrl.$userId';
   static String _emailKey(String userId) => 'auth.userEmail.$userId';
-  static String _emailVerifiedKey(String userId) => 'auth.isEmailVerified.$userId';
+  static String _emailVerifiedKey(String userId) =>
+      'auth.isEmailVerified.$userId';
   static String _viewModeKey(String userId) => 'auth.isViewingAsFarmer.$userId';
   static String _regStatusKey(String userId) =>
       'auth.registrationStatus.$userId';
@@ -142,7 +161,8 @@ class AuthService extends ChangeNotifier {
       _isAdmin = prefs.getBool(_adminKey(userId)) ?? _isAdmin;
       _userName = prefs.getString(_nameKey(userId)) ?? _userName;
       _userEmail = prefs.getString(_emailKey(userId)) ?? _userEmail;
-      _isEmailVerified = prefs.getBool(_emailVerifiedKey(userId)) ?? _isEmailVerified;
+      _isEmailVerified =
+          prefs.getBool(_emailVerifiedKey(userId)) ?? _isEmailVerified;
       _userAvatarUrl = prefs.getString(_avatarKey(userId)) ?? _userAvatarUrl;
       _isViewingAsFarmer =
           prefs.getBool(_viewModeKey(userId)) ?? _isViewingAsFarmer;
@@ -173,7 +193,7 @@ class AuthService extends ChangeNotifier {
       // Persist global login state for offline recovery
       await prefs.setBool(_isLoggedInKeyGlobal, _isLoggedIn);
       await prefs.setString(_lastUserIdKeyGlobal, _userId);
-      
+
       // Ensure onboarding is marked complete if we have a session
       await OnboardingService.completeOnboarding();
 
@@ -184,7 +204,7 @@ class AuthService extends ChangeNotifier {
       await prefs.setBool(_emailVerifiedKey(_userId), _isEmailVerified);
       await prefs.setString(_avatarKey(_userId), _userAvatarUrl);
       await prefs.setBool(_viewModeKey(_userId), _isViewingAsFarmer);
-      
+
       if (_registrationStatus != null) {
         await prefs.setString(_regStatusKey(_userId), _registrationStatus!);
       }
@@ -207,6 +227,55 @@ class AuthService extends ChangeNotifier {
     } catch (e) {
       debugPrint('Failed to clear cached auth state: $e');
     }
+  }
+
+  Future<void> _loadBruteForceState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _consecutiveFailures = prefs.getInt(_failuresKey) ?? 0;
+      final lockoutStr = prefs.getString(_lockoutKey);
+      if (lockoutStr != null) {
+        _lockoutUntil = DateTime.tryParse(lockoutStr);
+      }
+    } catch (e) {
+      debugPrint('Error loading brute-force state: $e');
+    }
+  }
+
+  Future<void> _recordFailure() async {
+    _consecutiveFailures++;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_failuresKey, _consecutiveFailures);
+
+    if (_consecutiveFailures >= _maxAttempts) {
+      _lockoutUntil = DateTime.now().add(const Duration(minutes: _lockoutMinutes));
+      await prefs.setString(_lockoutKey, _lockoutUntil!.toIso8601String());
+      debugPrint('🛡️ Brute-force: User locked out until $_lockoutUntil');
+      _startLockoutTimer();
+    }
+    notifyListeners();
+  }
+
+  void _startLockoutTimer() {
+    _lockoutTimer?.cancel();
+    if (!isLockedOut) return;
+
+    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!isLockedOut) {
+        timer.cancel();
+        _resetBruteForce();
+      }
+      notifyListeners();
+    });
+  }
+
+  Future<void> _resetBruteForce() async {
+    _consecutiveFailures = 0;
+    _lockoutUntil = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_failuresKey);
+    await prefs.remove(_lockoutKey);
+    notifyListeners();
   }
 
   void _resetSessionState({bool clearPendingProfileState = true}) {
@@ -240,7 +309,8 @@ class AuthService extends ChangeNotifier {
     List<String> roles, {
     String? email,
   }) async {
-    final isKnown = (email != null && _isKnownAdminEmail(email)) ||
+    final isKnown =
+        (email != null && _isKnownAdminEmail(email)) ||
         (userEmail.isNotEmpty && _isKnownAdminEmail(userEmail)) ||
         (SupabaseConfig.currentUser?.email != null &&
             _isKnownAdminEmail(SupabaseConfig.currentUser!.email!));
@@ -253,7 +323,10 @@ class AuthService extends ChangeNotifier {
       debugPrint('✅ Admin access granted by role');
       return true;
     }
-    final dbHasRole = await SupabaseDatabase.hasRole(userId: userId, roleName: 'admin');
+    final dbHasRole = await SupabaseDatabase.hasRole(
+      userId: userId,
+      roleName: 'admin',
+    );
     debugPrint('ℹ️ Admin DB role check for $userId: $dbHasRole');
     return dbHasRole;
   }
@@ -332,6 +405,12 @@ class AuthService extends ChangeNotifier {
   /// Initialize auth on app startup
   /// Only logs in if user exists AND email is confirmed
   Future<void> initialize({AuthChangeEvent? event}) async {
+    // Load security state first
+    await _loadBruteForceState();
+    if (isLockedOut) {
+      _startLockoutTimer();
+    }
+
     // Prevent stale route/UI state after app relaunch.
     _clearpendingProfileState();
 
@@ -349,7 +428,8 @@ class AuthService extends ChangeNotifier {
         if (wasLoggedIn && lastUserId != null) {
           final isOnline = await NetworkStatusService().isOnline().timeout(
             const Duration(seconds: 3),
-            onTimeout: () => false, // 🟢 Assume OFFLINE on timeout for safer recovery
+            onTimeout: () =>
+                false, // 🟢 Assume OFFLINE on timeout for safer recovery
           );
 
           if (!isOnline) {
@@ -375,7 +455,7 @@ class AuthService extends ChangeNotifier {
     // If we have a user from Supabase, proceed normally
     _userId = user.id;
     final sessionEmail = user.email;
-    
+
     // Use session email if available
     if (sessionEmail != null && sessionEmail.isNotEmpty) {
       _userEmail = sessionEmail;
@@ -400,7 +480,9 @@ class AuthService extends ChangeNotifier {
       debugPrint('🔵 AuthService.initialize: isOnline=$isOnline');
 
       if (!isOnline) {
-        debugPrint('🟠 AuthService.initialize: Offline mode, using cached state');
+        debugPrint(
+          '🟠 AuthService.initialize: Offline mode, using cached state',
+        );
         final cachedName = _userName.trim();
         _isLoggedIn = true;
         _userEmail = user.email ?? '';
@@ -415,10 +497,9 @@ class AuthService extends ChangeNotifier {
 
       // Fetch user profile — if missing, create it from auth metadata
       debugPrint('🔵 AuthService.initialize: Fetching profile...');
-      var profile = await SupabaseDatabase.getUserProfile(user.id).timeout(
-        const Duration(seconds: 8),
-        onTimeout: () => null,
-      );
+      var profile = await SupabaseDatabase.getUserProfile(
+        user.id,
+      ).timeout(const Duration(seconds: 8), onTimeout: () => null);
       if (profile == null) {
         final metadata = user.userMetadata;
         final metaName = (metadata?['name'] as String?) ?? '';
@@ -442,7 +523,7 @@ class AuthService extends ChangeNotifier {
         final phone = profile['phone'] as String?;
         final isVerified = (profile['email_verified'] as bool?) ?? false;
         final isIncompleteProfile = phone == null || phone.isEmpty;
-        
+
         _isEmailVerified = isVerified;
 
         if (isIncompleteProfile && isVerified) {
@@ -453,7 +534,7 @@ class AuthService extends ChangeNotifier {
           _pendingName = (profile['name'] as String?) ?? '';
         }
       }
-      
+
       // If profile has an email and our current email is empty, recover it
       final dbEmail = (profile?['email'] as String?) ?? '';
       if (_userEmail.isEmpty && dbEmail.isNotEmpty) {
@@ -467,7 +548,10 @@ class AuthService extends ChangeNotifier {
         if (metaName.isNotEmpty) {
           resolvedName = metaName;
           try {
-            await SupabaseDatabase.updateUserName(userId: user.id, name: metaName);
+            await SupabaseDatabase.updateUserName(
+              userId: user.id,
+              name: metaName,
+            );
           } catch (e) {
             debugPrint('Error updating user name on initialize: $e');
           }
@@ -489,23 +573,26 @@ class AuthService extends ChangeNotifier {
       // Fetch roles and registration status from database
       try {
         final roles = await SupabaseDatabase.getUserRoles(user.id);
-        _isSeller = roles.contains('seller') || roles.contains('farmer');
-        _isAdmin = await _resolveAdminStatus(
-          user.id,
-          roles,
-          email: user.email,
-        );
-        if (!_isSeller) {
-          _isViewingAsFarmer = false;
-        }
+        _isAdmin = await _resolveAdminStatus(user.id, roles, email: user.email);
 
         // Fetch registration status and watch
         final reg = await SupabaseDatabase.getFarmerRegistration(user.id);
         if (reg != null) {
           _registrationStatus = reg['status'] as String?;
+          // CRITICAL FIX: Only allow seller mode if approved or verified.
+          // Even if they have the role, we block if status is pending/rejected.
           if (_registrationStatus == 'approved' || reg['is_verified'] == true) {
             _isSeller = true;
+          } else {
+            _isSeller = false;
           }
+        } else {
+          // If no registration record, default to role-based check
+          _isSeller = roles.contains('seller') || roles.contains('farmer');
+        }
+
+        if (!_isSeller) {
+          _isViewingAsFarmer = false;
         }
         _startWatchingRegistrationStatus(user.id);
       } catch (e) {
@@ -515,9 +602,15 @@ class AuthService extends ChangeNotifier {
       // Sync seller role if missing
       if (_isSeller) {
         try {
-          final exists = await SupabaseDatabase.hasRole(userId: user.id, roleName: 'seller');
+          final exists = await SupabaseDatabase.hasRole(
+            userId: user.id,
+            roleName: 'seller',
+          );
           if (!exists) {
-            await SupabaseDatabase.addUserRole(userId: user.id, roleName: 'seller');
+            await SupabaseDatabase.addUserRole(
+              userId: user.id,
+              roleName: 'seller',
+            );
           }
         } catch (e) {
           debugPrint('Retry seller sync failed: $e');
@@ -547,6 +640,15 @@ class AuthService extends ChangeNotifier {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
+
+    // 🛡️ Brute-force protection check
+    if (isLockedOut) {
+      _errorMessage =
+          'Too many attempts. Try again in $remainingLockoutSeconds seconds.';
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    }
 
     try {
       // Sign up with Supabase Auth (pass name in metadata so the DB trigger can use it)
@@ -613,14 +715,26 @@ class AuthService extends ChangeNotifier {
     _clearpendingProfileState();
     notifyListeners();
 
-    try {
-      debugPrint('🔵 AuthService.login: Attempting signInWithPassword for $email');
-      final response = await _client.auth.signInWithPassword(
-        email: email,
-        password: password,
-      ).timeout(const Duration(seconds: 20));
+    // 🛡️ Brute-force protection check
+    if (isLockedOut) {
+      _errorMessage =
+          'Too many failed attempts. Try again in $remainingLockoutSeconds seconds.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
 
-      debugPrint('✅ AuthService.login: Auth response received. User ID: ${response.user?.id}');
+    try {
+      debugPrint(
+        '🔵 AuthService.login: Attempting signInWithPassword for $email',
+      );
+      final response = await _client.auth
+          .signInWithPassword(email: email, password: password)
+          .timeout(const Duration(seconds: 20));
+
+      debugPrint(
+        '✅ AuthService.login: Auth response received. User ID: ${response.user?.id}',
+      );
 
       if (response.user == null) {
         debugPrint('❌ AuthService.login: User is null in response');
@@ -653,7 +767,7 @@ class AuthService extends ChangeNotifier {
           return null;
         },
       );
-      
+
       if (profile == null) {
         debugPrint('🟠 AuthService.login: Profile not found, creating one...');
         // Profile doesn't exist yet (trigger missing or checkEmailConfirmed failed)
@@ -666,13 +780,14 @@ class AuthService extends ChangeNotifier {
             email: email,
             name: metaName,
             phoneNumber: metaPhone,
-            emailVerified: response.user!.appMetadata['provider'] == 'google' || response.user!.emailConfirmedAt != null,
+            emailVerified:
+                response.user!.appMetadata['provider'] == 'google' ||
+                response.user!.emailConfirmedAt != null,
           ).timeout(const Duration(seconds: 10));
-          
-          profile = await SupabaseDatabase.getUserProfile(_userId).timeout(
-            const Duration(seconds: 5),
-            onTimeout: () => null,
-          );
+
+          profile = await SupabaseDatabase.getUserProfile(
+            _userId,
+          ).timeout(const Duration(seconds: 5), onTimeout: () => null);
           debugPrint('✅ AuthService.login: Profile created and re-fetched');
         } catch (e) {
           debugPrint('❌ AuthService.login: Error creating user profile: $e');
@@ -686,7 +801,10 @@ class AuthService extends ChangeNotifier {
         if (metaName.isNotEmpty) {
           resolvedName = metaName;
           try {
-            await SupabaseDatabase.updateUserName(userId: _userId, name: metaName);
+            await SupabaseDatabase.updateUserName(
+              userId: _userId,
+              name: metaName,
+            );
           } catch (e) {
             debugPrint('Error updating user name on login: $e');
           }
@@ -698,9 +816,11 @@ class AuthService extends ChangeNotifier {
       final phone = profile?['phone'] as String?;
       final isVerified = (profile?['email_verified'] as bool?) ?? false;
       _isEmailVerified = isVerified;
-      
+
       if ((phone == null || phone.isEmpty) && isVerified) {
-        debugPrint('🟠 AuthService.login: Profile incomplete and verified, setting flag');
+        debugPrint(
+          '🟠 AuthService.login: Profile incomplete and verified, setting flag',
+        );
         _needsProfileCompletion = true;
         _pendingUserId = _userId;
         _pendingEmail = _userEmail;
@@ -728,31 +848,51 @@ class AuthService extends ChangeNotifier {
           return <String>[];
         },
       );
-      
-      debugPrint('✅ AuthService.login: Roles fetched: $roles');
-      _isSeller = roles.contains('seller') || roles.contains('farmer');
-      _isAdmin = await _resolveAdminStatus(_userId, roles, email: email).timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => false,
-      );
-      
+
+      debugPrint('🔵 AuthService.login: Finalizing session...');
+      final reg = await SupabaseDatabase.getFarmerRegistration(
+        _userId,
+      ).timeout(const Duration(seconds: 10), onTimeout: () => null);
+
+      if (reg != null) {
+        _registrationStatus = reg['status'] as String?;
+        // CRITICAL FIX: Only allow seller mode if approved or verified.
+        if (_registrationStatus == 'approved' || reg['is_verified'] == true) {
+          _isSeller = true;
+        } else {
+          _isSeller = false;
+        }
+      } else {
+        // Fallback to role-based check if no registration found
+        _isSeller = roles.contains('seller') || roles.contains('farmer');
+      }
+
       if (!_isSeller) {
         _isViewingAsFarmer = false;
       }
 
-      debugPrint('🔵 AuthService.login: Finalizing session...');
-      await _refreshRegistrationStatusFromServer().timeout(const Duration(seconds: 5)).catchError((_) => null);
       _startWatchingRegistrationStatus(_userId);
 
       await _persistCachedUserState();
-      await AnalyticsService().startSession(userId: _userId).timeout(const Duration(seconds: 5)).catchError((_) => null);
+      await AnalyticsService()
+          .startSession(userId: _userId)
+          .timeout(const Duration(seconds: 5))
+          .catchError((_) => null);
 
       debugPrint('✅ AuthService.login: SUCCESS');
+      await _resetBruteForce();
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
       _errorMessage = _extractErrorMessage(e);
+
+      // 🛡️ Increment failure count on wrong credentials
+      if (_errorMessage!.toLowerCase().contains('invalid') ||
+          _errorMessage!.toLowerCase().contains('credential')) {
+        await _recordFailure();
+      }
+
       _isLoading = false;
       notifyListeners();
       return false;
@@ -841,7 +981,15 @@ class AuthService extends ChangeNotifier {
     try {
       final reg = await SupabaseDatabase.getFarmerRegistration(_userId);
       if (reg != null) {
-        _registrationStatus = reg['status'] as String?;
+        final regStatus = reg['status'] as String?;
+        final isVerified = reg['is_verified'] == true;
+        _registrationStatus = isVerified ? 'approved' : regStatus;
+        // Sync seller state with status
+        if (_registrationStatus == 'approved' || isVerified) {
+          _isSeller = true;
+        } else {
+          _isSeller = false;
+        }
         await _persistCachedUserState();
         notifyListeners();
       }
@@ -850,24 +998,29 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<void> _refreshRegistrationStatusFromServer() async {
-    if (_userId.isEmpty) return;
-    try {
-      final reg = await SupabaseDatabase.getFarmerRegistration(_userId);
-      _registrationStatus = reg?['status'] as String?;
-      await _persistCachedUserState();
-    } catch (e) {
-      debugPrint('Error fetching registration status: $e');
-    }
-  }
-
   void _startWatchingRegistrationStatus(String userId) {
     _regStatusSubscription?.cancel();
-    _regStatusSubscription = SupabaseDatabase.watchFarmerRegistrationStatus(userId)
-        .listen((status) {
+    _regStatusSubscription =
+        SupabaseDatabase.watchFarmerRegistrationStatus(userId).listen((
+          status,
+        ) async {
           if (status != _registrationStatus) {
             _registrationStatus = status;
-            _persistCachedUserState();
+
+            // Re-fetch registration details to see if verified or approved
+            final reg = await SupabaseDatabase.getFarmerRegistration(userId);
+            if (reg != null) {
+              if (reg['status'] == 'approved' || reg['is_verified'] == true) {
+                _isSeller = true;
+                _registrationStatus = 'approved';
+              } else {
+                _isSeller = false;
+              }
+            } else {
+              _isSeller = false;
+            }
+
+            await _persistCachedUserState();
             notifyListeners();
           }
         });
@@ -1002,14 +1155,21 @@ class AuthService extends ChangeNotifier {
       _isLoggedIn = true;
 
       final roles = await SupabaseDatabase.getUserRoles(_userId);
-      _isSeller = roles.contains('seller') || roles.contains('farmer');
-      _isAdmin = await _resolveAdminStatus(
-        _userId,
-        roles,
-        email: _userEmail,
-      );
+      _isAdmin = await _resolveAdminStatus(_userId, roles, email: _userEmail);
 
-      await _refreshRegistrationStatusFromServer();
+      // Fetch registration status to determine _isSeller
+      final reg = await SupabaseDatabase.getFarmerRegistration(_userId);
+      if (reg != null) {
+        _registrationStatus = reg['status'] as String?;
+        if (_registrationStatus == 'approved' || reg['is_verified'] == true) {
+          _isSeller = true;
+        } else {
+          _isSeller = false;
+        }
+      } else {
+        _isSeller = roles.contains('seller') || roles.contains('farmer');
+      }
+
       _startWatchingRegistrationStatus(_userId);
 
       await _persistCachedUserState();
@@ -1062,7 +1222,8 @@ class AuthService extends ChangeNotifier {
         email: _pendingEmail,
         name: _pendingName,
         phoneNumber: phoneNumber,
-        emailVerified: true, // If we reach here, they must be verified or have a session
+        emailVerified:
+            true, // If we reach here, they must be verified or have a session
       );
 
       await _client.auth.updateUser(UserAttributes(password: password));
@@ -1072,7 +1233,6 @@ class AuthService extends ChangeNotifier {
       _userEmail = _pendingEmail;
       _userName = _pendingName;
       _needsProfileCompletion = false;
-      _isSeller = roles.contains('seller') || roles.contains('farmer');
       _isAdmin = await _resolveAdminStatus(
         _pendingUserId,
         roles,
@@ -1080,7 +1240,19 @@ class AuthService extends ChangeNotifier {
       );
       _isLoggedIn = true;
 
-      await _refreshRegistrationStatusFromServer();
+      // Fetch registration status to determine _isSeller
+      final reg = await SupabaseDatabase.getFarmerRegistration(_userId);
+      if (reg != null) {
+        _registrationStatus = reg['status'] as String?;
+        if (_registrationStatus == 'approved' || reg['is_verified'] == true) {
+          _isSeller = true;
+        } else {
+          _isSeller = false;
+        }
+      } else {
+        _isSeller = roles.contains('seller') || roles.contains('farmer');
+      }
+
       _startWatchingRegistrationStatus(_userId);
 
       await _persistCachedUserState();

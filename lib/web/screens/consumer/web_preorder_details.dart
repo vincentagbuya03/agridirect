@@ -65,17 +65,24 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
               _buildTopBar(context, isCompact: isCompact),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.all(isCompact ? 20 : 32),
+                  padding: EdgeInsets.fromLTRB(
+                    isCompact ? 16 : 32,
+                    isCompact ? 14 : 32,
+                    isCompact ? 16 : 32,
+                    isCompact ? 28 : 32,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildBreadcrumbs(),
-                      SizedBox(height: isCompact ? 18 : 24),
+                      SizedBox(height: isCompact ? 14 : 24),
                       _buildMainContent(isCompact: isCompact),
-                      SizedBox(height: isCompact ? 36 : 48),
-                      _buildFarmSection(),
-                      SizedBox(height: isCompact ? 36 : 48),
-                      _buildRelatedProducts(),
+                      if (!isCompact) ...[
+                        const SizedBox(height: 48),
+                        _buildFarmSection(),
+                        const SizedBox(height: 48),
+                        _buildRelatedProducts(),
+                      ],
                       const SizedBox(height: 40),
                     ],
                   ),
@@ -90,61 +97,68 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
 
   // ─── Top Bar ───
   Widget _buildTopBar(BuildContext context, {required bool isCompact}) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: isCompact ? 16 : 32,
-        vertical: 16,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: _border)),
-      ),
-      child: Row(
-        children: [
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: _surface,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: _border),
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isCompact ? 14 : 32,
+          vertical: isCompact ? 10 : 16,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: _border)),
+        ),
+        child: Row(
+          children: [
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: isCompact ? 40 : 38,
+                  height: isCompact ? 40 : 38,
+                  decoration: BoxDecoration(
+                    color: _surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _border),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    size: 18,
+                    color: _dark,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.arrow_back_rounded,
-                  size: 18,
+              ),
+            ),
+            SizedBox(width: isCompact ? 12 : 16),
+            Expanded(
+              child: Text(
+                isCompact
+                    ? (_activeProduct?.name.trim().isNotEmpty == true
+                          ? _activeProduct!.name
+                          : 'Pre-order')
+                    : 'Product Details',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: isCompact ? 16 : 18,
+                  fontWeight: FontWeight.w800,
                   color: _dark,
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 16),
-          const Expanded(
-            child: Text(
-              'Product Details',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: _dark,
-              ),
-            ),
-          ),
-          const Spacer(),
-          if (!isCompact) ...[
-            _buildHeaderButton(Icons.share_rounded, 'Share'),
-            const SizedBox(width: 12),
-            _buildHeaderButton(Icons.favorite_border_rounded, 'Save'),
-          ] else ...[
-            _buildHeaderIcon(Icons.share_rounded),
-            const SizedBox(width: 8),
-            _buildHeaderIcon(Icons.favorite_border_rounded),
+            if (!isCompact) ...[
+              const SizedBox(width: 16),
+              _buildHeaderButton(Icons.share_rounded, 'Share'),
+              const SizedBox(width: 12),
+              _buildHeaderButton(Icons.favorite_border_rounded, 'Save'),
+            ] else ...[
+              _buildHeaderIcon(Icons.share_rounded),
+              const SizedBox(width: 8),
+              _buildHeaderIcon(Icons.favorite_border_rounded),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -224,8 +238,8 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildImageSection(),
-          const SizedBox(height: 24),
+          _buildImageSection(isCompact: true),
+          const SizedBox(height: 20),
           _buildDetailsSection(isCompact: true),
         ],
       );
@@ -234,22 +248,31 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(flex: 5, child: _buildImageSection()),
+        Expanded(flex: 5, child: _buildImageSection(isCompact: false)),
         const SizedBox(width: 40),
         Expanded(flex: 4, child: _buildDetailsSection(isCompact: false)),
       ],
     );
   }
 
-  Widget _buildImageSection() {
-    final imageUrl = _activeProduct?.imageUrl.trim() ?? '';
+  Widget _buildImageSection({required bool isCompact}) {
+    final images =
+        _activeProduct?.imageUrls
+            .map((url) => url.trim())
+            .where((url) => url.isNotEmpty)
+            .toSet()
+            .toList() ??
+        [];
+    final imageUrl = images.isNotEmpty
+        ? images.first
+        : (_activeProduct?.imageUrl.trim() ?? '');
     return Column(
       children: [
         // Main image
         ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(isCompact ? 18 : 20),
           child: AspectRatio(
-            aspectRatio: 4 / 3,
+            aspectRatio: isCompact ? 1.3 : 4 / 3,
             child: Stack(
               children: [
                 if (imageUrl.isNotEmpty)
@@ -291,11 +314,13 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        if (images.length > 1) const SizedBox(height: 16),
         // Thumbnail row
-        if (imageUrl.isNotEmpty) ...[
+        if (images.length > 1) ...[
           Row(
-            children: List.generate(3, (i) {
+            children: images.take(3).toList().asMap().entries.map((entry) {
+              final i = entry.key;
+              final thumbUrl = entry.value;
               return Expanded(
                 child: Padding(
                   padding: EdgeInsets.only(right: i < 2 ? 12 : 0),
@@ -304,7 +329,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                     child: AspectRatio(
                       aspectRatio: 1,
                       child: CachedNetworkImage(
-                        imageUrl: imageUrl,
+                        imageUrl: thumbUrl,
                         fit: BoxFit.cover,
                         placeholder: (ctx, url) =>
                             Container(color: Colors.grey[100]),
@@ -315,7 +340,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                   ),
                 ),
               );
-            }),
+            }).toList(),
           ),
         ],
       ],
@@ -363,11 +388,10 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         // Title
         Text(
           _activeProduct?.name ?? 'Pre-order Product',
-          style: const TextStyle(
-            fontSize: 32,
+          style: TextStyle(
+            fontSize: isCompact ? 30 : 32,
             fontWeight: FontWeight.w800,
             color: _dark,
-            letterSpacing: -0.5,
           ),
         ),
         const SizedBox(height: 12),
@@ -376,9 +400,9 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              _activeProduct?.price ?? '₱0',
-              style: const TextStyle(
-                fontSize: 28,
+              _formatCurrencyLabel(_activeProduct?.price ?? '₱0'),
+              style: TextStyle(
+                fontSize: isCompact ? 26 : 28,
                 fontWeight: FontWeight.w800,
                 color: _dark,
               ),
@@ -403,9 +427,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                   _buildInfoChip(
                     Icons.calendar_today_rounded,
                     'Harvest',
-                    _activeProduct?.harvestDays != null
-                        ? 'In ${_activeProduct!.harvestDays} days'
-                        : 'TBD',
+                    _harvestLabel(),
                   ),
                   const SizedBox(height: 12),
                   _buildInfoChip(
@@ -423,9 +445,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                     child: _buildInfoChip(
                       Icons.calendar_today_rounded,
                       'Harvest',
-                      _activeProduct?.harvestDays != null
-                          ? 'In ${_activeProduct!.harvestDays} days'
-                          : 'TBD',
+                      _harvestLabel(),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -563,21 +583,23 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
       );
 
       if (!mounted) return;
-      final orderId = (result['order'] as Map<String, dynamic>)['orderId'];
-      final farmerUserId = result['farmer_user_id']?.toString();
+      final order = result['order'] as Map<String, dynamic>;
+      final orderId =
+          order['order_id']?.toString() ?? order['orderId']?.toString();
+      final conversationId = result['conversation_id']?.toString();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Pre-order placed successfully. Order $orderId will be paid via $_selectedPaymentMethod.',
+            'Pre-order placed successfully. Order ${orderId ?? ''} will be paid via $_selectedPaymentMethod.',
           ),
           backgroundColor: const Color(0xFF15803D),
         ),
       );
 
-      if (farmerUserId != null && farmerUserId.isNotEmpty) {
+      if (conversationId != null && conversationId.isNotEmpty) {
         context.push(
           AppRoutes.messages,
-          extra: {'farmerUserId': farmerUserId, 'asFarmer': false},
+          extra: {'conversationId': conversationId, 'asFarmer': false},
         );
       }
     } catch (e) {
@@ -601,7 +623,42 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
       '',
     );
     final unitPrice = double.tryParse(rawPrice) ?? 0;
-    return '₱${(_quantity * unitPrice).toStringAsFixed(2)}';
+    return _formatCurrencyValue(_quantity * unitPrice);
+  }
+
+  String _formatCurrencyLabel(String value) {
+    final rawPrice = value.replaceAll(RegExp(r'[^0-9.]'), '');
+    final amount = double.tryParse(rawPrice) ?? 0;
+    return _formatCurrencyValue(amount);
+  }
+
+  String _formatCurrencyValue(double amount) {
+    final fixed = amount.toStringAsFixed(2);
+    final parts = fixed.split('.');
+    final whole = parts.first;
+    final buffer = StringBuffer();
+
+    for (var i = 0; i < whole.length; i++) {
+      final remaining = whole.length - i;
+      buffer.write(whole[i]);
+      if (remaining > 1 && remaining % 3 == 1) {
+        buffer.write(',');
+      }
+    }
+
+    return '₱${buffer.toString()}.${parts.last}';
+  }
+
+  String _harvestLabel() {
+    final days = int.tryParse(_activeProduct?.harvestDays ?? '');
+    if (days == null) return 'TBD';
+    if (days <= 0) return 'Date TBD';
+    return 'In $days days';
+  }
+
+  String _unitLabel() {
+    final unit = _activeProduct?.unit.trim();
+    return unit == null || unit.isEmpty ? 'unit' : unit;
   }
 
   Widget _buildInfoChip(IconData icon, String label, String value) {
@@ -703,7 +760,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'kg',
+                      _unitLabel(),
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -714,7 +771,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Min order: 1 kg',
+                  'Min order: 1 ${_unitLabel()}',
                   style: TextStyle(fontSize: 12, color: _muted),
                 ),
               ],
@@ -736,7 +793,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                         ),
                       ),
                       Text(
-                        'Min order: 1 kg',
+                        'Min order: 1 ${_unitLabel()}',
                         style: TextStyle(fontSize: 12, color: _muted),
                       ),
                     ],
@@ -773,7 +830,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'kg',
+                  _unitLabel(),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -1208,4 +1265,3 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
     );
   }
 }
-

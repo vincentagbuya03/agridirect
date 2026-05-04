@@ -11,6 +11,7 @@ import '../../mobile/screens/auth/complete_profile_screen.dart';
 import '../../mobile/screens/common/onboarding_screen.dart';
 import '../../mobile/screens/common/face_capture_screen.dart';
 import '../../mobile/screens/farmer/add_product_screen.dart';
+import '../../mobile/screens/consumer/preorder_details_screen.dart';
 import '../../mobile/screens/consumer/farmers_map_screen.dart';
 import '../../mobile/screens/consumer/my_details_screen.dart';
 import '../../web/web_navigation.dart';
@@ -25,6 +26,7 @@ import '../../web/screens/admin/admin_dashboard_redesigned.dart';
 import '../../web/screens/common/web_welcome_screen.dart';
 import '../screens/messages/messages_screen.dart';
 import '../../mobile/screens/common/loading_screen.dart';
+import '../../mobile/screens/consumer/orders_screen.dart';
 
 import '../data/app_data.dart';
 import 'app_routes.dart';
@@ -45,7 +47,7 @@ GoRouter createAppRouter() {
       final isAdmin = auth.isAdmin;
       final isFarmer = auth.isViewingAsFarmer;
       final location = state.matchedLocation;
-      
+
       // Use View.of for a more stable width check that doesn't trigger loops
       final view = View.of(context);
       final width = view.physicalSize.width / view.devicePixelRatio;
@@ -74,8 +76,8 @@ GoRouter createAppRouter() {
       // 3. Authenticated Users logic
       if (isLoggedIn) {
         // Allow unverified users to stay on login or register
-        if (!auth.isEmailVerified && 
-            location != AppRoutes.login && 
+        if (!auth.isEmailVerified &&
+            location != AppRoutes.login &&
             location != AppRoutes.register) {
           return AppRoutes.login;
         }
@@ -87,20 +89,20 @@ GoRouter createAppRouter() {
         }
 
         // Skip auth pages
-        if (location == AppRoutes.login || 
-            location == AppRoutes.register || 
+        if (location == AppRoutes.login ||
+            location == AppRoutes.register ||
             location == AppRoutes.webWelcome) {
           if (!auth.isEmailVerified) {
-             return null; // Stay on login or register to allow fresh start or resume
+            return null; // Stay on login or register to allow fresh start or resume
           }
           return AppRoutes.loading;
         }
-        
+
         // If on home/base path, go to correct dashboard
         if (location == AppRoutes.home) {
           // On mobile, the home path (/) is already the dashboard
           if (isMobile) return null;
-          
+
           return isFarmer ? AppRoutes.farmerDashboard : AppRoutes.marketplace;
         }
       } else {
@@ -118,6 +120,7 @@ GoRouter createAppRouter() {
           AppRoutes.marketplace,
           AppRoutes.shop,
           AppRoutes.community,
+          AppRoutes.preorderDetails,
         };
 
         if (protectedRoutes.contains(location)) {
@@ -140,22 +143,36 @@ GoRouter createAppRouter() {
 
       // 6. Web Session Restoration Guard
       if (kIsWeb && !isLoggedIn) {
-        if (isMobile && location != AppRoutes.webWelcome && location != AppRoutes.login && location != AppRoutes.onboarding) {
-          debugPrint('↪️ Router: Unauthenticated web user on protected route, going to welcome');
+        if (isMobile &&
+            location != AppRoutes.webWelcome &&
+            location != AppRoutes.login &&
+            location != AppRoutes.onboarding) {
+          debugPrint(
+            '↪️ Router: Unauthenticated web user on protected route, going to welcome',
+          );
           return AppRoutes.webWelcome;
         }
       }
 
       // Prevent redundant redirects if we are already where we need to be
-      if (isLoggedIn && (location == AppRoutes.login || location == AppRoutes.webWelcome || location == AppRoutes.onboarding)) {
+      if (isLoggedIn &&
+          (location == AppRoutes.login ||
+              location == AppRoutes.webWelcome ||
+              location == AppRoutes.onboarding)) {
         // On mobile, the "Dashboard" is just the home route (/)
         if (isMobile) {
-          debugPrint('↪️ Router: Logged in mobile user at entry page, sending to home');
+          debugPrint(
+            '↪️ Router: Logged in mobile user at entry page, sending to home',
+          );
           return AppRoutes.home;
         }
-        
-        final target = isAdmin ? AppRoutes.admin : (isFarmer ? AppRoutes.farmerDashboard : AppRoutes.marketplace);
-        debugPrint('↪️ Router: Logged in web user at entry page, sending to $target');
+
+        final target = isAdmin
+            ? AppRoutes.admin
+            : (isFarmer ? AppRoutes.farmerDashboard : AppRoutes.marketplace);
+        debugPrint(
+          '↪️ Router: Logged in web user at entry page, sending to $target',
+        );
         return target;
       }
 
@@ -358,10 +375,7 @@ GoRouter createAppRouter() {
               ? extra['customerId'] as String?
               : null;
 
-          return MessagesScreen(
-            asFarmer: true,
-            initialCustomerId: customerId,
-          );
+          return MessagesScreen(asFarmer: true, initialCustomerId: customerId);
         },
       ),
 
@@ -388,7 +402,9 @@ GoRouter createAppRouter() {
             return LoadingScreen(
               onFinished: () {
                 if (!auth.isLoggedIn) {
-                  context.go(isMobile ? AppRoutes.onboarding : AppRoutes.webWelcome);
+                  context.go(
+                    isMobile ? AppRoutes.onboarding : AppRoutes.webWelcome,
+                  );
                   return;
                 }
 
@@ -458,9 +474,8 @@ GoRouter createAppRouter() {
       // ── Google Complete Profile ───────────────────────────────────────────
       GoRoute(
         path: AppRoutes.completeProfile,
-        builder: (context, state) => CompleteProfileScreen(
-          onComplete: () => context.go(AppRoutes.home),
-        ),
+        builder: (context, state) =>
+            CompleteProfileScreen(onComplete: () => context.go(AppRoutes.home)),
       ),
 
       // ── Farmer Registration (mobile) ──────────────────────────────────────
@@ -505,7 +520,23 @@ GoRouter createAppRouter() {
       // ── Preorder Details ──────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.preorderDetails,
-        builder: (context, state) => const WebPreorderDetails(),
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            final product = state.extra is ProductItem
+                ? state.extra as ProductItem
+                : null;
+
+            if (constraints.maxWidth <= 800) {
+              return PreOrderDetailsScreen(initialProduct: product);
+            }
+
+            return WebPreorderDetails(initialProduct: product);
+          },
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.customerOrders,
+        builder: (context, state) => const OrdersScreen(),
       ),
 
       // ── Auth Callback (Google OAuth) ──────────────────────────────────────

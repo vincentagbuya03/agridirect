@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../styles/app_theme.dart';
 import '../services/community/forum_service.dart';
+import '../services/core/supabase_data_service.dart';
 import '../models/forum/forum_comment_model.dart';
+import 'report_content_dialog.dart';
 
 class CommentsDialog extends StatefulWidget {
   final String postId;
@@ -107,6 +109,31 @@ class _CommentsDialogState extends State<CommentsDialog> {
     }
   }
 
+  Future<void> _reportComment(ForumComment comment) async {
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (context) => ReportContentDialog(
+        contentLabel: 'comment',
+        contentTitle: comment.body,
+        onSubmit: (reason, details) {
+          return SupabaseDataService().reportForumComment(
+            commentId: comment.commentId,
+            reason: reason,
+            description: details,
+          );
+        },
+      ),
+    );
+
+    if (submitted == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Comment reported. Our team will review it soon.'),
+        ),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _commentController.dispose();
@@ -175,9 +202,35 @@ class _CommentsDialogState extends State<CommentsDialog> {
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text(
-                                                comment.userName ?? 'Anonymous',
-                                                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textHeadline),
+                                              Row(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      comment.userName ?? 'Anonymous',
+                                                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textHeadline),
+                                                    ),
+                                                  ),
+                                                  PopupMenuButton<String>(
+                                                    padding: EdgeInsets.zero,
+                                                    onSelected: (value) {
+                                                      if (value == 'report') {
+                                                        _reportComment(comment);
+                                                      }
+                                                    },
+                                                    itemBuilder: (context) => const [
+                                                      PopupMenuItem<String>(
+                                                        value: 'report',
+                                                        child: Text('Report comment'),
+                                                      ),
+                                                    ],
+                                                    child: const Icon(
+                                                      Icons.more_horiz_rounded,
+                                                      size: 18,
+                                                      color: AppColors.textSubtle,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                               const SizedBox(height: 4),
                                               Text(comment.body, style: const TextStyle(color: AppColors.textSubtle)),

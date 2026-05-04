@@ -509,6 +509,8 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                       const SizedBox(height: 24),
                       _buildWeatherIntelligence(),
                       const SizedBox(height: 24),
+                      _buildHourlyForecast(),
+                      const SizedBox(height: 24),
                       _buildForecast(),
                       const SizedBox(height: 24),
                       _buildAICropInsights(),
@@ -952,17 +954,16 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: gradientColors,
+          colors: [Colors.white, ...gradientColors],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: color.withValues(alpha: 0.2), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.1),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            color: color.withValues(alpha: 0.08),
+            blurRadius: 32,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -974,13 +975,13 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(16),
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(18),
                 ),
                 child: Icon(
-                  isAlert ? Icons.warning_amber_rounded : Icons.wb_sunny_rounded,
+                  isAlert ? Icons.auto_awesome_rounded : Icons.wb_sunny_rounded,
                   color: color,
-                  size: 24,
+                  size: 22,
                 ),
               ),
               const SizedBox(width: 16),
@@ -988,20 +989,46 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'AI Intelligence',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: color.withValues(alpha: 0.8),
-                        letterSpacing: 1,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'FARM INTELLIGENCE',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textSubtle,
+                              letterSpacing: 1.5,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: isAlert ? AppColors.error : AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'LIVE',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
+                            color: isAlert ? AppColors.error : AppColors.primary,
+                          ),
+                        ),
+                      ],
                     ),
                     Text(
                       isAlert ? (activeAlert?.title ?? 'Weather Alert') : 'Optimal Conditions',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 18,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w900,
                         color: AppColors.textHeadline,
                       ),
                     ),
@@ -1010,82 +1037,65 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
               ),
               IconButton(
                 onPressed: _loadWeatherData,
-                icon: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 8,
-                      ),
-                    ],
-                  ),
-                  child: Icon(Icons.refresh_rounded, size: 18, color: color),
-                ),
+                icon: Icon(Icons.refresh_rounded, size: 20, color: AppColors.textSubtle.withValues(alpha: 0.5)),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          Text(
-            isAlert
-                ? (activeAlert?.description ?? '')
-                : 'Current conditions are optimal for harvesting. Expect low humidity throughout the day.',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 15,
-              color: AppColors.textHeadline.withValues(alpha: 0.8),
-              height: 1.6,
-              fontWeight: isAlert ? FontWeight.w600 : FontWeight.w500,
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isAlert 
+                  ? [color.withValues(alpha: 0.05), color.withValues(alpha: 0.02)]
+                  : [AppColors.primary.withValues(alpha: 0.05), AppColors.primary.withValues(alpha: 0.01)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: color.withValues(alpha: 0.1)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isAlert
+                      ? (activeAlert?.description ?? '')
+                      : 'Current conditions are optimal for harvesting. Expect stable humidity throughout the day.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15,
+                    color: AppColors.textHeadline.withValues(alpha: 0.8),
+                    height: 1.6,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (isAlert && activeAlert!.recommendation != null) ...[
+                  const SizedBox(height: 16),
+                  Divider(color: color.withValues(alpha: 0.1), height: 1),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline_rounded, size: 16, color: color),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          activeAlert.recommendation ?? '',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textHeadline,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             ),
           ),
-          if (isAlert && activeAlert!.recommendation != null) ...[
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.tips_and_updates_rounded,
-                      size: 16,
-                      color: AppColors.accent,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      activeAlert.recommendation ?? '',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textHeadline,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -1109,7 +1119,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 180,
+          height: 200,
           child: ListView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -1137,7 +1147,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     Color color,
   ) {
     return Container(
-      width: 260,
+      width: 280,
       padding: const EdgeInsets.all(20),
       decoration: AppDecorations.cardDecoration.copyWith(
         borderRadius: BorderRadius.circular(24),
@@ -1199,6 +1209,150 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     return Icons.wb_cloudy_rounded;
   }
 
+  Widget _buildHourlyForecast() {
+    if (_isLoadingWeather) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader('Hourly Forecast'),
+          const SizedBox(height: 16),
+          Container(
+            height: 120,
+            decoration: AppDecorations.cardDecoration.copyWith(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: const Center(child: CircularProgressIndicator()),
+          ),
+        ],
+      );
+    }
+
+    if (_weatherForecast == null) return const SizedBox.shrink();
+
+    // Prepare REAL TIME current weather as the first item
+    final hourlyData = <ForecastData>[];
+    if (_weatherData != null) {
+      final now = DateTime.now();
+      hourlyData.add(
+        ForecastData(
+          dateTime: now, // Use exact current time (hour + minute) for "Real Time"
+          temperature: _weatherData!.temperature,
+          feelsLike: _weatherData!.feelsLike,
+          humidity: _weatherData!.humidity,
+          windSpeed: _weatherData!.windSpeed,
+          cloudiness: _weatherData!.cloudiness,
+          pressure: _weatherData!.pressure,
+          description: _weatherData!.description,
+          icon: _weatherData!.icon,
+          rainProbability: _weatherData!.description.toLowerCase().contains('rain') ? 1.0 : 0.0,
+        ),
+      );
+    }
+
+    // Add up to the next 24 hours of data (8 entries if 3-hour intervals)
+    final upcomingData = _weatherForecast!.forecasts.where((f) {
+      final hoursAhead = f.dateTime.difference(DateTime.now()).inHours;
+      return hoursAhead >= 0 && hoursAhead <= 24;
+    }).toList();
+
+    for (final f in upcomingData) {
+      // Prevent duplicates if forecast matches the current hour
+      if (hourlyData.isEmpty || f.dateTime.difference(hourlyData.first.dateTime).inHours.abs() > 0) {
+        hourlyData.add(f);
+      }
+    }
+
+    if (hourlyData.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('Hourly Forecast'),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 160,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: hourlyData.length,
+            itemBuilder: (context, index) {
+              final forecast = hourlyData[index];
+              final isNow = index == 0;
+              
+              final pop = ((forecast.rainProbability ?? 0.0) * 100).round();
+              final showRainChance = pop > 10;
+              
+              return Container(
+                width: 100,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: isNow ? AppColors.primary : Colors.white,
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isNow 
+                        ? AppColors.primary.withValues(alpha: 0.3)
+                        : Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                  border: isNow ? null : Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      forecast.timeString,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: isNow ? Colors.white.withValues(alpha: 0.8) : AppColors.textSubtle,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isNow ? Colors.white.withValues(alpha: 0.1) : AppColors.primary.withValues(alpha: 0.05),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _getAlertIcon(forecast.description.toLowerCase()),
+                        size: 24,
+                        color: isNow ? Colors.white : AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '${forecast.temperature.toStringAsFixed(0)}°',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: isNow ? Colors.white : AppColors.textHeadline,
+                      ),
+                    ),
+                    if (showRainChance) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '🌧 $pop%',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: isNow ? Colors.white.withValues(alpha: 0.8) : AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildForecast() {
     if (_isLoadingWeather) {
       return Column(
@@ -1225,84 +1379,266 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         _buildSectionHeader('Weekly Forecast'),
         const SizedBox(height: 16),
         Container(
-          padding: const EdgeInsets.all(24),
           decoration: AppDecorations.cardDecoration.copyWith(
             borderRadius: BorderRadius.circular(32),
+            color: Colors.white,
           ),
           child: Column(
-            children: _weatherForecast!.getDailyForecast().take(5).map((f) {
+            children: _weatherForecast!.getDailyForecast().take(5).indexed.map((entry) {
+              final index = entry.$1;
+              final f = entry.$2;
+              final isLast = index == 4;
+
               final dayAdvisory = _weatherForecast!.dailyAdvisories.firstWhere(
                 (a) => a.day.startsWith(f.dayName) || f.dayName.startsWith(a.day),
                 orElse: () => DailyAdvisory(day: '', condition: '', message: '', isSevere: false),
               );
               final hasAdvisory = dayAdvisory.day.isNotEmpty;
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: hasAdvisory ? AppColors.error.withValues(alpha: 0.05) : AppColors.background,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: hasAdvisory ? AppColors.error.withValues(alpha: 0.3) : Colors.transparent,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 50,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            f.dayName.substring(0, 3).toUpperCase(),
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _showHourlyForecastSheet(context, f.dateTime),
+                  borderRadius: BorderRadius.circular(isLast ? 32 : 0),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      border: isLast ? null : Border(
+                        bottom: BorderSide(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 50,
+                          child: Text(
+                            f.dayName.toUpperCase(),
                             style: GoogleFonts.plusJakartaSans(
                               fontWeight: FontWeight.w800,
-                              fontSize: 13,
+                              fontSize: 12,
+                              letterSpacing: 0.5,
                               color: hasAdvisory ? AppColors.error : AppColors.textHeadline,
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: hasAdvisory ? AppColors.error.withValues(alpha: 0.1) : AppColors.primary.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _getAlertIcon(f.description.toLowerCase()),
-                        size: 18,
-                        color: hasAdvisory ? AppColors.error : AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Text(
-                        f.description,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          color: hasAdvisory ? AppColors.error : AppColors.textSubtle,
-                          fontWeight: hasAdvisory ? FontWeight.w700 : FontWeight.w600,
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: hasAdvisory 
+                              ? AppColors.error.withValues(alpha: 0.1) 
+                              : AppColors.primary.withValues(alpha: 0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _getAlertIcon(f.description.toLowerCase()),
+                            size: 20,
+                            color: hasAdvisory ? AppColors.error : AppColors.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                f.description,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14,
+                                  color: AppColors.textHeadline,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if (hasAdvisory)
+                                Text(
+                                  'Special Advisory Available',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11,
+                                    color: AppColors.error,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '${f.temperature.toStringAsFixed(0)}°',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textHeadline,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      '${f.temperature.toStringAsFixed(0)}°',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textHeadline,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               );
             }).toList(),
           ),
         ),
       ],
+    );
+  }
+
+  void _showHourlyForecastSheet(BuildContext context, DateTime selectedDate) {
+    if (_weatherForecast == null) return;
+    
+    final hourlyData = _weatherForecast!.getHourlyForecastForDate(selectedDate);
+    if (hourlyData.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hourly data available for this date.')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.65,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(32),
+              topRight: Radius.circular(32),
+            ),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hourly Forecast',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textHeadline,
+                          ),
+                        ),
+                        Text(
+                          '${hourlyData.first.dayName}, ${hourlyData.first.dateString}',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSubtle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(context),
+                      color: AppColors.textSubtle,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  itemCount: hourlyData.length,
+                  itemBuilder: (context, index) {
+                    final forecast = hourlyData[index];
+                    final pop = ((forecast.rainProbability ?? 0.0) * 100).round();
+                    
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 80,
+                            alignment: Alignment.center,
+                            child: Text(
+                              forecast.timeString,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textHeadline,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            margin: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              _getAlertIcon(forecast.description.toLowerCase()),
+                              size: 20,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  forecast.description,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textHeadline,
+                                  ),
+                                ),
+                                if (pop > 0)
+                                  Text(
+                                    '$pop% chance of rain',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '${forecast.temperature.toStringAsFixed(0)}°',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textHeadline,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

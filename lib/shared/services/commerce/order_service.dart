@@ -43,9 +43,7 @@ class OrderService {
     if (userId == null) return;
 
     // Trigger re-fetch when orders for this user change
-    final stream = _supabase
-        .from('orders')
-        .stream(primaryKey: ['order_id']);
+    final stream = _supabase.from('orders').stream(primaryKey: ['order_id']);
 
     await for (final _ in stream) {
       yield await getMyOrders(limit: limit);
@@ -177,7 +175,9 @@ class OrderService {
             'subtotal': subtotal,
             'total_amount': subtotal,
             'payment_method': normalizedMethod,
-            'delivery_method': normalizedMethod == 'COP' ? 'pickup' : 'delivery',
+            'delivery_method': normalizedMethod == 'COP'
+                ? 'pickup'
+                : 'delivery',
             'delivery_fee': 0.0,
             if (specialInstructions != null &&
                 specialInstructions.trim().isNotEmpty)
@@ -273,7 +273,14 @@ class OrderService {
 
     final farmerUserId = await _getFarmerUserIdByFarmerId(farmerId);
 
-    if (notes != null && notes.trim().isNotEmpty) {
+    // Send a structured order notice for the chat UI
+    await _sendConversationMessage(
+      conversationId: conversationId,
+      messageText: '[ORDER_NOTICE:${order.orderId}:ORDER:$normalizedMethod]',
+      recipientUserId: farmerUserId,
+    );
+
+    if (notes != null && notes.trim().isNotEmpty && notes.trim() != 'Customer selected Cash on Delivery for this order.' && notes.trim() != 'Customer selected Cash on Pickup for this order.') {
       await _sendConversationMessage(
         conversationId: conversationId,
         messageText: notes.trim(),
@@ -301,49 +308,73 @@ class OrderService {
       throw Exception('Quantity must be greater than zero');
     }
 
-    final product = await _supabase
-        .from('v_products')
-        .select('product_id, farmer_id, price, name')
-        .eq('product_id', productId)
-        .eq('is_preorder', true)
-        .maybeSingle();
-
-    if (product == null) {
-      throw Exception('Selected pre-order product is not available.');
+    final normalizedMethod = paymentMethod.trim().toUpperCase();
+    if (normalizedMethod != 'COD' && normalizedMethod != 'COP') {
+      throw Exception('Offline payment method must be COD or COP');
     }
 
-    final resolvedProductId = product['product_id'] as String?;
-    final farmerId = product['farmer_id'] as String?;
-    final unitPrice = (product['price'] as num?)?.toDouble();
+    try {
+      final rpcResult = await _supabase.rpc(
+        'create_offline_preorder',
+        params: {
+          'p_product_id': productId,
+          'p_quantity': quantity,
+          'p_payment_method': normalizedMethod,
+          'p_delivery_address_id': deliveryAddressId,
+          'p_notes': notes,
+        },
+      );
 
-    if (resolvedProductId == null || resolvedProductId.isEmpty) {
-      throw Exception('Selected product does not have a product_id');
-    }
-    if (farmerId == null || farmerId.isEmpty) {
-      throw Exception('Selected product does not have a farmer_id');
-    }
-    if (unitPrice == null || unitPrice <= 0) {
-      throw Exception('Selected product has an invalid price');
-    }
+      final result = Map<String, dynamic>.from(rpcResult as Map);
+      final orderId = result['order_id']?.toString();
+      if (orderId == null || orderId.isEmpty) {
+        throw Exception('Pre-order was created but no order id was returned');
+      }
 
-    final result = await createOfflineOrder(
-      farmerId: farmerId,
-      items: [
-        OrderItemInput(
-          productId: resolvedProductId,
-          quantity: quantity,
-          unitPrice: unitPrice,
-        ),
-      ],
-      paymentMethod: paymentMethod,
-      deliveryAddressId: deliveryAddressId,
-      notes: notes,
-    );
+      final createdOrder = await getOrderById(orderId);
+      if (createdOrder == null) {
+        throw Exception('Pre-order was created but could not be reloaded');
+      }
 
-    return {
-      ...result,
-      'product': {'product_id': resolvedProductId, 'name': product['name']},
-    };
+      final conversationId = result['conversation_id']?.toString();
+      final farmerUserId = result['farmer_user_id']?.toString();
+      // Send a structured order notice for the chat UI
+      if (conversationId != null && conversationId.isNotEmpty) {
+        await _sendConversationMessage(
+          conversationId: conversationId,
+          messageText: '[ORDER_NOTICE:$orderId:PRE_ORDER:$normalizedMethod]',
+          recipientUserId: farmerUserId,
+        );
+        
+        // Only send additional notes if they aren't the default auto-generated ones
+        if (notes != null && 
+            notes.trim().isNotEmpty && 
+            !notes.contains('Customer selected Cash on')) {
+          await _sendConversationMessage(
+            conversationId: conversationId,
+            messageText: notes.trim(),
+            recipientUserId: farmerUserId,
+          );
+        }
+      }
+
+      return {
+        'order': createdOrder.toJson(),
+        'payment_method': normalizedMethod,
+        'payment_status': result['payment_status'] ?? 'offline_pending',
+        'conversation_id': conversationId,
+        'farmer_id': result['farmer_id']?.toString(),
+        'farmer_user_id': farmerUserId,
+        'product': {
+          'product_id': result['product_id']?.toString() ?? productId,
+          'name': result['product_name']?.toString(),
+        },
+      };
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    } catch (e) {
+      throw Exception('Failed to create pre-order: $e');
+    }
   }
 
   /// Creates a pre-order product by name for offline payment only.

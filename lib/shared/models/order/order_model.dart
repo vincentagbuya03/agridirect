@@ -35,7 +35,14 @@ class Order {
   final double? total;
   @JsonKey(name: 'payment_method')
   final String? paymentMethod;
+  @JsonKey(name: 'item_count')
   final int? itemCount;
+
+  // Cancellation details
+  @JsonKey(name: 'cancellation_reason')
+  final String? cancellationReason;
+  @JsonKey(name: 'cancelled_by')
+  final String? cancelledBy;
 
   // Added farm details from view
   @JsonKey(name: 'farm_name')
@@ -57,6 +64,8 @@ class Order {
     this.total,
     this.paymentMethod,
     this.itemCount,
+    this.cancellationReason,
+    this.cancelledBy,
     this.farmName,
     this.farmerAvatarUrl,
   });
@@ -78,6 +87,8 @@ class Order {
     double? total,
     String? paymentMethod,
     int? itemCount,
+    String? cancellationReason,
+    String? cancelledBy,
     String? farmName,
     String? farmerAvatarUrl,
   }) {
@@ -95,6 +106,8 @@ class Order {
       total: total ?? this.total,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       itemCount: itemCount ?? this.itemCount,
+      cancellationReason: cancellationReason ?? this.cancellationReason,
+      cancelledBy: cancelledBy ?? this.cancelledBy,
       farmName: farmName ?? this.farmName,
       farmerAvatarUrl: farmerAvatarUrl ?? this.farmerAvatarUrl,
     );

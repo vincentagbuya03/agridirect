@@ -91,7 +91,7 @@ class NotificationService {
     }
 
     _listenToAuthChanges();
-    _startMessageListener();
+    // _startMessageListener(); // Disabled to avoid double notifications with FCM
     _startPresenceTracking();
 
     _initialized = true;
@@ -239,7 +239,7 @@ class NotificationService {
       final event = authState.event;
       if (event == AuthChangeEvent.signedIn || event == AuthChangeEvent.tokenRefreshed || event == AuthChangeEvent.initialSession) {
         _getFCMToken();
-        _startMessageListener();
+        // _startMessageListener(); // Disabled to avoid double notifications with FCM
         _startPresenceTracking();
       } else if (event == AuthChangeEvent.signedOut) {
         _stopMessageListener();
@@ -303,81 +303,12 @@ class NotificationService {
     }
   }
 
-  void _startMessageListener() {
-    _messageSubscription?.unsubscribe();
-
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) return;
-
-    _messageSubscription = supabase
-        .channel('public:messages')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'messages',
-          callback: (payload) async {
-            final senderId = payload.newRecord['sender_id']?.toString();
-            final conversationId = payload.newRecord['conversation_id']
-                ?.toString();
-            final text =
-                payload.newRecord['message_text']?.toString() ?? 'New message';
-
-            // Only notify if:
-            // 1. Message is from someone else
-            // 2. We aren't currently looking at this conversation
-            if (senderId != null &&
-                senderId != userId &&
-                conversationId != _activeConversationId) {
-              final senderName = await _resolveSenderDisplayName(senderId);
-              await _showLocalMessageNotification(
-                conversationId,
-                text,
-                senderName: senderName,
-              );
-            }
-          },
-        )
-        .subscribe();
-  }
 
   void _stopMessageListener() {
     _messageSubscription?.unsubscribe();
     _messageSubscription = null;
   }
 
-  Future<void> _showLocalMessageNotification(
-    String? conversationId,
-    String text, {
-    String? senderName,
-  }) async {
-    final title = senderName != null && senderName.trim().isNotEmpty
-        ? 'New message from ${senderName.trim()}'
-        : 'New Message';
-
-    await flutterLocalNotificationsPlugin.show(
-      conversationId.hashCode,
-      title,
-      text,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          channelId,
-          channelName,
-          channelDescription: channelDescription,
-          importance: Importance.max,
-          priority: Priority.high,
-          playSound: true,
-          enableVibration: true,
-          icon: '@mipmap/ic_launcher',
-        ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
-      payload: 'chat:$conversationId',
-    );
-  }
 
   // Handle foreground messages
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
@@ -388,6 +319,14 @@ class NotificationService {
       debugPrint('Message notification: ${message.notification}');
 
       final senderName = message.data['sender_name']?.toString().trim();
+      final conversationId = message.data['conversation_id']?.toString();
+      
+      // Suppress notification if we are already in the conversation
+      if (conversationId != null && conversationId == _activeConversationId) {
+        debugPrint('Suppressed notification for active conversation: $conversationId');
+        return;
+      }
+
       final title = senderName != null && senderName.isNotEmpty
           ? 'New message from $senderName'
           : message.notification!.title;
@@ -424,7 +363,8 @@ class NotificationService {
     debugPrint('Notification tapped!');
     debugPrint('Message data: ${message.data}');
 
-    final linkType = message.data['link_type'] ?? '';
+    final inferredLinkType = _inferLinkTypeFromData(message.data);
+    final linkType = (message.data['link_type'] ?? inferredLinkType).toString();
     final linkId = message.data['link_id'] ?? '';
 
     debugPrint('Link type: $linkType, Link ID: $linkId');
@@ -459,9 +399,19 @@ class NotificationService {
 
   // Helper to get payload from message
   String _getPayload(RemoteMessage message) {
-    final linkType = message.data['link_type'] ?? '';
+    final linkType =
+        (message.data['link_type'] ?? _inferLinkTypeFromData(message.data))
+            .toString();
     final linkId = message.data['link_id'] ?? '';
     return '$linkType:$linkId';
+  }
+
+  String _inferLinkTypeFromData(Map<String, dynamic> data) {
+    final category = data['category']?.toString().trim().toLowerCase();
+    if (category == 'weather') {
+      return 'weather';
+    }
+    return '';
   }
 
   (String, String) _parsePayload(String? payload) {
@@ -470,12 +420,14 @@ class NotificationService {
     }
 
     final separator = payload.indexOf(':');
-    if (separator <= 0 || separator >= payload.length - 1) {
+    if (separator <= 0) {
       return (payload, '');
     }
 
     final rawType = payload.substring(0, separator);
-    final rawId = payload.substring(separator + 1);
+    final rawId = separator >= payload.length - 1
+        ? ''
+        : payload.substring(separator + 1);
     final normalizedType = rawType == 'chat' ? 'conversation' : rawType;
     return (normalizedType, rawId);
   }
@@ -508,32 +460,14 @@ class NotificationService {
       return;
     }
 
-    GoRouter.of(context).go(AppRoutes.messages);
-  }
-
-  Future<String?> _resolveSenderDisplayName(String senderId) async {
-    try {
-      final user = await supabase
-          .from('users')
-          .select('name, email')
-          .eq('user_id', senderId)
-          .maybeSingle();
-
-      final name = (user?['name'] as String?)?.trim();
-      if (name != null && name.isNotEmpty) {
-        return name;
-      }
-
-      final email = (user?['email'] as String?)?.trim();
-      if (email != null && email.isNotEmpty) {
-        return email;
-      }
-    } catch (e) {
-      debugPrint('Failed to resolve sender name for local notification: $e');
+    if (linkType == 'weather') {
+      GoRouter.of(context).go(AppRoutes.home);
+      return;
     }
 
-    return null;
+    GoRouter.of(context).go(AppRoutes.home);
   }
+
 
   // Get unread notification count
   Future<int> getUnreadNotificationCount(String userId) async {
@@ -611,11 +545,21 @@ class NotificationService {
 
       // Fallback: Attempt direct insert if Edge Function fails
       try {
+        // Query the notification_type_id first
+        final typeResponse = await supabase
+            .from('notification_types')
+            .select('notification_type_id')
+            .eq('code', type)
+            .limit(1)
+            .maybeSingle();
+            
+        final typeId = typeResponse?['notification_type_id'] ?? 1; // fallback to general (usually ID 1)
+
         await supabase.from('notifications').insert({
           'user_id': userId,
           'title': title,
           'body': content,
-          'type': type,
+          'notification_type_id': typeId,
           'link_type': linkType,
           'link_id': linkId,
           'is_read': false,

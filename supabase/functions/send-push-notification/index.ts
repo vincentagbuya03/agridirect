@@ -8,6 +8,8 @@ const corsHeaders = {
 
 type SendPushPayload = {
   targetUserId?: string;
+  targetUserIds?: string[];
+  audience?: "farmers" | "customers" | "farmers_customers" | "all";
   title?: string;
   body?: string;
   notificationCode?: string;
@@ -28,6 +30,7 @@ type NotificationTypeRow = {
 type DeviceTokenRow = {
   token_id: string;
   fcm_token: string;
+  user_id?: string;
 };
 
 type NotificationInsertRow = {
@@ -38,6 +41,116 @@ type NotificationInsertRow = {
   link_type: string | null;
   link_id: string | null;
 };
+
+const WEATHER_NOTIFICATION_COOLDOWN_HOURS = 1;
+const MAX_BROADCAST_USERS = 500;
+
+function bearerFromRequest(request: Request): string | null {
+  const authHeader = request.headers.get("authorization") ??
+    request.headers.get("Authorization");
+  if (!authHeader) return null;
+
+  const parts = authHeader.split(" ");
+  if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+    return parts[1].trim();
+  }
+  return authHeader.trim();
+}
+
+async function assertIsAdmin(
+  adminClient: ReturnType<typeof createClient>,
+  request: Request,
+  supabaseServiceRoleKey: string,
+): Promise<{ userId: string } | Response> {
+  const jwt = bearerFromRequest(request);
+  if (!jwt) {
+    return new Response(JSON.stringify({ error: "Missing authorization header." }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Allow internal server-to-server calls that authenticate with the service role key.
+  // This is used by scheduled jobs (e.g. daily weather checks) and should never be
+  // sent from client apps.
+  if (jwt === supabaseServiceRoleKey) {
+    return { userId: "service_role" };
+  }
+
+  const userResponse = await adminClient.auth.getUser(jwt);
+  if (userResponse.error || !userResponse.data?.user) {
+    return new Response(JSON.stringify({ error: "Invalid authorization token." }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const userId = userResponse.data.user.id;
+  const adminRecord = await adminClient
+    .from("admins")
+    .select("admin_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (adminRecord.error) {
+    return new Response(
+      JSON.stringify({ error: `Failed to check admin role: ${adminRecord.error.message}` }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  if (!adminRecord.data) {
+    return new Response(JSON.stringify({ error: "Forbidden." }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  return { userId };
+}
+
+async function resolveAudienceUserIds(
+  adminClient: ReturnType<typeof createClient>,
+  audience: NonNullable<SendPushPayload["audience"]>,
+): Promise<string[]> {
+  if (audience === "all") {
+    const users = await adminClient.from("users").select("user_id");
+    if (users.error) {
+      throw new Error(`Failed to load users: ${users.error.message}`);
+    }
+    return (users.data as Array<{ user_id: string }>).map((r) => r.user_id);
+  }
+
+  const userIds = new Set<string>();
+
+  if (audience === "farmers" || audience === "farmers_customers") {
+    const farmers = await adminClient
+      .from("farmers")
+      .select("user_id")
+      .eq("is_active", true);
+    if (farmers.error) {
+      throw new Error(`Failed to load farmers: ${farmers.error.message}`);
+    }
+    for (const row of farmers.data as Array<{ user_id: string }>) {
+      if (row.user_id) userIds.add(row.user_id);
+    }
+  }
+
+  if (audience === "customers" || audience === "farmers_customers") {
+    const customers = await adminClient.from("customers").select("user_id");
+    if (customers.error) {
+      throw new Error(`Failed to load customers: ${customers.error.message}`);
+    }
+    for (const row of customers.data as Array<{ user_id: string }>) {
+      if (row.user_id) userIds.add(row.user_id);
+    }
+  }
+
+  return Array.from(userIds);
+}
 
 function normalizePrivateKey(privateKey: string): string {
   return privateKey.replace(/\\n/g, "\n");
@@ -233,7 +346,7 @@ Deno.serve(async (request: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseServiceRoleKey = Deno.env.get("SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const firebaseProjectId = Deno.env.get("FIREBASE_PROJECT_ID");
 
     if (!supabaseUrl || !supabaseServiceRoleKey) {
@@ -248,8 +361,21 @@ Deno.serve(async (request: Request) => {
 
     const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+    const adminCheck = await assertIsAdmin(
+      adminClient,
+      request,
+      supabaseServiceRoleKey,
+    );
+    if (adminCheck instanceof Response) {
+      return adminCheck;
+    }
+
     const payload = await request.json() as SendPushPayload;
     const targetUserId = payload.targetUserId?.trim();
+    const targetUserIds = Array.isArray(payload.targetUserIds)
+      ? payload.targetUserIds.map((id) => String(id).trim()).filter(Boolean)
+      : [];
+    const audience = payload.audience;
     const title = payload.title?.trim();
     const body = payload.body?.trim();
     const notificationCode = payload.notificationCode?.trim() || "general";
@@ -258,10 +384,10 @@ Deno.serve(async (request: Request) => {
     console.log(`Target User: ${targetUserId}`);
     console.log(`Title: ${title}`);
 
-    if (!targetUserId || !title || !body) {
+    if (!title || !body) {
       return new Response(
         JSON.stringify({
-          error: "targetUserId, title, and body are required.",
+          error: "title and body are required.",
         }),
         {
           status: 400,
@@ -269,6 +395,38 @@ Deno.serve(async (request: Request) => {
             ...corsHeaders,
             "Content-Type": "application/json",
           },
+        },
+      );
+    }
+
+    let resolvedUserIds: string[] = [];
+    if (targetUserId) {
+      resolvedUserIds = [targetUserId];
+    } else if (targetUserIds.length > 0) {
+      resolvedUserIds = Array.from(new Set(targetUserIds));
+    } else if (audience) {
+      resolvedUserIds = await resolveAudienceUserIds(adminClient, audience);
+    } else {
+      return new Response(
+        JSON.stringify({
+          error: "targetUserId, targetUserIds, or audience is required.",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    if (resolvedUserIds.length > MAX_BROADCAST_USERS) {
+      return new Response(
+        JSON.stringify({
+          error:
+            `Too many recipients (${resolvedUserIds.length}). Max is ${MAX_BROADCAST_USERS}.`,
+        }),
+        {
+          status: 413,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
     }
@@ -285,18 +443,63 @@ Deno.serve(async (request: Request) => {
       payload.data,
     );
 
-    const notificationRow: NotificationInsertRow = {
-      user_id: targetUserId,
-      notification_type_id: notificationTypeId,
-      title,
-      body,
-      link_type: payload.linkType ?? null,
-      link_id: payload.linkId ?? null,
-    };
+    const notificationRows: NotificationInsertRow[] = resolvedUserIds.map(
+      (userId) => ({
+        user_id: userId,
+        notification_type_id: notificationTypeId,
+        title,
+        body,
+        link_type: payload.linkType ?? null,
+        link_id: payload.linkId ?? null,
+      }),
+    );
+
+    const isWeatherNotification =
+      notificationCode.startsWith("weather_") ||
+      payload.linkType === "weather" ||
+      payload.data?.category === "weather";
+
+    if (isWeatherNotification && resolvedUserIds.length === 1) {
+      const cutoff = new Date(
+        Date.now() - WEATHER_NOTIFICATION_COOLDOWN_HOURS * 60 * 60 * 1000,
+      ).toISOString();
+
+      const recentNotificationResponse = await adminClient
+        .from("notifications")
+        .select("notification_id")
+        .eq("user_id", resolvedUserIds[0])
+        .eq("notification_type_id", notificationTypeId)
+        .gte("created_at", cutoff)
+        .limit(1)
+        .maybeSingle();
+
+      if (recentNotificationResponse.error) {
+        throw new Error(
+          `Failed to check recent weather notifications: ${recentNotificationResponse.error.message}`,
+        );
+      }
+
+      if (recentNotificationResponse.data) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            sent: 0,
+            skipped: true,
+            reason: `Duplicate weather notification suppressed within ${WEATHER_NOTIFICATION_COOLDOWN_HOURS} hours.`,
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+      }
+    }
 
     const insertResponse = await adminClient
       .from("notifications")
-      .insert(notificationRow);
+      .insert(notificationRows);
     const insertError = insertResponse.error;
 
     if (insertError) {
@@ -305,8 +508,8 @@ Deno.serve(async (request: Request) => {
 
     const tokenRowsResponse = await adminClient
       .from("user_device_tokens")
-      .select("token_id, fcm_token")
-      .eq("user_id", targetUserId)
+      .select("token_id, fcm_token, user_id")
+      .in("user_id", resolvedUserIds)
       .eq("is_active", true);
     const tokenRows = tokenRowsResponse.data as DeviceTokenRow[] | null;
     const tokenError = tokenRowsResponse.error;
@@ -316,12 +519,15 @@ Deno.serve(async (request: Request) => {
     }
 
     if (!tokenRows || tokenRows.length === 0) {
-      console.log(`[!] No active tokens found for user ${targetUserId}`);
+      console.log(
+        `[!] No active tokens found for ${resolvedUserIds.length} users`,
+      );
       return new Response(
         JSON.stringify({
           success: true,
           sent: 0,
-          reason: "Notification stored, but user has no active phone tokens.",
+          users: resolvedUserIds.length,
+          reason: "Notifications stored, but users have no active phone tokens.",
         }),
         {
           headers: {
@@ -385,6 +591,7 @@ Deno.serve(async (request: Request) => {
 
         return {
           tokenId: tokenRow.token_id,
+          userId: tokenRow.user_id,
           ok,
           responseText,
         };
@@ -396,6 +603,7 @@ Deno.serve(async (request: Request) => {
         success: true,
         sent: sendResults.filter((result) => result.ok).length,
         total: sendResults.length,
+        users: resolvedUserIds.length,
         results: sendResults,
       }),
       {

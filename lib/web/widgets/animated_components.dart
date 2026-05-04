@@ -109,6 +109,45 @@ class AgriColors {
   static const Color meshC = Color(0xFFFBBF24);
 }
 
+/// ── NEW: Hover scale card — lifts and scales on hover ──
+class HoverScaleCard extends StatefulWidget {
+  final Widget child;
+  final double scale;
+  final Duration duration;
+
+  const HoverScaleCard({
+    super.key,
+    required this.child,
+    this.scale = 1.02,
+    this.duration = const Duration(milliseconds: 200),
+  });
+
+  @override
+  State<HoverScaleCard> createState() => _HoverScaleCardState();
+}
+
+class _HoverScaleCardState extends State<HoverScaleCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: widget.duration,
+        transform: Matrix4.diagonal3Values(
+          _hovered ? widget.scale : 1.0,
+          _hovered ? widget.scale : 1.0,
+          1.0,
+        ),
+        transformAlignment: Alignment.center,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 // ─── SVG-Like Painters ─────────────────────────────────────────────
 
 /// Animated wave background painter for hero sections

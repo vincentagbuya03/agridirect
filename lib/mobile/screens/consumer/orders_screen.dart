@@ -272,7 +272,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
             // Map status to color and progress
             Color statusColor = AppColors.primary;
             double progress = 0.5;
-            String statusText = order.status;
 
             if (order.isPending) {
               statusColor = AppColors.warning;
@@ -300,7 +299,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 orderId: order.orderNumber,
                 itemCount: order.itemCount ?? 1,
                 price: '₱${(order.total ?? 0).toStringAsFixed(2)}',
-                status: statusText,
+                status: order.status,
                 statusColor: statusColor,
                 estimatedTime: order.isDelivered
                     ? 'Delivered'
@@ -326,19 +325,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
     required String estimatedTime,
     required double progress,
   }) {
-    return Container(
-      decoration: AppDecorations.cardDecoration.copyWith(
-        borderRadius: BorderRadius.circular(24),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => _showOrderDetailsSheet(order),
-                child: Container(
+    return GestureDetector(
+      onTap: () => _showOrderDetailsSheet(order),
+      child: Container(
+        decoration: AppDecorations.cardDecoration.copyWith(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Farmer Image / Avatar
+                Container(
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
@@ -349,144 +350,175 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       width: 2,
                     ),
                   ),
-                  child: SafeCircleAvatar(
-                    imageUrl: farmImage,
-                    radius: 28,
-                    backgroundColor: Colors.transparent,
-                    child: Icon(
-                      Icons.agriculture_rounded,
-                      color: AppColors.primary,
-                      size: 24,
-                    ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: farmImage != null && farmImage.isNotEmpty
+                        ? SafeNetworkImage(
+                            imageUrl: farmImage,
+                            defaultBucket: 'uploads',
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
+                            placeholder: const Icon(
+                              Icons.agriculture_rounded,
+                              color: AppColors.primary,
+                              size: 24,
+                            ),
+                            errorWidget: const Icon(
+                              Icons.agriculture_rounded,
+                              color: AppColors.primary,
+                              size: 24,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.agriculture_rounded,
+                            color: AppColors.primary,
+                            size: 24,
+                          ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _showOrderDetailsSheet(order),
+                const SizedBox(width: 14),
+                // Farm & Order Info
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         farmName,
-                        style: AppTextStyles.headline3.copyWith(fontSize: 16),
+                        style: AppTextStyles.headline3.copyWith(fontSize: 17),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: 4),
                       Text(
-                        'Order #$orderId • $itemCount items',
+                        '#${orderId.toUpperCase()}',
                         style: AppTextStyles.bodySmall.copyWith(
                           color: AppColors.textSubtle,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '$itemCount ${itemCount > 1 ? 'items' : 'item'}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSubtle,
+                          fontSize: 11,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              Text(
-                price,
-                style: AppTextStyles.headline3.copyWith(
-                  fontSize: 17,
-                  color: AppColors.primary,
+                const SizedBox(width: 8),
+                // Price
+                Text(
+                  price,
+                  style: AppTextStyles.headline3.copyWith(
+                    fontSize: 18,
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: statusColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      status.toUpperCase(),
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: statusColor,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              Text(
-                estimatedTime,
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textSubtle,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 6,
-              backgroundColor: statusColor.withValues(alpha: 0.2),
-              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+              ],
             ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                    foregroundColor: AppColors.primary,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        status.toUpperCase(),
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: statusColor,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  estimatedTime,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSubtle,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 6,
+                backgroundColor: statusColor.withValues(alpha: 0.2),
+                valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _showOrderDetailsSheet(order),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                      foregroundColor: AppColors.primary,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      'Track Order',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
-                  child: Text(
-                    'Track Order',
-                    style: AppTextStyles.labelSmall.copyWith(
-                      fontWeight: FontWeight.w800,
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppColors.textHeadline.withValues(alpha: 0.1),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: AppColors.textHeadline.withValues(alpha: 0.1),
+                  child: const Icon(
+                    Icons.messenger_outline_rounded,
+                    size: 20,
+                    color: AppColors.textHeadline,
                   ),
                 ),
-                child: const Icon(
-                  Icons.messenger_outline_rounded,
-                  size: 20,
-                  color: AppColors.textHeadline,
-                ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -568,15 +600,32 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             color: AppColors.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: SafeCircleAvatar(
-                            imageUrl: order.farmerAvatarUrl,
-                            radius: 30,
-                            backgroundColor: Colors.transparent,
-                            child: Icon(
-                              Icons.agriculture_rounded,
-                              color: AppColors.primary,
-                              size: 28,
-                            ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: order.farmerAvatarUrl != null &&
+                                    order.farmerAvatarUrl!.isNotEmpty
+                                ? SafeNetworkImage(
+                                    imageUrl: order.farmerAvatarUrl,
+                                    defaultBucket: 'uploads',
+                                    width: 60,
+                                    height: 60,
+                                    fit: BoxFit.cover,
+                                    placeholder: const Icon(
+                                      Icons.agriculture_rounded,
+                                      color: AppColors.primary,
+                                      size: 28,
+                                    ),
+                                    errorWidget: const Icon(
+                                      Icons.agriculture_rounded,
+                                      color: AppColors.primary,
+                                      size: 28,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.agriculture_rounded,
+                                    color: AppColors.primary,
+                                    size: 28,
+                                  ),
                           ),
                         ),
                         const SizedBox(width: 16),

@@ -35,8 +35,9 @@ class OTPService {
       );
 
       if (response == null || response['success'] != true) {
-        debugPrint('❌ Error generating OTP from DB: ${response?['message']}');
-        return null;
+        final errorMsg = response?['message'] ?? 'Failed to generate OTP';
+        debugPrint('❌ Error generating OTP from DB: $errorMsg');
+        throw errorMsg;
       }
 
       // 2. Return the 6-digit code for the SMTP service to send

@@ -15,14 +15,14 @@ import '../../../shared/services/integration/reverse_geocoding_service.dart';
 import '../../../shared/router/app_router.dart';
 import 'dart:convert';
 import '../../widgets/auth/verification_guide_widget.dart';
-import '../common/id_capture_screen.dart';
-import '../common/id_back_capture_screen.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:agridirect/mobile/screens/common/id_back_scanner.dart';
+import 'package:agridirect/mobile/screens/common/id_capture_screen.dart';
 
 /// Mobile Farmer Registration — 3-step wizard.
-/// Step 1: Personal Data & Farm Details
-/// Step 2: Identity Verification (Face Scan + Valid ID)
-/// Step 3: Final Submission (Education, Work, Signature)
+/// Step 1: Identity Verification (Face Scan + Valid ID + PCN) <- NEW
+/// Step 2: Personal Data & Farm Details <- MOVED HERE
+/// Step 3: Final Submission (Education, Work)
 class FarmerRegistrationScreen extends StatefulWidget {
   final VoidCallback onRegistrationComplete;
 
@@ -48,7 +48,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
   bool _isSubmitting = false;
   final _registration = FarmerRegistration();
 
-  // New Personal Data Controllers (pre-filled by QR)
   final _fullNameController = TextEditingController();
   final _sexController = TextEditingController();
   final _placeOfBirthController = TextEditingController();
@@ -88,7 +87,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
   final ImagePicker _imagePicker = ImagePicker();
 
   // Signature
-  final List<Offset?> _signaturePoints = [];
   bool _guideShown = false;
   bool _isClosingSuccessDialog = false;
 
@@ -619,7 +617,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                             Text(
                               _farmLatitude != null
                                   ? 'Location Captured'
-                                  : 'Select Farm Location',
+                                  : 'Select Farm Location (Required)',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w800,
@@ -1407,76 +1405,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         ),
 
         const SizedBox(height: 32),
-        _buildSectionTitle('E-Signature', Icons.draw_rounded),
-        const SizedBox(height: 16),
-
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: _border),
-          ),
-          child: Column(
-            children: [
-              SizedBox(
-                height: 180,
-                child: Stack(
-                  children: [
-                    if (_signaturePoints.isEmpty)
-                      Center(
-                        child: Text(
-                          'Draw your signature here',
-                          style: GoogleFonts.plusJakartaSans(
-                            color: _muted.withValues(alpha: 0.5),
-                            fontWeight: FontWeight.w600,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
-                    GestureDetector(
-                      onPanUpdate: (details) {
-                        setState(
-                          () => _signaturePoints.add(details.localPosition),
-                        );
-                      },
-                      onPanEnd: (_) => _signaturePoints.add(null),
-                      child: CustomPaint(
-                        size: const Size(double.infinity, 180),
-                        painter: _SignaturePainter(_signaturePoints),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Divider(height: 1, color: _border),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => setState(() => _signaturePoints.clear()),
-                      icon: const Icon(
-                        Icons.cleaning_services_rounded,
-                        size: 16,
-                      ),
-                      label: Text(
-                        'CLEAR',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
-                      ),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.red[400],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
 
         const SizedBox(height: 32),
         _buildCertificationCheckbox(),
@@ -1978,6 +1906,10 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         _showError('Please enter your farm name');
         return;
       }
+      if (_farmLatitude == null || _farmLongitude == null) {
+        _showError('Please pin your farm location on the map');
+        return;
+      }
     }
 
     setState(() => _currentStep++);
@@ -1986,10 +1918,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
   Future<void> _handleSubmit() async {
     if (!_certificationAccepted) {
       _showError('Please accept the certification to proceed');
-      return;
-    }
-    if (_signaturePoints.isEmpty) {
-      _showError('Please provide your electronic signature');
       return;
     }
 
@@ -2027,7 +1955,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     _registration.college = _collegeController.text.trim();
     _registration.farmingHistory = _farmingHistoryController.text.trim();
     _registration.yearsOfExperience = _yearsController.text.trim();
-    _registration.hasSigned = _signaturePoints.isNotEmpty;
     _registration.certificationAccepted = _certificationAccepted;
 
     try {
@@ -2151,8 +2078,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red[400],
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        behavior: SnackBarBehavior.fixed,
       ),
     );
   }
@@ -2251,7 +2177,9 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                                         'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
                                     subdomains: const ['a', 'b', 'c', 'd'],
                                     userAgentPackageName: 'com.agridirect.app',
-                                    retinaMode: RetinaMode.isHighDensity(context),
+                                    retinaMode: RetinaMode.isHighDensity(
+                                      context,
+                                    ),
                                   ),
                                   MarkerLayer(
                                     markers: [
@@ -2461,27 +2389,4 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
       },
     );
   }
-}
-
-// ─── Signature Painter ───
-class _SignaturePainter extends CustomPainter {
-  final List<Offset?> points;
-  _SignaturePainter(this.points);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF0F172A)
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 2.5;
-
-    for (int i = 0; i < points.length - 1; i++) {
-      if (points[i] != null && points[i + 1] != null) {
-        canvas.drawLine(points[i]!, points[i + 1]!, paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _SignaturePainter oldDelegate) => true;
 }

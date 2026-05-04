@@ -3,6 +3,8 @@ import '../shared/services/auth/auth_service.dart';
 import 'screens/consumer/web_marketplace_home.dart';
 import 'screens/consumer/web_shop_screen.dart';
 import 'screens/farmer/web_sales_dashboard.dart';
+import 'screens/farmer/web_farmer_products.dart';
+import 'screens/farmer/web_farmer_orders.dart';
 import 'screens/farmer/web_community_hub.dart';
 import 'screens/consumer/web_profile_screen.dart';
 import 'screens/auth/web_login_screen.dart';
@@ -72,7 +74,8 @@ class _WebNavigationState extends State<WebNavigation> {
     if (_auth.isViewingAsFarmer) {
       return [
         WebSalesDashboard(onNavigate: _navigateTo, currentIndex: _currentIndex),
-        WebShopScreen(onNavigate: _navigateTo, currentIndex: _currentIndex),
+        WebFarmerProducts(onNavigate: _navigateTo, currentIndex: _currentIndex),
+        WebFarmerOrders(onNavigate: _navigateTo, currentIndex: _currentIndex),
         WebCommunityHub(onNavigate: _navigateTo, currentIndex: _currentIndex),
         WebProfileScreen(
           onModeChanged: () => setState(() => _currentIndex = 0),

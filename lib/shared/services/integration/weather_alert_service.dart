@@ -55,16 +55,24 @@ class WeatherAlertService {
         return;
       }
 
-      // Fetch weather alerts
+      // Fetch current weather and forecast alerts
       final weatherData = await _weather.getWeatherByCoordinates(
         latitude: lat,
         longitude: lon,
       );
+      final weatherForecast = await _weather.getForecastByCoordinates(
+        latitude: lat,
+        longitude: lon,
+      );
 
-      if (weatherData != null && weatherData.alerts.isNotEmpty) {
-        for (final alert in weatherData.alerts) {
-          // Only notify for high severity alerts
-          if (alert.severity >= 0.6) {
+      final combinedAlerts = _mergeAlerts(
+        weatherData?.alerts ?? const [],
+        weatherForecast?.alerts ?? const [],
+      );
+
+      if (combinedAlerts.isNotEmpty) {
+        for (final alert in combinedAlerts) {
+          if (alert.severity >= 0.65) {
             await _showWeatherNotification(alert, locationName);
           }
         }
@@ -89,6 +97,28 @@ class WeatherAlertService {
       recommendation: 'Check your crops and secure loose items.',
     );
     await _showWeatherNotification(mockAlert, 'Test Location');
+  }
+
+  List<WeatherAlert> _mergeAlerts(
+    List<WeatherAlert> currentAlerts,
+    List<WeatherAlert> forecastAlerts,
+  ) {
+    final merged = <WeatherAlert>[];
+    final seen = <String>{};
+
+    void addAlert(WeatherAlert alert) {
+      final key = '${alert.type}|${alert.title}|${alert.description}';
+      if (seen.add(key)) {
+        merged.add(alert);
+      }
+    }
+
+    for (final alert in [...currentAlerts, ...forecastAlerts]) {
+      addAlert(alert);
+    }
+
+    merged.sort((a, b) => b.severity.compareTo(a.severity));
+    return merged;
   }
 
   /// Get the current GPS position with permission handling
@@ -120,7 +150,9 @@ class WeatherAlertService {
     String locationName,
   ) async {
     final title = '${alert.alertIcon} ${alert.title}';
-    final body = '${alert.description} Affecting $locationName.';
+    final now = DateTime.now();
+    final timeStr = '${now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour)}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
+    final body = '${alert.description}\nChecked at $timeStr for $locationName.';
 
     // 1. Save to database for history
     if (_auth.userId.isNotEmpty) {

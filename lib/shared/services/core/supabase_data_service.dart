@@ -17,6 +17,9 @@ class SupabaseDataService {
   static const String _forumPostsCacheKey = 'cache_forum_posts_v1';
   static const String _articlesCacheKey = 'cache_articles_v1';
   static const int _reportContentTypePost = 1;
+  static const int _reportContentTypeComment = 2;
+  static const int _reportContentTypeProduct = 3;
+  static const int _reportContentTypeReview = 4;
   static const int _reportContentTypeArticle = 5;
 
   final _client = SupabaseConfig.client;
@@ -239,6 +242,42 @@ class SupabaseDataService {
     } catch (e) {
       debugPrint('Error fetching all products: $e');
       return [];
+    }
+  }
+
+  /// Watch farmer's own products in real-time
+  Stream<List<Map<String, dynamic>>> watchFarmerProducts() async* {
+    final userId = SupabaseConfig.currentUser?.id;
+    if (userId == null) {
+      yield [];
+      return;
+    }
+
+    // Get farmer_id first
+    final farmerResponse = await _client
+        .from('farmers')
+        .select('farmer_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (farmerResponse == null) {
+      yield [];
+      return;
+    }
+
+    final farmerId = farmerResponse['farmer_id'] as String;
+
+    // Yield initial data
+    yield await getFarmerProducts();
+
+    // Listen for changes in products table
+    final productStream = _client
+        .from('products')
+        .stream(primaryKey: ['product_id'])
+        .eq('farmer_id', farmerId);
+
+    await for (final _ in productStream) {
+      yield await getFarmerProducts();
     }
   }
 
@@ -627,6 +666,20 @@ class SupabaseDataService {
     }
   }
 
+  /// Report a product for community safety
+  Future<void> reportProduct({
+    required String productId,
+    required String reason,
+    String? description,
+  }) async {
+    await _submitContentReport(
+      contentId: productId,
+      contentTypeId: _reportContentTypeProduct,
+      reason: reason,
+      description: description,
+    );
+  }
+
   ProductItem _mapToProductItem(Map<String, dynamic> item) {
     return ProductItem(
       productId: item['product_id']?.toString(),
@@ -917,6 +970,19 @@ class SupabaseDataService {
     await _submitContentReport(
       contentId: postId,
       contentTypeId: _reportContentTypePost,
+      reason: reason,
+      description: description,
+    );
+  }
+
+  Future<void> reportForumComment({
+    required String commentId,
+    required String reason,
+    String? description,
+  }) async {
+    await _submitContentReport(
+      contentId: commentId,
+      contentTypeId: _reportContentTypeComment,
       reason: reason,
       description: description,
     );
@@ -1341,6 +1407,23 @@ class SupabaseDataService {
   // ORDERS
   // ══════════════════════════════════════════════════════════════════════════
 
+  /// Watch farmer orders in real-time
+  Stream<List<Map<String, dynamic>>> watchFarmerOrders() async* {
+    yield await getFarmerOrders();
+
+    final userId = SupabaseConfig.currentUser?.id;
+    if (userId == null) return;
+
+    // Listen for changes in orders table
+    final orderStream = _client
+        .from('orders')
+        .stream(primaryKey: ['order_id']);
+
+    await for (final _ in orderStream) {
+      yield await getFarmerOrders();
+    }
+  }
+
   /// Get farmer's orders
   Future<List<Map<String, dynamic>>> getFarmerOrders({String? status}) async {
     try {
@@ -1547,6 +1630,21 @@ class SupabaseDataService {
         return Colors.red;
       default:
         return Colors.grey;
+    }
+  }
+
+  /// Get farmer profile data for a specific user ID
+  Future<Map<String, dynamic>?> getFarmerProfile(String userId) async {
+    try {
+      final response = await _client
+          .from('v_farmer_profiles')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      debugPrint('Error fetching farmer profile: $e');
+      return null;
     }
   }
 

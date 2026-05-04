@@ -9,6 +9,7 @@ import '../../../shared/router/app_router.dart';
 import '../../../shared/services/commerce/cart_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'marketplace_screen.dart';
+import '../../../shared/services/auth/auth_service.dart';
 
 /// Full-screen public profile for a farmer, with Products & Posts tabs.
 class FarmerPublicProfileScreen extends StatefulWidget {
@@ -498,42 +499,43 @@ class _ProductsTab extends StatelessWidget {
                               ),
                           ],
                         ),
-                        GestureDetector(
-                          onTap: () {
-                            CartService().addItem(product);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content:
-                                    Text('${product.name} added to cart'),
-                                duration: const Duration(seconds: 1),
-                                backgroundColor: AppColors.primary,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color:
-                                      AppColors.primary.withValues(alpha: 0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
+                        if (AuthService().userId.isEmpty || product.farmerId != AuthService().userId)
+                          GestureDetector(
+                            onTap: () {
+                              CartService().addItem(product);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content:
+                                      Text('${product.name} added to cart'),
+                                  duration: const Duration(seconds: 1),
+                                  backgroundColor: AppColors.primary,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10)),
                                 ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.add_shopping_cart_rounded,
-                              size: 16,
-                              color: Colors.white,
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color:
+                                        AppColors.primary.withValues(alpha: 0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.add_shopping_cart_rounded,
+                                size: 16,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ],

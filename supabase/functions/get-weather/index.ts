@@ -50,10 +50,24 @@ serve(async (req: Request) => {
       }
     } else {
       const forecast = data.list || [];
-      for (let i = 0; i < 32; i++) {
+      const now = Date.now();
+      for (let i = 0; i < Math.min(32, forecast.length); i++) {
         const f = forecast[i];
         const fid = f.weather?.[0]?.id || 0;
-        if (fid >= 500 && fid <= 531) {
+        const forecastTime = (f.dt || 0) * 1000;
+        const hoursUntilForecast = (forecastTime - now) / (1000 * 60 * 60);
+        const pop = Number(f.pop || 0);
+        const rainVolume = Number(f.rain?.['3h'] || 0);
+        const isNearTerm = hoursUntilForecast >= 0 && hoursUntilForecast <= 24;
+        const isRainCode = fid >= 500 && fid <= 531;
+        const isThunderstormCode = fid >= 200 && fid <= 232;
+        const hasSignificantRain =
+          rainVolume >= 1 ||
+          pop >= 0.6 ||
+          (isRainCode && pop >= 0.5) ||
+          isThunderstormCode;
+
+        if (isNearTerm && hasSignificantRain) {
           isEmergency = true;
           alertCategory = "ADVANCE_WARNING";
           alertTitle = "⚠️ Preparation Alert";

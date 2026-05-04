@@ -85,7 +85,7 @@ class _ReportContentDialogState extends State<ReportContentDialog> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedReason,
+              initialValue: _selectedReason,
               decoration: const InputDecoration(
                 labelText: 'Reason',
                 border: OutlineInputBorder(),

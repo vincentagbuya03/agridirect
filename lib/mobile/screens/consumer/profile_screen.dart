@@ -37,7 +37,14 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
   void initState() {
     super.initState();
 
-    _loadHeaderProfileData();
+    _refreshAndLoad();
+  }
+
+  Future<void> _refreshAndLoad() async {
+    final auth = AuthService();
+    await auth.refreshRegistrationStatus();
+    if (!mounted) return;
+    await _loadHeaderProfileData();
   }
 
   // Listen to connectivity changes
@@ -327,7 +334,7 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Profile', style: AppTextStyles.headline1),
-                      if (auth.registrationStatus == 'approved' || auth.isSeller)
+                      if (auth.registrationStatus == 'approved')
                         GestureDetector(
                           onTap: isFarmer
                               ? _handleSwitchToCustomer
@@ -550,12 +557,13 @@ class _MobileProfileScreenState extends State<MobileProfileScreen> {
                 ] else if (auth.registrationStatus == 'rejected') ...[
                   _buildRejectedRetryMenuItem(),
                   _buildDivider(),
-                ] else if (!auth.isSeller && (auth.registrationStatus == null ||
-                    auth.registrationStatus == '')) ...[
+                ] else if (!auth.isSeller &&
+                    (auth.registrationStatus == null ||
+                        auth.registrationStatus == '')) ...[
                   _buildStartSellingMenuItem(),
                   _buildDivider(),
                 ],
-                if (auth.registrationStatus == 'approved' || auth.isSeller) ...[
+                if (auth.registrationStatus == 'approved') ...[
                   _buildMenuItem(
                     icon: Icons.dashboard_rounded,
                     title: isFarmer

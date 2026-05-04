@@ -10,6 +10,7 @@ import 'admin_products_tab.dart';
 import 'admin_moderation_tab.dart';
 import 'admin_content_tab.dart';
 import 'admin_logs_tab.dart';
+import 'admin_announcements_tab.dart';
 import '../../../shared/widgets/brand_logo.dart';
 
 class AdminDashboardRedesigned extends StatefulWidget {
@@ -148,6 +149,8 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
       case 6:
         return 'System Activity Logs';
       case 7:
+        return 'Announcements';
+      case 8:
         return 'System Settings';
       default:
         return 'The AgriDirect Curator';
@@ -166,6 +169,8 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
         return 'Search moderation logs...';
       case 6:
         return 'Search activity logs...';
+      case 7:
+        return 'Search announcements...';
       default:
         return 'Search arboretum data...';
     }
@@ -299,7 +304,8 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
           _buildNavItem(4, 'Content', Icons.article_rounded),
           _buildNavItem(5, 'Moderation', Icons.gavel_rounded),
           _buildNavItem(6, 'System Logs', Icons.history_rounded),
-          _buildNavItem(7, 'Settings', Icons.settings_rounded),
+          _buildNavItem(7, 'Announcements', Icons.campaign_rounded),
+          _buildNavItem(8, 'Settings', Icons.settings_rounded),
           const Spacer(),
           Padding(
             padding: const EdgeInsets.all(24),
@@ -421,6 +427,8 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
       case 6:
         return AdminLogsTab(adminService: _adminService);
       case 7:
+        return AdminAnnouncementsTab(adminService: _adminService);
+      case 8:
         return const Center(child: Text('Settings'));
       default:
         return _buildDashboardView();
@@ -436,12 +444,21 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
           subtitle: 'Growth metrics and logistics for the AgriDirect platform.',
           actions: [
             ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Generating platform report...'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
               style: AdminUi.secondaryButton,
               child: const Text('Download Report'),
             ),
             ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                setState(() => _selectedIndex = 4);
+              },
               style: AdminUi.primaryButton,
               child: const Text('Manage Assets'),
             ),
@@ -569,20 +586,24 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _getShortDate(Duration(days: 28)),
-              _getShortDate(Duration(days: 21)),
-              _getShortDate(Duration(days: 14)),
-              _getShortDate(Duration(days: 7)),
-              'TODAY',
-            ]
-                .map(
-                  (d) => Text(
-                    d,
-                    style: AdminUi.label(size: 10, color: AdminUi.textMuted),
-                  ),
-                )
-                .toList(),
+            children:
+                [
+                      _getShortDate(Duration(days: 28)),
+                      _getShortDate(Duration(days: 21)),
+                      _getShortDate(Duration(days: 14)),
+                      _getShortDate(Duration(days: 7)),
+                      'TODAY',
+                    ]
+                    .map(
+                      (d) => Text(
+                        d,
+                        style: AdminUi.label(
+                          size: 10,
+                          color: AdminUi.textMuted,
+                        ),
+                      ),
+                    )
+                    .toList(),
           ),
         ],
       ),
@@ -591,7 +612,20 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
 
   String _getShortDate(Duration subtract) {
     final date = DateTime.now().subtract(subtract);
-    final months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    final months = [
+      'JAN',
+      'FEB',
+      'MAR',
+      'APR',
+      'MAY',
+      'JUN',
+      'JUL',
+      'AUG',
+      'SEP',
+      'OCT',
+      'NOV',
+      'DEC',
+    ];
     return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]}';
   }
 

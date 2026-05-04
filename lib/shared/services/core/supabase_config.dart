@@ -13,7 +13,8 @@ class SupabaseConfig {
 
   // Hardcoded fallbacks to ensure production stability
   static const String _fallbackUrl = 'https://ywfppgarzyksacgbesme.supabase.co';
-  static const String _fallbackKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZnBwZ2Fyenlrc2FjZ2Jlc21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NzEzMjcsImV4cCI6MjA4NzM0NzMyN30.aX1HIacJsHV8gU-9tGONnDpucE9vePWOrJbgMR4fSzs';
+  static const String _fallbackKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZnBwZ2Fyenlrc2FjZ2Jlc21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NzEzMjcsImV4cCI6MjA4NzM0NzMyN30.aX1HIacJsHV8gU-9tGONnDpucE9vePWOrJbgMR4fSzs';
 
   static String _sanitizeEnvValue(String raw) {
     var value = raw.trim();
@@ -41,14 +42,14 @@ class SupabaseConfig {
     if (url.isNotEmpty && !url.contains(r'$') && _looksLikeValidUrl(url)) {
       return url;
     }
-    
+
     final envValue = _sanitizeEnvValue(dotenv.env['SUPABASE_URL'] ?? '');
     if (envValue.isNotEmpty &&
         !envValue.contains(r'$') &&
         _looksLikeValidUrl(envValue)) {
       return envValue;
     }
-    
+
     return _fallbackUrl;
   }
 
@@ -57,15 +58,14 @@ class SupabaseConfig {
     if (key.isNotEmpty && !key.contains(r'$') && _looksLikeJwt(key)) {
       return key;
     }
-    
-    final envValue =
-        _sanitizeEnvValue(dotenv.env['SUPABASE_ANON_KEY'] ?? '');
+
+    final envValue = _sanitizeEnvValue(dotenv.env['SUPABASE_ANON_KEY'] ?? '');
     if (envValue.isNotEmpty &&
         !envValue.contains(r'$') &&
         _looksLikeJwt(envValue)) {
       return envValue;
     }
-    
+
     return _fallbackKey;
   }
 
@@ -124,7 +124,7 @@ class SupabaseDatabase {
         'email_verified': emailVerified,
         'updated_at': DateTime.now().toIso8601String(),
       };
-      
+
       if (phoneNumber != null && phoneNumber.isNotEmpty) {
         userData['phone'] = phoneNumber;
       }
@@ -153,7 +153,7 @@ class SupabaseDatabase {
           'role_level': 3,
           'is_active': true,
         }, onConflict: 'user_id');
-        
+
         try {
           await addUserRole(userId: userId, roleName: 'admin');
         } catch (e) {
@@ -229,15 +229,25 @@ class SupabaseDatabase {
 
   static Future<Map<String, dynamic>?> getUserProfile(String userId) async {
     try {
-      return await _client.from('users').select().eq('user_id', userId).maybeSingle();
+      return await _client
+          .from('users')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
     } catch (e) {
       return null;
     }
   }
 
-  static Future<Map<String, dynamic>?> getUserProfileByEmail(String email) async {
+  static Future<Map<String, dynamic>?> getUserProfileByEmail(
+    String email,
+  ) async {
     try {
-      return await _client.from('users').select().eq('email', email).maybeSingle();
+      return await _client
+          .from('users')
+          .select()
+          .eq('email', email)
+          .maybeSingle();
     } catch (e) {
       return null;
     }
@@ -248,7 +258,11 @@ class SupabaseDatabase {
     required String roleName,
   }) async {
     try {
-      final roleData = await _client.from('roles').select('role_id').eq('name', roleName).maybeSingle();
+      final roleData = await _client
+          .from('roles')
+          .select('role_id')
+          .eq('name', roleName)
+          .maybeSingle();
       if (roleData != null) {
         await _client.from('user_roles').upsert({
           'user_id': userId,
@@ -257,12 +271,17 @@ class SupabaseDatabase {
       }
 
       if (roleName == 'seller' || roleName == 'farmer') {
-        final exists = await _client.from('farmers').select('farmer_id').eq('user_id', userId).maybeSingle();
+        final exists = await _client
+            .from('farmers')
+            .select('farmer_id')
+            .eq('user_id', userId)
+            .maybeSingle();
         if (exists == null) {
-          final farmerResponse = await _client.from('farmers').insert({
-            'user_id': userId,
-            'farm_name': 'My Farm',
-          }).select('farmer_id').single();
+          final farmerResponse = await _client
+              .from('farmers')
+              .insert({'user_id': userId, 'farm_name': 'My Farm'})
+              .select('farmer_id')
+              .single();
 
           await _client.from('farmer_registrations').insert({
             'farmer_id': farmerResponse['farmer_id'],
@@ -270,7 +289,11 @@ class SupabaseDatabase {
           });
         }
       } else if (roleName == 'admin') {
-        final exists = await _client.from('admins').select('admin_id').eq('user_id', userId).maybeSingle();
+        final exists = await _client
+            .from('admins')
+            .select('admin_id')
+            .eq('user_id', userId)
+            .maybeSingle();
         if (exists == null) {
           await _client.from('admins').insert({
             'user_id': userId,
@@ -305,10 +328,18 @@ class SupabaseDatabase {
   }) async {
     try {
       if (roleName == 'seller') {
-        final res = await _client.from('farmers').select('farmer_id').eq('user_id', userId).maybeSingle();
+        final res = await _client
+            .from('farmers')
+            .select('farmer_id')
+            .eq('user_id', userId)
+            .maybeSingle();
         return res != null;
       } else if (roleName == 'admin') {
-        final res = await _client.from('admins').select('admin_id').eq('user_id', userId).maybeSingle();
+        final res = await _client
+            .from('admins')
+            .select('admin_id')
+            .eq('user_id', userId)
+            .maybeSingle();
         return res != null;
       }
       return false;
@@ -325,7 +356,11 @@ class SupabaseDatabase {
       final cleanEmail = email.trim().toLowerCase();
       if (cleanEmail != 'noreplyagridirect@gmail.com') return;
 
-      final existing = await _client.from('admins').select('admin_id').eq('user_id', userId).maybeSingle();
+      final existing = await _client
+          .from('admins')
+          .select('admin_id')
+          .eq('user_id', userId)
+          .maybeSingle();
       if (existing == null) {
         await _client.from('admins').insert({
           'user_id': userId,
@@ -341,8 +376,15 @@ class SupabaseDatabase {
 
   static Future<List<String>> getUserRoles(String userId) async {
     try {
-      final response = await _client.rpc('get_user_roles', params: {'checked_user_id': userId}) as List<dynamic>;
-      return response.map((item) => (item as Map<String, dynamic>)['role_name'] as String).toList();
+      final response =
+          await _client.rpc(
+                'get_user_roles',
+                params: {'checked_user_id': userId},
+              )
+              as List<dynamic>;
+      return response
+          .map((item) => (item as Map<String, dynamic>)['role_name'] as String)
+          .toList();
     } catch (e) {
       return ['consumer'];
     }
@@ -364,7 +406,8 @@ class SupabaseDatabase {
       if (registration.facePhotoPath != null || faceImageBytes != null) {
         faceUrl = await uploadImage(
           bucket: 'registrations',
-          path: 'face_scans/${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          path:
+              'face_scans/${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg',
           localPath: registration.facePhotoPath,
           bytes: faceImageBytes,
         );
@@ -373,7 +416,8 @@ class SupabaseDatabase {
       if (registration.validIdPath != null || idImageBytes != null) {
         idUrl = await uploadImage(
           bucket: 'registrations',
-          path: 'valid_ids/${userId}_${DateTime.now().millisecondsSinceEpoch}_front.jpg',
+          path:
+              'valid_ids/${userId}_${DateTime.now().millisecondsSinceEpoch}_front.jpg',
           localPath: registration.validIdPath,
           bytes: idImageBytes,
         );
@@ -382,19 +426,31 @@ class SupabaseDatabase {
       if (registration.validIdBackPath != null || idBackImageBytes != null) {
         idBackUrl = await uploadImage(
           bucket: 'registrations',
-          path: 'valid_ids/${userId}_${DateTime.now().millisecondsSinceEpoch}_back.jpg',
+          path:
+              'valid_ids/${userId}_${DateTime.now().millisecondsSinceEpoch}_back.jpg',
           localPath: registration.validIdBackPath,
           bytes: idBackImageBytes,
         );
       }
 
-      final educationJsonb = registration.toEducationRows().cast<Map<String, dynamic>>();
-      final cropJsonb = registration.toCropTypeRows().cast<Map<String, dynamic>>();
-      final livestockJsonb = registration.toLivestockRows().cast<Map<String, dynamic>>();
+      final educationJsonb = registration
+          .toEducationRows()
+          .cast<Map<String, dynamic>>();
+      final cropJsonb = registration
+          .toCropTypeRows()
+          .cast<Map<String, dynamic>>();
+      final livestockJsonb = registration
+          .toLivestockRows()
+          .cast<Map<String, dynamic>>();
 
       final Map<String, dynamic> rpcParams = {
         'p_user_id': userId,
+        'p_full_name': registration.fullName,
         'p_birth_date': registration.birthDate,
+        'p_sex': registration.sex,
+        'p_place_of_birth': registration.placeOfBirth,
+        'p_pcn': registration.pcn,
+        'p_id_type': registration.idType,
         'p_years_of_experience': yearsOfExp,
         'p_residential_address': registration.residentialAddress,
         'p_farm_name': registration.farmName,
@@ -410,29 +466,28 @@ class SupabaseDatabase {
         'p_livestock_rows': livestockJsonb,
       };
 
-      final response = await _client.rpc('submit_complete_farmer_registration', params: rpcParams);
-      final result = response is List ? (response.isNotEmpty ? response[0] : {}) : response;
-      if (result['success'] != true) throw Exception(result['message'] ?? 'Registration failed');
+      final response = await _client.rpc(
+        'submit_complete_farmer_registration',
+        params: rpcParams,
+      );
+      final result = response is List
+          ? (response.isNotEmpty ? response[0] : {})
+          : response;
+      if (result['success'] != true) {
+        throw Exception(result['message'] ?? 'Registration failed');
+      }
 
-      final registrationId = result['registration_id'];
-      
-      try {
-        await _client.from('farmers').update({
-          'id_type': registration.idType,
-          'sex': registration.sex,
-          'place_of_birth': registration.placeOfBirth,
-          'pcn': registration.pcn,
-          'valid_id_path': idUrl,
-          'valid_id_back_path': idBackUrl,
-        }).eq('user_id', userId);
-
-        final displayName = registration.fullName.trim();
-        if (displayName.isNotEmpty) {
-          await _client.from('farmer_registrations').update({'full_name': displayName}).eq('registration_id', registrationId);
-          await _client.from('users').update({'name': displayName}).eq('user_id', userId);
+      // Sync user display name if changed
+      final displayName = registration.fullName.trim();
+      if (displayName.isNotEmpty) {
+        try {
+          await _client
+              .from('users')
+              .update({'name': displayName})
+              .eq('user_id', userId);
+        } catch (e) {
+          debugPrint('User name sync warning: $e');
         }
-      } catch (e) {
-        debugPrint('Identity sync warning: $e');
       }
     } catch (e) {
       rethrow;
@@ -445,19 +500,38 @@ class SupabaseDatabase {
     return 'pending';
   }
 
-  static Future<Map<String, dynamic>?> getFarmerRegistration(String userId) async {
+  static Future<Map<String, dynamic>?> getFarmerRegistration(
+    String userId,
+  ) async {
     try {
-      final farmer = await _client.from('farmers').select('farmer_id, user_id, is_verified, is_active, created_at, updated_at').eq('user_id', userId).maybeSingle();
+      final farmer = await _client
+          .from('farmers')
+          .select(
+            'farmer_id, user_id, is_verified, is_active, created_at, updated_at',
+          )
+          .eq('user_id', userId)
+          .maybeSingle();
       if (farmer == null) return null;
 
       final farmerId = farmer['farmer_id'] as String;
-      final registration = await _client.from('farmer_registrations').select('registration_id, status').eq('farmer_id', farmerId).order('created_at', ascending: false).maybeSingle();
+      final registration = await _client
+          .from('farmer_registrations')
+          .select('registration_id, status')
+          .eq('farmer_id', farmerId)
+          .order('created_at', ascending: false)
+          .maybeSingle();
 
       String status = 'pending';
-      String? registrationId = farmer['farmer_id'];
+      String? registrationId = farmerId;
       if (registration != null) {
         registrationId = registration['registration_id'];
         status = _normalizeRegistrationStatus(registration['status']);
+      }
+
+      // If the farmer is already verified, treat the registration as approved
+      // even if the latest farmer_registrations row is stale.
+      if (farmer['is_verified'] == true) {
+        status = 'approved';
       }
 
       return {
@@ -489,7 +563,12 @@ class SupabaseDatabase {
           if (isFirst || currentStatus != lastStatus) {
             lastStatus = currentStatus;
             isFirst = false;
-            if (currentStatus != null) await prefs.setString('registration_status_$userId', currentStatus);
+            if (currentStatus != null) {
+              await prefs.setString(
+                'registration_status_$userId',
+                currentStatus,
+              );
+            }
             yield currentStatus;
           }
         } catch (_) {}
@@ -500,7 +579,11 @@ class SupabaseDatabase {
 
   static Future<Map<String, dynamic>?> getFarmerProfile(String userId) async {
     try {
-      return await _client.from('farmers').select().eq('user_id', userId).maybeSingle();
+      return await _client
+          .from('farmers')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
     } catch (e) {
       return null;
     }
@@ -515,12 +598,30 @@ class SupabaseDatabase {
     try {
       if (kIsWeb) {
         if (bytes == null) return null;
-        await _client.storage.from(bucket).uploadBinary(path, bytes, fileOptions: const FileOptions(cacheControl: '3600', upsert: true));
+        await _client.storage
+            .from(bucket)
+            .uploadBinary(
+              path,
+              bytes,
+              fileOptions: const FileOptions(
+                cacheControl: '3600',
+                upsert: true,
+              ),
+            );
       } else {
         if (localPath == null) return null;
         final file = io.File(localPath);
         if (!await file.exists()) return null;
-        await _client.storage.from(bucket).upload(path, file, fileOptions: const FileOptions(cacheControl: '3600', upsert: true));
+        await _client.storage
+            .from(bucket)
+            .upload(
+              path,
+              file,
+              fileOptions: const FileOptions(
+                cacheControl: '3600',
+                upsert: true,
+              ),
+            );
       }
       return '$bucket/$path';
     } catch (e) {
@@ -528,7 +629,10 @@ class SupabaseDatabase {
     }
   }
 
-  static Future<String> getSafeUrl(String? path, {String? defaultBucket}) async {
+  static Future<String> getSafeUrl(
+    String? path, {
+    String? defaultBucket,
+  }) async {
     if (path == null || path.isEmpty) return '';
     String bucket = defaultBucket ?? 'uploads';
     String fileName = path;
@@ -545,7 +649,9 @@ class SupabaseDatabase {
         } else {
           return path;
         }
-      } catch (_) { return path; }
+      } catch (_) {
+        return path;
+      }
     } else {
       final parts = path.split('/');
       if (parts.length >= 2) {
@@ -594,7 +700,7 @@ class SupabaseDatabase {
       if (categoryId != null) {
         query = query.eq('category_id', categoryId);
       }
-      
+
       query = query.limit(limit);
 
       final response = await query;
@@ -606,7 +712,9 @@ class SupabaseDatabase {
   }
 
   /// Marketplace: Get verified farmers for spotlight
-  static Future<List<Map<String, dynamic>>> getFarmerSpotlight({int limit = 5}) async {
+  static Future<List<Map<String, dynamic>>> getFarmerSpotlight({
+    int limit = 5,
+  }) async {
     try {
       final response = await _client
           .from('farmers')

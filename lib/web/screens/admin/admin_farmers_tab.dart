@@ -224,7 +224,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
         ),
         const Spacer(),
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: () => _showOnboardingDialog(),
           style: AdminUi.primaryButton,
           icon: const Icon(Icons.add_rounded, size: 18),
           label: const Text('Onboard New Farmer'),
@@ -546,16 +546,42 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                         ),
                         child: const Text('Verify Farmer'),
                       ),
-                    if (!isVerified) const SizedBox(width: 8),
-                    if (!isVerified)
-                      IconButton(
-                        icon: const Icon(
-                          Icons.more_vert_rounded,
-                          color: AdminUi.textMuted,
-                          size: 20,
-                        ),
-                        onPressed: () {},
+                    const SizedBox(width: 8),
+                    PopupMenuButton<String>(
+                      icon: const Icon(
+                        Icons.more_vert_rounded,
+                        color: AdminUi.textMuted,
+                        size: 20,
                       ),
+                      onSelected: (value) {
+                        if (value == 'view') {
+                          _showDetails(farmer);
+                        } else if (value == 'edit') {
+                          // TODO: Implement edit profile
+                        } else if (value == 'deactivate') {
+                          widget.adminService.deactivateUser(farmer['user_id']);
+                          _loadData();
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'view',
+                          child: Text('View Details'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Edit Profile'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'deactivate',
+                          child: Text('Deactivate Farmer'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Delete Account'),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -1690,5 +1716,121 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
             )
             .join(' ');
     }
+  }
+
+  void _showOnboardingDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => _OnboardFarmerDialog(adminService: widget.adminService),
+    ).then((_) => _loadData());
+  }
+}
+
+class _OnboardFarmerDialog extends StatefulWidget {
+  final AdminService adminService;
+  const _OnboardFarmerDialog({required this.adminService});
+
+  @override
+  State<_OnboardFarmerDialog> createState() => _OnboardFarmerDialogState();
+}
+
+class _OnboardFarmerDialogState extends State<_OnboardFarmerDialog> {
+  final _searchController = TextEditingController();
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _searching = false;
+  Map<String, dynamic>? _selectedUser;
+
+  void _search() async {
+    if (_searchController.text.length < 3) return;
+    setState(() => _searching = true);
+    final results = await widget.adminService.getAllUsers(
+      searchQuery: _searchController.text,
+    );
+    if (mounted) {
+      setState(() {
+        _searchResults = results.where((u) => u['role'] != 'farmer' && u['role'] != 'admin').toList();
+        _searching = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: AdminUi.radiusLg),
+      child: Container(
+        width: 500,
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Onboard New Farmer', style: AdminUi.title(size: 20)),
+            const SizedBox(height: 8),
+            Text(
+              'Search for an existing user to promote them to a verified farmer.',
+              style: AdminUi.body(color: AdminUi.textSecondary),
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _searchController,
+              decoration: AdminUi.inputDecoration(
+                hintText: 'Search by email or name...',
+                prefixIcon: const Icon(Icons.search_rounded),
+              ),
+              onChanged: (_) => _search(),
+            ),
+            const SizedBox(height: 16),
+            if (_searching)
+              const Center(child: CircularProgressIndicator())
+            else if (_searchResults.isNotEmpty)
+              Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  border: Border.all(color: AdminUi.border),
+                  borderRadius: AdminUi.radiusMd,
+                ),
+                child: ListView.separated(
+                  itemCount: _searchResults.length,
+                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final user = _searchResults[index];
+                    final isSelected = _selectedUser?['user_id'] == user['user_id'];
+                    return ListTile(
+                      title: Text(user['name'] ?? 'Unknown'),
+                      subtitle: Text(user['email'] ?? ''),
+                      selected: isSelected,
+                      onTap: () => setState(() => _selectedUser = user),
+                      trailing: isSelected ? const Icon(Icons.check_circle, color: AdminUi.brand) : null,
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: _selectedUser == null ? null : () async {
+                    await widget.adminService.updateUserRole(
+                      userId: _selectedUser!['user_id'],
+                      newRole: 'farmer',
+                    );
+                    if (mounted) Navigator.pop(context);
+                  },
+                  style: AdminUi.primaryButton,
+                  child: const Text('Promote to Farmer'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -11,4 +11,18 @@ PS C:\Users\Nick Vincent Agbuya\Documents\Flutter Project\agridirect> Get-ChildI
 
 // arm64-v8a, : version that i can push
 
-Rename-Item -Path "web\agridirect-android-arm64-v8a-release.apk" -NewName "AgriDirect-Installer.apk"
+Rename-Item -Path "web\AgriDirect-Installer-v1.0.0-arm64-v8a-release.apk" -NewName "AgriDirect-Installer.apk"
+
+
+
+SELECT cron.unschedule('daily-weather-check');
+
+SELECT cron.schedule(
+  'daily-weather-check',
+  '0 4 * * *',  -- Fires at 4:00 AM UTC (12:00 PM PHT)
+  $$
+  SELECT net.http_post(
+    url := 'https://ywfppgarzyksacgbesme.supabase.co/functions/v1/daily-weather-check',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsIn

@@ -77,6 +77,12 @@ class AppTextStyles {
         color: AppColors.textSubtle,
         letterSpacing: 0.2,
       );
+
+  static TextStyle get labelLarge => GoogleFonts.inter(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textBody,
+      );
 }
 
 class AppDecorations {

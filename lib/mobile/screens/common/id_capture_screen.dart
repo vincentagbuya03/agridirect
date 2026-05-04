@@ -9,12 +9,29 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
-/// Full-screen camera view for capturing the front or back of an ID card.
-/// Uses ML Kit Text Recognition with Intelligent Keyword Filtering to 
-/// differentiate valid IDs from credit/debit cards.
+/// Full-screen camera view for capturing the front of an ID card.
+///
+/// Detection logic (simplified & robust):
+///   1. Text recognition — looks for Philippine National ID keywords OR
+///      a minimum number of text blocks (dense text = ID-like document).
+///   2. Face detection — a face must be visible on the ID card.
+///
+/// The detected face and text must also fit inside the visible guide box.
+///
+/// When BOTH conditions are met for [_requiredStableFrames] stable frames,
+/// the screen auto-captures a photo and returns the file path.
 class IdCaptureScreen extends StatefulWidget {
   final String label;
-  const IdCaptureScreen({super.key, this.label = 'ID Front'});
+  final bool requireQr;
+
+  const IdCaptureScreen({super.key, this.label = 'ID Front', bool? requireQr})
+    : requireQr = requireQr ?? false;
+
+  const IdCaptureScreen.back({
+    super.key,
+    this.label = 'ID Back',
+    this.requireQr = true,
+  });
 
   @override
   State<IdCaptureScreen> createState() => _IdCaptureScreenState();
@@ -37,57 +54,74 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
       enableClassification: false,
       enableTracking: false,
       performanceMode: FaceDetectorMode.fast,
+      // Very small — ID card photo is a tiny printed image
+      minFaceSize: 0.02,
     ),
   );
+
   bool _isProcessing = false;
+  bool _isCapturing = false;
 
-  // ─── Detection States ───
-  bool _isValidIdDetected = false;
-  bool _isForbiddenCardDetected = false;
-  bool _isIdConfirmed = false; // stays true only while face+text are continuously visible
+  // ─── Detection state ───
+  bool _isIdDetected = false;
+  bool _isForbiddenCard = false;
   int _stableFrames = 0;
-  static const int _requiredStableFrames = 4; // Frames needed to confirm valid ID
+  static const int _requiredStableFrames = 2;
 
-  // ─── Countdown Timer ───
+  // ─── Countdown ───
   Timer? _countdownTimer;
   int _countdownSeconds = 3;
   bool _countdownActive = false;
-  bool _isCapturing = false;
-
-  String _statusText = 'Initializing camera…';
-  String _guidanceText = '';
   double _progress = 0.0;
 
+  String _statusText = 'Initializing camera...';
+  String _guidanceText = '';
+
+  // ─── Guide overlay and detection constants ───
   static const double _cardCenterYFraction = 0.42;
   static const double _cardWidthFraction = 0.88;
   static const double _cardAspectRatio = 1.586;
+  static const double _guideToleranceFraction = 0.05; // Was 0.025
+  static const double _minFeatureWidthFraction = 0.42;
+  static const double _minFeatureHeightFraction = 0.12;
 
-  // --- Keywords for Intelligent Detection ---
-  
-  // Valid ID Keywords (PhilSys / General National ID — Filipino + English)
+  // ─── Keywords for Philippine National ID ───
   final List<String> _validKeywords = [
-    // Filipino text on PhilID
-    'REPUBLIKA NG PILIPINAS',
-    'PAMBANSANG PAGKAKAKILANLAN',
+    'REPUBLIKA',
+    'PILIPINAS',
+    'PHILIPPINES',
+    'PAMBANSANG',
     'PAGKAKAKILANLAN',
-    // English text on PhilID
-    'REPUBLIC OF THE PHILIPPINES',
     'PHILIPPINE IDENTIFICATION',
     'IDENTIFICATION CARD',
-    'PHILID',
     'NATIONAL ID',
-    // Common PhilID field labels
-    'PCN',
-    'DATE OF BIRTH',
+    'PHILID',
+    'PHIL ID',
+    'PHILSYS',
+    'APELYIDO',
+    'PANGALAN',
+    'KAPANGANAKAN',
+    'TIRAHAN',
+    'KASARIAN',
     'LAST NAME',
     'FIRST NAME',
-    'APELYIDO',
-    'MGA PANGALAN',
-    'PETSA NG KAPANGANAKAN',
-    'TIRAHAN',
+    'MIDDLE NAME',
+    'DATE OF BIRTH',
+    'PLACE OF BIRTH',
+    'ADDRESS',
+    'PHL',
+    'PCN',
+    // OCR fragments
+    'REPUB',
+    'PILI',
+    'PINAS',
+    'PAMBAN',
+    'PAGKAKA',
+    'TIRA',
+    'APEL',
+    'PANG',
   ];
 
-  // Forbidden Keywords (Bank Cards)
   final List<String> _forbiddenKeywords = [
     'VISA',
     'MASTERCARD',
@@ -145,17 +179,21 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
       setState(() {
         _isCameraReady = true;
         _statusText = 'Position your ID in the frame';
-        _guidanceText = 'Waiting for National ID...';
+        _guidanceText = 'Fit the entire card inside the box';
       });
 
-      // Begin streaming frames for text detection
       await _controller!.startImageStream(_onCameraFrame);
     } catch (e) {
+      debugPrint('[IdCapture] Camera init error: $e');
       if (mounted) {
         setState(() => _statusText = 'Camera not available');
       }
     }
   }
+
+  // ─────────────────────────────────────────────────
+  // Frame processing
+  // ─────────────────────────────────────────────────
 
   void _onCameraFrame(CameraImage image) {
     if (_isProcessing || _isCapturing) return;
@@ -168,7 +206,6 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
     if (inputImage == null) return;
 
     try {
-      // Process both text and faces concurrently for speed
       final results = await Future.wait([
         _textRecognizer.processImage(inputImage),
         _faceDetector.processImage(inputImage),
@@ -179,118 +216,15 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
       final recognizedText = results[0] as RecognizedText;
       final faces = results[1] as List<Face>;
 
-      _analyzeFrame(recognizedText, faces, image.height.toDouble());
-
+      _analyzeFrame(
+        recognizedText,
+        faces,
+        image.width.toDouble(),
+        image.height.toDouble(),
+        _rearCamera!.sensorOrientation,
+      );
     } catch (e) {
-      debugPrint('Frame processing error: $e');
-    }
-  }
-
-  void _analyzeFrame(RecognizedText recognizedText, List<Face> faces, double frameHeight) {
-    if (recognizedText.blocks.isEmpty) {
-      _resetDetectionState();
-      return;
-    }
-
-    final String fullText = recognizedText.text.toUpperCase();
-
-    // 1. Check for Valid ID Keywords FIRST
-    bool isValidId = false;
-    for (final keyword in _validKeywords) {
-      if (fullText.contains(keyword)) {
-        isValidId = true;
-        break;
-      }
-    }
-
-    // 2. Check for Forbidden Cards (only if not a valid ID)
-    bool isForbidden = false;
-    if (!isValidId) {
-      for (final keyword in _forbiddenKeywords) {
-        if (fullText.contains(keyword)) {
-          isForbidden = true;
-          break;
-        }
-      }
-    }
-
-    if (isForbidden) {
-      _stableFrames = 0;
-      if (_countdownActive) _resetCountdown();
-
-      setState(() {
-        _isForbiddenCardDetected = true;
-        _isValidIdDetected = false;
-        _progress = 0.0;
-        _statusText = 'Invalid ID Detected!';
-        _guidanceText = 'Please scan a valid National ID.';
-      });
-      return;
-    }
-
-    // 3. Intelligent Face Requirement
-    // A valid National ID must have a face that is:
-    // a) Large enough to be the portrait (not a tiny background face)
-    bool hasValidFace = false;
-    
-    for (final face in faces) {
-      final rect = face.boundingBox;
-      
-      // Face must be at least 15% of the frame height to be considered the ID portrait
-      final double faceHeightRatio = rect.height / frameHeight;
-      
-      if (faceHeightRatio > 0.15) {
-        hasValidFace = true;
-        break;
-      }
-    }
-
-    if (isValidId && hasValidFace) {
-      _stableFrames++;
-      _isIdConfirmed = true; // face + valid text are present right now
-
-      setState(() {
-        _isForbiddenCardDetected = false;
-        _isValidIdDetected = true;
-      });
-
-      if (_stableFrames >= _requiredStableFrames && !_countdownActive) {
-        _startCountdown();
-      }
-
-      if (_countdownActive) {
-        setState(() {
-          _statusText = 'Hold still — $_countdownSeconds';
-          _guidanceText = 'National ID detected ✓ Stay steady!';
-        });
-      } else {
-        setState(() {
-          _statusText = 'Validating ID…';
-          _guidanceText = 'Keep the card steady in the frame';
-          _progress = (_stableFrames / _requiredStableFrames).clamp(0.0, 1.0);
-        });
-      }
-    } else {
-      // Face or valid keywords disappeared — clear confirmed state and reset
-      _isIdConfirmed = false;
-      _resetDetectionState();
-    }
-  }
-
-  void _resetDetectionState() {
-    _stableFrames = 0;
-    if (_countdownActive) {
-      _resetCountdown();
-    }
-
-    if (mounted && (_isValidIdDetected || _isForbiddenCardDetected)) {
-      setState(() {
-        _isValidIdDetected = false;
-        _isForbiddenCardDetected = false;
-        _progress = 0.0;
-        _statusText = 'Position your ID in the frame';
-        _guidanceText = 'Waiting for National ID...';
-      });
+      debugPrint('[IdCapture] Frame processing error: $e');
     }
   }
 
@@ -323,6 +257,319 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
     );
   }
 
+  // ─────────────────────────────────────────────────
+  // Detection logic
+  // ─────────────────────────────────────────────────
+
+  int _countKeywordMatches(String text) {
+    int count = 0;
+    for (final keyword in _validKeywords) {
+      if (text.contains(keyword)) count++;
+    }
+    return count;
+  }
+
+  bool _hasForbiddenKeyword(String text) {
+    for (final keyword in _forbiddenKeywords) {
+      if (text.contains(keyword)) return true;
+    }
+    return false;
+  }
+
+  void _analyzeFrame(
+    RecognizedText recognizedText,
+    List<Face> faces,
+    double frameW,
+    double frameH,
+    int sensorOrientation,
+  ) {
+    final String fullText = recognizedText.text.toUpperCase();
+    final int blockCount = recognizedText.blocks.length;
+    final int keywordHits = _countKeywordMatches(fullText);
+    final bool hasFace = faces.isNotEmpty;
+    final bool isForbidden = _hasForbiddenKeyword(fullText);
+
+    // ID-like: 1+ keyword AND (3+ keywords OR 5+ text blocks)
+    final bool hasKeywords =
+        keywordHits >= 1 && (keywordHits >= 3 || blockCount >= 5);
+
+    // ── 1. Build a combined bounding box of ALL features ──
+    Rect? combinedFeatureBox;
+    for (final block in recognizedText.blocks) {
+      final rect = _normalizeRectToPortraitFraction(
+        block.boundingBox,
+        frameW,
+        frameH,
+        sensorOrientation,
+      );
+      combinedFeatureBox = combinedFeatureBox == null
+          ? rect
+          : combinedFeatureBox.expandToInclude(rect);
+    }
+    bool hasFaceInsideGuide = false;
+    for (final face in faces) {
+      final rect = _normalizeRectToPortraitFraction(
+        face.boundingBox,
+        frameW,
+        frameH,
+        sensorOrientation,
+      );
+      combinedFeatureBox = combinedFeatureBox == null
+          ? rect
+          : combinedFeatureBox.expandToInclude(rect);
+      hasFaceInsideGuide =
+          hasFaceInsideGuide || _isRectInsideGuide(rect, _portraitGuideRect());
+    }
+
+    bool isInsideGuide = false;
+    bool isLargeEnough = false;
+
+    if (combinedFeatureBox != null) {
+      final double left = combinedFeatureBox.left;
+      final double right = combinedFeatureBox.right;
+      final double top = combinedFeatureBox.top;
+      final double bottom = combinedFeatureBox.bottom;
+
+      final double cx = (left + right) / 2;
+      final double cy = (top + bottom) / 2;
+      final double cw = (right - left).abs();
+      final double ch = (bottom - top).abs();
+
+      final guideRect = _portraitGuideRect();
+      isInsideGuide =
+          hasFaceInsideGuide &&
+          _isRectInsideGuide(combinedFeatureBox, guideRect);
+
+      isLargeEnough =
+          cw >= _minFeatureWidthFraction && ch >= _minFeatureHeightFraction;
+
+      debugPrint(
+        '[IdCapture] PortraitBox: L=${left.toStringAsFixed(2)} R=${right.toStringAsFixed(2)} T=${top.toStringAsFixed(2)} B=${bottom.toStringAsFixed(2)}',
+      );
+      debugPrint(
+        '[IdCapture] Center: (${cx.toStringAsFixed(2)}, ${cy.toStringAsFixed(2)}) Size: ${cw.toStringAsFixed(2)}x${ch.toStringAsFixed(2)}',
+      );
+    }
+
+    final String debug =
+        'k=$keywordHits b=$blockCount f=${faces.length} '
+        'in=$isInsideGuide big=$isLargeEnough '
+        'rot=$sensorOrientation';
+    debugPrint('[IdCapture] $debug');
+
+    // ── Forbidden card ──
+    if (isForbidden) {
+      _stableFrames = 0;
+      if (_countdownActive) _resetCountdown();
+      if (mounted) {
+        setState(() {
+          _isForbiddenCard = true;
+          _isIdDetected = false;
+          _progress = 0.0;
+          _statusText = 'Invalid card detected!';
+          _guidanceText = 'Please use a valid Philippine National ID';
+        });
+      }
+      return;
+    }
+
+    // ── All conditions met ──
+    if (hasKeywords && hasFace && isInsideGuide && isLargeEnough) {
+      _stableFrames++;
+      if (mounted) {
+        setState(() {
+          _isForbiddenCard = false;
+          _isIdDetected = true;
+          _progress = (_stableFrames / _requiredStableFrames).clamp(0.0, 1.0);
+        });
+      }
+
+      if (_stableFrames >= _requiredStableFrames && !_countdownActive) {
+        _startCountdown();
+      }
+
+      if (mounted) {
+        setState(() {
+          _statusText = _countdownActive
+              ? 'Hold still — $_countdownSeconds'
+              : 'Validating ID...';
+          _guidanceText = _countdownActive
+              ? 'ID detected! Stay steady'
+              : 'Keep the card steady';
+        });
+      }
+      return;
+    }
+
+    // ── Keywords + face but not in the box ──
+    if (hasKeywords && hasFace && !isInsideGuide) {
+      _stableFrames = 0;
+      if (_countdownActive) _resetCountdown();
+      if (mounted) {
+        setState(() {
+          _isForbiddenCard = false;
+          _isIdDetected = false;
+          _progress = 0.0;
+          _statusText = 'Fit ID inside the box';
+          _guidanceText = 'Move the card so it fits inside the guide lines';
+        });
+      }
+      return;
+    }
+
+    // ── Keywords + face but too small ──
+    if (hasKeywords && hasFace && !isLargeEnough) {
+      _stableFrames = 0;
+      if (_countdownActive) _resetCountdown();
+      if (mounted) {
+        setState(() {
+          _isForbiddenCard = false;
+          _isIdDetected = false;
+          _progress = 0.0;
+          _statusText = 'Move closer';
+          _guidanceText = 'The ID should fill the guide box';
+        });
+      }
+      return;
+    }
+
+    // ── Keywords found but no face ──
+    if (hasKeywords) {
+      _stableFrames = 0;
+      if (_countdownActive) _resetCountdown();
+      if (mounted) {
+        setState(() {
+          _isForbiddenCard = false;
+          _isIdDetected = false;
+          _progress = 0.0;
+          _statusText = 'Face not found';
+          _guidanceText = 'Ensure the portrait photo is visible and well-lit';
+        });
+      }
+      return;
+    }
+
+    // ── Face found but no text ──
+    if (hasFace) {
+      _stableFrames = 0;
+      if (_countdownActive) _resetCountdown();
+      if (mounted) {
+        setState(() {
+          _isForbiddenCard = false;
+          _isIdDetected = false;
+          _progress = 0.0;
+          _statusText = 'Reading text...';
+          _guidanceText = 'Hold still so the camera can focus';
+        });
+      }
+      return;
+    }
+
+    // ── Nothing ──
+    _resetDetection();
+  }
+
+  Rect _portraitGuideRect() {
+    final cardHeight = _cardWidthFraction / _cardAspectRatio;
+    return Rect.fromCenter(
+      center: const Offset(0.5, _cardCenterYFraction),
+      width: _cardWidthFraction,
+      height: cardHeight,
+    ).inflate(_guideToleranceFraction);
+  }
+
+  Rect _normalizeRectToPortraitFraction(
+    Rect rect,
+    double frameW,
+    double frameH,
+    int sensorOrientation,
+  ) {
+    final points = [
+      _normalizePointToPortraitFraction(
+        rect.left,
+        rect.top,
+        frameW,
+        frameH,
+        sensorOrientation,
+      ),
+      _normalizePointToPortraitFraction(
+        rect.right,
+        rect.top,
+        frameW,
+        frameH,
+        sensorOrientation,
+      ),
+      _normalizePointToPortraitFraction(
+        rect.right,
+        rect.bottom,
+        frameW,
+        frameH,
+        sensorOrientation,
+      ),
+      _normalizePointToPortraitFraction(
+        rect.left,
+        rect.bottom,
+        frameW,
+        frameH,
+        sensorOrientation,
+      ),
+    ];
+
+    final xs = points.map((point) => point.dx);
+    final ys = points.map((point) => point.dy);
+
+    return Rect.fromLTRB(
+      xs.reduce((a, b) => a < b ? a : b).clamp(0.0, 1.0),
+      ys.reduce((a, b) => a < b ? a : b).clamp(0.0, 1.0),
+      xs.reduce((a, b) => a > b ? a : b).clamp(0.0, 1.0),
+      ys.reduce((a, b) => a > b ? a : b).clamp(0.0, 1.0),
+    );
+  }
+
+  Offset _normalizePointToPortraitFraction(
+    double x,
+    double y,
+    double frameW,
+    double frameH,
+    int sensorOrientation,
+  ) {
+    switch (sensorOrientation) {
+      case 90:
+        return Offset(1.0 - (y / frameH), x / frameW);
+      case 180:
+        return Offset(1.0 - (x / frameW), 1.0 - (y / frameH));
+      case 270:
+        return Offset(y / frameH, 1.0 - (x / frameW));
+      default:
+        return Offset(x / frameW, y / frameH);
+    }
+  }
+
+  bool _isRectInsideGuide(Rect rect, Rect guideRect) {
+    return rect.left >= guideRect.left &&
+        rect.top >= guideRect.top &&
+        rect.right <= guideRect.right &&
+        rect.bottom <= guideRect.bottom;
+  }
+
+  void _resetDetection() {
+    _stableFrames = 0;
+    if (_countdownActive) _resetCountdown();
+    if (mounted) {
+      setState(() {
+        _isIdDetected = false;
+        _isForbiddenCard = false;
+        _progress = 0.0;
+        _statusText = 'Position your ID in the frame';
+        _guidanceText = 'Fit the entire card inside the box';
+      });
+    }
+  }
+
+  // ─────────────────────────────────────────────────
+  // Countdown & Auto-capture
+  // ─────────────────────────────────────────────────
+
   void _startCountdown() {
     if (_countdownActive) return;
     _countdownActive = true;
@@ -333,15 +580,12 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
         timer.cancel();
         return;
       }
-
       setState(() {
         _countdownSeconds--;
         _progress = (3 - _countdownSeconds) / 3.0;
-        if (_countdownSeconds > 0) {
-          _statusText = 'Capturing in $_countdownSeconds…';
-        } else {
-          _statusText = 'Capturing…';
-        }
+        _statusText = _countdownSeconds > 0
+            ? 'Capturing in $_countdownSeconds…'
+            : 'Capturing…';
       });
 
       if (_countdownSeconds <= 0) {
@@ -360,23 +604,6 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
 
   Future<void> _autoCapture() async {
     if (_isCapturing) return;
-    
-    // Final safety check — if the face was covered just as the timer fired,
-    // abort the capture and restart detection instead.
-    if (!_isIdConfirmed) {
-      _stableFrames = 0;
-      _resetCountdown();
-      if (mounted) {
-        setState(() {
-          _isValidIdDetected = false;
-          _statusText = 'ID face not visible!';
-          _guidanceText = 'Make sure the portrait on your ID is uncovered';
-        });
-        _controller?.startImageStream(_onCameraFrame);
-      }
-      return;
-    }
-
     _isCapturing = true;
 
     try {
@@ -384,12 +611,13 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
       final xFile = await _controller!.takePicture();
       if (mounted) Navigator.of(context).pop(xFile.path);
     } catch (e) {
+      debugPrint('[IdCapture] Capture error: $e');
       _isCapturing = false;
       _stableFrames = 0;
       _resetCountdown();
       if (mounted) {
         setState(() {
-          _isValidIdDetected = false;
+          _isIdDetected = false;
           _statusText = 'Capture failed — try again';
           _guidanceText = 'Position your ID and hold steady';
         });
@@ -408,6 +636,10 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
     super.dispose();
   }
 
+  // ─────────────────────────────────────────────────
+  // UI
+  // ─────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -415,36 +647,41 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Camera preview
+          // ── Camera preview ──
           if (_isCameraReady && _controller != null)
             Center(
               child: AspectRatio(
                 aspectRatio: 1 / _controller!.value.aspectRatio,
-                child: CameraPreview(_controller!),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CameraPreview(_controller!),
+                    CustomPaint(
+                      painter: _CardOverlayPainter(
+                        cardDetected: _isIdDetected,
+                        isForbidden: _isForbiddenCard,
+                        progress: _progress,
+                        primaryColor: _primary,
+                        errorColor: _errorColor,
+                        cardWidthFraction: _cardWidthFraction,
+                        cardCenterYFraction: _cardCenterYFraction,
+                        cardAspectRatio: _cardAspectRatio,
+                      ),
+                      size: Size.infinite,
+                    ),
+                  ],
+                ),
               ),
             )
           else
             const Center(child: AppShimmerLoader(color: _primary)),
 
-          // Dark overlay with card cutout
-          CustomPaint(
-            painter: _CardOverlayPainter(
-              cardDetected: _isValidIdDetected,
-              isForbidden: _isForbiddenCardDetected,
-              progress: _progress,
-              primaryColor: _primary,
-              errorColor: _errorColor,
-              cardWidthFraction: _cardWidthFraction,
-              cardCenterYFraction: _cardCenterYFraction,
-              cardAspectRatio: _cardAspectRatio,
-            ),
-            size: Size.infinite,
-          ),
-
-          // ─── Countdown number in the center ───
+          // ── Countdown number ──
           if (_countdownActive && _countdownSeconds > 0)
             Positioned(
-              top: MediaQuery.of(context).size.height * _cardCenterYFraction - 30,
+              top:
+                  MediaQuery.of(context).size.height * _cardCenterYFraction -
+                  36,
               left: 0,
               right: 0,
               child: Center(
@@ -453,12 +690,8 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
                   tween: Tween(begin: 1.5, end: 1.0),
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.elasticOut,
-                  builder: (context, scale, child) {
-                    return Transform.scale(
-                      scale: scale,
-                      child: child,
-                    );
-                  },
+                  builder: (context, scale, child) =>
+                      Transform.scale(scale: scale, child: child),
                   child: Container(
                     width: 72,
                     height: 72,
@@ -488,7 +721,7 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
               ),
             ),
 
-          // ─── Top bar ───
+          // ── Top bar ──
           Positioned(
             top: 0,
             left: 0,
@@ -519,7 +752,7 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
             ),
           ),
 
-          // ─── Bottom status & guidance ───
+          // ── Bottom status & guidance ──
           Positioned(
             bottom: 0,
             left: 0,
@@ -528,25 +761,28 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Status pill
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 24,
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      color: _isForbiddenCardDetected 
+                      color: _isForbiddenCard
                           ? _errorColor.withValues(alpha: 0.8)
-                          : (_isValidIdDetected ? _primary.withValues(alpha: 0.8) : Colors.black54),
+                          : (_isIdDetected
+                                ? _primary.withValues(alpha: 0.8)
+                                : Colors.black54),
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          _isForbiddenCardDetected
+                          _isForbiddenCard
                               ? Icons.cancel_rounded
-                              : (_isValidIdDetected ? Icons.check_circle : Icons.credit_card_rounded),
+                              : (_isIdDetected
+                                    ? Icons.check_circle
+                                    : Icons.credit_card_rounded),
                           color: Colors.white,
                           size: 20,
                         ),
@@ -562,9 +798,8 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
-                  // Guidance text
                   if (_guidanceText.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -574,15 +809,16 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: _isForbiddenCardDetected ? _errorColor : Colors.white70,
+                          color: _isForbiddenCard
+                              ? _errorColor
+                              : Colors.white70,
                         ),
                       ),
                     ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 6),
 
-                  // Info text
                   Text(
-                    'Auto-captures when valid ID is detected for 3 seconds',
+                    'Auto-captures when Philippine ID is detected',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
                       color: Colors.white60,
@@ -599,7 +835,7 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
   }
 }
 
-// ─── Overlay painter with rounded-rect card cutout & progress border ───
+// ─── Overlay painter ───────────────────────────────────────────────────────
 class _CardOverlayPainter extends CustomPainter {
   final bool cardDetected;
   final bool isForbidden;
@@ -636,7 +872,7 @@ class _CardOverlayPainter extends CustomPainter {
       const Radius.circular(16),
     );
 
-    // 1) Semi-transparent background with punched-out card
+    // 1) Dimmed background with card cutout
     canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
@@ -645,56 +881,51 @@ class _CardOverlayPainter extends CustomPainter {
     canvas.drawRRect(cardRect, Paint()..blendMode = BlendMode.clear);
     canvas.restore();
 
-    // 2) Card border — green if detected, red if forbidden, white if not
-    Color borderColor = Colors.white.withValues(alpha: 0.3);
-    if (isForbidden) {
-      borderColor = errorColor;
-    } else if (cardDetected) {
-      borderColor = primaryColor;
-    }
-
-    final borderPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..color = borderColor;
-    canvas.drawRRect(cardRect, borderPaint);
+    // 2) Border
+    final borderColor = isForbidden
+        ? errorColor
+        : (cardDetected ? primaryColor : Colors.white.withValues(alpha: 0.4));
+    canvas.drawRRect(
+      cardRect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..color = borderColor,
+    );
 
     // 3) Corner brackets
     _drawCornerBrackets(canvas, cardRect.outerRect, borderColor);
 
-    // 4) Progress border (traces around the card as countdown proceeds)
+    // 4) Progress arc
     if (progress > 0 && cardDetected && !isForbidden) {
       final progressRect = RRect.fromRectAndRadius(
         cardRect.outerRect.inflate(6),
         const Radius.circular(20),
       );
-
-      final arcPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 5
-        ..strokeCap = StrokeCap.round
-        ..color = primaryColor;
-
       final path = Path()..addRRect(progressRect);
-      final pathMetrics = path.computeMetrics().first;
-      final progressLength = pathMetrics.length * progress;
-      final extractedPath = pathMetrics.extractPath(0, progressLength);
-
-      canvas.drawPath(extractedPath, arcPaint);
+      final metrics = path.computeMetrics().first;
+      canvas.drawPath(
+        metrics.extractPath(0, metrics.length * progress),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 5
+          ..strokeCap = StrokeCap.round
+          ..color = primaryColor,
+      );
     }
 
-    // 5) Subtle inner guide when not detected
+    // 5) Subtle inner guide when idle
     if (!cardDetected && !isForbidden) {
-      final innerGuide = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1
-        ..color = Colors.white.withValues(alpha: 0.2);
-
-      final innerRect = RRect.fromRectAndRadius(
-        cardRect.outerRect.deflate(12),
-        const Radius.circular(10),
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          cardRect.outerRect.deflate(12),
+          const Radius.circular(10),
+        ),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = Colors.white.withValues(alpha: 0.15),
       );
-      canvas.drawRRect(innerRect, innerGuide);
     }
   }
 
@@ -704,62 +935,54 @@ class _CardOverlayPainter extends CustomPainter {
       ..strokeWidth = 5
       ..strokeCap = StrokeCap.round
       ..color = color;
+    const len = 28.0;
+    const o = 4.0;
 
-    const bracketLength = 28.0;
-    const offset = 4.0;
-
-    // Top-left
     canvas.drawLine(
-      Offset(rect.left - offset, rect.top - offset),
-      Offset(rect.left - offset + bracketLength, rect.top - offset),
+      Offset(rect.left - o, rect.top - o),
+      Offset(rect.left - o + len, rect.top - o),
       paint,
     );
     canvas.drawLine(
-      Offset(rect.left - offset, rect.top - offset),
-      Offset(rect.left - offset, rect.top - offset + bracketLength),
-      paint,
-    );
-
-    // Top-right
-    canvas.drawLine(
-      Offset(rect.right + offset, rect.top - offset),
-      Offset(rect.right + offset - bracketLength, rect.top - offset),
+      Offset(rect.left - o, rect.top - o),
+      Offset(rect.left - o, rect.top - o + len),
       paint,
     );
     canvas.drawLine(
-      Offset(rect.right + offset, rect.top - offset),
-      Offset(rect.right + offset, rect.top - offset + bracketLength),
-      paint,
-    );
-
-    // Bottom-left
-    canvas.drawLine(
-      Offset(rect.left - offset, rect.bottom + offset),
-      Offset(rect.left - offset + bracketLength, rect.bottom + offset),
+      Offset(rect.right + o, rect.top - o),
+      Offset(rect.right + o - len, rect.top - o),
       paint,
     );
     canvas.drawLine(
-      Offset(rect.left - offset, rect.bottom + offset),
-      Offset(rect.left - offset, rect.bottom + offset - bracketLength),
-      paint,
-    );
-
-    // Bottom-right
-    canvas.drawLine(
-      Offset(rect.right + offset, rect.bottom + offset),
-      Offset(rect.right + offset - bracketLength, rect.bottom + offset),
+      Offset(rect.right + o, rect.top - o),
+      Offset(rect.right + o, rect.top - o + len),
       paint,
     );
     canvas.drawLine(
-      Offset(rect.right + offset, rect.bottom + offset),
-      Offset(rect.right + offset, rect.bottom + offset - bracketLength),
+      Offset(rect.left - o, rect.bottom + o),
+      Offset(rect.left - o + len, rect.bottom + o),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(rect.left - o, rect.bottom + o),
+      Offset(rect.left - o, rect.bottom + o - len),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(rect.right + o, rect.bottom + o),
+      Offset(rect.right + o - len, rect.bottom + o),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(rect.right + o, rect.bottom + o),
+      Offset(rect.right + o, rect.bottom + o - len),
       paint,
     );
   }
 
   @override
   bool shouldRepaint(covariant _CardOverlayPainter old) =>
-      old.cardDetected != cardDetected || 
+      old.cardDetected != cardDetected ||
       old.isForbidden != isForbidden ||
       old.progress != progress;
 }

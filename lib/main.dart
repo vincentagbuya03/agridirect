@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -23,7 +22,6 @@ import 'shared/services/offline/offline_queue_service.dart';
 import 'shared/services/community/notification_service.dart';
 import 'shared/router/app_router.dart';
 import 'shared/services/offline/offline_cache_service.dart';
-import 'shared/services/integration/weather_alert_service.dart';
 import 'shared/utils/url_strategy.dart';
 import 'mobile/screens/common/loading_screen.dart';
 
@@ -32,31 +30,6 @@ import 'mobile/screens/common/loading_screen.dart';
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   debugPrint('Handling background message: ${message.messageId}');
-
-  final notificationService = NotificationService();
-  await notificationService.ensureLocalNotificationsInitialized();
-  if (message.notification != null) {
-    await notificationService.flutterLocalNotificationsPlugin.show(
-      message.hashCode,
-      message.notification!.title,
-      message.notification!.body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          NotificationService.channelId,
-          NotificationService.channelName,
-          channelDescription: NotificationService.channelDescription,
-          importance: Importance.max,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-        ),
-        iOS: DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
-    );
-  }
 }
 
 void main() async {
@@ -237,7 +210,6 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
   StreamSubscription<AuthState>? _authStateSubscription;
   bool _sessionStartedByLifecycle = false;
   bool _isDatabaseSyncRunning = false;
-  Timer? _weatherCheckTimer;
 
   @override
   void initState() {
@@ -249,7 +221,6 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
     _initializeDatabaseSync();
     _initializeOfflineProductSync();
     _initializeAppSession();
-    _initializeWeatherAlerts();
     _authStateSubscription = SupabaseConfig.client.auth.onAuthStateChange.listen((
       data,
     ) async {
@@ -322,6 +293,9 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
       if (auth.isLoggedIn && auth.userId.isNotEmpty) {
         await _analyticsService.startSession(userId: auth.userId);
         _sessionStartedByLifecycle = true;
+
+        // Also check weather on app resume (non-blocking)
+
       }
     } catch (e) {
       debugPrint('⚠️ Analytics session resume error: $e');
@@ -348,24 +322,14 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
     }
   }
 
-  Future<void> _initializeWeatherAlerts() async {
-    // Initial check
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      WeatherAlertService().checkWeatherAndNotify();
-    });
-
-    // Periodic check every 6 hours
-    _weatherCheckTimer = Timer.periodic(const Duration(hours: 6), (_) {
-      WeatherAlertService().checkWeatherAndNotify();
-    });
-  }
-
   Future<void> _initializeNotifications() async {
     try {
       // Initialize notification service
       final notificationService = NotificationService();
       await notificationService.initialize();
       debugPrint('✅ Notification service initialized');
+
+      // Trigger a weather check on app start (non-blocking)
     } catch (e) {
       debugPrint('⚠️ Notification initialization error: $e');
     }
@@ -382,10 +346,8 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     _authStateSubscription?.cancel();
     _analyticsService.dispose();
-    _weatherCheckTimer?.cancel();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(

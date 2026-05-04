@@ -101,6 +101,7 @@ flutter:
   assets:
     - assets/icon/logo_v3.png
     - assets/images/
+    - assets/images/fresh_organic_hero.png
     - assets/lottie/Face Scan.json
     - assets/lottie/Scan User ID.json
     - assets/lottie/Security.json

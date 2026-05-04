@@ -173,53 +173,65 @@ class _AdminContentTabState extends State<AdminContentTab> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: AdminUi.cardDecoration(),
-      child: Row(
-        children: [
-          if (isArticles) ...[
-            Text('Filter by:', style: AdminUi.body(size: 13, color: AdminUi.textSecondary)),
-            const SizedBox(width: 16),
-            _filterTab('All Content'),
-            _filterTab('Published'),
-            _filterTab('Drafts'),
-            _filterTab('Archived'),
-            const SizedBox(width: 24),
-          ] else ...[
-            Text('Moderate:', style: AdminUi.body(size: 13, color: AdminUi.textSecondary)),
-            const SizedBox(width: 16),
-            _filterTab('All Content'),
-            _filterTab('Pinned'),
-            const SizedBox(width: 24),
-          ],
-          
-          Text('Sorted by:', style: AdminUi.body(size: 12, color: AdminUi.textMuted)),
-          const SizedBox(width: 8),
-          Text(_sortBy, style: AdminUi.label(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w600)),
-          const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AdminUi.textMuted),
-          const Spacer(),
-          // Stats badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            decoration: BoxDecoration(
-              color: AdminUi.brand,
-              borderRadius: AdminUi.radiusMd,
-            ),
-            child: Row(
-              children: isArticles ? [
-                _statItem(_stats['total'].toString(), 'ARTICLES'), 
-                Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
-                _statItem(_stats['published'].toString(), 'PUBLISHED'),
-                Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
-                _statItem(_stats['views'].toString(), 'VIEWS'),
-              ] : [
-                _statItem(_stats['total'].toString(), 'POSTS'), 
-                Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
-                _statItem(_stats['pinned'].toString(), 'PINNED'),
-                Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
-                _statItem(_stats['recent']?.toString() ?? '0', 'NEW (24H)'),
-              ],
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 900;
+          return Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      if (isArticles) ...[
+                        Text('Filter by:', style: AdminUi.body(size: 13, color: AdminUi.textSecondary)),
+                        const SizedBox(width: 16),
+                        _filterTab('All Content'),
+                        _filterTab('Published'),
+                        _filterTab('Drafts'),
+                        _filterTab('Archived'),
+                      ] else ...[
+                        Text('Moderate:', style: AdminUi.body(size: 13, color: AdminUi.textSecondary)),
+                        const SizedBox(width: 16),
+                        _filterTab('All Content'),
+                        _filterTab('Pinned'),
+                      ],
+                      const SizedBox(width: 24),
+                      Text('Sorted by:', style: AdminUi.body(size: 12, color: AdminUi.textMuted)),
+                      const SizedBox(width: 8),
+                      Text(_sortBy, style: AdminUi.label(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w600)),
+                      const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AdminUi.textMuted),
+                    ],
+                  ),
+                ),
+              ),
+              if (!isCompact) const SizedBox(width: 24),
+              // Stats badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AdminUi.brand,
+                  borderRadius: AdminUi.radiusMd,
+                ),
+                child: Row(
+                  children: isArticles ? [
+                    _statItem(_stats['total'].toString(), 'ARTICLES'), 
+                    Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
+                    _statItem(_stats['published'].toString(), 'PUBLISHED'),
+                    Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
+                    _statItem(_stats['views'].toString(), 'VIEWS'),
+                  ] : [
+                    _statItem(_stats['total'].toString(), 'POSTS'), 
+                    Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
+                    _statItem(_stats['pinned'].toString(), 'PINNED'),
+                    Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.2), margin: const EdgeInsets.symmetric(horizontal: 16)),
+                    _statItem(_stats['recent']?.toString() ?? '0', 'NEW (24H)'),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }
       ),
     );
   }
@@ -522,10 +534,10 @@ class _AdminContentTabState extends State<AdminContentTab> {
                 CircleAvatar(
                   radius: 10,
                   backgroundColor: AdminUi.brandSoft,
-                  child: Text((post['user_name'] ?? 'U')[0], style: TextStyle(fontSize: 8, color: AdminUi.brand, fontWeight: FontWeight.bold)),
+                  child: Text((post['author_name'] ?? 'U')[0], style: TextStyle(fontSize: 8, color: AdminUi.brand, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(width: 8),
-                Text(post['user_name'] ?? 'Unknown', style: AdminUi.body(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w500)),
+                Text(post['author_name'] ?? 'Unknown', style: AdminUi.body(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w500)),
               ],
             ),
           ),

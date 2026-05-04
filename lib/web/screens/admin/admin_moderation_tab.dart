@@ -119,6 +119,15 @@ class _AdminModerationTabState extends State<AdminModerationTab> {
     bool contentRemoved = false;
     if (contentType == 'post') {
       contentRemoved = await widget.adminService.deleteCommunityPost(contentId);
+    } else if (contentType == 'comment') {
+      contentRemoved = await widget.adminService.deleteForumComment(contentId);
+    } else if (contentType == 'product') {
+      contentRemoved = await widget.adminService.suspendProduct(
+        contentId,
+        notes.isEmpty ? 'Reported product removed by moderator' : notes,
+      );
+    } else if (contentType == 'review') {
+      contentRemoved = await widget.adminService.deleteProductReview(contentId);
     } else if (contentType == 'article') {
       contentRemoved = await widget.adminService.deleteArticle(contentId);
     }
@@ -446,7 +455,13 @@ class _AdminModerationTabState extends State<AdminModerationTab> {
     final title = report['content_title']?.toString() ?? 'Reported content';
     final preview = report['content_preview']?.toString() ?? 'No preview available.';
     final canRemove = !isResolved &&
-        (report['content_type_code'] == 'post' || report['content_type_code'] == 'article');
+        ({
+          'post',
+          'comment',
+          'product',
+          'review',
+          'article',
+        }.contains(report['content_type_code']));
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -691,7 +706,16 @@ class _AdminModerationTabState extends State<AdminModerationTab> {
                     children: [
                       Text('AVERAGE RESOLVE TIME', style: AdminUi.label(size: 11, color: Colors.white.withValues(alpha: 0.8), weight: FontWeight.w700, letterSpacing: 0.5)),
                       const SizedBox(height: 8),
-                      Text('14m', style: GoogleFonts.plusJakartaSans(fontSize: 40, fontWeight: FontWeight.w800, color: Colors.white)),
+                                            FutureBuilder<Map<String, dynamic>>(
+                        future: widget.adminService.getDashboardCounts(),
+                        builder: (context, snapshot) {
+                          return Text(
+                            '${snapshot.data?['avg_resolve_time'] ?? "..."}', 
+                            style: GoogleFonts.plusJakartaSans(fontSize: 40, fontWeight: FontWeight.w800, color: Colors.white)
+                          );
+                        }
+                      ),
+
                     ],
                   ),
                 ),

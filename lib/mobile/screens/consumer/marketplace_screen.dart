@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
-import 'orders_screen.dart';
 import 'cart_screen.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
@@ -22,10 +21,11 @@ import '../../../shared/models/auth/user_address_model.dart';
 import '../../../shared/services/integration/reverse_geocoding_service.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_router.dart';
-import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/widgets/report_content_dialog.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../shared/services/auth/auth_service.dart';
 
 /// Marketplace Screen - Professional Digital Marketplace
 class MarketplaceScreen extends StatefulWidget {
@@ -41,6 +41,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   bool _isOnline = true;
   late OfflineCacheService _cacheService;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  final GlobalKey _cartKey = GlobalKey();
 
   @override
   void initState() {
@@ -54,8 +55,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   void _onExternalCategoryFilter() {
     final cat = SupabaseDataService.marketplaceCategoryNotifier.value;
     if (cat != null && mounted) {
-      // Find the index of the category in our filters
-      // Note: _filters might not be loaded yet, so we'll wait or handle it in _loadMarketplaceCategories
       _applyExternalFilter();
     }
   }
@@ -69,8 +68,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       setState(() {
         _selectedFilter = index;
       });
-      // Reset the notifier so it doesn't re-trigger unexpectedly if we navigate back and forth
-      // SupabaseDataService.marketplaceCategoryNotifier.value = null;
     }
   }
 
@@ -84,7 +81,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         if (_selectedFilter >= _filters.length) {
           _selectedFilter = 0;
         }
-        // If there's an external filter waiting, apply it now
         _applyExternalFilter();
       });
     } catch (e) {
@@ -118,7 +114,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         setState(() {
           _isOnline = isOnline;
         });
-        // When transitioning offline → online, purge stale cache entries
         if (wasOffline && isOnline) {
           _refreshMarketplaceCacheFromServer();
         }
@@ -133,7 +128,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     }
   }
 
-  /// On reconnect, compare cached products with live data and remove deleted ones.
   Future<void> _refreshMarketplaceCacheFromServer() async {
     try {
       debugPrint('[Marketplace] 🔄 Refreshing cache after reconnect...');
@@ -147,7 +141,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       int removed = 0;
 
       for (final cached in cachedProducts) {
-        // Only prune auto-cached items; keep manually-saved ones
         if (cached.isManuallySaved) continue;
         if (!liveIds.contains(cached.id)) {
           await _cacheService.removeCachedProduct(cached.id);
@@ -156,9 +149,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       }
 
       if (removed > 0) {
-        debugPrint(
-          '[Marketplace] 🧹 Purged $removed stale products from cache',
-        );
+        debugPrint('[Marketplace] 🧹 Purged $removed stale products from cache');
       }
       debugPrint('[Marketplace] ✅ Cache refresh complete');
     } catch (e) {
@@ -173,12 +164,32 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     super.dispose();
   }
 
-
-
   void _openProductView(ProductItem product) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => ProductViewScreen(product: product)),
     );
+  }
+
+  void _runFlyToCartAnimation(GlobalKey startKey, String imageUrl) {
+    final RenderBox? buttonBox = startKey.currentContext?.findRenderObject() as RenderBox?;
+    final RenderBox? cartBox = _cartKey.currentContext?.findRenderObject() as RenderBox?;
+
+    if (buttonBox == null || cartBox == null) return;
+
+    final startPosition = buttonBox.localToGlobal(Offset.zero);
+    final endPosition = cartBox.localToGlobal(Offset.zero);
+
+    late OverlayEntry overlayEntry;
+    overlayEntry = OverlayEntry(
+      builder: (context) => _FlyingIconAnimation(
+        startPosition: startPosition,
+        endPosition: endPosition,
+        imageUrl: imageUrl,
+        onComplete: () => overlayEntry.remove(),
+      ),
+    );
+
+    Overlay.of(context).insert(overlayEntry);
   }
 
   @override
@@ -290,6 +301,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       builder: (context, _) {
         final count = CartService().itemCount;
         return GestureDetector(
+          key: _cartKey,
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const CartScreen()),
@@ -410,11 +422,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   Widget _buildProductContent() {
     if (!_isOnline) {
+      final currentUserId = AuthService().userId;
       final cachedProducts = _cacheService
           .getAllCachedProducts()
           .where((p) => !p.isPreorder)
           .map(_cachedToProductItem)
-          .where(_matchesSelectedCategory)
+          .where((p) {
+            final isNotMine = currentUserId.isEmpty || p.farmerId != currentUserId;
+            return _matchesSelectedCategory(p) && isNotMine;
+          })
           .toList();
 
       return Column(
@@ -451,7 +467,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       );
     }
 
-    // Online mode - fetch products and cache them
     return StreamBuilder<List<ProductItem>>(
       stream: SupabaseDataService().watchNearbyProducts(),
       builder: (context, snapshot) {
@@ -464,13 +479,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         }
 
         final products = snapshot.data ?? [];
-        final filteredProducts = products.where(_matchesSelectedCategory).toList();
+        final currentUserId = AuthService().userId;
+        final filteredProducts = products.where((p) {
+          final isNotMine = currentUserId.isEmpty || p.farmerId != currentUserId;
+          return _matchesSelectedCategory(p) && isNotMine;
+        }).toList();
 
         if (filteredProducts.isEmpty) {
           return _buildNoCategoryMatchState();
         }
 
-        // Auto-cache products when loaded
         if (products.isNotEmpty) {
           for (final product in products) {
             final cachedProduct = CachedProduct(
@@ -672,11 +690,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(24),
                   ),
-                  child: CachedNetworkImage(
-                    imageUrl: product.imageUrl,
-                    height: 130,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
+                  child: Hero(
+                    tag: 'product_image_${product.productId}',
+                    child: CachedNetworkImage(
+                      imageUrl: product.imageUrl,
+                      height: 130,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
                 Positioned(
@@ -742,8 +763,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                             ),
                           ],
                         ),
-                        GestureDetector(
-                          onTap: () {
+                        _AddToCartButton(
+                          onTap: (GlobalKey buttonKey) {
+                            _runFlyToCartAnimation(buttonKey, product.imageUrl);
                             CartService().addItem(product);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -755,25 +777,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                               ),
                             );
                           },
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.add_shopping_cart_rounded,
-                              size: 18,
-                              color: Colors.white,
-                            ),
-                          ),
                         ),
                       ],
                     ),
@@ -788,9 +791,74 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 }
 
+class _AddToCartButton extends StatefulWidget {
+  final Function(GlobalKey) onTap;
+  const _AddToCartButton({required this.onTap});
+
+  @override
+  State<_AddToCartButton> createState() => _AddToCartButtonState();
+}
+
+class _AddToCartButtonState extends State<_AddToCartButton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.9).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  final GlobalKey _buttonKey = GlobalKey();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) => _controller.reverse(),
+      onTapCancel: () => _controller.reverse(),
+      onTap: () => widget.onTap(_buttonKey),
+      child: ScaleTransition(
+        key: _buttonKey,
+        scale: _scaleAnimation,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.add_shopping_cart_rounded,
+            size: 20,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ProductViewScreen extends StatefulWidget {
   final ProductItem product;
-
   const ProductViewScreen({super.key, required this.product});
 
   @override
@@ -806,6 +874,15 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   bool _isLoadingAddress = true;
   final OfflineCacheService _cacheService = OfflineCacheService();
   final _instructionsController = TextEditingController();
+  final GlobalKey _cartKey = GlobalKey();
+  final GlobalKey _addToCartBtnKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAddress();
+    _cacheProductForOffline();
+  }
 
   @override
   void dispose() {
@@ -832,26 +909,52 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     }
   }
 
-  Future<UserAddress?> _openAddressEditor([UserAddress? initialAddress]) async {
-    return await showModalBottomSheet<UserAddress>(
-      context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => AddressEditorSheet(initialAddress: initialAddress),
+  void _cacheProductForOffline() {
+    try {
+      final price = double.tryParse(widget.product.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+      final cachedProduct = CachedProduct(
+        id: widget.product.productId ?? 'unknown',
+        farmerId: widget.product.farmerId ?? 'unknown',
+        name: widget.product.name,
+        price: price,
+        description: widget.product.description,
+        imageUrl: widget.product.imageUrl,
+        availableQuantity: widget.product.targetQuantity?.toInt(),
+        isPreorder: widget.product.targetQuantity != null,
+        harvestDays: int.tryParse(widget.product.harvestDays ?? '0') ?? 0,
+        farmName: widget.product.farm,
+        unit: widget.product.unit,
+        rating: double.tryParse(widget.product.rating ?? '0'),
+        farmerAvatarUrl: widget.product.farmerAvatarUrl,
+      );
+      _cacheService.autoCacheProduct(cachedProduct);
+    } catch (e) {
+      debugPrint('⚠️ Failed to auto-cache product: $e');
+    }
+  }
+
+  CachedProduct _buildCachedProduct() {
+    final price = double.tryParse(widget.product.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+    return CachedProduct(
+      id: widget.product.productId ?? 'unknown',
+      farmerId: widget.product.farmerId ?? 'unknown',
+      name: widget.product.name,
+      price: price,
+      description: widget.product.description,
+      imageUrl: widget.product.imageUrl,
+      availableQuantity: widget.product.targetQuantity?.toInt(),
+      isPreorder: widget.product.targetQuantity != null,
+      harvestDays: int.tryParse(widget.product.harvestDays ?? '0') ?? 0,
+      farmName: widget.product.farm,
+      unit: widget.product.unit,
+      rating: double.tryParse(widget.product.rating ?? '0'),
+      farmerAvatarUrl: widget.product.farmerAvatarUrl,
     );
   }
 
-  Future<UserAddress?> _openAddressSelector() async {
-    return await showModalBottomSheet<UserAddress>(
-      context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) =>
-          AddressSelectorSheet(currentAddressId: _address?.addressId),
-    );
-  }
+  double? _getRating() => widget.product.rating != null ? double.tryParse(widget.product.rating!) : null;
+  int _getReviewCount() => widget.product.reviews != null ? int.tryParse(widget.product.reviews!) ?? 0 : 0;
+  String _getDescription() => (widget.product.description != null && widget.product.description!.isNotEmpty) ? widget.product.description! : 'No product description available.';
 
   void _showCheckoutSheet() {
     showModalBottomSheet(
@@ -875,924 +978,203 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 4,
+                Center(
+                  child: Container(
+                    width: 48,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.textHeadline.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text('Checkout Confirmation', style: AppTextStyles.headline1.copyWith(fontSize: 22)),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.textHeadline.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(2),
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.1)),
                   ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Checkout Confirmation',
-                style: AppTextStyles.headline1.copyWith(fontSize: 22),
-              ),
-              const SizedBox(height: 20),
-
-              // Product Summary
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AppColors.textHeadline.withValues(alpha: 0.1),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: CachedNetworkImage(
-                        imageUrl: widget.product.imageUrl,
-                        width: 64,
-                        height: 64,
-                        fit: BoxFit.cover,
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: CachedNetworkImage(imageUrl: widget.product.imageUrl, width: 64, height: 64, fit: BoxFit.cover),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.product.name,
-                            style: AppTextStyles.headline3.copyWith(
-                              fontSize: 16,
-                            ),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Quantity:',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.textSubtle,
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  _buildQtyBtn(
-                                    icon: Icons.remove_rounded,
-                                    onTap: () {
-                                      if (_quantity > 1) {
-                                        setState(() => _quantity--);
-                                        setSheetState(() {});
-                                      }
-                                    },
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                    ),
-                                    child: Text(
-                                      '$_quantity',
-                                      style: AppTextStyles.headline3.copyWith(
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  _buildQtyBtn(
-                                    icon: Icons.add_rounded,
-                                    onTap: () {
-                                      setState(() => _quantity++);
-                                      setSheetState(() {});
-                                    },
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    widget.product.unit,
-                                    style: AppTextStyles.bodySmall.copyWith(
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Address Section
-              Text(
-                _paymentMethod == 'COP'
-                    ? 'Pickup Location (at Farm)'
-                    : 'Shipping Address',
-                style: AppTextStyles.headline3.copyWith(
-                  fontSize: 14,
-                  color: AppColors.textHeadline,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.textHeadline.withValues(alpha: 0.1),
-                  ),
-                ),
-                child: _isLoadingAddress
-                    ? const Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    : _paymentMethod == 'COP'
-                        ? Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: AppColors.primary.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(widget.product.name, style: AppTextStyles.headline3.copyWith(fontSize: 16)),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
+                                Text('Quantity:', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
                                 Row(
                                   children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Farmer Location',
-                                            style: AppTextStyles.labelSmall.copyWith(
-                                              fontWeight: FontWeight.w800,
-                                              color: AppColors.primary,
-                                              letterSpacing: 0.5,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            widget.product.farmerName ?? 'AgriDirect Farmer',
-                                            style: AppTextStyles.bodyMedium.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    _buildMapButton(),
-                                  ],
-                                ),
-                                const Divider(height: 24, thickness: 0.5),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Icon(
-                                      Icons.storefront_rounded,
-                                      size: 20,
-                                      color: AppColors.primary.withValues(alpha: 0.4),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            widget.product.farm,
-                                            style: AppTextStyles.bodySmall.copyWith(
-                                              fontWeight: FontWeight.w600,
-                                              color: AppColors.textHeadline,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Pickup point for your order.',
-                                            style: AppTextStyles.bodySmall.copyWith(
-                                              fontSize: 10,
-                                              color: AppColors.textSubtle,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                                    _buildQtyBtn(icon: Icons.remove_rounded, onTap: () { if (_quantity > 1) { setState(() => _quantity--); setSheetState(() {}); } }),
+                                    Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('$_quantity', style: AppTextStyles.headline3.copyWith(fontSize: 16))),
+                                    _buildQtyBtn(icon: Icons.add_rounded, onTap: () { setState(() => _quantity++); setSheetState(() {}); }),
+                                    const SizedBox(width: 4),
+                                    Text(widget.product.unit, style: AppTextStyles.bodySmall.copyWith(fontSize: 10)),
                                   ],
                                 ),
                               ],
                             ),
-                          )
-                        : _address == null
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'No address set yet.',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.error,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              OutlinedButton.icon(
-                                onPressed: () async {
-                                  final updatedAddress = await _openAddressEditor();
-                                  if (!mounted) return;
-                                  if (updatedAddress != null) {
-                                    setState(() => _address = updatedAddress);
-                                    setSheetState(() {});
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Shipping address updated.'),
-                                        backgroundColor: Colors.green,
-                                      ),
-                                    );
-                                  }
-                                },
-                                icon: const Icon(Icons.add_location_alt_rounded),
-                                label: const Text('Add Address'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.primary,
-                                  side: const BorderSide(color: AppColors.primary),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          )
-                        : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                _address!.label,
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                _address!.recipientName,
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _address!.street,
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(
-                            '${_address!.barangay}, ${_address!.city}, ${_address!.province}',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.textSubtle,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () async {
-                                    final selected =
-                                        await _openAddressSelector();
-                                    if (selected != null && mounted) {
-                                      setState(() => _address = selected);
-                                      setSheetState(() {});
-                                    }
-                                  },
-                                  icon: const Icon(
-                                    Icons.swap_horiz_rounded,
-                                    size: 18,
-                                  ),
-                                  label: const Text('Change'),
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                    ),
-                                    visualDensity: VisualDensity.compact,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () async {
-                                    final updated = await _openAddressEditor(
-                                      _address,
-                                    );
-                                    if (updated != null && mounted) {
-                                      setState(() => _address = updated);
-                                      setSheetState(() {});
-                                    }
-                                  },
-                                  icon: const Icon(
-                                    Icons.edit_rounded,
-                                    size: 18,
-                                  ),
-                                  label: const Text('Edit'),
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                    ),
-                                    visualDensity: VisualDensity.compact,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-              ),
-              const SizedBox(height: 20),
-
-              // Payment Method
-              Text(
-                'Payment Method',
-                style: AppTextStyles.headline3.copyWith(
-                  fontSize: 14,
-                  color: AppColors.textHeadline,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildPaymentOption(
-                      title: 'COD',
-                      subtitle: 'Cash on Delivery',
-                      isSelected: _paymentMethod == 'COD',
-                      onTap: () {
-                        setSheetState(() => _paymentMethod = 'COD');
-                        setState(() => _paymentMethod = 'COD');
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildPaymentOption(
-                      title: 'COP',
-                      subtitle: 'Cash on Pickup',
-                      isSelected: _paymentMethod == 'COP',
-                      onTap: () {
-                        setSheetState(() => _paymentMethod = 'COP');
-                        setState(() => _paymentMethod = 'COP');
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Special Instructions (Optional)',
-                style: AppTextStyles.headline3.copyWith(
-                  fontSize: 14,
-                  color: AppColors.textHeadline,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _instructionsController,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  hintText: 'e.g. Leave at the gate, call upon arrival...',
-                  hintStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
-                  filled: true,
-                  fillColor: AppColors.background,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.textHeadline.withValues(alpha: 0.1)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.textHeadline.withValues(alpha: 0.1)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // Order Summary
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Total Amount', style: AppTextStyles.bodyLarge),
-                  Text(
-                    '₱${(double.tryParse(widget.product.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0) * _quantity}',
-                    style: AppTextStyles.headline1.copyWith(
-                      color: AppColors.primary,
-                      fontSize: 24,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Confirm Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: (_paymentMethod == 'COD' && _address == null || _isOrdering)
-                      ? null
-                      : () {
-                          Navigator.pop(sheetContext);
-                          _handleOrderNow();
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Text(
-                    'Confirm Order',
-                    style: AppTextStyles.headline3.copyWith(
-                      color: Colors.white,
-                      fontSize: 18,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-  void _showFarmerMapSheet() {
-    final lat = widget.product.latitude;
-    final lng = widget.product.longitude;
-
-    if (lat == null || lng == null) {
-      // Fallback: search by address string if coordinates are missing
-      _viewFarmOnMap();
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        child: Column(
-          children: [
-            // Drag Handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}',
-                          style: AppTextStyles.headline1.copyWith(fontSize: 20),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          'GPS Coordinates (Pickup)',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSubtle,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.background,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Stack(
-                    children: [
-                      FlutterMap(
-                        options: MapOptions(
-                          initialCenter: LatLng(lat, lng),
-                          initialZoom: 15.5,
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                            subdomains: const ['a', 'b', 'c', 'd'],
-                          ),
-                          MarkerLayer(
-                            markers: [
-                              Marker(
-                                point: LatLng(lat, lng),
-                                width: 120,
-                                height: 80,
-                                alignment: Alignment.bottomCenter,
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary,
-                                        borderRadius: BorderRadius.circular(8),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.2),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Text(
-                                        '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    const Icon(
-                                      Icons.location_on_rounded,
-                                      color: AppColors.primary,
-                                      size: 36,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      Positioned(
-                        bottom: 20,
-                        left: 20,
-                        right: 20,
-                        child: ElevatedButton.icon(
-                          onPressed: _viewFarmOnMap,
-                          icon: const Icon(Icons.navigation_rounded, size: 20),
-                          label: const Text('Navigate to Farm'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 8,
-                            shadowColor: AppColors.primary.withValues(alpha: 0.3),
-                          ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
+                const SizedBox(height: 20),
+                Text(_paymentMethod == 'COP' ? 'Pickup Location (at Farm)' : 'Shipping Address', style: AppTextStyles.headline3.copyWith(fontSize: 14)),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.1)),
+                  ),
+                  child: _isLoadingAddress
+                      ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                      : _paymentMethod == 'COP'
+                          ? _buildFarmPickupSection()
+                          : _buildShippingAddressSection(setSheetState),
+                ),
+                const SizedBox(height: 20),
+                Text('Payment Method', style: AppTextStyles.headline3.copyWith(fontSize: 14)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: _buildPaymentOption(title: 'COD', subtitle: 'Cash on Delivery', isSelected: _paymentMethod == 'COD', onTap: () { setSheetState(() => _paymentMethod = 'COD'); setState(() => _paymentMethod = 'COD'); })),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildPaymentOption(title: 'COP', subtitle: 'Cash on Pickup', isSelected: _paymentMethod == 'COP', onTap: () { setSheetState(() => _paymentMethod = 'COP'); setState(() => _paymentMethod = 'COP'); })),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _instructionsController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: 'Special Instructions (Optional)',
+                    hintStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                    filled: true,
+                    fillColor: AppColors.background,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Total Amount', style: AppTextStyles.bodyLarge),
+                    Text('₱${(double.tryParse(widget.product.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0) * _quantity}', style: AppTextStyles.headline1.copyWith(color: AppColors.primary, fontSize: 24)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: (_paymentMethod == 'COD' && _address == null || _isOrdering) ? null : () { Navigator.pop(sheetContext); _handleOrderNow(); },
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                    child: Text(_isOrdering ? 'Ordering...' : 'Confirm Order', style: AppTextStyles.headline3.copyWith(color: Colors.white, fontSize: 18)),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _viewFarmOnMap() async {
-    String query = '';
-    if (widget.product.latitude != null && widget.product.longitude != null) {
-      query = '${widget.product.latitude},${widget.product.longitude}';
-    } else {
-      query = Uri.encodeComponent(widget.product.farm);
-    }
-    
-    final url = 'https://www.google.com/maps/search/?api=1&query=$query';
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    }
-  }
-
-  Widget _buildMapButton() {
-    return InkWell(
-      onTap: _showFarmerMapSheet,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.map_outlined, size: 14, color: AppColors.primary),
-            const SizedBox(width: 4),
-            Text(
-              'View Map',
-              style: AppTextStyles.labelSmall.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w800,
-                fontSize: 10,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQtyBtn({required IconData icon, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: AppColors.textHeadline.withValues(alpha: 0.1),
           ),
         ),
-        child: Icon(icon, size: 16, color: AppColors.primary),
       ),
     );
   }
 
-  Widget _buildPaymentOption({
-    required String title,
-    required String subtitle,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.1)
-              : AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.primary
-                : AppColors.textHeadline.withValues(alpha: 0.1),
-            width: 2,
-          ),
-        ),
-        child: Column(
+  Widget _buildFarmPickupSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Text(
-              title,
-              style: AppTextStyles.headline3.copyWith(
-                fontSize: 16,
-                color: isSelected ? AppColors.primary : AppColors.textHeadline,
-              ),
-            ),
-            Text(
-              subtitle,
-              style: AppTextStyles.bodySmall.copyWith(
-                fontSize: 9,
-                color: AppColors.textSubtle,
-              ),
-            ),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Farmer Location', style: AppTextStyles.labelSmall.copyWith(fontWeight: FontWeight.w800, color: AppColors.primary)),
+              Text(widget.product.farmerName ?? 'AgriDirect Farmer', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+            ])),
+            _buildMapButton(),
           ],
         ),
-      ),
+        const Divider(height: 24),
+        Row(children: [
+          const Icon(Icons.storefront_rounded, size: 20, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(child: Text(widget.product.farm, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600))),
+        ]),
+      ],
     );
   }
 
+  Widget _buildShippingAddressSection(StateSetter setSheetState) {
+    if (_address == null) {
+      return OutlinedButton.icon(
+        onPressed: () async {
+          final updated = await _openAddressEditor();
+          if (updated != null && mounted) { setState(() => _address = updated); setSheetState(() {}); }
+        },
+        icon: const Icon(Icons.add_location_alt_rounded),
+        label: const Text('Add Address'),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Text(_address!.label, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w800, color: AppColors.primary)),
+          const Spacer(),
+          Text(_address!.recipientName, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
+        ]),
+        const SizedBox(height: 4),
+        Text(_address!.street, style: AppTextStyles.bodyMedium),
+        Text('${_address!.barangay}, ${_address!.city}', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: OutlinedButton(onPressed: () async { final sel = await _openAddressSelector(); if (sel != null) { setState(() => _address = sel); setSheetState(() {}); } }, child: const Text('Change'))),
+          const SizedBox(width: 8),
+          Expanded(child: OutlinedButton(onPressed: () async { final upd = await _openAddressEditor(_address); if (upd != null) { setState(() => _address = upd); setSheetState(() {}); } }, child: const Text('Edit'))),
+        ]),
+      ],
+    );
+  }
 
   Future<void> _handleOrderNow() async {
-    if (widget.product.productId == null || widget.product.farmerId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Product details are incomplete. Cannot place order.'),
-        ),
-      );
-      return;
-    }
-
+    if (widget.product.productId == null || widget.product.farmerId == null) return;
     setState(() => _isOrdering = true);
-
     try {
-      final orderService = OrderService();
-      final normalizedPrice = widget.product.price.replaceAll(
-        RegExp(r'[^0-9.]'),
-        '',
-      );
-      final unitPrice = double.tryParse(normalizedPrice) ?? 0.0;
-
-      await orderService.createOrder(
+      final unitPrice = double.tryParse(widget.product.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+      await OrderService().createOfflineOrder(
         farmerId: widget.product.farmerId!,
-        items: [
-          OrderItemInput(
-            productId: widget.product.productId!,
-            quantity: _quantity.toDouble(),
-            unitPrice: unitPrice,
-          ),
-        ],
+        items: [OrderItemInput(productId: widget.product.productId!, quantity: _quantity.toDouble(), unitPrice: unitPrice)],
         paymentMethod: _paymentMethod,
         deliveryAddressId: _paymentMethod == 'COP' ? null : _address?.addressId,
-        specialInstructions: _instructionsController.text.trim(),
+        notes: _instructionsController.text.trim(),
       );
-
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Order placed for $_quantity ${widget.product.unit} successfully!',
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
-      // Navigate to orders screen
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const OrdersScreen()),
-      );
+      context.pushReplacement(AppRoutes.customerOrders);
     } catch (e) {
-      if (!mounted) return;
-      final rawMessage = e.toString().replaceFirst('Exception: ', '');
-      final message = rawMessage.contains('Customer profile not found')
-          ? 'Customer profile not found. Please complete your consumer profile first.'
-          : rawMessage;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to place order: $message'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _isOrdering = false);
     }
   }
 
   @override
-  void initState() {
-    super.initState();
-    _loadAddress();
-    final imageUrl = widget.product.imageUrl.trim();
-    if (imageUrl.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        precacheImage(CachedNetworkImageProvider(imageUrl), context);
-
-        // Cache the product for offline browsing when opened while online
-        _cacheProductForOffline();
-      });
-    }
-  }
-
-  void _cacheProductForOffline() {
-    try {
-      final cacheService = OfflineCacheService();
-      final price =
-          double.tryParse(
-            widget.product.price.replaceAll(RegExp(r'[^0-9.]'), ''),
-          ) ??
-          0.0;
-
-      final cachedProduct = CachedProduct(
-        id: widget.product.productId ?? 'unknown',
-        farmerId: widget.product.farmerId ?? 'unknown',
-        name: widget.product.name,
-        price: price,
-        description: widget.product.description,
-        imageUrl: widget.product.imageUrl,
-        availableQuantity: widget.product.targetQuantity
-            ?.toInt(), // Or reserved if available
-        isPreorder: widget.product.targetQuantity != null,
-        harvestDays: int.tryParse(widget.product.harvestDays ?? '0') ?? 0,
-      );
-
-      cacheService.autoCacheProduct(cachedProduct);
-      debugPrint(
-        '📦 Auto-cached product ${widget.product.name} for offline browsing',
-      );
-    } catch (e) {
-      debugPrint('⚠️ Failed to auto-cache product: $e');
-    }
-  }
-
-  CachedProduct _buildCachedProduct() {
-    final price =
-        double.tryParse(
-          widget.product.price.replaceAll(RegExp(r'[^0-9.]'), ''),
-        ) ??
-        0.0;
-
-    return CachedProduct(
-      id: widget.product.productId ?? 'unknown',
-      farmerId: widget.product.farmerId ?? 'unknown',
-      name: widget.product.name,
-      price: price,
-      description: widget.product.description,
-      imageUrl: widget.product.imageUrl,
-      availableQuantity: widget.product.targetQuantity?.toInt(),
-      isPreorder: widget.product.targetQuantity != null,
-      harvestDays: int.tryParse(widget.product.harvestDays ?? '0') ?? 0,
-      farmName: widget.product.farm,
-      unit: widget.product.unit,
-      rating: double.tryParse(widget.product.rating ?? '0'),
-      farmerAvatarUrl: widget.product.farmerAvatarUrl,
-    );
-  }
-
-  double? _getRating() {
-    if (widget.product.rating == null) return null;
-    return double.tryParse(widget.product.rating!);
-  }
-
-  int _getReviewCount() {
-    if (widget.product.reviews == null) return 0;
-    return int.tryParse(widget.product.reviews!) ?? 0;
-  }
-
-  String _getDescription() {
-    if (widget.product.description != null &&
-        widget.product.description!.isNotEmpty) {
-      return widget.product.description!;
-    }
-    return 'No product description available.';
-  }
-
-  Widget _buildStarRating(double rating) {
-    return Row(
-      children: List.generate(5, (index) {
-        final starValue = index + 1;
-        final isFilled = rating >= starValue;
-        final isHalf = rating > index && rating < starValue;
-        return Padding(
-          padding: const EdgeInsets.only(right: 4),
-          child: Icon(
-            isHalf
-                ? Icons.star_half_rounded
-                : isFilled
-                ? Icons.star_rounded
-                : Icons.star_outline_rounded,
-            color: AppColors.primary,
-            size: 18,
-          ),
-        );
-      }),
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
     final rating = _getRating();
     final reviewCount = _getReviewCount();
-    final displayFarmName = (widget.product.farm).trim().isNotEmpty
-        ? widget.product.farm.trim()
-        : 'Unnamed Farm';
     final farmerAvatarUrl = (widget.product.farmerImageUrl ?? widget.product.farmerAvatarUrl ?? '').trim();
 
     return Scaffold(
@@ -1800,541 +1182,36 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            margin: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 18,
-              color: Color(0xFF0F172A),
-            ),
-          ),
-        ),
+        leading: _buildAppBarBtn(Icons.arrow_back_ios_new_rounded, () => Navigator.pop(context)),
         actions: [
-          GestureDetector(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Added to favorites')),
-              );
-            },
-            child: Container(
-              margin: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.favorite_border_rounded,
-                size: 20,
-                color: Color(0xFF0F172A),
-              ),
-            ),
-          ),
+          _buildAppBarBtn(Icons.flag_outlined, _openProductReportDialog),
+          _buildAppBarBtn(Icons.favorite_border_rounded, () {}),
+          _buildHeaderCart(),
           const SizedBox(width: 8),
         ],
       ),
       body: ListView(
         physics: const BouncingScrollPhysics(),
         children: [
-          // Product Image Gallery with Swipe
-          Stack(
-            children: [
-              SizedBox(
-                height: 320,
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(32),
-                  ),
-                  child: widget.product.imageUrls.isNotEmpty
-                      ? PageView.builder(
-                          itemCount: widget.product.imageUrls.length,
-                          onPageChanged: (index) {
-                            setState(() => _currentPage = index);
-                          },
-                          itemBuilder: (context, index) {
-                            return CachedNetworkImage(
-                              imageUrl: widget.product.imageUrls[index],
-                              width: double.infinity,
-                              height: 320,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                color: Colors.grey[100],
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ),
-                              errorWidget: (context, url, error) =>
-                                  const Icon(Icons.error),
-                            );
-                          },
-                        )
-                      : CachedNetworkImage(
-                          imageUrl: widget.product.imageUrl,
-                          width: double.infinity,
-                          height: 320,
-                          fit: BoxFit.cover,
-                        ),
-                ),
-              ),
-              // Dot Indicators
-              if (widget.product.imageUrls.length > 1)
-                Positioned(
-                  bottom: 20,
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: widget.product.imageUrls.asMap().entries.map((
-                      entry,
-                    ) {
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: _currentPage == entry.key ? 20.0 : 8.0,
-                        height: 8.0,
-                        margin: const EdgeInsets.symmetric(horizontal: 4.0),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(4),
-                          color: _currentPage == entry.key
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.4),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-            ],
-          ),
+          _buildImageGallery(),
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Product Name and Rating
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.product.name,
-                            style: AppTextStyles.headline1.copyWith(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (rating != null) ...[
-                            const SizedBox(height: 8),
-                            _buildStarRating(rating),
-                            const SizedBox(height: 4),
-                            Text(
-                              '$rating ($reviewCount reviews)',
-                              style: AppTextStyles.bodySmall.copyWith(
-                                color: AppColors.textSubtle,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          widget.product.price,
-                          style: AppTextStyles.headline1.copyWith(
-                            color: AppColors.primary,
-                            fontSize: 32,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        Text(
-                          'per ${widget.product.unit}',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSubtle,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                _buildNamePriceSection(rating, reviewCount),
                 const SizedBox(height: 24),
-
-                // Harvest Days Badge
-                if (widget.product.harvestDays != null)
-                  Builder(
-                    builder: (context) {
-                      final days =
-                          int.tryParse(widget.product.harvestDays!) ?? 0;
-                      final isPreOrder = widget.product.targetQuantity != null;
-                      final label = days > 0
-                          ? 'Harvest in $days days'
-                          : (isPreOrder ? 'Pre-order' : 'Ready Now');
-
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFECFDF5),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.2),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.schedule_rounded,
-                              color: AppColors.primary,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              label,
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                _buildHarvestBadge(),
                 const SizedBox(height: 28),
-                Row(
-                  children: [
-                    SaveForOfflineButton(
-                      product: _buildCachedProduct(),
-                      cacheService: _cacheService,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Product Description
-                Text(
-                  'About this product',
-                  style: AppTextStyles.headline3.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: AppColors.textHeadline.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  child: Text(
-                    _getDescription(),
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: AppColors.textBody,
-                      height: 1.6,
-                    ),
-                  ),
-                ),
+                SaveForOfflineButton(product: _buildCachedProduct(), cacheService: _cacheService),
                 const SizedBox(height: 28),
-
-                // Farmer Details Card
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppColors.textHeadline.withValues(alpha: 0.1),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: SafeCircleAvatar(
-                          imageUrl: farmerAvatarUrl,
-                          radius: 32,
-                          backgroundColor: Colors.transparent,
-                          child: Icon(
-                            Icons.agriculture_rounded,
-                            color: AppColors.primary,
-                            size: 32,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Farm',
-                              style: AppTextStyles.labelSmall.copyWith(
-                                color: AppColors.textSubtle,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              displayFarmName,
-                              style: AppTextStyles.headline3.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () async {
-                          if (widget.product.farmerId == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Farmer information is unavailable.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-
-                          // Prevent self-messaging
-                          final currentUserId = SupabaseConfig.currentUser?.id;
-                          if (currentUserId != null) {
-                            try {
-                              final farmerRecord = await SupabaseConfig.client
-                                  .from('farmers')
-                                  .select('farmer_id')
-                                  .eq('user_id', currentUserId)
-                                  .maybeSingle();
-
-                              if (farmerRecord != null &&
-                                  farmerRecord['farmer_id'] ==
-                                      widget.product.farmerId) {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'You cannot message your own farm.',
-                                    ),
-                                    backgroundColor: Colors.orange,
-                                  ),
-                                );
-                                return;
-                              }
-                            } catch (e) {
-                              debugPrint('Error checking self-messaging: $e');
-                            }
-                          }
-
-                          if (!context.mounted) return;
-                          context.push(
-                            AppRoutes.customerMessages,
-                            extra: {
-                              'farmerId': widget.product.farmerId,
-                              'product': widget.product,
-                            },
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            Icons.message_rounded,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                _buildAboutSection(),
                 const SizedBox(height: 28),
-
-                // Quantity Selector
-                Text(
-                  'Quantity',
-                  style: AppTextStyles.headline3.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.textHeadline.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      GestureDetector(
-                        onTap: _quantity > 1
-                            ? () => setState(() => _quantity--)
-                            : null,
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          child: Icon(
-                            Icons.remove_rounded,
-                            color: _quantity > 1
-                                ? AppColors.primary
-                                : AppColors.textSubtle.withValues(alpha: 0.3),
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '$_quantity ${widget.product.unit}',
-                        style: AppTextStyles.headline3.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => setState(() => _quantity++),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          child: Icon(
-                            Icons.add_rounded,
-                            color: AppColors.primary,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                _buildFarmerCard(farmerAvatarUrl),
                 const SizedBox(height: 28),
-
-                // Add to Cart and Order Now Buttons
-                Row(
-                  children: [
-                    // Add to Cart Button
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          CartService().addItem(widget.product, _quantity);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Added $_quantity ${widget.product.unit} to cart',
-                              ),
-                              duration: const Duration(seconds: 2),
-                              backgroundColor: AppColors.primary,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.shopping_bag_rounded, size: 22),
-                        label: Text(
-                          'Add to Cart',
-                          style: AppTextStyles.headline3.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Order Now Button
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _isOrdering ? null : _showCheckoutSheet,
-                        icon: _isOrdering
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.flash_on_rounded, size: 22),
-                        label: Text(
-                          _isOrdering ? 'Ordering...' : 'Order Now',
-                          style: AppTextStyles.headline3.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.accent,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
+                _buildQuantitySelector(),
+                const SizedBox(height: 32),
+                _buildActionButtons(),
               ],
             ),
           ),
@@ -2342,36 +1219,291 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
       ),
     );
   }
+
+  Widget _buildAppBarBtn(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8)]),
+        child: Icon(icon, size: 20, color: AppColors.textHeadline),
+      ),
+    );
+  }
+
+  Widget _buildHeaderCart() {
+    return ListenableBuilder(
+      listenable: CartService(),
+      builder: (context, _) {
+        final count = CartService().itemCount;
+        return GestureDetector(
+          key: _cartKey,
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CartScreen())),
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8)]),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.shopping_cart_outlined, size: 20, color: AppColors.textHeadline),
+                if (count > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+                      constraints: const BoxConstraints(minWidth: 12, minHeight: 12),
+                      child: Text('$count', style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildImageGallery() {
+    return Stack(
+      children: [
+        SizedBox(
+          height: 320,
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+            child: widget.product.imageUrls.isNotEmpty
+                ? PageView.builder(
+                    itemCount: widget.product.imageUrls.length,
+                    onPageChanged: (i) => setState(() => _currentPage = i),
+                    itemBuilder: (context, i) => CachedNetworkImage(imageUrl: widget.product.imageUrls[i], fit: BoxFit.cover),
+                  )
+                : Hero(tag: 'product_image_${widget.product.productId}', child: CachedNetworkImage(imageUrl: widget.product.imageUrl, fit: BoxFit.cover)),
+          ),
+        ),
+        if (widget.product.imageUrls.length > 1)
+          Positioned(bottom: 20, left: 0, right: 0, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: widget.product.imageUrls.asMap().entries.map((e) => AnimatedContainer(duration: const Duration(milliseconds: 300), width: _currentPage == e.key ? 20 : 8, height: 8, margin: const EdgeInsets.symmetric(horizontal: 4), decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), color: _currentPage == e.key ? Colors.white : Colors.white.withValues(alpha: 0.4)))).toList())),
+      ],
+    );
+  }
+
+  Widget _buildNamePriceSection(double? rating, int reviewCount) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(widget.product.name, style: AppTextStyles.headline1.copyWith(fontSize: 28), overflow: TextOverflow.ellipsis),
+          if (rating != null) ...[const SizedBox(height: 8), _buildStarRating(rating), Text('$rating ($reviewCount reviews)', style: AppTextStyles.bodySmall.copyWith(fontSize: 12))],
+        ])),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(widget.product.price, style: AppTextStyles.headline1.copyWith(color: AppColors.primary, fontSize: 32)),
+          Text('per ${widget.product.unit}', style: AppTextStyles.bodySmall),
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildHarvestBadge() {
+    final days = int.tryParse(widget.product.harvestDays ?? '0') ?? 0;
+    final label = days > 0 ? 'Harvest in $days days' : (widget.product.targetQuantity != null ? 'Pre-order' : 'Ready Now');
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.primary.withValues(alpha: 0.2))),
+      child: Row(children: [const Icon(Icons.schedule_rounded, color: AppColors.primary, size: 18), const SizedBox(width: 8), Text(label, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600))]),
+    );
+  }
+
+  Widget _buildAboutSection() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('About this product', style: AppTextStyles.headline3),
+      const SizedBox(height: 12),
+      Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.1))), child: Text(_getDescription(), style: AppTextStyles.bodyMedium.copyWith(height: 1.6))),
+    ]);
+  }
+
+  Widget _buildFarmerCard(String avatarUrl) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.1))),
+      child: Row(children: [
+        SafeCircleAvatar(imageUrl: avatarUrl, radius: 32, child: const Icon(Icons.agriculture_rounded, color: AppColors.primary)),
+        const SizedBox(width: 16),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Farm', style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSubtle)),
+          Text(widget.product.farm, style: AppTextStyles.headline3),
+        ])),
+        _buildMessageBtn(),
+      ]),
+    );
+  }
+
+  Widget _buildMessageBtn() {
+    return GestureDetector(
+      onTap: () => context.push(AppRoutes.customerMessages, extra: {'farmerId': widget.product.farmerId, 'product': widget.product}),
+      child: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.message_rounded, color: Colors.white, size: 20)),
+    );
+  }
+
+  Widget _buildQuantitySelector() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Quantity', style: AppTextStyles.headline3),
+      const SizedBox(height: 12),
+      Container(
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.1))),
+        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          _buildQtySelectorBtn(Icons.remove_rounded, _quantity > 1 ? () => setState(() => _quantity--) : null),
+          Text('$_quantity ${widget.product.unit}', style: AppTextStyles.headline3),
+          _buildQtySelectorBtn(Icons.add_rounded, () => setState(() => _quantity++)),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _buildQtySelectorBtn(IconData icon, VoidCallback? onTap) {
+    return GestureDetector(onTap: onTap, child: Container(padding: const EdgeInsets.all(14), child: Icon(icon, color: onTap != null ? AppColors.primary : AppColors.textSubtle.withValues(alpha: 0.3))));
+  }
+
+  Widget _buildActionButtons() {
+    final isOwnProduct = AuthService().userId.isNotEmpty &&
+        widget.product.farmerId == AuthService().userId;
+
+    if (isOwnProduct) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'This is your own product. You cannot order or add it to your cart.',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Row(children: [
+      Expanded(
+        child: ElevatedButton.icon(
+          key: _addToCartBtnKey,
+          onPressed: () {
+            _runFlyToCartAnimation(_addToCartBtnKey, widget.product.imageUrl);
+            CartService().addItem(widget.product, _quantity);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Added to cart'),
+                duration: Duration(seconds: 1),
+              ),
+            );
+          },
+          icon: const Icon(Icons.shopping_bag_rounded),
+          label: const Text('Add to Cart'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: ElevatedButton.icon(
+          onPressed: _isOrdering ? null : _showCheckoutSheet,
+          icon: const Icon(Icons.flash_on_rounded),
+          label: const Text('Order Now'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.accent,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  void _runFlyToCartAnimation(GlobalKey startKey, String imageUrl) {
+    final RenderBox? buttonBox = startKey.currentContext?.findRenderObject() as RenderBox?;
+    final RenderBox? cartBox = _cartKey.currentContext?.findRenderObject() as RenderBox?;
+
+    if (buttonBox == null || cartBox == null) return;
+
+    final startPosition = buttonBox.localToGlobal(Offset.zero);
+    final endPosition = cartBox.localToGlobal(Offset.zero);
+
+    late OverlayEntry overlayEntry;
+    overlayEntry = OverlayEntry(
+      builder: (context) => _FlyingIconAnimation(
+        startPosition: startPosition,
+        endPosition: endPosition,
+        imageUrl: imageUrl,
+        onComplete: () => overlayEntry.remove(),
+      ),
+    );
+
+    Overlay.of(context).insert(overlayEntry);
+  }
+
+  Widget _buildStarRating(double rating) {
+    return Row(children: List.generate(5, (i) => Icon(i + 1 <= rating ? Icons.star_rounded : (rating > i ? Icons.star_half_rounded : Icons.star_outline_rounded), color: AppColors.primary, size: 18)));
+  }
+
+  Widget _buildMapButton() { return _buildSmallBtn(Icons.map_outlined, 'View Map', _showFarmerMapSheet); }
+  Widget _buildQtyBtn({required IconData icon, required VoidCallback onTap}) { return GestureDetector(onTap: onTap, child: Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.1))), child: Icon(icon, size: 16, color: AppColors.primary))); }
+
+  Widget _buildSmallBtn(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(onTap: onTap, child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.primary.withValues(alpha: 0.2))), child: Row(children: [Icon(icon, size: 14, color: AppColors.primary), const SizedBox(width: 4), Text(label, style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary, fontSize: 10))])));
+  }
+
+  Widget _buildPaymentOption({required String title, required String subtitle, required bool isSelected, required VoidCallback onTap}) {
+    return GestureDetector(onTap: onTap, child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: isSelected ? AppColors.primary : AppColors.textHeadline.withValues(alpha: 0.1), width: 2)), child: Column(children: [Text(title, style: AppTextStyles.headline3.copyWith(color: isSelected ? AppColors.primary : AppColors.textHeadline)), Text(subtitle, style: AppTextStyles.bodySmall.copyWith(fontSize: 9))])));
+  }
+
+  void _showFarmerMapSheet() {
+    final lat = widget.product.latitude; final lng = widget.product.longitude;
+    if (lat == null || lng == null) { _viewFarmOnMap(); return; }
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (context) => Container(height: MediaQuery.of(context).size.height * 0.7, decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(32))), child: Column(children: [Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.symmetric(vertical: 16), decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))), Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}', style: AppTextStyles.headline1.copyWith(fontSize: 20)), Text('GPS Coordinates (Pickup)', style: AppTextStyles.bodySmall)])), IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded))])), Expanded(child: Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), child: ClipRRect(borderRadius: BorderRadius.circular(24), child: Stack(children: [FlutterMap(options: MapOptions(initialCenter: LatLng(lat, lng), initialZoom: 15.5), children: [TileLayer(urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', subdomains: const ['a', 'b', 'c', 'd']), MarkerLayer(markers: [Marker(point: LatLng(lat, lng), width: 120, height: 80, child: Column(children: [Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(8)), child: Text('${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}', style: const TextStyle(color: Colors.white, fontSize: 10))), const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 36)]))])]), Positioned(bottom: 20, left: 20, right: 20, child: ElevatedButton.icon(onPressed: _viewFarmOnMap, icon: const Icon(Icons.navigation_rounded), label: const Text('Navigate to Farm'), style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)))))]))))])));
+  }
+
+  void _viewFarmOnMap() async {
+    final query = (widget.product.latitude != null && widget.product.longitude != null) ? '${widget.product.latitude},${widget.product.longitude}' : Uri.encodeComponent(widget.product.farm);
+    final url = 'https://www.google.com/maps/search/?api=1&query=$query';
+    if (await canLaunchUrl(Uri.parse(url))) await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  Future<UserAddress?> _openAddressEditor([UserAddress? initial]) => showModalBottomSheet<UserAddress>(context: context, isScrollControlled: true, useRootNavigator: true, backgroundColor: Colors.transparent, builder: (context) => AddressEditorSheet(initialAddress: initial));
+  Future<UserAddress?> _openAddressSelector() => showModalBottomSheet<UserAddress>(context: context, isScrollControlled: true, useRootNavigator: true, backgroundColor: Colors.transparent, builder: (context) => AddressSelectorSheet(currentAddressId: _address?.addressId));
+
+  Future<void> _openProductReportDialog() async {
+    final pid = widget.product.productId; if (pid == null) return;
+    final sub = await showDialog<bool>(context: context, builder: (context) => ReportContentDialog(contentLabel: 'product', contentTitle: widget.product.name, onSubmit: (r, d) => SupabaseDataService().reportProduct(productId: pid, reason: r, description: d)));
+    if (sub == true && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Product reported.')));
+  }
 }
 
 class AddressSelectorSheet extends StatefulWidget {
   final String? currentAddressId;
   const AddressSelectorSheet({super.key, this.currentAddressId});
-
-  @override
-  State<AddressSelectorSheet> createState() => _AddressSelectorSheetState();
+  @override State<AddressSelectorSheet> createState() => _AddressSelectorSheetState();
 }
-
 class _AddressSelectorSheetState extends State<AddressSelectorSheet> {
-  final UserService _userService = UserService();
-  List<UserAddress> _addresses = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAddresses();
-  }
-
-  Future<void> _loadAddresses() async {
-    try {
-      final list = await _userService.getAllUserAddresses();
-      if (mounted) setState(() => _addresses = list);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
+  final UserService _userService = UserService(); List<UserAddress> _addresses = []; bool _isLoading = true;
+  @override void initState() { super.initState(); _loadAddresses(); }
+  Future<void> _loadAddresses() async { try { final list = await _userService.getAllUserAddresses(); if (mounted) setState(() => _addresses = list); } finally { if (mounted) setState(() => _isLoading = false); } }
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2395,23 +1527,18 @@ class _AddressSelectorSheetState extends State<AddressSelectorSheet> {
             padding: const EdgeInsets.all(24),
             child: Row(
               children: [
-                Text(
-                  'Select Address',
-                  style: AppTextStyles.headline1.copyWith(fontSize: 22),
-                ),
+                Text('Select Address', style: AppTextStyles.headline1.copyWith(fontSize: 22)),
                 const Spacer(),
                 TextButton.icon(
                   onPressed: () async {
-                    final newAddress = await showModalBottomSheet<UserAddress>(
+                    final nw = await showModalBottomSheet<UserAddress>(
                       context: context,
                       isScrollControlled: true,
                       useRootNavigator: true,
                       backgroundColor: Colors.transparent,
                       builder: (context) => const AddressEditorSheet(),
                     );
-                    if (newAddress != null && context.mounted) {
-                      Navigator.pop(context, newAddress);
-                    }
+                    if (nw != null && context.mounted) Navigator.pop(context, nw);
                   },
                   icon: const Icon(Icons.add_rounded),
                   label: const Text('Add New'),
@@ -2422,130 +1549,74 @@ class _AddressSelectorSheetState extends State<AddressSelectorSheet> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _addresses.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.location_off_rounded,
-                          size: 64,
-                          color: Colors.grey[300],
-                        ),
-                        const SizedBox(height: 16),
-                        const Text('No addresses found'),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    itemCount: _addresses.length,
-                    itemBuilder: (context, index) {
-                      final addr = _addresses[index];
-                      final isSelected =
-                          addr.addressId == widget.currentAddressId;
-                      return GestureDetector(
-                        onTap: () => Navigator.pop(context, addr),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? AppColors.primary.withValues(alpha: 0.1)
-                                : AppColors.background,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : Colors.transparent,
-                              width: 2,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  addr.label.toLowerCase() == 'home'
-                                      ? Icons.home_rounded
-                                      : addr.label.toLowerCase() == 'office'
-                                      ? Icons.work_rounded
-                                      : Icons.location_on_rounded,
-                                  color: isSelected
-                                      ? Colors.white
-                                      : AppColors.primary,
-                                  size: 20,
-                                ),
+                : (_addresses.isEmpty
+                    ? const Center(child: Text('No addresses found'))
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        itemCount: _addresses.length,
+                        itemBuilder: (context, i) {
+                          final addr = _addresses[i];
+                          final sel = addr.addressId == widget.currentAddressId;
+                          return GestureDetector(
+                            onTap: () => Navigator.pop(context, addr),
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: sel ? AppColors.primary.withValues(alpha: 0.1) : AppColors.background,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: sel ? AppColors.primary : Colors.transparent, width: 2),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: sel ? AppColors.primary : Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Icon(
+                                      addr.label.toLowerCase() == 'home'
+                                          ? Icons.home_rounded
+                                          : (addr.label.toLowerCase() == 'office' ? Icons.work_rounded : Icons.location_on_rounded),
+                                      color: sel ? Colors.white : AppColors.primary,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          addr.label,
-                                          style: AppTextStyles.headline3
-                                              .copyWith(fontSize: 16),
-                                        ),
-                                        if (addr.isDefault) ...[
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 6,
-                                              vertical: 2,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.primary
-                                                  .withValues(alpha: 0.15),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              'DEFAULT',
-                                              style: TextStyle(
-                                                fontSize: 8,
-                                                fontWeight: FontWeight.w800,
-                                                color: AppColors.primary,
+                                        Row(
+                                          children: [
+                                            Text(addr.label, style: AppTextStyles.headline3.copyWith(fontSize: 16)),
+                                            if (addr.isDefault) ...[
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.primary.withValues(alpha: 0.15),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Text('DEFAULT', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: AppColors.primary)),
                                               ),
-                                            ),
-                                          ),
-                                        ],
+                                            ],
+                                          ],
+                                        ),
+                                        Text(addr.street, style: AppTextStyles.bodySmall),
+                                        Text('${addr.barangay}, ${addr.city}', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
                                       ],
                                     ),
-                                    Text(
-                                      addr.street,
-                                      style: AppTextStyles.bodySmall,
-                                    ),
-                                    Text(
-                                      '${addr.barangay}, ${addr.city}',
-                                      style: AppTextStyles.bodySmall.copyWith(
-                                        color: AppColors.textSubtle,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                  if (sel) const Icon(Icons.check_circle_rounded, color: AppColors.primary),
+                                ],
                               ),
-                              if (isSelected)
-                                const Icon(
-                                  Icons.check_circle_rounded,
-                                  color: AppColors.primary,
-                                ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                            ),
+                          );
+                        },
+                      )),
           ),
-          const SizedBox(height: 24),
         ],
       ),
     );
@@ -2555,587 +1626,127 @@ class _AddressSelectorSheetState extends State<AddressSelectorSheet> {
 class AddressEditorSheet extends StatefulWidget {
   final UserAddress? initialAddress;
   const AddressEditorSheet({super.key, this.initialAddress});
-
-  @override
-  State<AddressEditorSheet> createState() => _AddressEditorSheetState();
+  @override State<AddressEditorSheet> createState() => _AddressEditorSheetState();
 }
-
 class _AddressEditorSheetState extends State<AddressEditorSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _labels = ['Home', 'Office', 'Farm', 'Warehouse', 'Other'];
-  String _selectedLabel = 'Home';
-  final _recipientController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _streetController = TextEditingController();
-  final _barangayController = TextEditingController();
-  final _cityController = TextEditingController();
-  final _provinceController = TextEditingController();
-  bool _isDefault = false;
-  bool _isSaving = false;
-  double? _latitude;
-  double? _longitude;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.initialAddress != null) {
-      if (_labels.contains(widget.initialAddress!.label)) {
-        _selectedLabel = widget.initialAddress!.label;
-      } else {
-        _selectedLabel = 'Other';
-      }
-      _recipientController.text = widget.initialAddress!.recipientName;
-      _phoneController.text = widget.initialAddress!.recipientPhone;
-      _streetController.text = widget.initialAddress!.street;
-      _barangayController.text = widget.initialAddress!.barangay;
-      _cityController.text = widget.initialAddress!.city;
-      _provinceController.text = widget.initialAddress!.province;
-      _isDefault = widget.initialAddress!.isDefault;
-      _latitude = widget.initialAddress!.latitude;
-      _longitude = widget.initialAddress!.longitude;
-    }
-  }
-
+  final _formKey = GlobalKey<FormState>(); final _labels = ['Home', 'Office', 'Farm', 'Warehouse', 'Other']; String _selectedLabel = 'Home';
+  final _recipientController = TextEditingController(); final _phoneController = TextEditingController(); final _streetController = TextEditingController(); final _barangayController = TextEditingController(); final _cityController = TextEditingController(); final _provinceController = TextEditingController();
+  bool _isDefault = false; bool _isSaving = false; double? _latitude; double? _longitude;
+  @override void initState() { super.initState(); if (widget.initialAddress != null) { _selectedLabel = _labels.contains(widget.initialAddress!.label) ? widget.initialAddress!.label : 'Other'; _recipientController.text = widget.initialAddress!.recipientName; _phoneController.text = widget.initialAddress!.recipientPhone; _streetController.text = widget.initialAddress!.street; _barangayController.text = widget.initialAddress!.barangay; _cityController.text = widget.initialAddress!.city; _provinceController.text = widget.initialAddress!.province; _isDefault = widget.initialAddress!.isDefault; _latitude = widget.initialAddress!.latitude; _longitude = widget.initialAddress!.longitude; } }
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-
-    if (_latitude == null || _longitude == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select your exact delivery location on the map'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isSaving = true);
-    try {
-      final service = UserService();
-      final result = await service.upsertAddress(
-        addressId: widget.initialAddress?.addressId,
-        label: _selectedLabel,
-        recipientName: _recipientController.text,
-        recipientPhone: _phoneController.text,
-        street: _streetController.text,
-        barangay: _barangayController.text,
-        city: _cityController.text,
-        province: _provinceController.text,
-        zipCode: '0000', // Default placeholder
-        isDefault: _isDefault,
-        latitude: _latitude,
-        longitude: _longitude,
-      );
-
-      if (mounted && result != null) Navigator.pop(context, result);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
+    if (_latitude == null || _longitude == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select your exact delivery location on the map'), backgroundColor: AppColors.error)); return; }
+    setState(() => _isSaving = true); try { final res = await UserService().upsertAddress(addressId: widget.initialAddress?.addressId, label: _selectedLabel, recipientName: _recipientController.text, recipientPhone: _phoneController.text, street: _streetController.text, barangay: _barangayController.text, city: _cityController.text, province: _provinceController.text, zipCode: '0000', isDefault: _isDefault, latitude: _latitude, longitude: _longitude); if (mounted && res != null) Navigator.pop(context, res); } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red)); } finally { if (mounted) setState(() => _isSaving = false); }
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    widget.initialAddress == null
-                        ? 'Add Address'
-                        : 'Edit Address',
-                    style: AppTextStyles.headline1.copyWith(fontSize: 22),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              // Label Dropdown
-              Text(
-                'Label (e.g. Home, Office)',
-                style: AppTextStyles.bodySmall.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedLabel,
-                items: _labels.map((label) {
-                  return DropdownMenuItem(value: label, child: Text(label));
-                }).toList(),
-                onChanged: (v) {
-                  if (v != null) setState(() => _selectedLabel = v);
-                },
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: AppColors.background,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              _buildField(
-                _recipientController,
-                'Recipient Name',
-                'Juan Dela Cruz',
-              ),
-              const SizedBox(height: 16),
-              _buildField(
-                _phoneController,
-                'Phone Number',
-                '09123456789',
-                keyboard: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-              _buildField(
-                _streetController,
-                'Street / House No.',
-                '123 Agri St.',
-              ),
-              const SizedBox(height: 16),
-              _buildField(_barangayController, 'Barangay', 'Brgy. San Jose'),
-              const SizedBox(height: 16),
-              _buildField(_cityController, 'City', 'Cabanatuan'),
-              const SizedBox(height: 16),
-              _buildField(_provinceController, 'Province', 'Nueva Ecija'),
-              const SizedBox(height: 16),
-              // Pin Location Indicator
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: (_latitude != null && _longitude != null)
-                      ? AppColors.primary.withValues(alpha: 0.1)
-                      : AppColors.error.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: (_latitude != null && _longitude != null)
-                        ? AppColors.primary.withValues(alpha: 0.2)
-                        : AppColors.error.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.location_on_rounded,
-                      color: (_latitude != null && _longitude != null)
-                          ? AppColors.primary
-                          : AppColors.textSubtle,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Delivery Pin',
-                            style: AppTextStyles.labelSmall.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: (_latitude != null && _longitude != null)
-                                  ? AppColors.primary
-                                  : AppColors.textHeadline,
-                            ),
-                          ),
-                          Text(
-                            (_latitude != null && _longitude != null)
-                                ? 'Location Pinned'
-                                : 'Required: Please pin your location',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              fontSize: 11,
-                              fontWeight: (_latitude == null) ? FontWeight.bold : null,
-                              color: (_latitude == null) ? AppColors.error : AppColors.textSubtle,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    TextButton.icon(
-                      onPressed: () async {
-                        final result =
-                            await showModalBottomSheet<Map<String, dynamic>>(
-                              context: context,
-                              isScrollControlled: true,
-                              useRootNavigator: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (context) => const LocationPickerSheet(),
-                            );
-
-                        if (result != null && mounted) {
-                          setState(() {
-                            _latitude = result['lat'];
-                            _longitude = result['lng'];
-                            if (result['address'] != null) {
-                              final ResolvedFarmLocation addr =
-                                  result['address'];
-                              _streetController.text = addr.street;
-                              _barangayController.text = addr.barangay;
-                              _cityController.text = addr.city;
-                              _provinceController.text = addr.province;
-                            }
-                          });
-                        }
-                      },
-                      icon: const Icon(Icons.map_rounded, size: 18),
-                      label: Text(
-                        (_latitude != null && _longitude != null)
-                            ? 'Change on Map'
-                            : 'Select on Map',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              SwitchListTile(
-                title: const Text('Set as default address'),
-                value: _isDefault,
-                onChanged: (v) => setState(() => _isDefault = v),
-                activeThumbColor: AppColors.primary,
-                contentPadding: EdgeInsets.zero,
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text(
-                          'Save Address',
-                          style: AppTextStyles.headline3.copyWith(
-                            color: Colors.white,
-                          ),
-                        ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildField(
-    TextEditingController controller,
-    String label,
-    String hint, {
-    TextInputType? keyboard,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboard,
-          decoration: InputDecoration(
-            hintText: hint,
-            filled: true,
-            fillColor: AppColors.background,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-          ),
-          validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-        ),
-      ],
-    );
-  }
+  @override Widget build(BuildContext context) { return Container(padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom), decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(32))), child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Form(key: _formKey, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [Text(widget.initialAddress == null ? 'Add Address' : 'Edit Address', style: AppTextStyles.headline1.copyWith(fontSize: 22)), const SizedBox(height: 24), Text('Label', style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.bold)), const SizedBox(height: 8), DropdownButtonFormField<String>(initialValue: _selectedLabel, items: _labels.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(), onChanged: (v) { if (v != null) setState(() => _selectedLabel = v); }, decoration: InputDecoration(filled: true, fillColor: AppColors.background, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none))), const SizedBox(height: 16), _buildField(_recipientController, 'Recipient Name', 'Juan Dela Cruz'), const SizedBox(height: 16), _buildField(_phoneController, 'Phone Number', '09123456789', keyboard: TextInputType.phone), const SizedBox(height: 16), _buildField(_streetController, 'Street / House No.', '123 Agri St.'), const SizedBox(height: 16), _buildField(_barangayController, 'Barangay', 'Brgy. San Jose'), const SizedBox(height: 16), _buildField(_cityController, 'City', 'Cabanatuan'), const SizedBox(height: 16), _buildField(_provinceController, 'Province', 'Nueva Ecija'), const SizedBox(height: 16), Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: (_latitude != null) ? AppColors.primary.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: (_latitude != null) ? AppColors.primary.withValues(alpha: 0.2) : AppColors.error.withValues(alpha: 0.3))), child: Row(children: [Icon(Icons.location_on_rounded, color: (_latitude != null) ? AppColors.primary : AppColors.textSubtle), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Delivery Pin', style: AppTextStyles.labelSmall.copyWith(fontWeight: FontWeight.w800, color: (_latitude != null) ? AppColors.primary : AppColors.textHeadline)), Text((_latitude != null) ? 'Location Pinned' : 'Required: Please pin your location', style: AppTextStyles.bodySmall.copyWith(fontSize: 11, color: (_latitude == null) ? AppColors.error : AppColors.textSubtle))])), TextButton.icon(onPressed: () async { final res = await showModalBottomSheet<Map<String, dynamic>>(context: context, isScrollControlled: true, useRootNavigator: true, backgroundColor: Colors.transparent, builder: (context) => const LocationPickerSheet()); if (res != null && mounted) { setState(() { _latitude = res['lat']; _longitude = res['lng']; if (res['address'] != null) { final ResolvedFarmLocation a = res['address']; _streetController.text = a.street; _barangayController.text = a.barangay; _cityController.text = a.city; _provinceController.text = a.province; } }); } }, icon: const Icon(Icons.map_rounded), label: Text((_latitude != null) ? 'Change' : 'Select'))])), const SizedBox(height: 20), SwitchListTile(title: const Text('Set as default'), value: _isDefault, onChanged: (v) => setState(() => _isDefault = v), contentPadding: EdgeInsets.zero), const SizedBox(height: 32), SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _isSaving ? null : _save, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: _isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Save Address', style: TextStyle(color: Colors.white))))])))); }
+  Widget _buildField(TextEditingController c, String l, String h, {TextInputType? keyboard}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(l, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.bold)), const SizedBox(height: 8), TextFormField(controller: c, keyboardType: keyboard, decoration: InputDecoration(hintText: h, filled: true, fillColor: AppColors.background, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)), validator: (v) => (v == null || v.isEmpty) ? 'Required' : null)]);
 }
 
 class LocationPickerSheet extends StatefulWidget {
   const LocationPickerSheet({super.key});
+  @override State<LocationPickerSheet> createState() => _LocationPickerSheetState();
+}
+class _LocationPickerSheetState extends State<LocationPickerSheet> {
+  final MapController _mapController = MapController(); LatLng _currentCenter = const LatLng(15.4828, 120.9714); bool _isLoading = true; bool _isResolving = false; ResolvedFarmLocation? _resolvedLocation;
+  @override void initState() { super.initState(); _moveToCurrentLocation(); }
+  Future<void> _moveToCurrentLocation() async { try { final pos = await Geolocator.getCurrentPosition(); final nw = LatLng(pos.latitude, pos.longitude); if (mounted) { setState(() { _currentCenter = nw; _isLoading = false; }); _mapController.move(nw, 16); _resolveAddress(nw); } } catch (_) { if (mounted) setState(() => _isLoading = false); } }
+  Future<void> _resolveAddress(LatLng p) async { setState(() => _isResolving = true); try { final res = await ReverseGeocodingService.resolveFromCoordinates(latitude: p.latitude, longitude: p.longitude); if (mounted) { setState(() { _resolvedLocation = res; _isResolving = false; }); } } catch (_) { if (mounted) setState(() => _isResolving = false); } }
+  @override Widget build(BuildContext context) { return Container(height: MediaQuery.of(context).size.height * 0.85, decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(32))), child: Stack(children: [ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(32)), child: FlutterMap(mapController: _mapController, options: MapOptions(initialCenter: _currentCenter, initialZoom: 16, onTap: (tp, p) { setState(() => _currentCenter = p); _mapController.move(p, _mapController.camera.zoom); _resolveAddress(p); }, onPositionChanged: (pos, hasGesture) { if (hasGesture) setState(() => _currentCenter = pos.center); }, onMapEvent: (ev) { if (ev is MapEventMoveEnd) _resolveAddress(_currentCenter); }), children: [TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.agridirect.app')])), Center(child: Padding(padding: const EdgeInsets.only(bottom: 35), child: Icon(Icons.location_on_rounded, color: AppColors.primary, size: 40, shadows: [Shadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 5))]))), Positioned(top: 20, left: 20, right: 20, child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [CircleAvatar(backgroundColor: Colors.white, child: IconButton(icon: const Icon(Icons.close_rounded, color: Colors.black), onPressed: () => Navigator.pop(context))), Text('Select Delivery Pin', style: AppTextStyles.headline3.copyWith(backgroundColor: Colors.white.withValues(alpha: 0.9))), const SizedBox(width: 40)])), Positioned(bottom: 20, left: 20, right: 20, child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [FloatingActionButton(onPressed: _moveToCurrentLocation, backgroundColor: Colors.white, mini: true, child: const Icon(Icons.my_location_rounded, color: AppColors.primary)), const SizedBox(height: 16), Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, -5))]), child: Column(mainAxisSize: MainAxisSize.min, children: [Row(children: [const Icon(Icons.location_on_rounded, color: AppColors.primary), const SizedBox(width: 12), Expanded(child: Text(_isResolving ? 'Resolving...' : (_resolvedLocation?.fullAddress.isNotEmpty == true ? _resolvedLocation!.fullAddress : 'Location: ${_currentCenter.latitude.toStringAsFixed(4)}, ${_currentCenter.longitude.toStringAsFixed(4)}'), style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600), maxLines: 2, overflow: TextOverflow.ellipsis))]), const SizedBox(height: 20), SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _isResolving ? null : () => Navigator.pop(context, {'lat': _currentCenter.latitude, 'lng': _currentCenter.longitude, 'address': _resolvedLocation}), style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: const Text('Confirm Location', style: TextStyle(color: Colors.white))))]))])), if (_isLoading) const Center(child: CircularProgressIndicator())])); }
+}
+class _FlyingIconAnimation extends StatefulWidget {
+  final Offset startPosition;
+  final Offset endPosition;
+  final String imageUrl;
+  final VoidCallback onComplete;
+
+  const _FlyingIconAnimation({
+    required this.startPosition,
+    required this.endPosition,
+    required this.imageUrl,
+    required this.onComplete,
+  });
 
   @override
-  State<LocationPickerSheet> createState() => _LocationPickerSheetState();
+  State<_FlyingIconAnimation> createState() => _FlyingIconAnimationState();
 }
 
-class _LocationPickerSheetState extends State<LocationPickerSheet> {
-  final MapController _mapController = MapController();
-  LatLng _currentCenter = const LatLng(15.4828, 120.9714); // Default Cabanatuan
-  bool _isLoading = true;
-  bool _isResolving = false;
-  ResolvedFarmLocation? _resolvedLocation;
+class _FlyingIconAnimationState extends State<_FlyingIconAnimation> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _positionAnimation;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
 
   @override
   void initState() {
     super.initState();
-    _moveToCurrentLocation();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _positionAnimation = Tween<Offset>(
+      begin: widget.startPosition,
+      end: widget.endPosition,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInQuint));
+
+    _scaleAnimation = TweenSequence([
+      TweenSequenceItem(tween: Tween<double>(begin: 1.0, end: 1.5), weight: 30),
+      TweenSequenceItem(tween: Tween<double>(begin: 1.5, end: 0.3), weight: 70),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+
+    _opacityAnimation = TweenSequence([
+      TweenSequenceItem(tween: Tween<double>(begin: 1.0, end: 1.0), weight: 80),
+      TweenSequenceItem(tween: Tween<double>(begin: 1.0, end: 0.0), weight: 20),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
+
+    _controller.forward().then((_) => widget.onComplete());
   }
 
-  Future<void> _moveToCurrentLocation() async {
-    try {
-      final position = await Geolocator.getCurrentPosition();
-      final newCenter = LatLng(position.latitude, position.longitude);
-      if (mounted) {
-        setState(() {
-          _currentCenter = newCenter;
-          _isLoading = false;
-        });
-        _mapController.move(newCenter, 16);
-        _resolveAddress(newCenter);
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _resolveAddress(LatLng point) async {
-    setState(() => _isResolving = true);
-    try {
-      final resolved = await ReverseGeocodingService.resolveFromCoordinates(
-        latitude: point.latitude,
-        longitude: point.longitude,
-      );
-      if (mounted) {
-        setState(() {
-          _resolvedLocation = resolved;
-          _isResolving = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isResolving = false);
-    }
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      child: Stack(
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: _currentCenter,
-                initialZoom: 16,
-                onTap: (tapPosition, point) {
-                  setState(() {
-                    _currentCenter = point;
-                  });
-                  _mapController.move(point, _mapController.camera.zoom);
-                  _resolveAddress(point);
-                },
-                onPositionChanged: (pos, hasGesture) {
-                  if (hasGesture) {
-                    setState(() => _currentCenter = pos.center);
-                  }
-                },
-                onMapEvent: (event) {
-                  if (event is MapEventMoveEnd) {
-                    _resolveAddress(_currentCenter);
-                  }
-                },
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.agridirect.app',
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Positioned(
+          left: _positionAnimation.value.dx,
+          top: _positionAnimation.value.dy,
+          child: Opacity(
+            opacity: _opacityAnimation.value,
+            child: Transform.scale(
+              scale: _scaleAnimation.value,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.4),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-
-          // Center Marker
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 35),
-              child: Icon(
-                Icons.location_on_rounded,
-                color: AppColors.primary,
-                size: 40,
-                shadows: [
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+                child: ClipOval(
+                  child: CachedNetworkImage(
+                    imageUrl: widget.imageUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => const Icon(Icons.shopping_cart_rounded, color: Colors.white, size: 20),
+                    errorWidget: (context, url, error) => const Icon(Icons.shopping_cart_rounded, color: Colors.white, size: 20),
                   ),
-                ],
+                ),
               ),
             ),
           ),
-
-          // Top Header
-          Positioned(
-            top: 20,
-            left: 20,
-            right: 20,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.white,
-                  child: IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.black),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-                Text(
-                  'Select Delivery Pin',
-                  style: AppTextStyles.headline3.copyWith(
-                    backgroundColor: Colors.white.withValues(alpha: 0.9),
-                  ),
-                ),
-                const SizedBox(width: 40), // Balance
-              ],
-            ),
-          ),
-
-          // Bottom Address Bar
-          Positioned(
-            bottom: 20,
-            left: 20,
-            right: 20,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                FloatingActionButton(
-                  onPressed: _moveToCurrentLocation,
-                  backgroundColor: Colors.white,
-                  mini: true,
-                  child: const Icon(
-                    Icons.my_location_rounded,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 20,
-                        offset: const Offset(0, -5),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on_rounded,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _isResolving
-                                      ? 'Resolving address...'
-                                      : (_resolvedLocation?.fullAddress.isNotEmpty == true
-                                          ? _resolvedLocation!.fullAddress
-                                          : 'Location: ${_currentCenter.latitude.toStringAsFixed(4)}, ${_currentCenter.longitude.toStringAsFixed(4)}'),
-                                  style: AppTextStyles.bodyMedium.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isResolving
-                              ? null
-                              : () {
-                                  Navigator.pop(context, {
-                                    'lat': _currentCenter.latitude,
-                                    'lng': _currentCenter.longitude,
-                                    'address': _resolvedLocation,
-                                  });
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: Text(
-                            'Confirm Pin Location',
-                            style: AppTextStyles.headline3.copyWith(
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          if (_isLoading) const Center(child: CircularProgressIndicator()),
-        ],
-      ),
+        );
+      },
     );
   }
 }

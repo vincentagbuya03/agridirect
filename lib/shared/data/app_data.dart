@@ -118,7 +118,7 @@ class ArticleItem {
   /// Dynamically calculates the read time based on word count
   /// Average reading speed: 200 words per minute
   String get calculatedReadTime {
-    final fullText = '${excerpt} ${content ?? ''}';
+    final fullText = '$excerpt ${content ?? ''}';
     final words = fullText.split(RegExp(r'\s+')).length;
     final minutes = (words / 200).ceil();
     return '$minutes min read';
@@ -134,6 +134,7 @@ class CartItem {
   final String unit;
   final String imageUrl;
   int quantity;
+  bool isSelected;
 
   CartItem({
     required this.farmerId,
@@ -144,6 +145,7 @@ class CartItem {
     required this.unit,
     required this.imageUrl,
     this.quantity = 1,
+    this.isSelected = true,
   });
 
   double get priceValue => double.tryParse(price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;

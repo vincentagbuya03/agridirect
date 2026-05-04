@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/animated_components.dart';
 import '../../../shared/widgets/brand_logo.dart';
+import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/services/integration/weather_service.dart';
+import '../../../shared/models/weather_model.dart';
+import '../../../shared/widgets/app_shimmer_loader.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import 'package:intl/intl.dart';
 
-/// Web Sales Dashboard — Modern Design
-/// Professional analytics dashboard for farmers
 class WebSalesDashboard extends StatefulWidget {
   final Function(int) onNavigate;
   final int currentIndex;
@@ -20,57 +24,156 @@ class WebSalesDashboard extends StatefulWidget {
 }
 
 class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProviderStateMixin {
-  // Modern colors
-  static const Color _primary = Color(0xFF16A34A);
-  static const Color _success = Color(0xFF06B6D4);
-  static const Color _warning = Color(0xFFF59E0B);
-
-  static const Color _dark = Color(0xFF111827);
-  static const Color _muted = Color(0xFF6B7280);
-  static const Color _border = Color(0xFFE5E7EB);
-  static const Color _surface = Color(0xFFFAFAFA);
+  // Premium Design Tokens
+  static const Color _primary = Color(0xFF10B981); // Emerald
+  static const Color _secondary = Color(0xFF3B82F6); // Blue
+  static const Color _accent = Color(0xFFF59E0B); // Amber
+  
+  static const Color _dark = Color(0xFF0F172A);
+  static const Color _muted = Color(0xFF64748B);
+  static const Color _border = Color(0xFFE2E8F0);
+  static const Color _surface = Color(0xFFF8FAFC);
   static const Color _white = Color(0xFFFFFFFF);
 
-  // ─── Animations ───
+  final NumberFormat _currencyFormat = NumberFormat.currency(symbol: '₱', decimalDigits: 0);
+
+  // Animations
   late AnimationController _fadeInController;
   late List<AnimationController> _metricControllers;
   final Set<int> _hoveredMetrics = {};
   int _hoveredNav = -1;
 
+  // Data State
+  int _pendingOrders = 0;
+  int _activeListings = 0;
+  double _weeklyRevenue = 0.0;
+  List<Map<String, dynamic>> _recentOrders = [];
+  bool _isLoading = true;
+  String _farmerName = '';
+  List<double> _salesData = List.filled(7, 0.0);
+  List<double> _inventoryData = [1.0, 0.0, 0.0];
+  String _inventoryLegend1 = '0%';
+  String _inventoryLegend2 = '0%';
+  String _inventoryLegend3 = '0%';
+  String _farmerRating = '0.0';
+  String _farmerReviews = '0 Reviews';
+
   @override
   void initState() {
     super.initState();
     _fadeInController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
     )..forward();
 
-    // Create controllers for 4 metric cards
     _metricControllers = List.generate(
       4,
       (i) => AnimationController(
-        duration: const Duration(milliseconds: 600),
+        duration: const Duration(milliseconds: 700),
         vsync: this,
       ),
     );
 
-    // Stagger the animations
-    Future.delayed(const Duration(milliseconds: 300), () {
+    // Staggered entry
+    Future.delayed(const Duration(milliseconds: 400), () {
       for (int i = 0; i < _metricControllers.length; i++) {
-        Future.delayed(Duration(milliseconds: 100 * i), () {
-          if (mounted) {
-            _metricControllers[i].forward();
-          }
+        Future.delayed(Duration(milliseconds: 120 * i), () {
+          if (mounted) _metricControllers[i].forward();
         });
       }
     });
+
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    try {
+      final name = AuthService().userName;
+      final products = await SupabaseDataService().getFarmerProducts();
+      final orders = await SupabaseDataService().getFarmerOrders();
+      final farmerResponse = await SupabaseDataService().getFarmerProfile(AuthService().userId);
+      
+      final rating = farmerResponse?['average_rating']?.toString() ?? '4.9';
+      final reviews = farmerResponse?['review_count']?.toString() ?? '120+';
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      List<double> salesLast7Days = List.filled(7, 0.0);
+
+      int pending = 0;
+      double revenue = 0.0;
+      for (final order in orders) {
+        final status = order['status']?.toString().toUpperCase() ?? '';
+        if (status == 'PENDING') pending++;
+        if (status == 'DELIVERED') {
+          final total = (order['rawTotal'] as num?)?.toDouble() ?? 0.0;
+          revenue += total;
+
+          final createdAt = order['createdAt'] as DateTime?;
+          if (createdAt != null) {
+            final orderDate = DateTime(createdAt.year, createdAt.month, createdAt.day);
+            final diff = today.difference(orderDate).inDays;
+            if (diff >= 0 && diff < 7) {
+              salesLast7Days[6 - diff] += total;
+            }
+          }
+        }
+      }
+
+      int inStockCount = 0;
+      int lowStockCount = 0;
+      int outOfStockCount = 0;
+
+      for (final product in products) {
+        final qty = (product['available_quantity'] as num?)?.toDouble() ?? 0.0;
+        if (qty <= 0) {
+          outOfStockCount++;
+        } else if (qty < 5) {
+          lowStockCount++;
+        } else {
+          inStockCount++;
+        }
+      }
+      
+      final totalInventory = inStockCount + lowStockCount + outOfStockCount;
+      List<double> inventoryData = [inStockCount.toDouble(), lowStockCount.toDouble(), outOfStockCount.toDouble()];
+      if (totalInventory == 0) {
+        inventoryData = [1.0, 0.0, 0.0]; // fallback
+      }
+
+      if (mounted) {
+        setState(() {
+          _farmerName = name.isEmpty ? 'Farmer' : name;
+          _activeListings = products.where((p) => (p['available_quantity'] ?? 0) > 0).length;
+          _pendingOrders = pending;
+          _weeklyRevenue = revenue;
+          _recentOrders = List<Map<String, dynamic>>.from(orders.take(6));
+          _salesData = salesLast7Days;
+          _inventoryData = inventoryData;
+          _farmerRating = rating;
+          _farmerReviews = '$reviews Reviews';
+          if (totalInventory > 0) {
+            _inventoryLegend1 = '${((inStockCount / totalInventory) * 100).toStringAsFixed(0)}%';
+            _inventoryLegend2 = '${((lowStockCount / totalInventory) * 100).toStringAsFixed(0)}%';
+            _inventoryLegend3 = '${((outOfStockCount / totalInventory) * 100).toStringAsFixed(0)}%';
+          } else {
+            _inventoryLegend1 = '0%';
+            _inventoryLegend2 = '0%';
+            _inventoryLegend3 = '0%';
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
   void dispose() {
     _fadeInController.dispose();
-    for (final controller in _metricControllers) {
-      controller.dispose();
+    for (final c in _metricControllers) {
+      c.dispose();
     }
     super.dispose();
   }
@@ -81,174 +184,171 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
       backgroundColor: _surface,
       body: Stack(
         children: [
-          // Subtle dot pattern background
+          // Background Design Elements
           Positioned.fill(
             child: CustomPaint(
-              painter: DotPatternPainter(opacity: 0.04, color: const Color(0xFF10B981)),
+              painter: DotPatternPainter(opacity: 0.04, color: _primary),
             ),
           ),
-          // Subtle floating particles
           const Positioned.fill(
             child: FloatingParticles(
-              count: 10,
-              maxSize: 2,
-              color: Color(0xFF34D399),
+              count: 12,
+              maxSize: 1.5,
+              color: Color(0xFF10B981),
               height: 1200,
             ),
           ),
-          SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildNavBar(),
-                _buildTopBar(),
-                Padding(
-                  padding: const EdgeInsets.all(40),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildGreeting(),
-                      const SizedBox(height: 32),
-                      _buildMetricsRow(),
-                      const SizedBox(height: 32),
-                      _buildChartsRow(),
-                      const SizedBox(height: 32),
-                      _buildRecentOrdersSection(),
-                      const SizedBox(height: 40),
-                    ],
-                  ),
+          // Gradient blobs
+          Positioned(
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 400,
+              height: 400,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [_primary.withValues(alpha: 0.05), Colors.transparent],
                 ),
-              ],
+              ),
             ),
+          ),
+
+          Column(
+            children: [
+              _buildNavBar(),
+              Expanded(
+                child: _isLoading 
+                  ? const Center(child: AppShimmerLoader())
+                  : _buildMainScrollableArea(),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // ─── Site Header ───
   Widget _buildNavBar() {
-    final navItems = ['Home', 'Shop', 'Farmers', 'About'];
+    final navItems = ['Dashboard', 'Products', 'Orders', 'Community'];
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 14),
-      child: Row(
-        children: [
-          const BrandLogo(size: BrandLogoSize.small),
-          const SizedBox(width: 40),
-          ...List.generate(navItems.length, (i) {
-            final isHovered = _hoveredNav == i;
-            return MouseRegion(
+      margin: const EdgeInsets.fromLTRB(32, 24, 32, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _border.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: _dark.withValues(alpha: 0.03),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Row(
+          children: [
+            MouseRegion(
               cursor: SystemMouseCursors.click,
-              onEnter: (_) => setState(() => _hoveredNav = i),
-              onExit: (_) => setState(() => _hoveredNav = -1),
               child: GestureDetector(
-                onTap: () => widget.onNavigate(i),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  child: Text(
-                    navItems[i],
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: isHovered ? _primary : _dark,
+                onTap: () => widget.onNavigate(0),
+                child: const BrandLogo(size: BrandLogoSize.medium),
+              ),
+            ),
+            const SizedBox(width: 64),
+            ...List.generate(navItems.length, (i) {
+              final isActive = i == widget.currentIndex;
+              final isHovered = _hoveredNav == i;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  onEnter: (_) => setState(() => _hoveredNav = i),
+                  onExit: (_) => setState(() => _hoveredNav = -1),
+                  child: GestureDetector(
+                    onTap: () => widget.onNavigate(i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        color: isActive
+                            ? _primary.withValues(alpha: 0.1)
+                            : isHovered
+                                ? _border.withValues(alpha: 0.3)
+                                : Colors.transparent,
+                      ),
+                      child: Text(
+                        navItems[i],
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                          color: isActive ? _primary : isHovered ? _dark : _muted,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          }),
-          const Spacer(),
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: const Icon(Icons.shopping_cart_outlined, size: 22, color: _dark),
-          ),
-          const SizedBox(width: 20),
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(3),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
-                decoration: BoxDecoration(
-                  color: _primary,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'Sign Up',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+              );
+            }),
+            const Spacer(),
+            // User Avatar
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => widget.onNavigate(4),
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [_primary, Color(0xFF059669)],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _primary.withValues(alpha: 0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
+                  child: const Icon(Icons.person_outline_rounded, color: Colors.white, size: 24),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // ─── Top Bar ───
-  Widget _buildTopBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-      decoration: BoxDecoration(
-        color: _white,
-        border: Border(bottom: BorderSide(color: _border)),
-      ),
-      child: Row(
-        children: [
-          Text(
-            'Dashboard',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: _dark,
-            ),
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _border),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.calendar_today, size: 16, color: _muted),
-                const SizedBox(width: 8),
-                Text(
-                  'This Week',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: _dark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _border),
-            ),
-            child: const Icon(Icons.notifications_none, size: 20, color: _dark),
-          ),
-        ],
+  Widget _buildMainScrollableArea() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(40),
+      physics: const BouncingScrollPhysics(),
+      child: FadeTransition(
+        opacity: _fadeInController,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildWelcomeHeader(),
+            const SizedBox(height: 40),
+            _buildMetricsRow(),
+            const SizedBox(height: 40),
+            _buildInsightsGrid(),
+            const SizedBox(height: 40),
+            _buildRecentActivitySection(),
+          ],
+        ),
       ),
     );
   }
 
-  // ─── Greeting ───
-  Widget _buildGreeting() {
+  Widget _buildWelcomeHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -256,433 +356,196 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Good Morning, John',
+              'Welcome back, $_farmerName!',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 28,
+                fontSize: 36,
                 fontWeight: FontWeight.w800,
                 color: _dark,
+                letterSpacing: -1,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 10),
             Text(
-              "Here's what's happening with your farm today.",
+              "Manage your farm's performance and orders from one place.",
               style: GoogleFonts.inter(
-                fontSize: 14,
+                fontSize: 16,
                 color: _muted,
+                fontWeight: FontWeight.w400,
               ),
             ),
           ],
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: _success.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _success.withValues(alpha: 0.2)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: _success,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(Icons.water_drop, color: Colors.white, size: 14),
+        // Weather Widget
+        FutureBuilder<WeatherData?>(
+          future: WeatherService().getWeatherByCity('Manila'),
+          builder: (context, snapshot) {
+            final data = snapshot.data;
+            final temp = data?.temperature.toStringAsFixed(0) ?? '28';
+            final desc = data?.description ?? 'Sunny';
+            final isSunny = desc.toLowerCase().contains('sun') || desc.toLowerCase().contains('clear');
+            
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _border),
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(
-                    'Weather Alert',
-                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: _success),
+                  Icon(
+                    isSunny ? Icons.wb_sunny_rounded : Icons.cloud_rounded,
+                    color: isSunny ? _accent : const Color(0xFF3B82F6),
+                    size: 24,
                   ),
-                  Text(
-                    'Heavy rain expected tomorrow',
-                    style: GoogleFonts.inter(fontSize: 11, color: _muted),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$desc · $temp°C',
+                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: _dark),
+                      ),
+                      Text(
+                        isSunny ? 'Perfect for harvesting' : 'Good day for maintenance',
+                        style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            );
+          }
         ),
       ],
     );
   }
 
-  // ─── Metrics Row ───
   Widget _buildMetricsRow() {
     final metrics = [
-      ('PENDING ORDERS', '12', 'Orders to fulfill', Icons.shopping_cart_outlined, _primary),
-      ('ACTIVE LISTINGS', '48', 'Products live', Icons.inventory_2_outlined, _success),
-      ('WEEKLY REVENUE', '₱4.2K', '+20% from last week', Icons.trending_up_rounded, _warning),
-      ('FARM RATING', '4.8', '120 reviews', Icons.star_rounded, Colors.amber),
+      ('Pending Orders', '$_pendingOrders', 'Active tasks', Icons.shopping_bag_outlined, _secondary),
+      ('Active Listings', '$_activeListings', 'Storefront live', Icons.inventory_2_outlined, _primary),
+      ('Total Revenue', _currencyFormat.format(_weeklyRevenue), 'Lifetime sales', Icons.trending_up_rounded, _accent),
+      ('Farmer Rating', _farmerRating, _farmerReviews, Icons.star_rounded, Colors.amber),
     ];
 
     return Row(
       children: List.generate(
         metrics.length,
         (index) => Expanded(
-          child: _buildAnimatedMetricCard(
-            index,
-            metrics[index].$1,
-            metrics[index].$2,
-            metrics[index].$3,
-            metrics[index].$4,
-            metrics[index].$5,
+          child: Padding(
+            padding: EdgeInsets.only(right: index == 3 ? 0 : 24),
+            child: _buildAnimatedMetricCard(
+              index,
+              metrics[index].$1,
+              metrics[index].$2,
+              metrics[index].$3,
+              metrics[index].$4,
+              metrics[index].$5,
+            ),
           ),
         ),
-      ).expand((w) => [w, const SizedBox(width: 20)]).toList()..removeLast(),
+      ),
     );
   }
 
-  Widget _buildAnimatedMetricCard(
-    int index,
-    String label,
-    String value,
-    String subtitle,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _buildAnimatedMetricCard(int i, String l, String v, String s, IconData ic, Color c) {
     return FadeTransition(
-      opacity: Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(parent: _metricControllers[index], curve: Curves.easeInOut),
-      ),
+      opacity: _metricControllers[i],
       child: SlideTransition(
         position: Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
-          CurvedAnimation(parent: _metricControllers[index], curve: Curves.easeOutCubic),
+          CurvedAnimation(parent: _metricControllers[i], curve: Curves.easeOutQuart),
         ),
         child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          onEnter: (_) => setState(() => _hoveredMetrics.add(index)),
-          onExit: (_) => setState(() => _hoveredMetrics.remove(index)),
-          child: _buildMetricCard(
-            label,
-            value,
-            subtitle,
-            icon,
-            color,
-            _hoveredMetrics.contains(index),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMetricCard(
-    String label,
-    String value,
-    String subtitle,
-    IconData icon,
-    Color color,
-    bool isHovered,
-  ) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isHovered ? color : _border,
-          width: isHovered ? 2 : 1,
-        ),
-        boxShadow: isHovered
-            ? [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.2),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+          onEnter: (_) => setState(() => _hoveredMetrics.add(i)),
+          onExit: (_) => setState(() => _hoveredMetrics.remove(i)),
+          child: HoverScaleCard(
+            child: Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: _white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: _hoveredMetrics.contains(i) ? c.withValues(alpha: 0.5) : _border,
+                  width: _hoveredMetrics.contains(i) ? 2 : 1,
                 ),
-              ]
-            : [],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: color == _warning || color == Colors.amber
-                      ? AgriColors.goldGradient
-                      : LinearGradient(
-                          colors: [color, color.withValues(alpha: 0.7)],
-                        ),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Icon(icon, color: Colors.white, size: 20),
-              ),
-              const Icon(Icons.more_horiz, size: 18, color: _muted),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: _muted,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: _dark,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: _muted,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Charts Row ───
-  Widget _buildChartsRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 3,
-          child: _buildSalesChart(),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          flex: 2,
-          child: _buildRevenueBreakdown(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSalesChart() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: _white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'TOTAL SALES',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: _muted,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '₱4,250',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: _dark,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.trending_up, size: 14, color: _primary),
-                            const SizedBox(width: 4),
-                            Text(
-                              '+20%',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: _primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                boxShadow: [
+                  BoxShadow(
+                    color: c.withValues(alpha: 0.05),
+                    blurRadius: 40,
+                    offset: const Offset(0, 10),
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _surface,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'This Week',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _dark,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          // Animated bar chart
-          SizedBox(
-            height: 200,
-            child: MiniBarChart(
-              values: const [650, 480, 820, 560, 930, 780, 1100],
-              labels: const ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
-              barColor: _primary,
-              height: 160,
-              barWidth: 32,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRevenueBreakdown() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: _white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'REVENUE BREAKDOWN',
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: _muted,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Animated donut chart
-          Center(
-            child: MiniDonutChart(
-              values: const [45, 35, 20],
-              colors: const [_primary, _success, _warning],
-              size: 160,
-              strokeWidth: 20,
-              center: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: c.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(ic, color: c, size: 24),
+                      ),
+                      Icon(Icons.more_horiz_rounded, color: _muted.withValues(alpha: 0.5)),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
                   Text(
-                    '₱4.2K',
+                    v,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 18,
+                      fontSize: 32,
                       fontWeight: FontWeight.w800,
                       color: _dark,
                     ),
                   ),
+                  const SizedBox(height: 6),
                   Text(
-                    'total',
+                    l.toUpperCase(),
                     style: GoogleFonts.inter(
-                      fontSize: 11,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                       color: _muted,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          _buildLegendItem('Vegetables', _primary, '45%'),
-          const SizedBox(height: 12),
-          _buildLegendItem('Fruits', _success, '35%'),
-          const SizedBox(height: 12),
-          _buildLegendItem('Other', _warning, '20%'),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildLegendItem(String label, Color color, String percentage) {
+  Widget _buildInsightsGrid() {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: _dark,
-            ),
-          ),
+          flex: 2,
+          child: _buildSalesPerformanceChart(),
         ),
-        Text(
-          percentage,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: _dark,
-          ),
+        const SizedBox(width: 40),
+        Expanded(
+          flex: 1,
+          child: _buildInventoryDistribution(),
         ),
       ],
     );
   }
 
-  // ─── Recent Orders ───
-  Widget _buildRecentOrdersSection() {
-    final orders = [
-      ('Maria Santos', 'Tomatoes · 5kg', '₱600', 'Pending', _warning),
-      ('Jose Cruz', 'Spinach · 2 bunches', '₱90', 'Shipped', _success),
-      ('Ana Reyes', 'Mangoes · 3kg', '₱540', 'Delivered', _primary),
-      ('Carlos Tan', 'Carrots · 4kg', '₱240', 'Pending', _warning),
-    ];
-
+  Widget _buildSalesPerformanceChart() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(32),
+      height: 400,
       decoration: BoxDecoration(
         color: _white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: _border),
       ),
       child: Column(
@@ -692,129 +555,188 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Recent Orders',
+                'Sales Performance',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
+                  fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: _dark,
                 ),
               ),
               Text(
-                'View all',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _primary,
-                  decoration: TextDecoration.underline,
-                ),
+                'Last 7 Days',
+                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: _muted),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columnSpacing: 24,
-              columns: [
-                DataColumn(
-                  label: Text(
-                    'Customer',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _dark,
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'Product',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _dark,
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'Amount',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _dark,
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'Status',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _dark,
-                    ),
-                  ),
-                ),
-              ],
-              rows: orders
-                  .map((o) => DataRow(
-                        cells: [
-                          DataCell(
-                            Text(
-                              o.$1,
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: _dark,
-                              ),
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              o.$2,
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: _muted,
-                              ),
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              o.$3,
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: _dark,
-                              ),
-                            ),
-                          ),
-                          DataCell(
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: o.$5.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                o.$4,
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: o.$5,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ))
-                  .toList(),
+          const Spacer(),
+          SizedBox(
+            height: 240,
+            child: MiniBarChart(
+              values: _salesData,
+              barColor: _primary,
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildInventoryDistribution() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      height: 400,
+      decoration: BoxDecoration(
+        color: _white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Inventory Split',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: _dark,
+            ),
+          ),
+          const Spacer(),
+          Center(
+            child: MiniDonutChart(
+              size: 200,
+              values: _inventoryData,
+              colors: const [_primary, _secondary, _accent],
+              center: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('$_activeListings', style: GoogleFonts.plusJakartaSans(fontSize: 28, fontWeight: FontWeight.w800, color: _dark)),
+                  Text('Total', style: GoogleFonts.inter(fontSize: 12, color: _muted)),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
+          _buildLegendRow('In Stock', _primary, _inventoryLegend1),
+          const SizedBox(height: 12),
+          _buildLegendRow('Low Stock', _secondary, _inventoryLegend2),
+          const SizedBox(height: 12),
+          _buildLegendRow('Out of Stock', _accent, _inventoryLegend3),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendRow(String label, Color color, String percent) {
+    return Row(
+      children: [
+        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 12),
+        Text(label, style: GoogleFonts.inter(fontSize: 13, color: _dark, fontWeight: FontWeight.w500)),
+        const Spacer(),
+        Text(percent, style: GoogleFonts.inter(fontSize: 13, color: _muted, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+
+  Widget _buildRecentActivitySection() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: _white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Recent Activity',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: _dark,
+                ),
+              ),
+              TextButton(
+                onPressed: () => widget.onNavigate(2),
+                child: Text('View Full History', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _primary)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          if (_recentOrders.isEmpty)
+            Center(child: Padding(padding: const EdgeInsets.all(40), child: Text('No recent orders.', style: GoogleFonts.inter(color: _muted))))
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _recentOrders.length,
+              separatorBuilder: (context, i) => Divider(color: _border.withValues(alpha: 0.5), height: 32),
+              itemBuilder: (context, i) => _buildActivityRow(_recentOrders[i]),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityRow(Map<String, dynamic> o) {
+    final status = o['status']?.toString().toUpperCase() ?? 'PENDING';
+    Color statusColor = Colors.orange;
+    if (status == 'DELIVERED') statusColor = _primary;
+    
+    return Row(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: statusColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(
+            status == 'DELIVERED' ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+            color: statusColor,
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Order from ${o['customerName'] ?? 'Customer'}',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _dark, fontSize: 15),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                o['items'] ?? 'Processing...',
+                style: GoogleFonts.inter(color: _muted, fontSize: 13),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              o['total'] ?? '₱0',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, color: _dark, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              o['timeAgo'] ?? 'Recently',
+              style: GoogleFonts.inter(color: _muted, fontSize: 12),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

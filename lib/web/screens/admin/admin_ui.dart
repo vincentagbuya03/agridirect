@@ -334,24 +334,21 @@ class AdminDashboardHeader extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: AdminUi.display(context, size: 32)),
-              const SizedBox(height: 4),
-              Text(subtitle, style: AdminUi.body(color: AdminUi.textSecondary)),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AdminUi.display(context, size: 32)),
+                const SizedBox(height: 4),
+                Text(subtitle, style: AdminUi.body(color: AdminUi.textSecondary)),
+              ],
+            ),
           ),
           if (actions.isNotEmpty)
-            Row(
-              children: actions
-                  .map(
-                    (a) => Padding(
-                      padding: const EdgeInsets.only(left: 12),
-                      child: a,
-                    ),
-                  )
-                  .toList(),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: actions,
             ),
         ],
       ),
