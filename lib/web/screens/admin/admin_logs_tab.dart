@@ -146,6 +146,21 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
       _Severity.info,
       Icons.campaign_rounded,
     ),
+    'user_session_start': _ActionMeta(
+      'User Session',
+      _Severity.info,
+      Icons.person_outline_rounded,
+    ),
+    'farmer_session_start': _ActionMeta(
+      'Farmer Activity',
+      _Severity.info,
+      Icons.agriculture_rounded,
+    ),
+    'customer_session_start': _ActionMeta(
+      'Customer Activity',
+      _Severity.info,
+      Icons.shopping_bag_outlined,
+    ),
     'grant_admin_role': _ActionMeta(
       'Admin Granted',
       _Severity.critical,
@@ -166,7 +181,7 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
 
   void _loadData() {
     setState(() {
-      _logsFuture = widget.adminService.getAdminLogs(
+      _logsFuture = widget.adminService.getSystemActivityLogs(
         actionFilter: _filterAction,
       );
     });
@@ -200,9 +215,13 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
         final action = (l['action'] ?? '').toString().toLowerCase();
         final details = (l['details'] ?? '').toString().toLowerCase();
         final name = (l['admin_name'] ?? '').toString().toLowerCase();
+        final actorName = (l['actor_name'] ?? '').toString().toLowerCase();
+        final actorRole = (l['actor_role'] ?? '').toString().toLowerCase();
         return action.contains(_searchQuery) ||
             details.contains(_searchQuery) ||
-            name.contains(_searchQuery);
+            name.contains(_searchQuery) ||
+            actorName.contains(_searchQuery) ||
+            actorRole.contains(_searchQuery);
       }).toList();
     }
 
@@ -546,6 +565,18 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
                   child: Text('Farmer Approval'),
                 ),
                 DropdownMenuItem(
+                  value: 'farmer_session_start',
+                  child: Text('Farmer Activity'),
+                ),
+                DropdownMenuItem(
+                  value: 'customer_session_start',
+                  child: Text('Customer Activity'),
+                ),
+                DropdownMenuItem(
+                  value: 'user_session_start',
+                  child: Text('User Sessions'),
+                ),
+                DropdownMenuItem(
                   value: 'create_article',
                   child: Text('Articles'),
                 ),
@@ -698,7 +729,9 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
   Widget _buildTimelineRow(Map<String, dynamic> log, {bool isLast = false}) {
     final action = (log['action'] ?? 'system_event').toString();
     final details = (log['details'] ?? 'No details').toString();
-    final adminName = (log['admin_name'] ?? 'System').toString();
+    final actorName = (log['actor_name'] ?? log['admin_name'] ?? 'System')
+        .toString();
+    final actorRole = (log['actor_role'] ?? '').toString();
     final createdAt = log['created_at'] != null
         ? DateFormat(
             'h:mm a',
@@ -794,7 +827,7 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    // Admin name
+                    // Actor name
                     Expanded(
                       flex: 2,
                       child: Row(
@@ -803,8 +836,8 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
                             radius: 12,
                             backgroundColor: AdminUi.brandSoft,
                             child: Text(
-                              adminName.isNotEmpty
-                                  ? adminName[0].toUpperCase()
+                              actorName.isNotEmpty
+                                  ? actorName[0].toUpperCase()
                                   : 'S',
                               style: TextStyle(
                                 fontSize: 10,
@@ -816,7 +849,9 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              adminName,
+                              actorRole.isEmpty
+                                  ? actorName
+                                  : '$actorName - $actorRole',
                               style: AdminUi.label(
                                 size: 12,
                                 color: AdminUi.textPrimary,

@@ -9,24 +9,38 @@ part 'farmer_profile_model.g.dart';
 
 @JsonSerializable()
 class FarmerProfile {
+  @JsonKey(name: 'farmer_id')
   final String profileId;
+  @JsonKey(name: 'user_id')
   final String userId;
+  @JsonKey(name: 'farm_name')
   final String farmName;
   final String? specialty;
   final String? location;
+  @JsonKey(name: 'farm_latitude')
   final double? farmLatitude;
+  @JsonKey(name: 'farm_longitude')
   final double? farmLongitude;
   final String? badge;
+  @JsonKey(name: 'image_url')
   final String? imageUrl;
+  @JsonKey(name: 'is_verified')
   final bool isVerified;
+  @JsonKey(name: 'created_at')
   final DateTime createdAt;
+  @JsonKey(name: 'updated_at')
   final DateTime updatedAt;
 
   // Related data from view
+  @JsonKey(name: 'farmer_name')
   final String? farmerName;
+  @JsonKey(name: 'farmer_email')
   final String? farmerEmail;
+  @JsonKey(name: 'farmer_phone')
   final String? farmerPhone;
+  @JsonKey(name: 'average_rating')
   final double? averageRating;
+  @JsonKey(name: 'total_reviews')
   final int? totalReviews;
 
   FarmerProfile({

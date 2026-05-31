@@ -110,9 +110,20 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
     if (cached.isEmpty || !mounted) return;
 
-    setState(() {
-      _cachedDbAvatarUrl = cached;
-    });
+    // Safety check: If cached URL is a relative path, resolve it
+    String finalUrl = cached;
+    if (!cached.startsWith('http')) {
+      finalUrl = await SupabaseDatabase.getSafeUrl(
+        cached,
+        defaultBucket: 'uploads',
+      ) ?? '';
+    }
+
+    if (mounted && finalUrl.isNotEmpty) {
+      setState(() {
+        _cachedDbAvatarUrl = finalUrl;
+      });
+    }
   }
 
   Future<void> _persistDbAvatar(String? imageUrl) async {
@@ -166,50 +177,67 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
       if (farmers.isNotEmpty) {
         final farmName = (farmers[0]['farm_name'] as String?)?.trim();
-        final farmImageUrl = (farmers[0]['image_url'] as String?)?.trim();
+        final rawUrl = (farmers[0]['image_url'] as String?)?.trim();
+        
+        final safeUrl = await SupabaseDatabase.getSafeUrl(
+          rawUrl,
+          defaultBucket: 'uploads',
+        );
+
         if (mounted) {
           setState(() {
             _profileName = farmName;
-            _profileAvatarUrl = farmImageUrl;
+            _profileAvatarUrl = safeUrl;
           });
-          await _persistDbAvatar(farmImageUrl);
-          await _precacheFarmerAvatar(farmImageUrl);
+          await _persistDbAvatar(safeUrl);
+          await _precacheFarmerAvatar(safeUrl);
         }
 
-        // If farmer row exists but image is empty, keep farm name but still try users avatar/image.
-        if ((farmImageUrl ?? '').isNotEmpty) {
+        // If farmer row exists and we found a valid image, we're done
+        if ((safeUrl ?? '').isNotEmpty) {
           return;
         }
       }
 
-      // Fallback to users table profile if no farmer row exists.
+      // Fallback to users table profile if no farmer row exists or farmer image is empty
       final profile = await SupabaseDatabase.getUserProfile(currentUserId);
       if (!mounted || profile == null) return;
 
+      final rawAvatarUrl = _extractAvatarFromUserProfile(profile);
+      final safeAvatarUrl = await SupabaseDatabase.getSafeUrl(
+        rawAvatarUrl,
+        defaultBucket: 'uploads',
+      );
+
       setState(() {
         _profileName = (profile['name'] as String?)?.trim();
-        _profileAvatarUrl = _extractAvatarFromUserProfile(profile);
+        _profileAvatarUrl = safeAvatarUrl;
       });
-      await _persistDbAvatar(_profileAvatarUrl);
-      await _precacheFarmerAvatar(_profileAvatarUrl);
+      await _persistDbAvatar(safeAvatarUrl);
+      await _precacheFarmerAvatar(safeAvatarUrl);
     } catch (e) {
       debugPrint('Error loading farmer profile header: $e');
 
-      // Last fallback: still try users table so DB avatar_url/image_url can win.
-      final currentUserId = _auth.userId.isNotEmpty
-          ? _auth.userId
-          : (_auth.client.auth.currentUser?.id ?? '');
-      if (currentUserId.isEmpty || !mounted) return;
+      // Final attempt: fallback to user profile
+      try {
+        final profile = await SupabaseDatabase.getUserProfile(currentUserId);
+        if (!mounted || profile == null) return;
 
-      final profile = await SupabaseDatabase.getUserProfile(currentUserId);
-      if (!mounted || profile == null) return;
+        final rawAvatarUrl = _extractAvatarFromUserProfile(profile);
+        final safeAvatarUrl = await SupabaseDatabase.getSafeUrl(
+          rawAvatarUrl,
+          defaultBucket: 'uploads',
+        );
 
-      setState(() {
-        _profileName = (profile['name'] as String?)?.trim();
-        _profileAvatarUrl = _extractAvatarFromUserProfile(profile);
-      });
-      await _persistDbAvatar(_profileAvatarUrl);
-      await _precacheFarmerAvatar(_profileAvatarUrl);
+        setState(() {
+          _profileName = (profile['name'] as String?)?.trim();
+          _profileAvatarUrl = safeAvatarUrl;
+        });
+        await _persistDbAvatar(safeAvatarUrl);
+        await _precacheFarmerAvatar(safeAvatarUrl);
+      } catch (innerE) {
+        debugPrint('Final fallback error: $innerE');
+      }
     }
   }
 
@@ -248,12 +276,25 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       // If permission is granted, proceed
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
+        
+        // 🟢 NEW: Start with last known position for instant loading
+        try {
+          final lastPosition = await Geolocator.getLastKnownPosition();
+          if (lastPosition != null) {
+            _currentPosition = lastPosition;
+            debugPrint('Using last known position: ${lastPosition.latitude}, ${lastPosition.longitude}');
+            _loadWeatherData();
+          }
+        } catch (e) {
+          debugPrint('Error getting last known position: $e');
+        }
+
         // Get initial position with longer timeout
         try {
           debugPrint('Requesting initial position...');
           final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high,
-            timeLimit: const Duration(seconds: 20),
+            desiredAccuracy: LocationAccuracy.medium, // Medium is faster than high for start
+            timeLimit: const Duration(seconds: 15),
           );
           _currentPosition = position;
           debugPrint(
@@ -264,44 +305,32 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           await _loadWeatherData();
         } catch (e) {
           debugPrint('Initial position error: $e');
-          // Try with lower accuracy if high accuracy fails
-          try {
-            final position = await Geolocator.getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.medium,
-              timeLimit: const Duration(seconds: 10),
-            );
-            _currentPosition = position;
-            debugPrint(
-              'Position obtained with medium accuracy: ${position.latitude}, ${position.longitude}',
-            );
-            await _loadWeatherData();
-          } catch (e2) {
-            debugPrint('Medium accuracy position error: $e2');
-            if (mounted) {
-              _loadWeatherData();
-            }
+          if (_currentPosition == null) {
+             _loadWeatherData(); // Still try to load with whatever we have
           }
         }
 
-        // Listen to position changes with higher frequency
+        // Listen to position changes - REMOVED strict timeLimit to prevent stream crashes
         _positionStream =
             Geolocator.getPositionStream(
               locationSettings: const LocationSettings(
-                accuracy: LocationAccuracy.high,
-                distanceFilter: 100, // Update when moved 100+ meters
-                timeLimit: Duration(seconds: 30),
+                accuracy: LocationAccuracy.medium,
+                distanceFilter: 500, // Update when moved 500+ meters (save battery)
               ),
             ).listen(
               (Position position) {
-                _currentPosition = position;
-                debugPrint(
-                  'Location updated: ${position.latitude}, ${position.longitude}',
-                );
-                // Refresh weather when location changes significantly
-                _loadWeatherData();
+                if (mounted) {
+                  setState(() {
+                    _currentPosition = position;
+                  });
+                  debugPrint(
+                    'Location updated: ${position.latitude}, ${position.longitude}',
+                  );
+                  _loadWeatherData();
+                }
               },
               onError: (error) {
-                debugPrint('Position stream error: $error');
+                debugPrint('Location stream error (non-fatal): $error');
               },
             );
       } else {
@@ -593,6 +622,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                         child: ClipOval(
                           child: _farmerAvatarUrl != null
                               ? CachedNetworkImage(
+                                  key: ValueKey(_farmerAvatarUrl), // 🟢 Force refresh when URL changes
                                   imageUrl: _farmerAvatarUrl!,
                                   width: 52,
                                   height: 52,

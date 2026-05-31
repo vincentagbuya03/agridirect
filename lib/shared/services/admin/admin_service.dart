@@ -2105,8 +2105,8 @@ class AdminService extends ChangeNotifier {
   // ADMIN LOGS
   // ========================================================================
 
-  /// Get admin activity logs with admin names
-  Future<List<Map<String, dynamic>>> getAdminLogs({
+  /// Get admin, farmer, and customer activity logs.
+  Future<List<Map<String, dynamic>>> getSystemActivityLogs({
     int page = 0,
     int pageSize = 50,
     String? actionFilter,
@@ -2115,40 +2115,231 @@ class AdminService extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      var query = _client
-          .from('admin_logs')
-          .select(
-            'log_id, action, details, ip_address, created_at, admin_id, target_user_id, admins!inner(user_id, users!inner(name, email))',
-          );
+      final adminLogs = await _getAdminLogRows(
+        page: page,
+        pageSize: pageSize,
+        actionFilter: actionFilter,
+      );
 
-      if (actionFilter != null && actionFilter != 'all') {
-        query = query.eq('action', actionFilter);
-      }
+      final userLogs = await _getUserSessionLogRows(
+        page: page,
+        pageSize: pageSize,
+        actionFilter: actionFilter,
+      );
 
-      final response = await query
-          .order('created_at', ascending: false)
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-
-      // Flatten admin name into each log entry
-      final enriched = (response as List).map((log) {
-        final admin = log['admins'];
-        final user = admin?['users'];
-        return {
-          ...Map<String, dynamic>.from(log),
-          'admin_name': user?['name'] ?? 'System',
-          'admin_email': user?['email'] ?? '',
-        };
-      }).toList();
+      final combined = [...adminLogs, ...userLogs];
+      combined.sort((a, b) {
+        final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '');
+        final bDate = DateTime.tryParse(b['created_at']?.toString() ?? '');
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        return bDate.compareTo(aDate);
+      });
 
       _isLoading = false;
       notifyListeners();
-      return List<Map<String, dynamic>>.from(enriched);
+      return combined.take(pageSize).toList();
     } catch (e) {
-      _errorMessage = 'Failed to load admin logs: $e';
+      _errorMessage = 'Failed to load activity logs: $e';
       _isLoading = false;
       notifyListeners();
       return [];
     }
+  }
+
+  /// Backward-compatible admin log entry point.
+  Future<List<Map<String, dynamic>>> getAdminLogs({
+    int page = 0,
+    int pageSize = 50,
+    String? actionFilter,
+  }) {
+    return getSystemActivityLogs(
+      page: page,
+      pageSize: pageSize,
+      actionFilter: actionFilter,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _getAdminLogRows({
+    required int page,
+    required int pageSize,
+    String? actionFilter,
+  }) async {
+    const userActivityFilters = {
+      'user_session_start',
+      'farmer_session_start',
+      'customer_session_start',
+    };
+
+    if (actionFilter != null && userActivityFilters.contains(actionFilter)) {
+      return [];
+    }
+
+    var query = _client
+        .from('admin_logs')
+        .select(
+          'log_id, action, details, ip_address, created_at, admin_id, target_user_id, admins!inner(user_id, users!inner(name, email))',
+        );
+
+    if (actionFilter != null && actionFilter != 'all') {
+      query = query.eq('action', actionFilter);
+    }
+
+    final response = await query
+        .order('created_at', ascending: false)
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+    // Flatten admin name into each log entry
+    final enriched = (response as List).map((log) {
+      final admin = log['admins'];
+      final user = admin?['users'];
+      return {
+        ...Map<String, dynamic>.from(log),
+        'actor_name': user?['name'] ?? 'System',
+        'actor_email': user?['email'] ?? '',
+        'actor_role': 'Admin',
+        'admin_name': user?['name'] ?? 'System',
+        'admin_email': user?['email'] ?? '',
+      };
+    }).toList();
+
+    return List<Map<String, dynamic>>.from(enriched);
+  }
+
+  Future<List<Map<String, dynamic>>> _getUserSessionLogRows({
+    required int page,
+    required int pageSize,
+    String? actionFilter,
+  }) async {
+    const allowedFilters = {
+      null,
+      'all',
+      'user_session_start',
+      'farmer_session_start',
+      'customer_session_start',
+    };
+
+    if (!allowedFilters.contains(actionFilter)) {
+      return [];
+    }
+
+    final response = await _client
+        .from('app_sessions')
+        .select(
+          'session_id, user_id, start_time, end_time, duration_seconds, platform, device_info, app_version, created_at',
+        )
+        .order('start_time', ascending: false)
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+    final sessions = List<Map<String, dynamic>>.from(
+      (response as List).map((s) => Map<String, dynamic>.from(s)),
+    );
+
+    if (sessions.isEmpty) return [];
+
+    final userIds = sessions
+        .map((s) => s['user_id']?.toString())
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+
+    final userById = <String, Map<String, dynamic>>{};
+    final farmerByUserId = <String, Map<String, dynamic>>{};
+    final customerByUserId = <String, Map<String, dynamic>>{};
+
+    if (userIds.isNotEmpty) {
+      final users = await _client
+          .from('users')
+          .select('user_id, name, email')
+          .inFilter('user_id', userIds);
+      for (final user in users as List) {
+        final row = Map<String, dynamic>.from(user);
+        final userId = row['user_id']?.toString();
+        if (userId != null) userById[userId] = row;
+      }
+
+      final farmers = await _client
+          .from('farmers')
+          .select('farmer_id, user_id, farm_name')
+          .inFilter('user_id', userIds);
+      for (final farmer in farmers as List) {
+        final row = Map<String, dynamic>.from(farmer);
+        final userId = row['user_id']?.toString();
+        if (userId != null) farmerByUserId[userId] = row;
+      }
+
+      final customers = await _client
+          .from('customers')
+          .select('customer_id, user_id')
+          .inFilter('user_id', userIds);
+      for (final customer in customers as List) {
+        final row = Map<String, dynamic>.from(customer);
+        final userId = row['user_id']?.toString();
+        if (userId != null) customerByUserId[userId] = row;
+      }
+    }
+
+    return sessions
+        .where((session) {
+          final userId = session['user_id']?.toString() ?? '';
+          final isFarmer = farmerByUserId.containsKey(userId);
+          final isCustomer = customerByUserId.containsKey(userId);
+
+          if (actionFilter == 'farmer_session_start') return isFarmer;
+          if (actionFilter == 'customer_session_start') return isCustomer;
+          return true;
+        })
+        .map((session) {
+          final userId = session['user_id']?.toString() ?? '';
+          final user = userById[userId];
+          final farmer = farmerByUserId[userId];
+          final isFarmer = farmer != null;
+          final isCustomer = customerByUserId.containsKey(userId);
+          final role = isFarmer ? 'Farmer' : (isCustomer ? 'Customer' : 'User');
+          final action = isFarmer
+              ? 'farmer_session_start'
+              : (isCustomer ? 'customer_session_start' : 'user_session_start');
+          final platform = (session['platform'] ?? 'unknown').toString();
+          final duration = _formatSessionDuration(session['duration_seconds']);
+          final appVersion = (session['app_version'] ?? '').toString().trim();
+          final name = (farmer?['farm_name'] ?? user?['name'] ?? role)
+              .toString();
+          final details = StringBuffer('$role session on $platform');
+          if (duration.isNotEmpty) details.write(' - $duration');
+          if (appVersion.isNotEmpty) details.write(' - v$appVersion');
+
+          return {
+            'log_id': session['session_id'],
+            'action': action,
+            'details': details.toString(),
+            'created_at': session['start_time'] ?? session['created_at'],
+            'target_user_id': userId,
+            'actor_name': name,
+            'actor_email': user?['email'] ?? '',
+            'actor_role': role,
+            'admin_name': name,
+            'admin_email': user?['email'] ?? '',
+          };
+        })
+        .toList();
+  }
+
+  String _formatSessionDuration(dynamic rawSeconds) {
+    final seconds = rawSeconds is int
+        ? rawSeconds
+        : int.tryParse(rawSeconds?.toString() ?? '');
+    if (seconds == null || seconds <= 0) {
+      return 'active now';
+    }
+
+    final duration = Duration(seconds: seconds);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    if (hours > 0) return '${hours}h ${minutes}m';
+    if (minutes > 0) return '${minutes}m';
+    return '${duration.inSeconds}s';
   }
 
   // ========================================================================

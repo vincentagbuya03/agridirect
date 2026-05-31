@@ -10,6 +10,59 @@ import '../../models/forum/forum_comment_model.dart';
 class ForumService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
+  Future<bool> _currentUserIsFarmer(String userId) async {
+    final farmer = await _supabase
+        .from('farmers')
+        .select('user_id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle();
+    return farmer != null;
+  }
+
+  Future<bool> _currentUserCanEngage(String userId) async {
+    final farmer = await _currentUserIsFarmer(userId);
+    if (farmer) return true;
+
+    final customer = await _supabase
+        .from('customers')
+        .select('user_id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle();
+    return customer != null;
+  }
+
+  Future<Map<String, Map<String, dynamic>>> _getUsersById(
+    Iterable<String> userIds,
+  ) async {
+    final ids = userIds.where((id) => id.isNotEmpty).toSet().toList();
+    if (ids.isEmpty) return {};
+
+    final response = await _supabase
+        .from('users')
+        .select('user_id, name, avatar_url')
+        .inFilter('user_id', ids);
+
+    return {
+      for (final row in response as List)
+        row['user_id'].toString(): Map<String, dynamic>.from(row as Map),
+    };
+  }
+
+  ForumComment _mapComment(
+    Map<String, dynamic> row,
+    Map<String, Map<String, dynamic>> usersById,
+  ) {
+    final userId = row['user_id']?.toString() ?? '';
+    final user = usersById[userId];
+    return ForumComment.fromJson({
+      ...row,
+      'user_name': user?['name'] ?? 'AgriDirect Member',
+      'user_avatar': user?['avatar_url'],
+    });
+  }
+
   // ============================================================================
   // FORUM POSTS OPERATIONS
   // ============================================================================
@@ -47,8 +100,7 @@ class ForumService {
   }
 
   /// Get user's posts
-  Future<List<ForumPost>> getUserPosts(String userId,
-      {int limit = 20}) async {
+  Future<List<ForumPost>> getUserPosts(String userId, {int limit = 20}) async {
     try {
       final response = await _supabase
           .from('v_forum_posts')
@@ -74,13 +126,20 @@ class ForumService {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
+      if (!await _currentUserIsFarmer(userId)) {
+        throw Exception('Only farmer accounts can publish community posts.');
+      }
 
-      final response = await _supabase.from('forum_posts').insert({
-        'user_id': userId,
-        'title': title,
-        'body': body,
-        'image_url': imageUrl,
-      }).select().single();
+      final response = await _supabase
+          .from('forum_posts')
+          .insert({
+            'user_id': userId,
+            'title': title,
+            'body': body,
+            'image_url': imageUrl,
+          })
+          .select()
+          .single();
 
       return ForumPost.fromJson(response);
     } catch (e) {
@@ -98,11 +157,7 @@ class ForumService {
     try {
       final response = await _supabase
           .from('forum_posts')
-          .update({
-            'title': ?title,
-            'body': ?body,
-            'image_url': ?imageUrl,
-          })
+          .update({'title': ?title, 'body': ?body, 'image_url': ?imageUrl})
           .eq('post_id', postId)
           .select()
           .single();
@@ -127,8 +182,10 @@ class ForumService {
   // ============================================================================
 
   /// Get post comments
-  Future<List<ForumComment>> getPostComments(String postId,
-      {int limit = 10}) async {
+  Future<List<ForumComment>> getPostComments(
+    String postId, {
+    int limit = 10,
+  }) async {
     try {
       final response = await _supabase
           .from('forum_comments')
@@ -137,9 +194,14 @@ class ForumService {
           .limit(limit)
           .order('created_at', ascending: false);
 
-      return (response as List<dynamic>)
-          .map((json) => ForumComment.fromJson(json as Map<String, dynamic>))
+      final rows = (response as List<dynamic>)
+          .map((json) => Map<String, dynamic>.from(json as Map))
           .toList();
+      final usersById = await _getUsersById(
+        rows.map((row) => row['user_id']?.toString() ?? ''),
+      );
+
+      return rows.map((row) => _mapComment(row, usersById)).toList();
     } catch (e) {
       throw Exception('Failed to fetch comments: \$e');
     }
@@ -153,14 +215,18 @@ class ForumService {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
+      if (!await _currentUserCanEngage(userId)) {
+        throw Exception('Only farmers and customers can comment.');
+      }
 
-      final response = await _supabase.from('forum_comments').insert({
-        'post_id': postId,
-        'user_id': userId,
-        'body': body,
-      }).select().single();
+      final response = await _supabase
+          .from('forum_comments')
+          .insert({'post_id': postId, 'user_id': userId, 'body': body})
+          .select()
+          .single();
 
-      return ForumComment.fromJson(response);
+      final usersById = await _getUsersById([userId]);
+      return _mapComment(Map<String, dynamic>.from(response), usersById);
     } catch (e) {
       throw Exception('Failed to create comment: \$e');
     }
@@ -203,8 +269,11 @@ class ForumService {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
+      if (!await _currentUserCanEngage(userId)) {
+        throw Exception('Only farmers and customers can like posts.');
+      }
 
-      await _supabase.from('forum_post_likes').insert({
+      await _supabase.from('forum_post_likes').upsert({
         'post_id': postId,
         'user_id': userId,
       });
@@ -256,8 +325,11 @@ class ForumService {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
+      if (!await _currentUserCanEngage(userId)) {
+        throw Exception('Only farmers and customers can like comments.');
+      }
 
-      await _supabase.from('forum_comment_likes').insert({
+      await _supabase.from('forum_comment_likes').upsert({
         'comment_id': commentId,
         'user_id': userId,
       });

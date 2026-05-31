@@ -1966,14 +1966,8 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         registration: _registration,
         faceImageBytes: _faceImageBytes,
         idImageBytes: _idImageBytes,
+        resolvedFarmLocation: _resolvedFarmLocation,
       );
-
-      if (_resolvedFarmLocation.trim().isNotEmpty) {
-        await SupabaseConfig.client
-            .from('farmers')
-            .update({'location': _resolvedFarmLocation.trim()})
-            .eq('user_id', auth.userId);
-      }
 
       // Refresh registration status in AuthService so profile UI updates immediately
       await auth.refreshRegistrationStatus();

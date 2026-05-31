@@ -10,7 +10,8 @@ import 'screens/farmer/farmer_sales_dashboard.dart';
 import 'screens/farmer/farmer_products_screen.dart';
 import 'screens/farmer/farmer_orders_screen.dart';
 import 'screens/farmer/farmer_community_hub.dart';
-import 'screens/consumer/profile_screen.dart';
+import 'screens/farmer/farmer_profile_screen.dart';
+import 'screens/consumer/customer_profile_screen.dart';
 
 class MobileNavigation extends StatefulWidget {
   final VoidCallback onLogout;
@@ -66,7 +67,7 @@ class _MobileNavigationState extends State<MobileNavigation> {
         const FarmerProductsScreen(),
         const FarmerOrdersScreen(),
         const FarmerCommunityHub(),
-        MobileProfileScreen(
+        FarmerProfileScreen(
           onModeChanged: () => setState(() => _currentIndex = 0),
           onLogout: widget.onLogout,
         ),
@@ -78,7 +79,7 @@ class _MobileNavigationState extends State<MobileNavigation> {
       const MarketplaceScreen(),
       const PreOrderHubScreen(),
       const OrdersScreen(),
-      MobileProfileScreen(
+      CustomerProfileScreen(
         onModeChanged: () => setState(() => _currentIndex = 0),
         onLogout: widget.onLogout,
       ),

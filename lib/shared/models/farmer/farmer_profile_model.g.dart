@@ -8,23 +8,23 @@ part of 'farmer_profile_model.dart';
 
 FarmerProfile _$FarmerProfileFromJson(Map<String, dynamic> json) =>
     FarmerProfile(
-      profileId: json['profileId'] as String,
-      userId: json['userId'] as String,
-      farmName: json['farmName'] as String,
+      profileId: json['farmer_id'] as String,
+      userId: json['user_id'] as String,
+      farmName: json['farm_name'] as String,
       specialty: json['specialty'] as String?,
       location: json['location'] as String?,
-      farmLatitude: (json['farmLatitude'] as num?)?.toDouble(),
-      farmLongitude: (json['farmLongitude'] as num?)?.toDouble(),
+      farmLatitude: (json['farm_latitude'] as num?)?.toDouble(),
+      farmLongitude: (json['farm_longitude'] as num?)?.toDouble(),
       badge: json['badge'] as String?,
-      imageUrl: json['imageUrl'] as String?,
-      isVerified: json['isVerified'] as bool? ?? false,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
-      farmerName: json['farmerName'] as String?,
-      farmerEmail: json['farmerEmail'] as String?,
-      farmerPhone: json['farmerPhone'] as String?,
-      averageRating: (json['averageRating'] as num?)?.toDouble(),
-      totalReviews: (json['totalReviews'] as num?)?.toInt(),
+      imageUrl: json['image_url'] as String?,
+      isVerified: json['is_verified'] as bool? ?? false,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String),
+      farmerName: json['farmer_name'] as String?,
+      farmerEmail: json['farmer_email'] as String?,
+      farmerPhone: json['farmer_phone'] as String?,
+      averageRating: (json['average_rating'] as num?)?.toDouble(),
+      totalReviews: (json['total_reviews'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$FarmerProfileToJson(FarmerProfile instance) =>

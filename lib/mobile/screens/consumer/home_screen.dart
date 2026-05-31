@@ -13,6 +13,7 @@ import 'cart_screen.dart';
 import 'farmer_public_profile_screen.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/screens/post_detail_screen.dart';
 
 /// Home Screen - Premium Customer Interface
 class HomeScreen extends StatefulWidget {
@@ -63,12 +64,13 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(vertical: 24),
               physics: const BouncingScrollPhysics(),
               child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   _buildGlassAIMarketInsight(),
                   _buildSectionHeader('Browse Categories', 'Show all', () {
                     SupabaseDataService.navigationTabNotifier.value = 1;
-                    SupabaseDataService.marketplaceCategoryNotifier.value = null;
+                    SupabaseDataService.marketplaceCategoryNotifier.value =
+                        null;
                   }),
                   _buildCategoryGrid(),
                   const SizedBox(height: 32),
@@ -82,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildSectionHeader('Community Stories', 'Join Chat', () {}),
                   _buildCommunityFeed(context),
                   const SizedBox(height: 40),
-                  ],
+                ],
               ),
             ),
           ),
@@ -306,9 +308,9 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, _) {
         final count = CartService().itemCount;
         return InkWell(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const CartScreen()),
-          ),
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const CartScreen())),
           borderRadius: BorderRadius.circular(14),
           child: Container(
             padding: const EdgeInsets.all(10),
@@ -484,7 +486,8 @@ class _HomeScreenState extends State<HomeScreen> {
               return GestureDetector(
                 onTap: () {
                   // 1. Set the global category filter
-                  SupabaseDataService.marketplaceCategoryNotifier.value = cat.name;
+                  SupabaseDataService.marketplaceCategoryNotifier.value =
+                      cat.name;
                   // 2. Switch to the Marketplace tab (Index 1 in MobileNavigation)
                   SupabaseDataService.navigationTabNotifier.value = 1;
                 },
@@ -552,7 +555,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final farmers = (snapshot.data ?? [])
             .where((f) => f['farmerUserId'] != currentUserId)
             .toList();
-        
+
         if (farmers.isEmpty) {
           return const SizedBox.shrink();
         }
@@ -803,7 +806,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return StreamBuilder<List<ForumPostItem>>(
       stream: SupabaseDataService().watchForumPosts(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
             child: Center(child: AppShimmerLoader()),
@@ -841,14 +845,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ...visiblePosts.map(
               (ForumPostItem post) => Padding(
                 padding: const EdgeInsets.only(bottom: 20),
-                child: _buildCommunityPostCard(
-                  authorName: post.userName,
-                  authorRole: post.title.isEmpty ? 'Farmer' : post.title,
-                  timeAgo: post.time,
-                  postContent: post.body,
-                  likes: post.likes.toString(),
-                  comments: post.comments.toString(),
-                ),
+                child: _buildCommunityPostCard(post: post),
               ),
             ),
             Padding(
@@ -930,14 +927,7 @@ class _HomeScreenState extends State<HomeScreen> {
         (uri.host.isNotEmpty);
   }
 
-  Widget _buildCommunityPostCard({
-    required String authorName,
-    required String authorRole,
-    required String timeAgo,
-    required String postContent,
-    required String likes,
-    required String comments,
-  }) {
+  Widget _buildCommunityPostCard({required ForumPostItem post}) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(20),
@@ -964,30 +954,30 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    authorName,
-                    style: AppTextStyles.headline3.copyWith(fontSize: 15),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    '$authorRole • $timeAgo',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSubtle,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.userName,
+                      style: AppTextStyles.headline3.copyWith(fontSize: 15),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                    Text(
+                      '${post.title.isEmpty ? 'Farmer' : post.title} • ${post.time}',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSubtle,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
           Text(
-            postContent,
+            post.body,
             style: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.textHeadline.withValues(alpha: 0.9),
               height: 1.5,
@@ -996,9 +986,29 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 16),
           Row(
             children: [
-              _buildPostAction(Icons.thumb_up_alt_outlined, likes),
+              _buildPostAction(
+                post.isLiked
+                    ? Icons.thumb_up_rounded
+                    : Icons.thumb_up_alt_outlined,
+                post.likes.toString(),
+                isActive: post.isLiked,
+                onTap: () async {
+                  await SupabaseDataService().togglePostLike(post.id);
+                  if (mounted) setState(() {});
+                },
+              ),
               const SizedBox(width: 20),
-              _buildPostAction(Icons.chat_bubble_outline_rounded, comments),
+              _buildPostAction(
+                Icons.chat_bubble_outline_rounded,
+                post.comments.toString(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => PostDetailScreen(post: post),
+                    ),
+                  );
+                },
+              ),
               const Spacer(),
               const Icon(
                 Icons.share_outlined,
@@ -1012,31 +1022,41 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildPostAction(IconData icon, String count) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: AppColors.textSubtle),
-        const SizedBox(width: 6),
-        Text(
-          count,
-          style: AppTextStyles.labelSmall.copyWith(
-            color: AppColors.textSubtle,
-            fontWeight: FontWeight.w700,
-          ),
+  Widget _buildPostAction(
+    IconData icon,
+    String count, {
+    bool isActive = false,
+    VoidCallback? onTap,
+  }) {
+    final color = isActive ? AppColors.primary : AppColors.textSubtle;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 6),
+            Text(
+              count,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
   // ── Farmer Profile Bottom Sheet ──
   void _showFarmerProfile(BuildContext context, Map<String, dynamic> f) {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => FarmerPublicProfileScreen(farmer: f),
-      ),
+      MaterialPageRoute(builder: (_) => FarmerPublicProfileScreen(farmer: f)),
     );
   }
-
 
   // ── Address Picker Bottom Sheet ──
   void _showAddressPicker(BuildContext context) async {
@@ -1048,7 +1068,9 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -1058,23 +1080,36 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: AppColors.textSubtle.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 20),
-            Text('Deliver To', style: AppTextStyles.headline2.copyWith(fontSize: 20)),
+            Text(
+              'Deliver To',
+              style: AppTextStyles.headline2.copyWith(fontSize: 20),
+            ),
             const SizedBox(height: 16),
             if (addresses.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 32),
                 child: Column(
                   children: [
-                    Icon(Icons.location_off_rounded, size: 48, color: AppColors.textSubtle.withValues(alpha: 0.4)),
+                    Icon(
+                      Icons.location_off_rounded,
+                      size: 48,
+                      color: AppColors.textSubtle.withValues(alpha: 0.4),
+                    ),
                     const SizedBox(height: 12),
-                    Text('No saved addresses', style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSubtle)),
+                    Text(
+                      'No saved addresses',
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        color: AppColors.textSubtle,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: () {
@@ -1086,7 +1121,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                     ),
                   ],
@@ -1097,10 +1134,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: addresses.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 10),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 10),
                   itemBuilder: (_, i) {
                     final addr = addresses[i];
-                    final isSelected = _defaultAddress?.addressId == addr.addressId;
+                    final isSelected =
+                        _defaultAddress?.addressId == addr.addressId;
                     return InkWell(
                       onTap: () async {
                         await UserService().setDefaultAddress(addr.addressId);
@@ -1113,10 +1152,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppColors.primary.withValues(alpha: 0.06) : AppColors.surface,
+                          color: isSelected
+                              ? AppColors.primary.withValues(alpha: 0.06)
+                              : AppColors.surface,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: isSelected ? AppColors.primary : AppColors.textHeadline.withValues(alpha: 0.08),
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.textHeadline.withValues(
+                                    alpha: 0.08,
+                                  ),
                             width: isSelected ? 1.5 : 1,
                           ),
                         ),
@@ -1129,8 +1174,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
-                                addr.label.toLowerCase() == 'home' ? Icons.home_rounded : Icons.work_rounded,
-                                color: AppColors.primary, size: 20,
+                                addr.label.toLowerCase() == 'home'
+                                    ? Icons.home_rounded
+                                    : Icons.work_rounded,
+                                color: AppColors.primary,
+                                size: 20,
                               ),
                             ),
                             const SizedBox(width: 14),
@@ -1140,16 +1188,36 @@ class _HomeScreenState extends State<HomeScreen> {
                                 children: [
                                   Row(
                                     children: [
-                                      Text(addr.label, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                                      Text(
+                                        addr.label,
+                                        style: AppTextStyles.bodyMedium
+                                            .copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
                                       if (addr.isDefault) ...[
                                         const SizedBox(width: 8),
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(6),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
                                           ),
-                                          child: Text('Default', style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary, fontSize: 10)),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'Default',
+                                            style: AppTextStyles.labelSmall
+                                                .copyWith(
+                                                  color: AppColors.primary,
+                                                  fontSize: 10,
+                                                ),
+                                          ),
                                         ),
                                       ],
                                     ],
@@ -1157,14 +1225,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                   const SizedBox(height: 2),
                                   Text(
                                     '${addr.barangay}, ${addr.city}',
-                                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
-                                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.textSubtle,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
                             ),
                             if (isSelected)
-                              const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 22),
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: AppColors.primary,
+                                size: 22,
+                              ),
                           ],
                         ),
                       ),
@@ -1185,9 +1260,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   label: const Text('Manage Addresses'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
-                    side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+                    side: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                 ),
               ),
@@ -1198,5 +1277,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
-

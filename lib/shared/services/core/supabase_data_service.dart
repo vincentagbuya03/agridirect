@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'supabase_config.dart';
 import '../../data/app_data.dart';
+import '../community/forum_service.dart';
 
 /// Supabase Data Service for fetching products, posts, and articles
 /// Replaces the local SQLite ProductDatabaseService
@@ -19,7 +21,6 @@ class SupabaseDataService {
   static const int _reportContentTypePost = 1;
   static const int _reportContentTypeComment = 2;
   static const int _reportContentTypeProduct = 3;
-  static const int _reportContentTypeReview = 4;
   static const int _reportContentTypeArticle = 5;
 
   final _client = SupabaseConfig.client;
@@ -799,16 +800,47 @@ class SupabaseDataService {
     return _watchForumPostsInternal().asBroadcastStream();
   }
 
-  Stream<List<ForumPostItem>> _watchForumPostsInternal() async* {
-    yield await getForumPosts();
+  Stream<List<ForumPostItem>> _watchForumPostsInternal() {
+    late final List<StreamSubscription<dynamic>> subscriptions;
+    final controller = StreamController<List<ForumPostItem>>();
 
-    final postStream = _client
-        .from('forum_posts')
-        .stream(primaryKey: ['post_id']);
-
-    await for (final _ in postStream) {
-      yield await getForumPosts();
+    Future<void> emitLatest() async {
+      try {
+        if (!controller.isClosed) {
+          controller.add(await getForumPosts());
+        }
+      } catch (e, stackTrace) {
+        if (!controller.isClosed) {
+          controller.addError(e, stackTrace);
+        }
+      }
     }
+
+    controller.onListen = () {
+      emitLatest();
+      subscriptions = [
+        _client
+            .from('forum_posts')
+            .stream(primaryKey: ['post_id'])
+            .listen((_) => emitLatest()),
+        _client
+            .from('forum_comments')
+            .stream(primaryKey: ['comment_id'])
+            .listen((_) => emitLatest()),
+        _client
+            .from('forum_post_likes')
+            .stream(primaryKey: ['user_id', 'post_id'])
+            .listen((_) => emitLatest()),
+      ];
+    };
+
+    controller.onCancel = () async {
+      for (final subscription in subscriptions) {
+        await subscription.cancel();
+      }
+    };
+
+    return controller.stream;
   }
 
   /// Get all forum posts
@@ -915,14 +947,11 @@ class SupabaseDataService {
   /// Add a new forum post
   Future<void> addForumPost(ForumPostItem post) async {
     try {
-      final userId = SupabaseConfig.currentUser?.id;
-
-      await _client.from('forum_posts').insert({
-        'user_id': userId,
-        'title': post.title,
-        'body': post.body,
-        'image_url': post.imageUrl,
-      });
+      await ForumService().createPost(
+        title: post.title,
+        body: post.body,
+        imageUrl: post.imageUrl,
+      );
     } catch (e) {
       debugPrint('Error adding forum post: $e');
       rethrow;
@@ -932,33 +961,17 @@ class SupabaseDataService {
   /// Like/Unlike a post
   Future<void> togglePostLike(String postId) async {
     try {
-      final userId = SupabaseConfig.currentUser?.id;
-      if (userId == null) return;
+      final forumService = ForumService();
+      final isLiked = await forumService.hasUserLikedPost(postId);
 
-      // Check if already liked
-      final existing = await _client
-          .from('forum_post_likes')
-          .select()
-          .eq('post_id', postId)
-          .eq('user_id', userId)
-          .maybeSingle();
-
-      if (existing != null) {
-        // Unlike
-        await _client
-            .from('forum_post_likes')
-            .delete()
-            .eq('post_id', postId)
-            .eq('user_id', userId);
+      if (isLiked) {
+        await forumService.unlikePost(postId);
       } else {
-        // Like
-        await _client.from('forum_post_likes').insert({
-          'post_id': postId,
-          'user_id': userId,
-        });
+        await forumService.likePost(postId);
       }
     } catch (e) {
       debugPrint('Error toggling post like: $e');
+      rethrow;
     }
   }
 
@@ -1140,7 +1153,10 @@ class SupabaseDataService {
       // Determine user role and filter audience
       final userId = _client.auth.currentUser?.id;
       if (userId != null) {
-        final isFarmer = await SupabaseDatabase.hasRole(userId: userId, roleName: 'seller');
+        final isFarmer = await SupabaseDatabase.hasRole(
+          userId: userId,
+          roleName: 'seller',
+        );
         if (isFarmer) {
           query = query.inFilter('audience', ['ALL', 'FARMER']);
         } else {
@@ -1415,9 +1431,7 @@ class SupabaseDataService {
     if (userId == null) return;
 
     // Listen for changes in orders table
-    final orderStream = _client
-        .from('orders')
-        .stream(primaryKey: ['order_id']);
+    final orderStream = _client.from('orders').stream(primaryKey: ['order_id']);
 
     await for (final _ in orderStream) {
       yield await getFarmerOrders();
@@ -1472,7 +1486,9 @@ class SupabaseDataService {
         debugPrint(
           'v_orders view failed, falling back to direct table join: $e',
         );
-        var query = _client.from('orders').select('''
+        var query = _client
+            .from('orders')
+            .select('''
           *,
           order_statuses(code, description),
           customers:customer_id(
@@ -1482,7 +1498,8 @@ class SupabaseDataService {
               image_url
             )
           )
-        ''').eq('farmer_id', farmerId);
+        ''')
+            .eq('farmer_id', farmerId);
 
         if (status != null) {
           if (status == 'Active') {
@@ -1605,7 +1622,9 @@ class SupabaseDataService {
           'statusColor': _getStatusColor(statusCode),
           'specialInstructions': item['special_instructions']?.toString(),
         });
-        debugPrint('📦 Mapped Order: ${mappedOrders.last['orderId']} - AddressID: ${mappedOrders.last['deliveryAddressId']} - Method: ${mappedOrders.last['paymentMethod']}');
+        debugPrint(
+          '📦 Mapped Order: ${mappedOrders.last['orderId']} - AddressID: ${mappedOrders.last['deliveryAddressId']} - Method: ${mappedOrders.last['paymentMethod']}',
+        );
       }
 
       return mappedOrders;

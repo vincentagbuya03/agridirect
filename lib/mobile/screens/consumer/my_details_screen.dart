@@ -49,6 +49,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   bool _isImagePickerActive = false;
   String? _farmerImageUrl;
   String? _customerImageUrl;
+  String? _farmerId;
 
   @override
   void initState() {
@@ -97,8 +98,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
 
       _emailController.text = _auth.userEmail;
 
-      final userId = _auth.userId.isEmpty ? SupabaseConfig.currentUser?.id : _auth.userId;
-      
+      final userId = _auth.userId.isEmpty
+          ? SupabaseConfig.currentUser?.id
+          : _auth.userId;
+
       if (userId == null || userId.isEmpty) {
         debugPrint('⚠️ Cannot load details: userId is empty');
         return;
@@ -115,16 +118,57 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
         if (farmers.isNotEmpty) {
           final farmer = farmers[0] as Map<String, dynamic>?;
           if (farmer != null) {
+            final rawLatitude = farmer['farm_latitude'];
+            final rawLongitude = farmer['farm_longitude'];
+            final latitudeText = (rawLatitude ?? '').toString();
+            final longitudeText = (rawLongitude ?? '').toString();
+            var storedLocation = (farmer['location'] ?? '').toString().trim();
+            var rawImagePath = (farmer['image_url'] ?? '').toString().trim();
+            final updates = <String, dynamic>{};
+
+            if (storedLocation.isEmpty) {
+              final latitude = _parseCoordinate(latitudeText);
+              final longitude = _parseCoordinate(longitudeText);
+
+              if (latitude != null && longitude != null) {
+                final resolved =
+                    await ReverseGeocodingService.resolveFromCoordinates(
+                      latitude: latitude,
+                      longitude: longitude,
+                    );
+                storedLocation = resolved.fullAddress.trim();
+              }
+
+              if (storedLocation.isEmpty) {
+                storedLocation = (farmer['residential_address'] ?? '')
+                    .toString()
+                    .trim();
+              }
+
+              if (storedLocation.isNotEmpty) {
+                updates['location'] = storedLocation;
+              }
+            }
+
             _nameController.text = farmer['farm_name'] ?? '';
-            _locationController.text = farmer['location'] ?? '';
+            _locationController.text = storedLocation;
             _addressController.text = farmer['residential_address'] ?? '';
-            _latitudeController.text = (farmer['farm_latitude'] ?? '')
-                .toString();
-            _longitudeController.text = (farmer['farm_longitude'] ?? '')
-                .toString();
-            _imageUrlController.text = farmer['image_url'] ?? '';
-            _farmerImageUrl = await SupabaseDatabase.getSafeUrl(farmer['image_url'] as String?, defaultBucket: 'uploads');
+            _latitudeController.text = latitudeText;
+            _longitudeController.text = longitudeText;
+            _imageUrlController.text = rawImagePath;
+            _farmerId = farmer['farmer_id']?.toString(); // 🟢 NEW: Save farmer_id
+            _farmerImageUrl = await SupabaseDatabase.getSafeUrl(
+              rawImagePath,
+              defaultBucket: 'uploads',
+            );
             await _precacheProfileImage(_farmerImageUrl);
+
+            if (updates.isNotEmpty) {
+              await SupabaseConfig.client
+                  .from('farmers')
+                  .update(updates)
+                  .eq('user_id', userId);
+            }
           }
         }
       } else {
@@ -146,9 +190,13 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               _phoneController.text =
                   (user['phone'] ?? user['phone_number'] ?? '').toString();
 
-              final rawImageUrl = (user['image_url'] ?? user['avatar_url'] ?? '').toString();
+              final rawImageUrl =
+                  (user['image_url'] ?? user['avatar_url'] ?? '').toString();
               _imageUrlController.text = rawImageUrl;
-              _customerImageUrl = await SupabaseDatabase.getSafeUrl(rawImageUrl, defaultBucket: 'uploads');
+              _customerImageUrl = await SupabaseDatabase.getSafeUrl(
+                rawImageUrl,
+                defaultBucket: 'uploads',
+              );
               await _precacheProfileImage(_customerImageUrl);
             }
           }
@@ -205,7 +253,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
       String publicUrl;
       try {
         final uploadResponse = await SupabaseConfig.client.storage
-            .from('uploads') // Create this bucket in Supabase Storage
+            .from('uploads')
             .upload(path, file);
 
         if (uploadResponse.isEmpty) {
@@ -237,26 +285,90 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
 
       // Update image URL controllers and state
       if (mounted) {
+        // We store the RELATIVE PATH (bucket/filename) in the database for consistency
+        final dbPath = 'uploads/$path';
+        
         setState(() {
           if (isFarmer) {
             _farmerImageUrl = publicUrl;
           } else {
             _customerImageUrl = publicUrl;
           }
-          _imageUrlController.text = publicUrl;
+          _imageUrlController.text = dbPath;
         });
+
+        // 🟢 NEW: Immediately sync with database so user doesn't lose the update
+        bool updateSuccessful = false;
+        try {
+          final userId = _auth.userId.isNotEmpty ? _auth.userId : SupabaseConfig.client.auth.currentUser?.id;
+          debugPrint('🔍 Attempting to update farmer image for user_id: $userId, farmer_id: $_farmerId');
+          
+          if (userId != null && userId.isNotEmpty) {
+            if (isFarmer) {
+              if (_farmerId != null && _farmerId!.isNotEmpty) {
+                final result = await SupabaseConfig.client
+                    .from('farmers')
+                    .update({'image_url': dbPath})
+                    .eq('farmer_id', _farmerId!)
+                    .select('farmer_id');
+                
+                updateSuccessful = result.isNotEmpty;
+                debugPrint('✅ Database update attempted via farmer_id: $_farmerId. Rows affected: ${result.length}');
+              } else {
+                final result = await SupabaseConfig.client
+                    .from('farmers')
+                    .update({'image_url': dbPath})
+                    .eq('user_id', userId)
+                    .select('farmer_id');
+                
+                updateSuccessful = result.isNotEmpty;
+                debugPrint('✅ Database update attempted via user_id: $userId. Rows affected: ${result.length}');
+              }
+            } else {
+              final result = await SupabaseConfig.client
+                  .from('users')
+                  .update({'avatar_url': dbPath})
+                  .eq('user_id', userId)
+                  .select('user_id');
+              updateSuccessful = result.isNotEmpty;
+            }
+          }
+        } catch (dbErr) {
+          debugPrint('❌ Database sync error: $dbErr');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Upload worked but sync failed: $dbErr'), backgroundColor: Colors.orange),
+            );
+          }
+          return; // Stop here on error
+        }
 
         if (!mounted) return;
         await _precacheProfileImage(publicUrl);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Image uploaded successfully!'),
-              backgroundColor: AppColors.success,
-              duration: Duration(seconds: 2),
-            ),
-          );
+          if (updateSuccessful) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Profile image updated successfully!'),
+                backgroundColor: AppColors.success,
+                duration: Duration(seconds: 2),
+              ),
+            );
+            // Wait a moment for the user to see the success message, then pop with success signal
+            Future.delayed(const Duration(milliseconds: 1500), () {
+              if (mounted) Navigator.of(context).pop(true);
+            });
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('⚠️ Not saved: Record not found or permission denied (RLS).'),
+                backgroundColor: Colors.redAccent,
+                duration: Duration(seconds: 4),
+              ),
+            );
+            debugPrint('⚠️ UI Warning: Update reported 0 rows modified. Check Supabase RLS policies.');
+          }
         }
       }
     } catch (e) {
@@ -280,7 +392,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     if (!_infoKey.currentState!.validate()) return;
 
     try {
-      final userId = _auth.userId.isEmpty ? SupabaseConfig.currentUser?.id : _auth.userId;
+      final userId = _auth.userId.isEmpty
+          ? SupabaseConfig.currentUser?.id
+          : _auth.userId;
       if (userId == null || userId.isEmpty) {
         throw Exception('User session expired. Please log in again.');
       }
@@ -289,17 +403,20 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
 
       if (_auth.isViewingAsFarmer) {
         // Update farmer details
-        await SupabaseConfig.client
-            .from('farmers')
-            .update({
-              'farm_name': _nameController.text.trim(),
-              'location': _locationController.text.trim(),
-              'residential_address': _addressController.text.trim(),
-              'farm_latitude': _parseCoordinate(_latitudeController.text),
-              'farm_longitude': _parseCoordinate(_longitudeController.text),
-              'image_url': _imageUrlController.text.trim(),
-            })
-            .eq('user_id', userId);
+        var query = SupabaseConfig.client.from('farmers').update({
+          'farm_name': _nameController.text.trim(),
+          'location': _locationController.text.trim(),
+          'residential_address': _addressController.text.trim(),
+          'farm_latitude': _parseCoordinate(_latitudeController.text),
+          'farm_longitude': _parseCoordinate(_longitudeController.text),
+          'image_url': _imageUrlController.text.trim(),
+        });
+
+        if (_farmerId != null && _farmerId!.isNotEmpty) {
+          await query.eq('farmer_id', _farmerId!);
+        } else {
+          await query.eq('user_id', userId);
+        }
       } else {
         // Update customer details in users table
         await SupabaseConfig.client
@@ -315,6 +432,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
 
       // Refresh auth-cached profile fields (e.g., displayed name in profile header).
       await _auth.initialize();
+      await _loadDetails();
 
       if (mounted) {
         setState(() => _isEditing = false);
@@ -473,7 +591,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Farm Location (auto from pin)',
+                                    'Farm Location',
                                     style: AppTextStyles.labelSmall.copyWith(
                                       color: AppColors.textSubtle,
                                       fontWeight: FontWeight.w700,
@@ -663,7 +781,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                 ]
               : [
                   Colors.blue.withValues(alpha: 0.1),
-                  Colors.blue.withValues(alpha: 0.1)
+                  Colors.blue.withValues(alpha: 0.1),
                 ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -1045,7 +1163,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                                           ? resolved.fullAddress
                                           : fallbackLocation;
                                     });
-                                    if (dialogContext.mounted) { Navigator.of(dialogContext).pop(); }
+                                    if (dialogContext.mounted) {
+                                      Navigator.of(dialogContext).pop();
+                                    }
                                   },
                                   child: const Text('Use This Pin'),
                                 ),
@@ -1065,4 +1185,3 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     );
   }
 }
-

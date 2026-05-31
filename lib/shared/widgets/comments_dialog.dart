@@ -20,7 +20,8 @@ class _CommentsDialogState extends State<CommentsDialog> {
   List<ForumComment> _comments = [];
   bool _isLoading = true;
   bool _isPosting = false;
-  final Set<String> _likedCommentIds = {}; // We'll keep local state for liked comments for now
+  final Set<String> _likedCommentIds =
+      {}; // We'll keep local state for liked comments for now
 
   @override
   void initState() {
@@ -35,7 +36,9 @@ class _CommentsDialogState extends State<CommentsDialog> {
       // Fetch likes status
       final likedIds = <String>{};
       for (final comment in comments) {
-        final isLiked = await _forumService.hasUserLikedComment(comment.commentId);
+        final isLiked = await _forumService.hasUserLikedComment(
+          comment.commentId,
+        );
         if (isLiked) {
           likedIds.add(comment.commentId);
         }
@@ -43,6 +46,7 @@ class _CommentsDialogState extends State<CommentsDialog> {
       if (mounted) {
         setState(() {
           _comments = comments;
+          _likedCommentIds.clear();
           _likedCommentIds.addAll(likedIds);
           _isLoading = false;
         });
@@ -50,7 +54,9 @@ class _CommentsDialogState extends State<CommentsDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load comments: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to load comments: $e')));
       }
     }
   }
@@ -74,7 +80,9 @@ class _CommentsDialogState extends State<CommentsDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _isPosting = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to post comment: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to post comment: $e')));
       }
     }
   }
@@ -159,11 +167,18 @@ class _CommentsDialogState extends State<CommentsDialog> {
                   children: [
                     const Text(
                       'Comments',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textHeadline),
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textHeadline,
+                      ),
                     ),
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(true),
-                      icon: const Icon(Icons.close_rounded, color: AppColors.textSubtle),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: AppColors.textSubtle,
+                      ),
                     ),
                   ],
                 ),
@@ -172,92 +187,138 @@ class _CommentsDialogState extends State<CommentsDialog> {
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : _comments.isEmpty
-                          ? const Center(child: Text('No comments yet. Be the first!', style: TextStyle(color: AppColors.textSubtle)))
-                          : ListView.builder(
-                              itemCount: _comments.length,
-                              itemBuilder: (context, index) {
-                                final comment = _comments[index];
-                                final isLiked = _likedCommentIds.contains(comment.commentId);
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      CircleAvatar(
-                                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                                        child: Text(
-                                          (comment.userName ?? 'U')[0].toUpperCase(),
-                                          style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                      ? const Center(
+                          child: Text(
+                            'No comments yet. Be the first!',
+                            style: TextStyle(color: AppColors.textSubtle),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _comments.length,
+                          itemBuilder: (context, index) {
+                            final comment = _comments[index];
+                            final isLiked = _likedCommentIds.contains(
+                              comment.commentId,
+                            );
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 8.0,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: AppColors.primary
+                                        .withValues(alpha: 0.1),
+                                    child: Text(
+                                      (comment.userName ?? 'U')[0]
+                                          .toUpperCase(),
+                                      style: const TextStyle(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surface,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: AppColors.textSubtle
+                                              .withValues(alpha: 0.2),
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Container(
-                                          padding: const EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.surface,
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: AppColors.textSubtle.withValues(alpha: 0.2)),
-                                          ),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
-                                              Row(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      comment.userName ?? 'Anonymous',
-                                                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textHeadline),
-                                                    ),
+                                              Expanded(
+                                                child: Text(
+                                                  comment.userName ??
+                                                      'Anonymous',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color:
+                                                        AppColors.textHeadline,
                                                   ),
-                                                  PopupMenuButton<String>(
-                                                    padding: EdgeInsets.zero,
-                                                    onSelected: (value) {
-                                                      if (value == 'report') {
-                                                        _reportComment(comment);
-                                                      }
-                                                    },
-                                                    itemBuilder: (context) => const [
+                                                ),
+                                              ),
+                                              PopupMenuButton<String>(
+                                                padding: EdgeInsets.zero,
+                                                onSelected: (value) {
+                                                  if (value == 'report') {
+                                                    _reportComment(comment);
+                                                  }
+                                                },
+                                                itemBuilder: (context) =>
+                                                    const [
                                                       PopupMenuItem<String>(
                                                         value: 'report',
-                                                        child: Text('Report comment'),
+                                                        child: Text(
+                                                          'Report comment',
+                                                        ),
                                                       ),
                                                     ],
-                                                    child: const Icon(
-                                                      Icons.more_horiz_rounded,
-                                                      size: 18,
-                                                      color: AppColors.textSubtle,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(comment.body, style: const TextStyle(color: AppColors.textSubtle)),
-                                              const SizedBox(height: 8),
-                                              Row(
-                                                children: [
-                                                  GestureDetector(
-                                                    onTap: () => _toggleCommentLike(comment.commentId),
-                                                    child: Icon(
-                                                      isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
-                                                      size: 16,
-                                                      color: isLiked ? AppColors.primary : AppColors.textSubtle,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(isLiked ? 'Liked' : 'Like', style: TextStyle(fontSize: 12, color: isLiked ? AppColors.primary : AppColors.textSubtle)),
-                                                ],
+                                                child: const Icon(
+                                                  Icons.more_horiz_rounded,
+                                                  size: 18,
+                                                  color: AppColors.textSubtle,
+                                                ),
                                               ),
                                             ],
                                           ),
-                                        ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            comment.body,
+                                            style: const TextStyle(
+                                              color: AppColors.textSubtle,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              GestureDetector(
+                                                onTap: () => _toggleCommentLike(
+                                                  comment.commentId,
+                                                ),
+                                                child: Icon(
+                                                  isLiked
+                                                      ? Icons.thumb_up_rounded
+                                                      : Icons.thumb_up_outlined,
+                                                  size: 16,
+                                                  color: isLiked
+                                                      ? AppColors.primary
+                                                      : AppColors.textSubtle,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                isLiked ? 'Liked' : 'Like',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: isLiked
+                                                      ? AppColors.primary
+                                                      : AppColors.textSubtle,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ),
-                                    ],
+                                    ),
                                   ),
-                                );
-                              },
-                            ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                 ),
                 const Divider(),
                 Row(
@@ -267,10 +328,16 @@ class _CommentsDialogState extends State<CommentsDialog> {
                         controller: _commentController,
                         decoration: InputDecoration(
                           hintText: 'Add a comment...',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
                           filled: true,
                           fillColor: AppColors.surface,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                         ),
                         onSubmitted: (_) => _postComment(),
                       ),
@@ -279,8 +346,15 @@ class _CommentsDialogState extends State<CommentsDialog> {
                     IconButton(
                       onPressed: _isPosting ? null : _postComment,
                       icon: _isPosting
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.send_rounded, color: AppColors.primary),
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(
+                              Icons.send_rounded,
+                              color: AppColors.primary,
+                            ),
                     ),
                   ],
                 ),

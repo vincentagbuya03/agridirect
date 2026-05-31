@@ -37,8 +37,23 @@ class ForumPost {
     this.commentsCount,
   });
 
-  factory ForumPost.fromJson(Map<String, dynamic> json) =>
-      _$ForumPostFromJson(json);
+  factory ForumPost.fromJson(Map<String, dynamic> json) {
+    final normalized = <String, dynamic>{
+      'postId': json['postId'] ?? json['post_id'],
+      'userId': json['userId'] ?? json['user_id'],
+      'title': json['title'],
+      'body': json['body'],
+      'imageUrl': json['imageUrl'] ?? json['image_url'],
+      'createdAt': json['createdAt'] ?? json['created_at'],
+      'updatedAt':
+          json['updatedAt'] ?? json['updated_at'] ?? json['created_at'],
+      'authorName': json['authorName'] ?? json['author_name'],
+      'authorAvatar': json['authorAvatar'] ?? json['author_avatar'],
+      'likesCount': json['likesCount'] ?? json['likes_count'],
+      'commentsCount': json['commentsCount'] ?? json['comments_count'],
+    };
+    return _$ForumPostFromJson(normalized);
+  }
   Map<String, dynamic> toJson() => _$ForumPostToJson(this);
 
   ForumPost copyWith({

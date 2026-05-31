@@ -396,6 +396,7 @@ class SupabaseDatabase {
     Uint8List? faceImageBytes,
     Uint8List? idImageBytes,
     Uint8List? idBackImageBytes,
+    String? resolvedFarmLocation,
   }) async {
     try {
       final yearsOfExp = int.tryParse(registration.yearsOfExperience) ?? 0;
@@ -475,6 +476,21 @@ class SupabaseDatabase {
           : response;
       if (result['success'] != true) {
         throw Exception(result['message'] ?? 'Registration failed');
+      }
+
+      final farmerProfileUpdates = <String, dynamic>{};
+      final trimmedResolvedLocation = resolvedFarmLocation?.trim() ?? '';
+      if (trimmedResolvedLocation.isNotEmpty) {
+        farmerProfileUpdates['location'] = trimmedResolvedLocation;
+      }
+      if (faceUrl != null && faceUrl.trim().isNotEmpty) {
+        farmerProfileUpdates['image_url'] = faceUrl.trim();
+      }
+      if (farmerProfileUpdates.isNotEmpty) {
+        await _client.from('farmers').update(farmerProfileUpdates).eq(
+          'user_id',
+          userId,
+        );
       }
 
       // Sync user display name if changed
