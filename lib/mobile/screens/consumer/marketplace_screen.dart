@@ -43,6 +43,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   final GlobalKey _cartKey = GlobalKey();
 
+  Future<void> _ensureCacheServiceReady() async {
+    if (!_cacheService.isInitialized) {
+      await _cacheService.init();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -100,6 +106,51 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   void _initializeCacheService() {
     _cacheService = OfflineCacheService();
+    _ensureCacheServiceReady();
+  }
+
+  CachedProduct _toCachedProduct(ProductItem product) {
+    return CachedProduct(
+      id: product.productId ?? 'unknown_${product.name}',
+      farmerId: product.farmerId ?? '',
+      name: product.name,
+      price: _parsePrice(product.price),
+      description: product.description,
+      imageUrl: product.imageUrl,
+      category: product.categoryName,
+      unit: product.unit,
+      isPreorder: false,
+      harvestDays: int.tryParse(product.harvestDays ?? '0') ?? 0,
+      farmName: product.farm,
+      rating: double.tryParse(product.rating ?? '0') ?? 0.0,
+      farmerAvatarUrl: product.farmerAvatarUrl,
+      farmerImageUrl: product.farmerImageUrl,
+    );
+  }
+
+  Future<void> _toggleFavorite(ProductItem product) async {
+    final productId = product.productId ?? 'unknown_${product.name}';
+    await _ensureCacheServiceReady();
+
+    final isSaved = _cacheService.isProductManuallySaved(productId);
+    if (isSaved) {
+      await _cacheService.removeCachedProduct(productId);
+    } else {
+      await _cacheService.manualSaveProduct(_toCachedProduct(product));
+    }
+
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          isSaved
+              ? '${product.name} removed from favorites.'
+              : '${product.name} saved to favorites.',
+        ),
+        backgroundColor: isSaved ? AppColors.textHeadline : AppColors.success,
+      ),
+    );
   }
 
   void _setupConnectivityListener() {
@@ -491,22 +542,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
         if (products.isNotEmpty) {
           for (final product in products) {
-            final cachedProduct = CachedProduct(
-              id: product.productId ?? 'unknown_${product.name}',
-              farmerId: product.farmerId ?? '',
-              name: product.name,
-              price: _parsePrice(product.price),
-              description: product.description,
-              imageUrl: product.imageUrl,
-              category: product.categoryName,
-              unit: product.unit,
-              isPreorder: false,
-              harvestDays: int.tryParse(product.harvestDays ?? '0') ?? 0,
-              farmName: product.farm,
-              rating: double.tryParse(product.rating ?? '0') ?? 0.0,
-              farmerAvatarUrl: product.farmerAvatarUrl,
-              farmerImageUrl: product.farmerImageUrl,
-            );
+            final cachedProduct = _toCachedProduct(product);
             _cacheService.autoCacheProduct(cachedProduct);
           }
         }
@@ -675,6 +711,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   Widget _buildProductCard(ProductItem product) {
+    final productId = product.productId ?? 'unknown_${product.name}';
+    final isSaved = _cacheService.isProductManuallySaved(productId);
+
     return GestureDetector(
       onTap: () => _openProductView(product),
       child: Container(
@@ -703,16 +742,27 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 Positioned(
                   top: 10,
                   right: 10,
-                  child: Container(
+                  child: GestureDetector(
+                    onTap: () => _toggleFavorite(product),
+                    child: Container(
                     padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 8,
+                        ),
+                      ],
                     ),
-                    child: const Icon(
-                      Icons.favorite_border_rounded,
+                    child: Icon(
+                      isSaved
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
                       size: 16,
-                      color: AppColors.textSubtle,
+                      color: isSaved ? Colors.redAccent : AppColors.textSubtle,
+                    ),
                     ),
                   ),
                 ),
@@ -876,12 +926,15 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   final _instructionsController = TextEditingController();
   final GlobalKey _cartKey = GlobalKey();
   final GlobalKey _addToCartBtnKey = GlobalKey();
+  bool _isSaved = false;
 
   @override
   void initState() {
     super.initState();
+    _ensureCacheServiceReady();
     _loadAddress();
     _cacheProductForOffline();
+    _refreshSavedState();
   }
 
   @override
@@ -909,25 +962,17 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     }
   }
 
+  Future<void> _ensureCacheServiceReady() async {
+    if (!_cacheService.isInitialized) {
+      await _cacheService.init();
+    }
+  }
+
   void _cacheProductForOffline() {
     try {
-      final price = double.tryParse(widget.product.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
-      final cachedProduct = CachedProduct(
-        id: widget.product.productId ?? 'unknown',
-        farmerId: widget.product.farmerId ?? 'unknown',
-        name: widget.product.name,
-        price: price,
-        description: widget.product.description,
-        imageUrl: widget.product.imageUrl,
-        availableQuantity: widget.product.targetQuantity?.toInt(),
-        isPreorder: widget.product.targetQuantity != null,
-        harvestDays: int.tryParse(widget.product.harvestDays ?? '0') ?? 0,
-        farmName: widget.product.farm,
-        unit: widget.product.unit,
-        rating: double.tryParse(widget.product.rating ?? '0'),
-        farmerAvatarUrl: widget.product.farmerAvatarUrl,
-      );
-      _cacheService.autoCacheProduct(cachedProduct);
+      _ensureCacheServiceReady().then((_) {
+        _cacheService.autoCacheProduct(_buildCachedProduct());
+      });
     } catch (e) {
       debugPrint('⚠️ Failed to auto-cache product: $e');
     }
@@ -949,6 +994,40 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
       unit: widget.product.unit,
       rating: double.tryParse(widget.product.rating ?? '0'),
       farmerAvatarUrl: widget.product.farmerAvatarUrl,
+    );
+  }
+
+  Future<void> _refreshSavedState() async {
+    await _ensureCacheServiceReady();
+    if (!mounted) return;
+    setState(() {
+      _isSaved = _cacheService.isProductManuallySaved(_buildCachedProduct().id);
+    });
+  }
+
+  Future<void> _toggleFavorite() async {
+    final cachedProduct = _buildCachedProduct();
+    await _ensureCacheServiceReady();
+
+    if (_isSaved) {
+      await _cacheService.removeCachedProduct(cachedProduct.id);
+    } else {
+      await _cacheService.manualSaveProduct(cachedProduct);
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isSaved = !_isSaved;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _isSaved
+              ? '${widget.product.name} saved to favorites.'
+              : '${widget.product.name} removed from favorites.',
+        ),
+        backgroundColor: _isSaved ? AppColors.success : AppColors.textHeadline,
+      ),
     );
   }
 
@@ -1185,7 +1264,11 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         leading: _buildAppBarBtn(Icons.arrow_back_ios_new_rounded, () => Navigator.pop(context)),
         actions: [
           _buildAppBarBtn(Icons.flag_outlined, _openProductReportDialog),
-          _buildAppBarBtn(Icons.favorite_border_rounded, () {}),
+          _buildAppBarBtn(
+            _isSaved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+            _toggleFavorite,
+            iconColor: _isSaved ? Colors.redAccent : AppColors.textHeadline,
+          ),
           _buildHeaderCart(),
           const SizedBox(width: 8),
         ],
@@ -1203,8 +1286,6 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                 const SizedBox(height: 24),
                 _buildHarvestBadge(),
                 const SizedBox(height: 28),
-                SaveForOfflineButton(product: _buildCachedProduct(), cacheService: _cacheService),
-                const SizedBox(height: 28),
                 _buildAboutSection(),
                 const SizedBox(height: 28),
                 _buildFarmerCard(farmerAvatarUrl),
@@ -1220,14 +1301,18 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     );
   }
 
-  Widget _buildAppBarBtn(IconData icon, VoidCallback onTap) {
+  Widget _buildAppBarBtn(
+    IconData icon,
+    VoidCallback onTap, {
+    Color iconColor = AppColors.textHeadline,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8)]),
-        child: Icon(icon, size: 20, color: AppColors.textHeadline),
+        child: Icon(icon, size: 20, color: iconColor),
       ),
     );
   }

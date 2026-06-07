@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/data/app_data.dart';
+import '../../../shared/models/cached_product.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/services/offline/offline_cache_service.dart';
 import '../../../shared/styles/app_theme.dart';
 
 import '../../../shared/services/auth/auth_service.dart';
@@ -25,13 +27,24 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
   String _paymentMethod = 'COD';
   bool _isLoading = false;
   bool _isSubmitting = false;
+  final OfflineCacheService _cacheService = OfflineCacheService();
+  bool _isSaved = false;
 
   @override
   void initState() {
     super.initState();
     _product = widget.initialProduct;
+    _ensureCacheServiceReady();
+    _cacheProductForOffline();
+    _refreshSavedState();
     if (_product == null) {
       _loadFallbackProduct();
+    }
+  }
+
+  Future<void> _ensureCacheServiceReady() async {
+    if (!_cacheService.isInitialized) {
+      await _cacheService.init();
     }
   }
 
@@ -41,9 +54,75 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
       final products = await SupabaseDataService().getPreOrderProducts();
       if (!mounted || products.isEmpty) return;
       setState(() => _product = products.first);
+      _cacheProductForOffline();
+      _refreshSavedState();
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  CachedProduct? _buildCachedProduct() {
+    final product = _product;
+    if (product == null) return null;
+
+    return CachedProduct(
+      id: product.productId ?? 'unknown_${product.name}',
+      farmerId: product.farmerId ?? '',
+      name: product.name,
+      price: _unitPrice(product),
+      description: product.description,
+      imageUrl: product.imageUrl,
+      unit: product.unit,
+      farmName: product.farm,
+      isPreorder: true,
+      harvestDays: int.tryParse(product.harvestDays ?? '0') ?? 0,
+      availableQuantity: product.targetQuantity?.toInt(),
+      rating: double.tryParse(product.rating ?? '0'),
+      category: product.categoryName,
+      farmerAvatarUrl: product.farmerAvatarUrl,
+      farmerImageUrl: product.farmerImageUrl,
+    );
+  }
+
+  Future<void> _cacheProductForOffline() async {
+    final cachedProduct = _buildCachedProduct();
+    if (cachedProduct == null) return;
+
+    await _ensureCacheServiceReady();
+    await _cacheService.autoCacheProduct(cachedProduct);
+  }
+
+  Future<void> _refreshSavedState() async {
+    final cachedProduct = _buildCachedProduct();
+    if (cachedProduct == null) return;
+
+    await _ensureCacheServiceReady();
+    if (!mounted) return;
+    setState(() {
+      _isSaved = _cacheService.isProductManuallySaved(cachedProduct.id);
+    });
+  }
+
+  Future<void> _toggleFavorite() async {
+    final cachedProduct = _buildCachedProduct();
+    if (cachedProduct == null) return;
+
+    await _ensureCacheServiceReady();
+    if (_isSaved) {
+      await _cacheService.removeCachedProduct(cachedProduct.id);
+    } else {
+      await _cacheService.manualSaveProduct(cachedProduct);
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isSaved = !_isSaved;
+    });
+    _showSnack(
+      _isSaved
+          ? '${cachedProduct.name} saved to favorites.'
+          : '${cachedProduct.name} removed from favorites.',
+    );
   }
 
   @override
@@ -105,8 +184,10 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
               ),
               const SizedBox(width: 10),
               _roundIconButton(
-                icon: Icons.favorite_border_rounded,
-                onTap: _showComingSoon,
+                icon: _isSaved
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_border_rounded,
+                onTap: _toggleFavorite,
               ),
             ],
           ),

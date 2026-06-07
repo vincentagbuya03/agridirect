@@ -52,7 +52,9 @@ class _MobileNavigationState extends State<MobileNavigation> {
   @override
   void dispose() {
     _auth.removeListener(_onAuthChanged);
-    SupabaseDataService.navigationTabNotifier.removeListener(_onExternalTabChange);
+    SupabaseDataService.navigationTabNotifier.removeListener(
+      _onExternalTabChange,
+    );
     super.dispose();
   }
 
@@ -68,7 +70,10 @@ class _MobileNavigationState extends State<MobileNavigation> {
         const FarmerOrdersScreen(),
         const FarmerCommunityHub(),
         FarmerProfileScreen(
-          onModeChanged: () => setState(() => _currentIndex = 0),
+          onModeChanged: () => setState(
+            () =>
+                _currentIndex = SupabaseDataService.navigationTabNotifier.value,
+          ),
           onLogout: widget.onLogout,
         ),
       ];

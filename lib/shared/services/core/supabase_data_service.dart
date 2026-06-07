@@ -1667,6 +1667,23 @@ class SupabaseDataService {
     }
   }
 
+  /// Get farmer profile data for a specific farmer ID
+  Future<Map<String, dynamic>?> getFarmerProfileByFarmerId(
+    String farmerId,
+  ) async {
+    try {
+      final response = await _client
+          .from('v_farmer_profiles')
+          .select()
+          .eq('farmer_id', farmerId)
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      debugPrint('Error fetching farmer profile by farmer id: $e');
+      return null;
+    }
+  }
+
   /// Get customer's orders
   Future<List<Map<String, dynamic>>> getCustomerOrders() async {
     try {
@@ -1730,24 +1747,34 @@ class SupabaseDataService {
             .limit(5);
       }
 
-      final farmers = (response as List).map((item) {
-        final rawImageUrl = item['image_url']?.toString();
-        final imageUrl = _isValidAbsoluteUrl(rawImageUrl) ? rawImageUrl : '';
+      final rows = (response as List)
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
 
-        return {
-          'farmerId': item['farmer_id'],
-          'farmerUserId': item['user_id'],
-          'imageUrl': imageUrl,
-          'name': item['farm_name'] ?? 'Farm',
-          'distance': 'Nearby',
-          'latitude': item['farm_latitude'],
-          'longitude': item['farm_longitude'],
-          'specialty': item['specialty'] ?? 'Fresh produce',
-          'rating': item['average_rating']?.toString() ?? '0.0',
-          'badge': item['badge'] ?? 'VERIFIED',
-          'tags': <String>['Fresh'],
-        };
-      }).toList();
+      final farmers = await Future.wait(
+        rows.map((item) async {
+          final rawImagePath = item['image_url']?.toString();
+          final imageUrl = await SupabaseDatabase.getSafeUrl(
+            rawImagePath,
+            defaultBucket: 'uploads',
+          );
+
+          return {
+            'farmerId': item['farmer_id'],
+            'farmerUserId': item['user_id'],
+            'imageUrl': imageUrl,
+            'name': item['farm_name'] ?? 'Farm',
+            'distance': 'Nearby',
+            'latitude': item['farm_latitude'],
+            'longitude': item['farm_longitude'],
+            'specialty': item['specialty'] ?? 'Fresh produce',
+            'rating': item['average_rating']?.toString() ?? '0.0',
+            'badge': item['badge'] ?? 'VERIFIED',
+            'tags': <String>['Fresh'],
+          };
+        }).toList(),
+      );
 
       await _cacheMapList(_featuredFarmersCacheKey, farmers);
       return farmers;
@@ -1792,14 +1819,5 @@ class SupabaseDataService {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '0') ?? 0;
-  }
-
-  bool _isValidAbsoluteUrl(String? value) {
-    final text = value?.trim();
-    if (text == null || text.isEmpty) return false;
-    final uri = Uri.tryParse(text);
-    return uri != null &&
-        (uri.scheme == 'http' || uri.scheme == 'https') &&
-        uri.host.isNotEmpty;
   }
 }

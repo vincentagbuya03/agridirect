@@ -37,7 +37,9 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
 
   @override
   void dispose() {
-    widget.adminService.dataVersionListenable.removeListener(_dataRefreshListener);
+    widget.adminService.dataVersionListenable.removeListener(
+      _dataRefreshListener,
+    );
     super.dispose();
   }
 
@@ -1721,7 +1723,8 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
   void _showOnboardingDialog() {
     showDialog(
       context: context,
-      builder: (context) => _OnboardFarmerDialog(adminService: widget.adminService),
+      builder: (context) =>
+          _OnboardFarmerDialog(adminService: widget.adminService),
     ).then((_) => _loadData());
   }
 }
@@ -1748,7 +1751,9 @@ class _OnboardFarmerDialogState extends State<_OnboardFarmerDialog> {
     );
     if (mounted) {
       setState(() {
-        _searchResults = results.where((u) => u['role'] != 'farmer' && u['role'] != 'admin').toList();
+        _searchResults = results
+            .where((u) => u['role'] != 'farmer' && u['role'] != 'admin')
+            .toList();
         _searching = false;
       });
     }
@@ -1792,16 +1797,20 @@ class _OnboardFarmerDialogState extends State<_OnboardFarmerDialog> {
                 ),
                 child: ListView.separated(
                   itemCount: _searchResults.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  separatorBuilder: (context, index) =>
+                      const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final user = _searchResults[index];
-                    final isSelected = _selectedUser?['user_id'] == user['user_id'];
+                    final isSelected =
+                        _selectedUser?['user_id'] == user['user_id'];
                     return ListTile(
                       title: Text(user['name'] ?? 'Unknown'),
                       subtitle: Text(user['email'] ?? ''),
                       selected: isSelected,
                       onTap: () => setState(() => _selectedUser = user),
-                      trailing: isSelected ? const Icon(Icons.check_circle, color: AdminUi.brand) : null,
+                      trailing: isSelected
+                          ? const Icon(Icons.check_circle, color: AdminUi.brand)
+                          : null,
                     );
                   },
                 ),
@@ -1816,13 +1825,15 @@ class _OnboardFarmerDialogState extends State<_OnboardFarmerDialog> {
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
-                  onPressed: _selectedUser == null ? null : () async {
-                    await widget.adminService.updateUserRole(
-                      userId: _selectedUser!['user_id'],
-                      newRole: 'farmer',
-                    );
-                    if (mounted) Navigator.pop(context);
-                  },
+                  onPressed: _selectedUser == null
+                      ? null
+                      : () async {
+                          await widget.adminService.updateUserRole(
+                            userId: _selectedUser!['user_id'],
+                            newRole: 'farmer',
+                          );
+                          if (mounted) Navigator.pop(context);
+                        },
                   style: AdminUi.primaryButton,
                   child: const Text('Promote to Farmer'),
                 ),

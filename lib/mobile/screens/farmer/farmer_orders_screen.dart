@@ -7,7 +7,7 @@ import '../../../shared/models/order/order_model.dart';
 import 'farmer_order_details_screen.dart';
 import '../../../shared/styles/app_theme.dart';
 
-/// Farmer Orders Screen - Professional Enterprise UI
+// Farmer Orders Screen - Professional Enterprise UI
 class FarmerOrdersScreen extends StatefulWidget {
   const FarmerOrdersScreen({super.key});
 

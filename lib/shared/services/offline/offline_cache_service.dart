@@ -21,7 +21,13 @@ class OfflineCacheService {
     return _instance!;
   }
 
-  bool get isInitialized => _box.isOpen;
+  bool get isInitialized {
+    try {
+      return _box.isOpen;
+    } catch (_) {
+      return false;
+    }
+  }
 
   Future<void> _warmImageCache(String? imageUrl) async {
     final url = imageUrl?.trim() ?? '';

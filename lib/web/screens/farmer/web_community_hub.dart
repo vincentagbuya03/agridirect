@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
@@ -8,8 +9,11 @@ import '../../widgets/animated_components.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/widgets/create_post_dialog.dart';
 import '../../../shared/widgets/comments_dialog.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/integration/weather_service.dart';
 import '../../../shared/models/weather_model.dart';
+import '../../widgets/web_consumer_nav_bar.dart';
 
 /// Web-only Community Hub — two-column layout with sidebar.
 /// Completely separate UI from the mobile community hub.
@@ -32,6 +36,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   late TabController _tabController;
   late AnimationController _fadeInController;
   late List<AnimationController> _postControllers;
+  late Future<List<ForumPostItem>> _forumPostsFuture;
+  late Future<WeatherData?> _weatherFuture;
   final Set<int> _hoveredPosts = {};
   int _hoveredNav = -1;
 
@@ -51,16 +57,24 @@ class _WebCommunityHubState extends State<WebCommunityHub>
     )..forward();
 
     _postControllers = [];
+    _forumPostsFuture = SupabaseDataService().getForumPosts();
+    _weatherFuture = WeatherService().getWeatherByCity('Manila');
+  }
+
+  void _refreshForumPosts() {
+    setState(() {
+      _forumPostsFuture = SupabaseDataService().getForumPosts();
+    });
   }
 
   void _syncPostControllers(int count) {
     if (_postControllers.length == count) return;
-    
+
     // Dispose old
     for (final c in _postControllers) {
       c.dispose();
     }
-    
+
     // Create new
     _postControllers = List.generate(
       count,
@@ -101,7 +115,10 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           // Subtle dot pattern background
           Positioned.fill(
             child: CustomPaint(
-              painter: DotPatternPainter(opacity: 0.03, color: const Color(0xFF10B981)),
+              painter: DotPatternPainter(
+                opacity: 0.03,
+                color: const Color(0xFF10B981),
+              ),
             ),
           ),
           // Particles
@@ -122,15 +139,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Main content
-                    Expanded(
-                      flex: 3,
-                      child: _buildMainContent(),
-                    ),
+                    Expanded(flex: 3, child: _buildMainContent()),
                     // Right sidebar
-                    SizedBox(
-                      width: 320,
-                      child: _buildRightSidebar(),
-                    ),
+                    SizedBox(width: 320, child: _buildRightSidebar()),
                   ],
                 ),
               ),
@@ -157,15 +168,20 @@ class _WebCommunityHubState extends State<WebCommunityHub>
               builder: (context) => const CreatePostDialog(),
             );
             if (result == true && mounted) {
-              setState(() {}); // Refresh list
+              _refreshForumPosts();
             }
           },
           backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
           elevation: 0,
           icon: const Icon(Icons.edit_rounded, size: 20),
-          label: Text('New Post', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          label: Text(
+            'New Post',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
       ),
     );
@@ -173,6 +189,15 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
   // ─── Site Header (consistent across all pages) ───
   Widget _buildNavBar() {
+    if (!AuthService().isViewingAsFarmer) {
+      return WebConsumerNavBar(
+        currentIndex: widget.currentIndex,
+        onNavigate: widget.onNavigate,
+        onCartTap: () => context.go(AppRoutes.cart),
+        margin: const EdgeInsets.fromLTRB(32, 24, 32, 12),
+      );
+    }
+
     final navItems = ['Dashboard', 'Products', 'Orders', 'Community'];
     return Container(
       margin: const EdgeInsets.fromLTRB(32, 24, 32, 12),
@@ -214,21 +239,30 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                   onTap: () => widget.onNavigate(i),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
                       color: isActive
                           ? _primary.withValues(alpha: 0.1)
                           : isHovered
-                              ? _border.withValues(alpha: 0.3)
-                              : Colors.transparent,
+                          ? _border.withValues(alpha: 0.3)
+                          : Colors.transparent,
                     ),
                     child: Text(
                       navItems[i],
                       style: GoogleFonts.inter(
                         fontSize: 15,
-                        fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                        color: isActive ? _primary : isHovered ? _dark : _muted,
+                        fontWeight: isActive
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: isActive
+                            ? _primary
+                            : isHovered
+                            ? _dark
+                            : _muted,
                         letterSpacing: 0.2,
                       ),
                     ),
@@ -284,7 +318,11 @@ class _WebCommunityHubState extends State<WebCommunityHub>
         children: [
           const Text(
             'Community Hub',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _dark),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: _dark,
+            ),
           ),
           const SizedBox(width: 32),
           // Search
@@ -300,7 +338,11 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                 decoration: InputDecoration(
                   hintText: 'Search topics, pests, crops...',
                   hintStyle: TextStyle(color: _muted, fontSize: 13),
-                  prefixIcon: Icon(Icons.search_rounded, color: _muted, size: 18),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: _muted,
+                    size: 18,
+                  ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
@@ -323,8 +365,14 @@ class _WebCommunityHubState extends State<WebCommunityHub>
               indicatorSize: TabBarIndicatorSize.label,
               indicatorColor: _primary,
               indicatorWeight: 2,
-              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-              unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              labelStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
               dividerColor: Colors.transparent,
               tabAlignment: TabAlignment.center,
               tabs: const [
@@ -342,16 +390,13 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   Widget _buildMainContent() {
     return TabBarView(
       controller: _tabController,
-      children: [
-        _buildForumFeed(),
-        _buildArticlesFeed(),
-      ],
+      children: [_buildForumFeed(), _buildArticlesFeed()],
     );
   }
 
   Widget _buildForumFeed() {
     return FutureBuilder<List<ForumPostItem>>(
-      future: SupabaseDataService().getForumPosts(),
+      future: _forumPostsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: AppShimmerLoader());
@@ -396,12 +441,19 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   Widget _buildAnimatedForumCard(int index, ForumPostItem post) {
     return FadeTransition(
       opacity: Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(parent: _postControllers[index], curve: Curves.easeInOut),
+        CurvedAnimation(
+          parent: _postControllers[index],
+          curve: Curves.easeInOut,
+        ),
       ),
       child: SlideTransition(
-        position: Tween<Offset>(begin: const Offset(-0.2, 0), end: Offset.zero).animate(
-          CurvedAnimation(parent: _postControllers[index], curve: Curves.easeOutCubic),
-        ),
+        position: Tween<Offset>(begin: const Offset(-0.2, 0), end: Offset.zero)
+            .animate(
+              CurvedAnimation(
+                parent: _postControllers[index],
+                curve: Curves.easeOutCubic,
+              ),
+            ),
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
           onEnter: (_) => setState(() => _hoveredPosts.add(index)),
@@ -449,7 +501,11 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                 child: Center(
                   child: Text(
                     post.userName.split(' ').map((w) => w[0]).take(2).join(),
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _primary),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _primary,
+                    ),
                   ),
                 ),
               ),
@@ -458,8 +514,18 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(post.userName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _dark)),
-                    Text(post.time, style: TextStyle(fontSize: 12, color: _muted)),
+                    Text(
+                      post.userName,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _dark,
+                      ),
+                    ),
+                    Text(
+                      post.time,
+                      style: TextStyle(fontSize: 12, color: _muted),
+                    ),
                   ],
                 ),
               ),
@@ -476,9 +542,19 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           ),
           const SizedBox(height: 16),
           // Title
-          Text(post.title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: _dark)),
+          Text(
+            post.title,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: _dark,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text(post.body, style: TextStyle(fontSize: 14, color: _muted, height: 1.6)),
+          Text(
+            post.body,
+            style: TextStyle(fontSize: 14, color: _muted, height: 1.6),
+          ),
           // Image
           if (post.imageUrl != null) ...[
             const SizedBox(height: 16),
@@ -490,7 +566,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                   imageUrl: post.imageUrl!,
                   fit: BoxFit.cover,
                   placeholder: (ctx, url) => Container(color: Colors.grey[100]),
-                  errorWidget: (ctx, url, err) => Container(color: Colors.grey[100]),
+                  errorWidget: (ctx, url, err) =>
+                      Container(color: Colors.grey[100]),
                 ),
               ),
             ),
@@ -505,12 +582,14 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             child: Row(
               children: [
                 _buildPostAction(
-                  icon: post.isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
+                  icon: post.isLiked
+                      ? Icons.thumb_up_rounded
+                      : Icons.thumb_up_outlined,
                   label: '${post.likes}',
                   active: post.isLiked,
                   onTap: () async {
                     await SupabaseDataService().togglePostLike(post.id);
-                    if (mounted) setState(() {});
+                    if (mounted) _refreshForumPosts();
                   },
                 ),
                 const SizedBox(width: 20),
@@ -523,12 +602,15 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                       builder: (context) => CommentsDialog(postId: post.id),
                     );
                     if (updated == true && mounted) {
-                      setState(() {});
+                      _refreshForumPosts();
                     }
                   },
                 ),
                 const Spacer(),
-                _buildPostAction(icon: Icons.bookmark_border_rounded, label: 'Save'),
+                _buildPostAction(
+                  icon: Icons.bookmark_border_rounded,
+                  label: 'Save',
+                ),
                 const SizedBox(width: 16),
                 _buildPostAction(icon: Icons.share_rounded, label: 'Share'),
               ],
@@ -539,22 +621,31 @@ class _WebCommunityHubState extends State<WebCommunityHub>
     );
   }
 
-  Widget _buildPostAction({required IconData icon, required String label, bool active = false, VoidCallback? onTap}) {
+  Widget _buildPostAction({
+    required IconData icon,
+    required String label,
+    bool active = false,
+    VoidCallback? onTap,
+  }) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onTap,
         child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: active ? _primary : _muted),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(fontSize: 13, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: active ? _primary : _muted),
-          ),
-        ],
-      ),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: active ? _primary : _muted),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                color: active ? _primary : _muted,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -607,28 +698,61 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: _primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       'FEATURED ARTICLE',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _primary, letterSpacing: 1.2),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: _primary,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Text(article.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _dark)),
+                  Text(
+                    article.title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: _dark,
+                    ),
+                  ),
                   const SizedBox(height: 6),
-                  Text(article.excerpt, style: TextStyle(fontSize: 13, color: _muted, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  Text(
+                    article.excerpt,
+                    style: TextStyle(fontSize: 13, color: _muted, height: 1.4),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Text('By ${article.author}', style: TextStyle(fontSize: 12, color: _muted)),
+                      Text(
+                        'By ${article.author}',
+                        style: TextStyle(fontSize: 12, color: _muted),
+                      ),
                       const SizedBox(width: 8),
-                      Container(width: 4, height: 4, decoration: BoxDecoration(color: _muted, shape: BoxShape.circle)),
+                      Container(
+                        width: 4,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: _muted,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
                       const SizedBox(width: 8),
-                      Text(article.readTime, style: TextStyle(fontSize: 12, color: _muted)),
+                      Text(
+                        article.readTime,
+                        style: TextStyle(fontSize: 12, color: _muted),
+                      ),
                     ],
                   ),
                 ],
@@ -643,8 +767,16 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                   width: 120,
                   height: 90,
                   fit: BoxFit.cover,
-                  placeholder: (ctx, url) => Container(width: 120, height: 90, color: Colors.grey[100]),
-                  errorWidget: (ctx, url, err) => Container(width: 120, height: 90, color: Colors.grey[100]),
+                  placeholder: (ctx, url) => Container(
+                    width: 120,
+                    height: 90,
+                    color: Colors.grey[100],
+                  ),
+                  errorWidget: (ctx, url, err) => Container(
+                    width: 120,
+                    height: 90,
+                    color: Colors.grey[100],
+                  ),
                 ),
               ),
             ],
@@ -680,7 +812,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
   Widget _buildWeatherWidget() {
     return FutureBuilder<WeatherData?>(
-      future: WeatherService().getWeatherByCity('Manila'),
+      future: _weatherFuture,
       builder: (context, snapshot) {
         final data = snapshot.data;
         final temp = data?.temperature.toStringAsFixed(0) ?? '28';
@@ -703,22 +835,38 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                   color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.cloud_rounded, color: Color(0xFF3B82F6), size: 22),
+                child: const Icon(
+                  Icons.cloud_rounded,
+                  color: Color(0xFF3B82F6),
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('$temp°C', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _dark)),
-                    Text('$desc · $location', style: TextStyle(fontSize: 12, color: _muted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      '$temp°C',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: _dark,
+                      ),
+                    ),
+                    Text(
+                      '$desc · $location',
+                      style: TextStyle(fontSize: 12, color: _muted),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
             ],
           ),
         );
-      }
+      },
     );
   }
 
@@ -727,7 +875,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
       future: SupabaseDataService().getTrendingTopics(),
       builder: (context, snapshot) {
         final topics = snapshot.data ?? [];
-        
+
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -738,10 +886,21 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Trending Topics', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _dark)),
+              const Text(
+                'Trending Topics',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: _dark,
+                ),
+              ),
               const SizedBox(height: 16),
-              if (topics.isEmpty && snapshot.connectionState != ConnectionState.waiting)
-                Text('No trending topics yet', style: TextStyle(fontSize: 12, color: _muted))
+              if (topics.isEmpty &&
+                  snapshot.connectionState != ConnectionState.waiting)
+                Text(
+                  'No trending topics yet',
+                  style: TextStyle(fontSize: 12, color: _muted),
+                )
               else
                 ...topics.asMap().entries.map((entry) {
                   final i = entry.key;
@@ -754,27 +913,50 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                           width: 24,
                           height: 24,
                           decoration: BoxDecoration(
-                            gradient: i == 0 ? AgriColors.goldGradient : AgriColors.primaryGradient,
+                            gradient: i == 0
+                                ? AgriColors.goldGradient
+                                : AgriColors.primaryGradient,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Center(
                             child: Text(
                               '${i + 1}',
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Text(t['title'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _dark)),
+                          child: Text(
+                            t['title'],
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: _dark,
+                            ),
+                          ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: _primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Text('${t['engagement']}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _primary)),
+                          child: Text(
+                            '${t['engagement']}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: _primary,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -783,7 +965,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             ],
           ),
         );
-      }
+      },
     );
   }
 
@@ -792,7 +974,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
       future: SupabaseDataService().getPopularTags(),
       builder: (context, snapshot) {
         final tags = snapshot.data ?? [];
-        
+
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -803,30 +985,51 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Popular Tags', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _dark)),
+              const Text(
+                'Popular Tags',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: _dark,
+                ),
+              ),
               const SizedBox(height: 14),
-              if (tags.isEmpty && snapshot.connectionState != ConnectionState.waiting)
-                Text('No tags found', style: TextStyle(fontSize: 12, color: _muted))
+              if (tags.isEmpty &&
+                  snapshot.connectionState != ConnectionState.waiting)
+                Text(
+                  'No tags found',
+                  style: TextStyle(fontSize: 12, color: _muted),
+                )
               else
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: tags.map((tag) {
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: _surface,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: _border),
                       ),
-                      child: Text(tag, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _muted)),
+                      child: Text(
+                        tag,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _muted,
+                        ),
+                      ),
                     );
                   }).toList(),
                 ),
             ],
           ),
         );
-      }
+      },
     );
   }
 
@@ -835,7 +1038,11 @@ class _WebCommunityHubState extends State<WebCommunityHub>
       future: SupabaseDataService().getTopContributors(),
       builder: (context, snapshot) {
         final contributors = snapshot.data ?? [];
-        final colors = [const Color(0xFF16A34A), const Color(0xFF3B82F6), const Color(0xFFF59E0B)];
+        final colors = [
+          const Color(0xFF16A34A),
+          const Color(0xFF3B82F6),
+          const Color(0xFFF59E0B),
+        ];
 
         return Container(
           padding: const EdgeInsets.all(20),
@@ -847,10 +1054,21 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Top Contributors', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _dark)),
+              const Text(
+                'Top Contributors',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: _dark,
+                ),
+              ),
               const SizedBox(height: 16),
-              if (contributors.isEmpty && snapshot.connectionState != ConnectionState.waiting)
-                Text('No contributors yet', style: TextStyle(fontSize: 12, color: _muted))
+              if (contributors.isEmpty &&
+                  snapshot.connectionState != ConnectionState.waiting)
+                Text(
+                  'No contributors yet',
+                  style: TextStyle(fontSize: 12, color: _muted),
+                )
               else
                 ...contributors.asMap().entries.map((entry) {
                   final i = entry.key;
@@ -869,8 +1087,17 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                           ),
                           child: Center(
                             child: Text(
-                              c['name'].toString().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join(),
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+                              c['name']
+                                  .toString()
+                                  .split(' ')
+                                  .map((w) => w.isNotEmpty ? w[0] : '')
+                                  .take(2)
+                                  .join(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: color,
+                              ),
                             ),
                           ),
                         ),
@@ -879,8 +1106,18 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(c['name'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _dark)),
-                              Text(c['posts'], style: TextStyle(fontSize: 11, color: _muted)),
+                              Text(
+                                c['name'],
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: _dark,
+                                ),
+                              ),
+                              Text(
+                                c['posts'],
+                                style: TextStyle(fontSize: 11, color: _muted),
+                              ),
                             ],
                           ),
                         ),
@@ -891,8 +1128,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             ],
           ),
         );
-      }
+      },
     );
   }
 }
-

@@ -228,11 +228,13 @@ class SupabaseDatabase {
   }
 
   static Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty) return null;
     try {
       return await _client
           .from('users')
           .select()
-          .eq('user_id', userId)
+          .eq('user_id', cleanUserId)
           .maybeSingle();
     } catch (e) {
       return null;
@@ -312,10 +314,12 @@ class SupabaseDatabase {
     required String roleName,
   }) async {
     try {
+      final cleanUserId = userId.trim();
+      if (cleanUserId.isEmpty) return;
       if (roleName == 'seller') {
-        await _client.from('farmers').delete().eq('user_id', userId);
+        await _client.from('farmers').delete().eq('user_id', cleanUserId);
       } else if (roleName == 'admin') {
-        await _client.from('admins').delete().eq('user_id', userId);
+        await _client.from('admins').delete().eq('user_id', cleanUserId);
       }
     } catch (e) {
       rethrow;
@@ -326,19 +330,21 @@ class SupabaseDatabase {
     required String userId,
     required String roleName,
   }) async {
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty) return false;
     try {
       if (roleName == 'seller') {
         final res = await _client
             .from('farmers')
             .select('farmer_id')
-            .eq('user_id', userId)
+            .eq('user_id', cleanUserId)
             .maybeSingle();
         return res != null;
       } else if (roleName == 'admin') {
         final res = await _client
             .from('admins')
             .select('admin_id')
-            .eq('user_id', userId)
+            .eq('user_id', cleanUserId)
             .maybeSingle();
         return res != null;
       }
@@ -353,21 +359,23 @@ class SupabaseDatabase {
     required String email,
   }) async {
     try {
+      final cleanUserId = userId.trim();
+      if (cleanUserId.isEmpty) return;
       final cleanEmail = email.trim().toLowerCase();
       if (cleanEmail != 'noreplyagridirect@gmail.com') return;
 
       final existing = await _client
           .from('admins')
           .select('admin_id')
-          .eq('user_id', userId)
+          .eq('user_id', cleanUserId)
           .maybeSingle();
       if (existing == null) {
         await _client.from('admins').insert({
-          'user_id': userId,
+          'user_id': cleanUserId,
           'role_level': 3,
           'is_active': true,
         });
-        await addUserRole(userId: userId, roleName: 'admin');
+        await addUserRole(userId: cleanUserId, roleName: 'admin');
       }
     } catch (e) {
       debugPrint('Error ensuring admin profile: $e');
@@ -375,11 +383,13 @@ class SupabaseDatabase {
   }
 
   static Future<List<String>> getUserRoles(String userId) async {
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty) return ['consumer'];
     try {
       final response =
           await _client.rpc(
                 'get_user_roles',
-                params: {'checked_user_id': userId},
+                params: {'checked_user_id': cleanUserId},
               )
               as List<dynamic>;
       return response
@@ -487,10 +497,10 @@ class SupabaseDatabase {
         farmerProfileUpdates['image_url'] = faceUrl.trim();
       }
       if (farmerProfileUpdates.isNotEmpty) {
-        await _client.from('farmers').update(farmerProfileUpdates).eq(
-          'user_id',
-          userId,
-        );
+        await _client
+            .from('farmers')
+            .update(farmerProfileUpdates)
+            .eq('user_id', userId);
       }
 
       // Sync user display name if changed
@@ -519,13 +529,15 @@ class SupabaseDatabase {
   static Future<Map<String, dynamic>?> getFarmerRegistration(
     String userId,
   ) async {
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty) return null;
     try {
       final farmer = await _client
           .from('farmers')
           .select(
             'farmer_id, user_id, is_verified, is_active, created_at, updated_at',
           )
-          .eq('user_id', userId)
+          .eq('user_id', cleanUserId)
           .maybeSingle();
       if (farmer == null) return null;
 

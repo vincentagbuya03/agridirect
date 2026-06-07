@@ -9,6 +9,7 @@ import '../../models/product/product_model.dart';
 import '../../models/product/category_model.dart';
 import '../../models/product/unit_model.dart';
 import '../../models/product/product_review_model.dart';
+import '../social/follow_service.dart';
 
 class ProductService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -238,6 +239,17 @@ class ProductService {
         );
       } catch (e) {
         debugPrint('⚠️ Error notifying nearby customers: $e');
+      }
+
+      try {
+        await FollowService().notifyFollowersAboutNewProduct(
+          farmerId: farmerId,
+          productId: product.productId,
+          productName: product.name,
+          farmName: farmName?.isNotEmpty == true ? farmName! : 'A farm you follow',
+        );
+      } catch (e) {
+        debugPrint('⚠️ Error notifying followers: $e');
       }
 
       return product;

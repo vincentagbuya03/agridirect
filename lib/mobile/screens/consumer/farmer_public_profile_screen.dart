@@ -10,6 +10,8 @@ import '../../../shared/services/commerce/cart_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'marketplace_screen.dart';
 import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/social/follow_service.dart';
+import '../../../shared/widgets/image_widgets.dart';
 
 /// Full-screen public profile for a farmer, with Products & Posts tabs.
 class FarmerPublicProfileScreen extends StatefulWidget {
@@ -26,14 +28,89 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _calculatedDistance = 'Nearby';
+  final FollowService _followService = FollowService();
+  bool _isFollowing = false;
+  bool _isFollowBusy = false;
+  int _followerCount = 0;
+  int _followingCount = 0;
 
   Map<String, dynamic> get f => widget.farmer;
+  bool get _isOwnProfile =>
+      AuthService().userId.isNotEmpty &&
+      AuthService().userId == (f['farmerUserId']?.toString() ?? '');
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _calculateDistance();
+    _loadFollowState();
+  }
+
+  Future<void> _loadFollowState() async {
+    final farmerId = f['farmerId']?.toString() ?? '';
+    if (farmerId.isEmpty || _isOwnProfile) return;
+
+    try {
+      final state = await _followService.getFollowState(farmerId);
+      if (!mounted) return;
+      setState(() {
+        _isFollowing = state['isFollowing'] as bool? ?? false;
+        _followerCount = state['followers'] as int? ?? 0;
+        _followingCount = state['following'] as int? ?? 0;
+      });
+    } catch (e) {
+      debugPrint('Error loading follow state: $e');
+    }
+  }
+
+  Future<void> _toggleFollow() async {
+    if (_isFollowBusy || _isOwnProfile) return;
+
+    final farmerId = f['farmerId']?.toString() ?? '';
+    if (farmerId.isEmpty) return;
+
+    setState(() => _isFollowBusy = true);
+    try {
+      final isNowFollowing = await _followService.toggleFollowFarmer(
+        farmerId: farmerId,
+        farmerUserId: f['farmerUserId']?.toString(),
+        farmName: f['name']?.toString(),
+      );
+      if (!mounted) return;
+
+      setState(() {
+        _isFollowing = isNowFollowing;
+        _followerCount += isNowFollowing ? 1 : -1;
+        if (_followerCount < 0) _followerCount = 0;
+        _followingCount += isNowFollowing ? 1 : -1;
+        if (_followingCount < 0) _followingCount = 0;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isNowFollowing
+                ? 'You are now following ${f['name'] ?? 'this farm'}.'
+                : 'Unfollowed ${f['name'] ?? 'this farm'}.',
+          ),
+          backgroundColor:
+              isNowFollowing ? AppColors.success : AppColors.textHeadline,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isFollowBusy = false);
+      }
+    }
   }
 
   Future<void> _calculateDistance() async {
@@ -81,17 +158,27 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
     super.dispose();
   }
 
-  bool _isValidUrl(String? value) {
-    final text = value?.trim();
-    if (text == null || text.isEmpty) return false;
-    final uri = Uri.tryParse(text);
-    return uri != null &&
-        (uri.scheme == 'http' || uri.scheme == 'https') &&
-        uri.host.isNotEmpty;
+  Widget _imagePlaceholder() {
+    return Container(
+      color: AppColors.primaryLight,
+      child: const Center(
+        child: Icon(
+          Icons.agriculture_rounded,
+          size: 48,
+          color: AppColors.primary,
+        ),
+      ),
+    );
   }
 
-  Widget _imagePlaceholder() {
-    return Container(color: AppColors.primaryLight, child: const Center(child: Icon(Icons.store, size: 48, color: Colors.white)));
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.isEmpty) return 'F';
+    if (parts.length == 1) {
+      return parts[0].substring(0, parts[0].length > 1 ? 2 : 1).toUpperCase();
+    }
+    return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 
   Widget _buildStat(IconData icon, String value, String label, Color iconColor) {
@@ -99,18 +186,26 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: iconColor, size: 20),
-          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 18),
+          ),
+          const SizedBox(height: 8),
           Text(
             value,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
               color: AppColors.textHeadline,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          const SizedBox(height: 2),
           Text(
             label,
             style: GoogleFonts.plusJakartaSans(
@@ -126,7 +221,7 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
 
   Widget _buildDivider() => Container(
         width: 1,
-        height: 30,
+        height: 32,
         color: AppColors.textSubtle.withValues(alpha: 0.1),
       );
 
@@ -160,7 +255,9 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
       backgroundColor: AppColors.background,
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          _buildCombinedAppBar(context),
+          _buildSliverAppBar(context, innerBoxIsScrolled),
+          _buildProfileCard(context),
+          _buildTabBarHeader(context),
         ],
         body: TabBarView(
           controller: _tabController,
@@ -173,10 +270,10 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
     );
   }
 
-  SliverAppBar _buildCombinedAppBar(BuildContext context) {
+  SliverAppBar _buildSliverAppBar(BuildContext context, bool innerBoxIsScrolled) {
     final imageUrl = f['imageUrl']?.toString();
     return SliverAppBar(
-      expandedHeight: 460,
+      expandedHeight: 180,
       pinned: true,
       stretch: true,
       backgroundColor: AppColors.primary,
@@ -221,118 +318,46 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
           ),
         ),
       ],
+      title: AnimatedOpacity(
+        opacity: innerBoxIsScrolled ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 200),
+        child: Text(
+          _titleCase(f['name'] ?? 'Farm'),
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            color: Colors.white,
+          ),
+        ),
+      ),
+      centerTitle: true,
       flexibleSpace: FlexibleSpaceBar(
         collapseMode: CollapseMode.pin,
         stretchModes: const [StretchMode.zoomBackground],
-        background: Column(
+        background: Stack(
+          fit: StackFit.expand,
           children: [
-            // Image Section
-            SizedBox(
-              height: 240,
-              width: double.infinity,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (_isValidUrl(imageUrl))
-                    Hero(
-                      tag: 'farmer_${f['farmerId']}',
-                      child: CachedNetworkImage(
-                        imageUrl: imageUrl!,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, _, _) => _imagePlaceholder(),
-                      ),
-                    )
-                  else
-                    _imagePlaceholder(),
-                  // Premium Gradient Overlay
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        stops: const [0.0, 0.5, 1.0],
-                        colors: [
-                          Colors.black.withValues(alpha: 0.4),
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.7),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+            Hero(
+              tag: 'farmer_${f['farmerId']}',
+              child: SafeNetworkImage(
+                imageUrl: imageUrl,
+                defaultBucket: 'uploads',
+                fit: BoxFit.cover,
+                placeholder: _imagePlaceholder(),
+                errorWidget: _imagePlaceholder(),
               ),
             ),
-            // Profile Info Section (Inside FlexibleSpace to scroll)
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-                ),
-                padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            f['name'] ?? 'Farm',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textHeadline,
-                              letterSpacing: -0.5,
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (f['badge'] == 'VERIFIED') ...[
-                          const SizedBox(width: 8),
-                          const Icon(Icons.verified_rounded,
-                              size: 22, color: AppColors.secondary),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        f['specialty'] ?? 'Fresh Produce',
-                        style: GoogleFonts.plusJakartaSans(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    // Stats Row
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white, width: 1.5),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildStat(Icons.star_rounded, f['rating'] ?? '0.0', 'Rating', AppColors.accent),
-                          _buildDivider(),
-                          _buildStat(Icons.location_on_rounded, _calculatedDistance, 'Distance', AppColors.primary),
-                          _buildDivider(),
-                          _buildStat(Icons.shopping_bag_rounded, 'Active', 'Status', AppColors.secondary),
-                        ],
-                      ),
-                    ),
+            // Premium Gradient Overlay
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.0, 0.5, 1.0],
+                  colors: [
+                    Colors.black.withValues(alpha: 0.4),
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.6),
                   ],
                 ),
               ),
@@ -340,39 +365,289 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
           ],
         ),
       ),
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(60),
-        child: Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
-          ),
-          child: TabBar(
-            controller: _tabController,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.textSubtle,
-            indicatorColor: AppColors.primary,
-            indicatorWeight: 4,
-            indicatorSize: TabBarIndicatorSize.label,
-            labelStyle: GoogleFonts.plusJakartaSans(
-              fontWeight: FontWeight.w800,
-              fontSize: 15,
+    );
+  }
+
+  Widget _buildProfileCard(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+        child: Column(
+          children: [
+            // Centered Avatar
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFF1F5F9), width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.secondary],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  _getInitials(f['name'] ?? 'Farm'),
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 26,
+                  ),
+                ),
+              ),
             ),
-            unselectedLabelStyle: GoogleFonts.plusJakartaSans(
-              fontWeight: FontWeight.w600,
-              fontSize: 15,
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    _titleCase(f['name'] ?? 'Farm'),
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textHeadline,
+                      letterSpacing: -0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (f['badge'] == 'VERIFIED') ...[
+                  const SizedBox(width: 8),
+                  const Icon(Icons.verified_rounded,
+                      size: 20, color: AppColors.secondary),
+                ],
+              ],
             ),
-            tabs: const [
-              Tab(text: 'Products'),
-              Tab(text: 'Posts'),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(100),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                _titleCase(f['specialty'] ?? 'Fresh Produce'),
+                style: GoogleFonts.plusJakartaSans(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 0.1,
+                ),
+              ),
+            ),
+            if (!_isOwnProfile) ...[
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: FilledButton.icon(
+                        onPressed: _isFollowBusy ? null : _toggleFollow,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _isFollowing
+                              ? Colors.white
+                              : AppColors.primary,
+                          foregroundColor: _isFollowing
+                              ? AppColors.textHeadline
+                              : Colors.white,
+                          side: BorderSide(
+                            color: _isFollowing
+                                ? AppColors.textSubtle.withValues(alpha: 0.2)
+                                : AppColors.primary,
+                            width: 1,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
+                        icon: _isFollowBusy
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.primary,
+                                ),
+                              )
+                            : Icon(
+                                _isFollowing
+                                    ? Icons.check_rounded
+                                    : Icons.person_add_alt_1_rounded,
+                                size: 18,
+                              ),
+                        label: Text(
+                          _isFollowing ? 'Following' : 'Follow Farm',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: IconButton(
+                      onPressed: () {
+                        final farmerId = f['farmerId']?.toString();
+                        if (farmerId != null) {
+                          context.push(AppRoutes.customerMessages,
+                              extra: {'farmerId': farmerId});
+                        }
+                      },
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+                        foregroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
-          ),
+            const SizedBox(height: 20),
+            // Stats Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: const Color(0xFFE2E8F0),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  _buildStat(Icons.star_rounded, f['rating']?.toString() ?? '0.0', 'Rating', AppColors.accent),
+                  _buildDivider(),
+                  _buildStat(Icons.location_on_rounded, _calculatedDistance, 'Distance', AppColors.primary),
+                  _buildDivider(),
+                  _buildStat(
+                    Icons.group_rounded,
+                    _followerCount.toString(),
+                    'Followers',
+                    AppColors.secondary,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  Widget _buildTabBarHeader(BuildContext context) {
+    return SliverPersistentHeader(
+      pinned: true,
+      delegate: _SliverTabBarDelegate(
+        child: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.textSubtle,
+              indicatorColor: AppColors.primary,
+              indicatorWeight: 3,
+              indicatorSize: TabBarIndicatorSize.label,
+              labelStyle: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+              ),
+              unselectedLabelStyle: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+              tabs: const [
+                Tab(text: 'Products'),
+                Tab(text: 'Posts'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
+  final PreferredSize child;
+
+  _SliverTabBarDelegate({required this.child});
+
+  @override
+  double get minExtent => child.preferredSize.height;
+
+  @override
+  double get maxExtent => child.preferredSize.height;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: Colors.white,
+      child: child,
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _SliverTabBarDelegate oldDelegate) {
+    return oldDelegate.child != child;
+  }
+
+}
+
+String _titleCase(String text) {
+  if (text.isEmpty) return text;
+  return text.split(' ').map((word) {
+    if (word.isEmpty) return word;
+    return word[0].toUpperCase() + word.substring(1).toLowerCase();
+  }).join(' ');
 }
 
 // ── Products Tab ──
@@ -467,7 +742,7 @@ class _ProductsTab extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      product.farm,
+                      _titleCase(product.farm),
                       style: AppTextStyles.bodySmall.copyWith(
                         color: AppColors.textSubtle,
                         fontSize: 11,

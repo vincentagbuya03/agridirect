@@ -9,27 +9,19 @@ class NetworkImageWithFallback extends StatelessWidget {
   /// The URL of the image to display
   final String? imageUrl;
 
-  /// The icon to show when no image is available (null/empty URL)
   final IconData fallbackIcon;
 
-  /// Size of the fallback icon
   final double fallbackIconSize;
 
-  /// Color of the fallback icon
   final Color fallbackIconColor;
 
-  /// Background color when no image is available
   final Color? backgroundColor;
 
-  /// Size of the image container
   final double size;
 
-  /// How the image should fit in the container
   final BoxFit fit;
 
-  /// Border radius for the image
   final BorderRadius? borderRadius;
-
   const NetworkImageWithFallback({
     super.key,
     required this.imageUrl,
@@ -168,7 +160,6 @@ class CircularAvatarWithFallback extends StatelessWidget {
   }
 }
 
-
 /// A widget that displays a Supabase storage image safely,
 /// automatically handling signed URL generation if needed.
 class SafeNetworkImage extends StatefulWidget {
@@ -217,10 +208,22 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
     _lastImageUrl = widget.imageUrl;
     if (_lastImageUrl == null || _lastImageUrl!.isEmpty) {
       _urlFuture = null;
-    } else if (_lastImageUrl!.contains('token=') || !_lastImageUrl!.contains('supabase.co')) {
-      _urlFuture = Future.value(_lastImageUrl);
     } else {
-      _urlFuture = SupabaseDatabase.getSafeUrl(_lastImageUrl, defaultBucket: widget.defaultBucket);
+      final rawUrl = _lastImageUrl!;
+      final isHttpUrl =
+          rawUrl.startsWith('http://') || rawUrl.startsWith('https://');
+      final isSignedUrl = rawUrl.contains('token=');
+      final needsSupabaseResolution =
+          !isHttpUrl || rawUrl.contains('supabase.co/storage/v1/object/');
+
+      if (isSignedUrl || !needsSupabaseResolution) {
+        _urlFuture = Future.value(rawUrl);
+      } else {
+        _urlFuture = SupabaseDatabase.getSafeUrl(
+          rawUrl,
+          defaultBucket: widget.defaultBucket,
+        );
+      }
     }
   }
 
@@ -245,8 +248,10 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
           width: widget.width,
           height: widget.height,
           fit: widget.fit,
-          placeholder: (context, url) => widget.placeholder ?? const SizedBox.shrink(),
-          errorWidget: (context, url, error) => widget.errorWidget ?? const Icon(Icons.error),
+          placeholder: (context, url) =>
+              widget.placeholder ?? const SizedBox.shrink(),
+          errorWidget: (context, url, error) =>
+              widget.errorWidget ?? const Icon(Icons.error),
         );
       },
     );

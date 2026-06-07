@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
@@ -9,11 +8,14 @@ import '../../../shared/router/app_router.dart';
 import '../../../shared/services/commerce/cart_service.dart';
 import '../../../shared/services/user/user_service.dart';
 import '../../../shared/models/auth/user_address_model.dart';
+import '../../../shared/widgets/image_widgets.dart';
 import 'cart_screen.dart';
 import 'farmer_public_profile_screen.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/screens/post_detail_screen.dart';
+import '../../../shared/services/social/follow_service.dart';
+import 'marketplace_screen.dart';
 
 /// Home Screen - Premium Customer Interface
 class HomeScreen extends StatefulWidget {
@@ -26,6 +28,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   UserAddress? _defaultAddress;
   bool _addressLoaded = false;
+  final FollowService _followService = FollowService();
 
   @override
   void initState() {
@@ -67,6 +70,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildGlassAIMarketInsight(),
+                  const SizedBox(height: 32),
+                  _buildFollowingUpdatesSection(),
                   _buildSectionHeader('Browse Categories', 'Show all', () {
                     SupabaseDataService.navigationTabNotifier.value = 1;
                     SupabaseDataService.marketplaceCategoryNotifier.value =
@@ -81,7 +86,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   _buildFeaturedFarmersList(context),
                   const SizedBox(height: 32),
-                  _buildSectionHeader('Community Stories', 'Join Chat', () {}),
+                  _buildSectionHeader(
+                    'Community Stories',
+                    'Join Chat',
+                    () => context.push(AppRoutes.customerMessages),
+                  ),
                   _buildCommunityFeed(context),
                   const SizedBox(height: 40),
                 ],
@@ -213,6 +222,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       child: TextField(
+                        readOnly: true,
+                        onTap: () {
+                          SupabaseDataService.marketplaceCategoryNotifier.value =
+                              null;
+                          SupabaseDataService.navigationTabNotifier.value = 1;
+                        },
                         decoration: InputDecoration(
                           hintText: 'Search fresh produce...',
                           hintStyle: AppTextStyles.bodyMedium.copyWith(
@@ -232,24 +247,32 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Container(
-                    height: 52,
-                    width: 52,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.tune_rounded,
-                      color: Colors.white,
-                      size: 22,
+                  InkWell(
+                    onTap: () {
+                      SupabaseDataService.marketplaceCategoryNotifier.value =
+                          null;
+                      SupabaseDataService.navigationTabNotifier.value = 1;
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      height: 52,
+                      width: 52,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.tune_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
                   ),
                 ],
@@ -430,7 +453,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                SupabaseDataService.marketplaceCategoryNotifier.value = null;
+                SupabaseDataService.navigationTabNotifier.value = 1;
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: const Color(0xFF0369A1),
@@ -455,6 +481,287 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Future<Map<String, dynamic>> _loadFollowingHomeData() async {
+    final results = await Future.wait<dynamic>([
+      _followService.getFollowingCount(),
+      _followService.getFollowingUpdates(limit: 6),
+    ]);
+
+    return {
+      'count': results[0] as int,
+      'updates': results[1] as List<Map<String, dynamic>>,
+    };
+  }
+
+  Widget _buildFollowingUpdatesSection() {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _loadFollowingHomeData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: SizedBox(height: 160, child: Center(child: AppShimmerLoader())),
+          );
+        }
+
+        final count = snapshot.data?['count'] as int? ?? 0;
+        final updates =
+            snapshot.data?['updates'] as List<Map<String, dynamic>>? ??
+            const <Map<String, dynamic>>[];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader(
+              'Following Updates',
+              count > 0 ? '$count farms' : 'Discover',
+              () => context.push(AppRoutes.farmersMap),
+            ),
+            if (count == 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: AppDecorations.cardDecoration.copyWith(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Follow farmers to get product launches and community posts in one place.',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textHeadline,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: () => context.push(AppRoutes.farmersMap),
+                        child: const Text('Find Farmers'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else if (updates.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: AppDecorations.cardDecoration.copyWith(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Text(
+                    'You are following $count farms. New updates will appear here once they post.',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textSubtle,
+                    ),
+                  ),
+                ),
+              )
+            else
+              SizedBox(
+                height: 198,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  scrollDirection: Axis.horizontal,
+                  clipBehavior: Clip.none,
+                  itemCount: updates.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 16),
+                  itemBuilder: (_, index) =>
+                      _buildFollowingUpdateCard(updates[index]),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFollowingUpdateCard(Map<String, dynamic> update) {
+    final isProduct = update['type'] == 'product';
+    final imageUrl = (update['imageUrl']?.toString() ?? '').trim();
+    final createdAt = update['createdAt'] as DateTime?;
+
+    return InkWell(
+      onTap: () => _openFollowingUpdate(update),
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        width: 290,
+        decoration: AppDecorations.cardDecoration.copyWith(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              child: SizedBox(
+                height: 108,
+                width: double.infinity,
+                child: imageUrl.isEmpty
+                    ? Container(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        child: Icon(
+                          isProduct
+                              ? Icons.inventory_2_rounded
+                              : Icons.campaign_rounded,
+                          color: AppColors.primary,
+                          size: 34,
+                        ),
+                      )
+                    : SafeNetworkImage(
+                        imageUrl: imageUrl,
+                        defaultBucket: 'uploads',
+                        fit: BoxFit.cover,
+                      ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isProduct
+                            ? AppColors.secondary.withValues(alpha: 0.12)
+                            : AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        isProduct ? 'NEW PRODUCT' : 'NEW POST',
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: isProduct ? AppColors.secondary : AppColors.primary,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      update['farmerName']?.toString() ?? 'Farm',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.textSubtle,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      update['title']?.toString().trim().isNotEmpty == true
+                          ? update['title'].toString()
+                          : 'Fresh update',
+                      style: AppTextStyles.headline3.copyWith(fontSize: 16),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      isProduct
+                          ? '${update['subtitle'] ?? 'Fresh produce'}${update['isPreorder'] == true ? ' • Pre-order' : ''}'
+                          : (update['body']?.toString() ?? ''),
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSubtle,
+                        height: 1.4,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        if (isProduct && update['price'] != null)
+                          Text(
+                            'PHP ${(update['price'] as num).toStringAsFixed(2)}',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          )
+                        else
+                          Text(
+                            _formatRelativeTime(createdAt),
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.textSubtle,
+                            ),
+                          ),
+                        const Spacer(),
+                        Text(
+                          'Open',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openFollowingUpdate(Map<String, dynamic> update) async {
+    if (update['type'] == 'product') {
+      final productId = update['productId']?.toString() ?? '';
+      if (productId.isEmpty) return;
+      final product = await SupabaseDataService().getProductById(productId);
+      if (!mounted) return;
+      if (product == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This product is no longer available.')),
+        );
+        return;
+      }
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ProductViewScreen(product: product)),
+      );
+      if (mounted) setState(() {});
+      return;
+    }
+
+    final post = ForumPostItem(
+      id: update['postId']?.toString() ?? '',
+      userId: update['farmerUserId']?.toString(),
+      userName: update['farmerName']?.toString() ?? 'Farmer',
+      time: _formatRelativeTime(update['createdAt'] as DateTime?),
+      title: update['title']?.toString() ?? '',
+      body: update['body']?.toString() ?? '',
+      imageUrl: update['imageUrl']?.toString(),
+      likes: update['likes'] as int? ?? 0,
+      comments: update['comments'] as int? ?? 0,
+      isLiked: false,
+    );
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
+    );
+    if (mounted) setState(() {});
+  }
+
+  String _formatRelativeTime(DateTime? dateTime) {
+    if (dateTime == null) return 'Just now';
+
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${(diff.inDays / 7).floor()}w ago';
   }
 
   Widget _buildCategoryGrid() {
@@ -850,35 +1157,39 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.1),
+              child: InkWell(
+                onTap: () => _showAllCommunityStories(posts),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                    ),
                   ),
-                ),
-                child: Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.people_outline_rounded,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'VIEW COMMUNITY HUB',
-                        style: AppTextStyles.labelSmall.copyWith(
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.people_outline_rounded,
                           color: AppColors.primary,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1,
+                          size: 20,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 10),
+                        Text(
+                          'VIEW COMMUNITY STORIES',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -890,17 +1201,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildFarmerImage(String? rawUrl) {
-    if (_isValidNetworkUrl(rawUrl)) {
-      return CachedNetworkImage(
-        imageUrl: rawUrl!,
-        height: 150,
-        width: double.infinity,
-        fit: BoxFit.cover,
-        errorWidget: (_, _, _) => _farmerImagePlaceholder(),
-      );
-    }
-
-    return _farmerImagePlaceholder();
+    return SafeNetworkImage(
+      imageUrl: rawUrl,
+      defaultBucket: 'uploads',
+      width: double.infinity,
+      height: 150,
+      fit: BoxFit.cover,
+      placeholder: _farmerImagePlaceholder(),
+      errorWidget: _farmerImagePlaceholder(),
+    );
   }
 
   Widget _farmerImagePlaceholder() {
@@ -918,25 +1227,23 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  bool _isValidNetworkUrl(String? value) {
-    final text = value?.trim();
-    if (text == null || text.isEmpty) return false;
-    final uri = Uri.tryParse(text);
-    return uri != null &&
-        (uri.scheme == 'http' || uri.scheme == 'https') &&
-        (uri.host.isNotEmpty);
-  }
-
   Widget _buildCommunityPostCard({required ForumPostItem post}) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
-      decoration: AppDecorations.cardDecoration.copyWith(
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return InkWell(
+      onTap: () {
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)));
+      },
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(20),
+        decoration: AppDecorations.cardDecoration.copyWith(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           Row(
             children: [
               Container(
@@ -1018,6 +1325,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ],
+        ),
       ),
     );
   }
@@ -1053,8 +1361,69 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ── Farmer Profile Bottom Sheet ──
   void _showFarmerProfile(BuildContext context, Map<String, dynamic> f) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => FarmerPublicProfileScreen(farmer: f)),
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => FarmerPublicProfileScreen(farmer: f),
+          ),
+        )
+        .then((_) {
+          if (mounted) setState(() {});
+        });
+  }
+
+  void _showAllCommunityStories(List<ForumPostItem> posts) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.textSubtle.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Community Stories',
+                      style: AppTextStyles.headline2.copyWith(fontSize: 22),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.only(bottom: 24),
+                physics: const BouncingScrollPhysics(),
+                itemCount: posts.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                itemBuilder: (_, index) =>
+                    _buildCommunityPostCard(post: posts[index]),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

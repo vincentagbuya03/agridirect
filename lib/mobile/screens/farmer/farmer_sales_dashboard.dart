@@ -38,6 +38,8 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   Map<String, dynamic> _stats = {
     'totalRevenue': 0.0,
     'activeListings': 0,
+    'followers': 0,
+    'communityPosts': 0,
     'yearlySales': 0.0,
     'revenueTrend': '0%',
     'listingsTrend': '0%',
@@ -74,7 +76,8 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     // 3. Fallback to metadata
     final metadata = _auth.client.auth.currentUser?.userMetadata;
     final metaName =
-        ((metadata?['name'] ?? metadata?['full_name']) as String?)?.trim() ?? '';
+        ((metadata?['name'] ?? metadata?['full_name']) as String?)?.trim() ??
+        '';
     if (metaName.isNotEmpty) {
       return metaName.split(' ').first;
     }
@@ -116,7 +119,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       finalUrl = await SupabaseDatabase.getSafeUrl(
         cached,
         defaultBucket: 'uploads',
-      ) ?? '';
+      );
     }
 
     if (mounted && finalUrl.isNotEmpty) {
@@ -178,7 +181,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       if (farmers.isNotEmpty) {
         final farmName = (farmers[0]['farm_name'] as String?)?.trim();
         final rawUrl = (farmers[0]['image_url'] as String?)?.trim();
-        
+
         final safeUrl = await SupabaseDatabase.getSafeUrl(
           rawUrl,
           defaultBucket: 'uploads',
@@ -194,7 +197,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         }
 
         // If farmer row exists and we found a valid image, we're done
-        if ((safeUrl ?? '').isNotEmpty) {
+        if (safeUrl.isNotEmpty) {
           return;
         }
       }
@@ -276,13 +279,14 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       // If permission is granted, proceed
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
-        
         // 🟢 NEW: Start with last known position for instant loading
         try {
           final lastPosition = await Geolocator.getLastKnownPosition();
           if (lastPosition != null) {
             _currentPosition = lastPosition;
-            debugPrint('Using last known position: ${lastPosition.latitude}, ${lastPosition.longitude}');
+            debugPrint(
+              'Using last known position: ${lastPosition.latitude}, ${lastPosition.longitude}',
+            );
             _loadWeatherData();
           }
         } catch (e) {
@@ -293,7 +297,8 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         try {
           debugPrint('Requesting initial position...');
           final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.medium, // Medium is faster than high for start
+            desiredAccuracy:
+                LocationAccuracy.medium, // Medium is faster than high for start
             timeLimit: const Duration(seconds: 15),
           );
           _currentPosition = position;
@@ -306,7 +311,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         } catch (e) {
           debugPrint('Initial position error: $e');
           if (_currentPosition == null) {
-             _loadWeatherData(); // Still try to load with whatever we have
+            _loadWeatherData(); // Still try to load with whatever we have
           }
         }
 
@@ -315,7 +320,8 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             Geolocator.getPositionStream(
               locationSettings: const LocationSettings(
                 accuracy: LocationAccuracy.medium,
-                distanceFilter: 500, // Update when moved 500+ meters (save battery)
+                distanceFilter:
+                    500, // Update when moved 500+ meters (save battery)
               ),
             ).listen(
               (Position position) {
@@ -446,21 +452,25 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
   List<Map<String, dynamic>> _generateDynamicInsights() {
     final insights = <Map<String, dynamic>>[];
-    
+
     // 1. Weather-based insight
     if (_weatherData != null) {
       final desc = _weatherData!.description.toLowerCase();
-      if (desc.contains('rain') || desc.contains('storm') || desc.contains('cloud')) {
+      if (desc.contains('rain') ||
+          desc.contains('storm') ||
+          desc.contains('cloud')) {
         insights.add({
           'title': 'Harvest Timing',
-          'description': 'Upcoming precipitation detected. Consider accelerating harvest for moisture-sensitive crops.',
+          'description':
+              'Upcoming precipitation detected. Consider accelerating harvest for moisture-sensitive crops.',
           'icon': Icons.opacity_rounded,
           'color': const Color(0xFF3B82F6),
         });
       } else {
         insights.add({
           'title': 'Irrigation Alert',
-          'description': 'Clear weather forecast. Monitor soil moisture levels to ensure optimal growth during the dry spell.',
+          'description':
+              'Clear weather forecast. Monitor soil moisture levels to ensure optimal growth during the dry spell.',
           'icon': Icons.water_drop_rounded,
           'color': const Color(0xFF3B82F6),
         });
@@ -472,14 +482,16 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     if (trend.startsWith('+')) {
       insights.add({
         'title': 'Market Trend',
-        'description': 'Your revenue is up $trend this week. Demand for your seasonal produce is peaking in the local market.',
+        'description':
+            'Your revenue is up $trend this week. Demand for your seasonal produce is peaking in the local market.',
         'icon': Icons.trending_up_rounded,
         'color': AppColors.success,
       });
     } else {
       insights.add({
         'title': 'Market Advice',
-        'description': 'Sales are steady. Try featuring your top products to attract more weekend buyers.',
+        'description':
+            'Sales are steady. Try featuring your top products to attract more weekend buyers.',
         'icon': Icons.lightbulb_outline_rounded,
         'color': AppColors.accent,
       });
@@ -490,14 +502,16 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     if (listings < 3) {
       insights.add({
         'title': 'Inventory Opportunity',
-        'description': 'You only have $listings active listings. Expanding your catalog can increase visibility by up to 40%.',
+        'description':
+            'You only have $listings active listings. Expanding your catalog can increase visibility by up to 40%.',
         'icon': Icons.add_business_rounded,
         'color': AppColors.primary,
       });
     } else {
       insights.add({
         'title': 'Stall Performance',
-        'description': 'Your $listings listings are performing well. Keep descriptions updated to maintain high conversion.',
+        'description':
+            'Your $listings listings are performing well. Keep descriptions updated to maintain high conversion.',
         'icon': Icons.auto_awesome_rounded,
         'color': AppColors.primary,
       });
@@ -524,7 +538,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   ),
                 _buildPremiumHeader(),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 24,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -622,7 +639,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                         child: ClipOval(
                           child: _farmerAvatarUrl != null
                               ? CachedNetworkImage(
-                                  key: ValueKey(_farmerAvatarUrl), // 🟢 Force refresh when URL changes
+                                  key: ValueKey(
+                                    _farmerAvatarUrl,
+                                  ), // 🟢 Force refresh when URL changes
                                   imageUrl: _farmerAvatarUrl!,
                                   width: 52,
                                   height: 52,
@@ -637,7 +656,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                                   width: 52,
                                   height: 52,
                                   decoration: BoxDecoration(
-                                    color: AppColors.primary.withValues(alpha: 0.1),
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.1,
+                                    ),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
@@ -746,7 +767,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.7)],
+                colors: [
+                  AppColors.primary,
+                  AppColors.primary.withValues(alpha: 0.7),
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -804,26 +828,54 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   }
 
   Widget _buildMetricsGrid() {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _buildMetricCard(
-            'Total Revenue',
-            '₱${_stats['totalRevenue'].toStringAsFixed(0)}',
-            _stats['revenueTrend'],
-            Icons.payments_outlined,
-            AppColors.primary,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                'Total Revenue',
+                '₱${_stats['totalRevenue'].toStringAsFixed(0)}',
+                _stats['revenueTrend'],
+                Icons.payments_outlined,
+                AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildMetricCard(
+                'Active Listings',
+                '${_stats['activeListings']}',
+                _stats['listingsTrend'],
+                Icons.inventory_2_outlined,
+                const Color(0xFF3B82F6),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _buildMetricCard(
-            'Active Listings',
-            '${_stats['activeListings']}',
-            _stats['listingsTrend'],
-            Icons.inventory_2_outlined,
-            const Color(0xFF3B82F6),
-          ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                'Followers',
+                '${_stats['followers']}',
+                '',
+                Icons.groups_rounded,
+                AppColors.secondary,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildMetricCard(
+                'Community Posts',
+                '${_stats['communityPosts']}',
+                '',
+                Icons.forum_outlined,
+                AppColors.accent,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -837,6 +889,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     Color color,
   ) {
     final isPositive = trend.startsWith('+');
+    final hasTrend = trend.trim().isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: AppDecorations.cardDecoration.copyWith(
@@ -866,15 +919,19 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 4),
-              Text(
-                trend,
-                style: AppTextStyles.labelSmall.copyWith(
-                  fontSize: 11,
-                  color: isPositive ? AppColors.success : AppColors.textSubtle,
-                  fontWeight: FontWeight.w700,
+              if (hasTrend) ...[
+                const SizedBox(width: 4),
+                Text(
+                  trend,
+                  style: AppTextStyles.labelSmall.copyWith(
+                    fontSize: 11,
+                    color: isPositive
+                        ? AppColors.success
+                        : AppColors.textSubtle,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ],
@@ -897,16 +954,16 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                    Text(
-                      'Yearly Sales',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.textSubtle,
-                      ),
+                  Text(
+                    'Yearly Sales',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textSubtle,
                     ),
-                    Text(
-                      '₱${_stats['yearlySales'].toStringAsFixed(2)}',
-                      style: AppTextStyles.headline2,
-                    ),
+                  ),
+                  Text(
+                    '₱${_stats['yearlySales'].toStringAsFixed(2)}',
+                    style: AppTextStyles.headline2,
+                  ),
                 ],
               ),
               Container(
@@ -935,7 +992,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
               size: const Size(double.infinity, 160),
               painter: _AnalyticsChartPainter(
                 AppColors.primary,
-                (_stats['weeklyData'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList() ?? List.filled(7, 0.0),
+                (_stats['weeklyData'] as List<dynamic>?)
+                        ?.map((e) => (e as num).toDouble())
+                        .toList() ??
+                    List.filled(7, 0.0),
               ),
             ),
           ),
@@ -969,15 +1029,21 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
     final currentAlerts = _weatherData!.alerts;
     final forecastAlerts = _weatherForecast?.alerts ?? [];
-    
+
     final isAlert = currentAlerts.isNotEmpty || forecastAlerts.isNotEmpty;
     final color = isAlert ? AppColors.warning : AppColors.primary;
-    final gradientColors = isAlert 
-        ? [AppColors.warning.withValues(alpha: 0.15), AppColors.warning.withValues(alpha: 0.05)]
-        : [AppColors.primary.withValues(alpha: 0.15), AppColors.primary.withValues(alpha: 0.05)];
+    final gradientColors = isAlert
+        ? [
+            AppColors.warning.withValues(alpha: 0.15),
+            AppColors.warning.withValues(alpha: 0.05),
+          ]
+        : [
+            AppColors.primary.withValues(alpha: 0.15),
+            AppColors.primary.withValues(alpha: 0.05),
+          ];
 
-    final activeAlert = currentAlerts.isNotEmpty 
-        ? currentAlerts.first 
+    final activeAlert = currentAlerts.isNotEmpty
+        ? currentAlerts.first
         : (forecastAlerts.isNotEmpty ? forecastAlerts.first : null);
 
     return Container(
@@ -1039,7 +1105,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                           width: 6,
                           height: 6,
                           decoration: BoxDecoration(
-                            color: isAlert ? AppColors.error : AppColors.primary,
+                            color: isAlert
+                                ? AppColors.error
+                                : AppColors.primary,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -1049,13 +1117,17 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 8,
                             fontWeight: FontWeight.w900,
-                            color: isAlert ? AppColors.error : AppColors.primary,
+                            color: isAlert
+                                ? AppColors.error
+                                : AppColors.primary,
                           ),
                         ),
                       ],
                     ),
                     Text(
-                      isAlert ? (activeAlert?.title ?? 'Weather Alert') : 'Optimal Conditions',
+                      isAlert
+                          ? (activeAlert?.title ?? 'Weather Alert')
+                          : 'Optimal Conditions',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
@@ -1067,7 +1139,11 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
               ),
               IconButton(
                 onPressed: _loadWeatherData,
-                icon: Icon(Icons.refresh_rounded, size: 20, color: AppColors.textSubtle.withValues(alpha: 0.5)),
+                icon: Icon(
+                  Icons.refresh_rounded,
+                  size: 20,
+                  color: AppColors.textSubtle.withValues(alpha: 0.5),
+                ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
@@ -1078,9 +1154,15 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: isAlert 
-                  ? [color.withValues(alpha: 0.05), color.withValues(alpha: 0.02)]
-                  : [AppColors.primary.withValues(alpha: 0.05), AppColors.primary.withValues(alpha: 0.01)],
+                colors: isAlert
+                    ? [
+                        color.withValues(alpha: 0.05),
+                        color.withValues(alpha: 0.02),
+                      ]
+                    : [
+                        AppColors.primary.withValues(alpha: 0.05),
+                        AppColors.primary.withValues(alpha: 0.01),
+                      ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -1107,7 +1189,11 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      Icon(Icons.lightbulb_outline_rounded, size: 16, color: color),
+                      Icon(
+                        Icons.lightbulb_outline_rounded,
+                        size: 16,
+                        color: color,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -1265,7 +1351,8 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       final now = DateTime.now();
       hourlyData.add(
         ForecastData(
-          dateTime: now, // Use exact current time (hour + minute) for "Real Time"
+          dateTime:
+              now, // Use exact current time (hour + minute) for "Real Time"
           temperature: _weatherData!.temperature,
           feelsLike: _weatherData!.feelsLike,
           humidity: _weatherData!.humidity,
@@ -1274,7 +1361,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           pressure: _weatherData!.pressure,
           description: _weatherData!.description,
           icon: _weatherData!.icon,
-          rainProbability: _weatherData!.description.toLowerCase().contains('rain') ? 1.0 : 0.0,
+          rainProbability:
+              _weatherData!.description.toLowerCase().contains('rain')
+              ? 1.0
+              : 0.0,
         ),
       );
     }
@@ -1287,7 +1377,8 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
     for (final f in upcomingData) {
       // Prevent duplicates if forecast matches the current hour
-      if (hourlyData.isEmpty || f.dateTime.difference(hourlyData.first.dateTime).inHours.abs() > 0) {
+      if (hourlyData.isEmpty ||
+          f.dateTime.difference(hourlyData.first.dateTime).inHours.abs() > 0) {
         hourlyData.add(f);
       }
     }
@@ -1308,10 +1399,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             itemBuilder: (context, index) {
               final forecast = hourlyData[index];
               final isNow = index == 0;
-              
+
               final pop = ((forecast.rainProbability ?? 0.0) * 100).round();
               final showRainChance = pop > 10;
-              
+
               return Container(
                 width: 100,
                 margin: const EdgeInsets.only(right: 12),
@@ -1320,14 +1411,18 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
-                      color: isNow 
-                        ? AppColors.primary.withValues(alpha: 0.3)
-                        : Colors.black.withValues(alpha: 0.03),
+                      color: isNow
+                          ? AppColors.primary.withValues(alpha: 0.3)
+                          : Colors.black.withValues(alpha: 0.03),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
                   ],
-                  border: isNow ? null : Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+                  border: isNow
+                      ? null
+                      : Border.all(
+                          color: AppColors.textHeadline.withValues(alpha: 0.05),
+                        ),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1337,14 +1432,18 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: isNow ? Colors.white.withValues(alpha: 0.8) : AppColors.textSubtle,
+                        color: isNow
+                            ? Colors.white.withValues(alpha: 0.8)
+                            : AppColors.textSubtle,
                       ),
                     ),
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: isNow ? Colors.white.withValues(alpha: 0.1) : AppColors.primary.withValues(alpha: 0.05),
+                        color: isNow
+                            ? Colors.white.withValues(alpha: 0.1)
+                            : AppColors.primary.withValues(alpha: 0.05),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -1369,7 +1468,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
-                          color: isNow ? Colors.white.withValues(alpha: 0.8) : AppColors.primary,
+                          color: isNow
+                              ? Colors.white.withValues(alpha: 0.8)
+                              : AppColors.primary,
                         ),
                       ),
                     ],
@@ -1414,14 +1515,22 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             color: Colors.white,
           ),
           child: Column(
-            children: _weatherForecast!.getDailyForecast().take(5).indexed.map((entry) {
+            children: _weatherForecast!.getDailyForecast().take(5).indexed.map((
+              entry,
+            ) {
               final index = entry.$1;
               final f = entry.$2;
               final isLast = index == 4;
 
               final dayAdvisory = _weatherForecast!.dailyAdvisories.firstWhere(
-                (a) => a.day.startsWith(f.dayName) || f.dayName.startsWith(a.day),
-                orElse: () => DailyAdvisory(day: '', condition: '', message: '', isSevere: false),
+                (a) =>
+                    a.day.startsWith(f.dayName) || f.dayName.startsWith(a.day),
+                orElse: () => DailyAdvisory(
+                  day: '',
+                  condition: '',
+                  message: '',
+                  isSevere: false,
+                ),
               );
               final hasAdvisory = dayAdvisory.day.isNotEmpty;
 
@@ -1433,9 +1542,15 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   child: Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      border: isLast ? null : Border(
-                        bottom: BorderSide(color: AppColors.textHeadline.withValues(alpha: 0.05)),
-                      ),
+                      border: isLast
+                          ? null
+                          : Border(
+                              bottom: BorderSide(
+                                color: AppColors.textHeadline.withValues(
+                                  alpha: 0.05,
+                                ),
+                              ),
+                            ),
                     ),
                     child: Row(
                       children: [
@@ -1447,7 +1562,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                               fontWeight: FontWeight.w800,
                               fontSize: 12,
                               letterSpacing: 0.5,
-                              color: hasAdvisory ? AppColors.error : AppColors.textHeadline,
+                              color: hasAdvisory
+                                  ? AppColors.error
+                                  : AppColors.textHeadline,
                             ),
                           ),
                         ),
@@ -1455,15 +1572,17 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: hasAdvisory 
-                              ? AppColors.error.withValues(alpha: 0.1) 
-                              : AppColors.primary.withValues(alpha: 0.08),
+                            color: hasAdvisory
+                                ? AppColors.error.withValues(alpha: 0.1)
+                                : AppColors.primary.withValues(alpha: 0.08),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
                             _getAlertIcon(f.description.toLowerCase()),
                             size: 20,
-                            color: hasAdvisory ? AppColors.error : AppColors.primary,
+                            color: hasAdvisory
+                                ? AppColors.error
+                                : AppColors.primary,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -1513,11 +1632,13 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
   void _showHourlyForecastSheet(BuildContext context, DateTime selectedDate) {
     if (_weatherForecast == null) return;
-    
+
     final hourlyData = _weatherForecast!.getHourlyForecastForDate(selectedDate);
     if (hourlyData.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hourly data available for this date.')),
+        const SnackBar(
+          content: Text('No hourly data available for this date.'),
+        ),
       );
       return;
     }
@@ -1586,19 +1707,25 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
               Expanded(
                 child: ListView.builder(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 8,
+                  ),
                   itemCount: hourlyData.length,
                   itemBuilder: (context, index) {
                     final forecast = hourlyData[index];
-                    final pop = ((forecast.rainProbability ?? 0.0) * 100).round();
-                    
+                    final pop = ((forecast.rainProbability ?? 0.0) * 100)
+                        .round();
+
                     return Container(
                       margin: const EdgeInsets.only(bottom: 16),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: AppColors.background,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+                        border: Border.all(
+                          color: AppColors.textHeadline.withValues(alpha: 0.05),
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -1696,14 +1823,20 @@ class _AnalyticsChartPainter extends CustomPainter {
     final path = Path();
     final fillPath = Path();
 
-    final maxVal = data.fold<double>(0, (prev, element) => element > prev ? element : prev);
+    final maxVal = data.fold<double>(
+      0,
+      (prev, element) => element > prev ? element : prev,
+    );
     final displayMax = maxVal == 0 ? 1.0 : maxVal;
 
     final points = List.generate(data.length, (i) {
       final x = (size.width / (data.length - 1)) * i;
-      // Invert Y: 0 is top, size.height is bottom. 
+      // Invert Y: 0 is top, size.height is bottom.
       // We want high values at the top (near 0) and low values at bottom (near size.height).
-      final y = size.height - (size.height * (data[i] / displayMax) * 0.8) - (size.height * 0.1);
+      final y =
+          size.height -
+          (size.height * (data[i] / displayMax) * 0.8) -
+          (size.height * 0.1);
       return Offset(x, y);
     });
 

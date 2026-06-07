@@ -6,6 +6,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/forum/forum_post_model.dart';
 import '../../models/forum/forum_comment_model.dart';
+import '../social/follow_service.dart';
 
 class ForumService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -140,6 +141,25 @@ class ForumService {
           })
           .select()
           .single();
+
+      try {
+        final farmer = await _supabase
+            .from('farmers')
+            .select('farmer_id, farm_name')
+            .eq('user_id', userId)
+            .maybeSingle();
+        final farmerId = farmer?['farmer_id']?.toString() ?? '';
+        if (farmerId.isNotEmpty) {
+          await FollowService().notifyFollowersAboutNewPost(
+            farmerId: farmerId,
+            postId: response['post_id'].toString(),
+            farmName: farmer?['farm_name']?.toString() ?? 'A farmer you follow',
+            postTitle: title,
+          );
+        }
+      } catch (_) {
+        // Do not fail post creation if follower notifications fail.
+      }
 
       return ForumPost.fromJson(response);
     } catch (e) {

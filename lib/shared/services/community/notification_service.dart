@@ -465,6 +465,16 @@ class NotificationService {
       return;
     }
 
+    if (linkType == 'product') {
+      GoRouter.of(context).go(AppRoutes.marketplace);
+      return;
+    }
+
+    if (linkType == 'post') {
+      GoRouter.of(context).go(AppRoutes.home);
+      return;
+    }
+
     GoRouter.of(context).go(AppRoutes.home);
   }
 

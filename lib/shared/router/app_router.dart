@@ -11,9 +11,15 @@ import '../../mobile/screens/auth/complete_profile_screen.dart';
 import '../../mobile/screens/common/onboarding_screen.dart';
 import '../../mobile/screens/common/face_capture_screen.dart';
 import '../../mobile/screens/farmer/add_product_screen.dart';
+import '../../mobile/screens/farmer/farmer_followers_screen.dart';
+import '../../mobile/screens/consumer/cart_screen.dart';
 import '../../mobile/screens/consumer/preorder_details_screen.dart';
 import '../../mobile/screens/consumer/farmers_map_screen.dart';
 import '../../mobile/screens/consumer/my_details_screen.dart';
+import '../../mobile/screens/profile/address_book_screen.dart';
+import '../../mobile/screens/profile/favorites_screen.dart';
+import '../../mobile/screens/profile/help_center_screen.dart';
+import '../../mobile/screens/profile/app_settings_screen.dart';
 import '../../web/web_navigation.dart';
 import '../../web/screens/auth/web_login_screen.dart';
 import '../../web/screens/auth/web_registration_screen.dart';
@@ -21,6 +27,8 @@ import '../../web/screens/auth/web_farmer_registration_screen.dart';
 import '../../web/screens/auth/web_auth_callback_screen.dart';
 import '../../web/screens/auth/web_password_reset_screen.dart';
 import '../../web/screens/auth/web_password_reset_with_code_screen.dart';
+import '../../web/screens/consumer/web_cart_screen.dart';
+import '../../web/screens/consumer/web_farmer_public_profile_screen.dart';
 import '../../web/screens/consumer/web_preorder_details.dart';
 import '../../web/screens/admin/admin_dashboard_redesigned.dart';
 import '../../web/screens/common/web_welcome_screen.dart';
@@ -115,11 +123,17 @@ GoRouter createAppRouter() {
           AppRoutes.messages,
           AppRoutes.customerMessages,
           AppRoutes.farmerMessages,
+          AppRoutes.addressBook,
+          AppRoutes.favorites,
+          AppRoutes.farmerFollowers,
+          AppRoutes.helpCenter,
+          AppRoutes.appSettings,
           AppRoutes.admin,
           AppRoutes.completeProfile,
           AppRoutes.marketplace,
           AppRoutes.shop,
           AppRoutes.community,
+          AppRoutes.cart,
           AppRoutes.preorderDetails,
         };
 
@@ -187,6 +201,7 @@ GoRouter createAppRouter() {
           builder: (context, constraints) {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
+                initialIndex: 0,
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
@@ -210,6 +225,7 @@ GoRouter createAppRouter() {
           builder: (context, constraints) {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
+                initialIndex: 0,
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
@@ -232,6 +248,7 @@ GoRouter createAppRouter() {
           builder: (context, constraints) {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
+                initialIndex: 1,
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
@@ -254,6 +271,7 @@ GoRouter createAppRouter() {
           builder: (context, constraints) {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
+                initialIndex: AuthService().isViewingAsFarmer ? 3 : 2,
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
@@ -276,6 +294,7 @@ GoRouter createAppRouter() {
           builder: (context, constraints) {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
+                initialIndex: AuthService().isViewingAsFarmer ? 4 : 3,
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
@@ -293,11 +312,23 @@ GoRouter createAppRouter() {
         ),
       ),
       GoRoute(
+        path: AppRoutes.cart,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 800) {
+              return const WebCartScreen();
+            }
+            return const CartScreen();
+          },
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.farmerDashboard,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
+                initialIndex: 0,
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
@@ -313,6 +344,13 @@ GoRouter createAppRouter() {
             );
           },
         ),
+      ),
+      GoRoute(
+        path: '${AppRoutes.farmerProfileBase}/:farmerId',
+        builder: (context, state) {
+          final farmerId = state.pathParameters['farmerId'] ?? '';
+          return WebFarmerPublicProfileScreen(farmerId: farmerId);
+        },
       ),
 
       // ── Wallet (shared) ──────────────────────────────────────────────────
@@ -537,6 +575,26 @@ GoRouter createAppRouter() {
       GoRoute(
         path: AppRoutes.customerOrders,
         builder: (context, state) => const OrdersScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.addressBook,
+        builder: (context, state) => const AddressBookScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.favorites,
+        builder: (context, state) => const FavoritesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.farmerFollowers,
+        builder: (context, state) => const FarmerFollowersScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.helpCenter,
+        builder: (context, state) => const HelpCenterScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.appSettings,
+        builder: (context, state) => const AppSettingsScreen(),
       ),
 
       // ── Auth Callback (Google OAuth) ──────────────────────────────────────

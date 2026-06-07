@@ -313,6 +313,8 @@ class FarmerService {
         return {
           'totalRevenue': 0.0,
           'activeListings': 0,
+          'followers': 0,
+          'communityPosts': 0,
           'yearlySales': 0.0,
           'revenueTrend': '0%',
           'listingsTrend': '0%',
@@ -330,32 +332,54 @@ class FarmerService {
           .eq('is_active', true);
       final activeListings = (productsResponse as List).length;
 
+      final followersResponse = await _supabase
+          .from('farmer_follows')
+          .select('follow_id')
+          .eq('farmer_id', farmerId);
+      final followers = (followersResponse as List).length;
+
+      final postsResponse = await _supabase
+          .from('forum_posts')
+          .select('post_id')
+          .eq('user_id', userId);
+      final communityPosts = (postsResponse as List).length;
+
       // 2. Get Sales Data for the last 14 days (to calculate trends)
       final now = DateTime.now();
-      final fourteenDaysAgo = now.subtract(const Duration(days: 14)).toIso8601String();
-      
+      final fourteenDaysAgo = now
+          .subtract(const Duration(days: 14))
+          .toIso8601String();
+
       final ordersResponse = await _supabase
           .from('orders')
           .select('total_amount, created_at')
           .eq('farmer_id', farmerId)
           .gte('created_at', fourteenDaysAgo)
-          .not('order_status_id', 'in', '(5, 6)'); // Exclude cancelled/failed orders
+          .not(
+            'order_status_id',
+            'in',
+            '(5, 6)',
+          ); // Exclude cancelled/failed orders
 
       final orders = ordersResponse as List<dynamic>;
-      
+
       // Calculate weekly data for chart (last 7 days)
       List<double> weeklyData = List.filled(7, 0.0);
       double currentWeekRevenue = 0;
       double previousWeekRevenue = 0;
-      
-      final sevenDaysAgo = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
-      
+
+      final sevenDaysAgo = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(const Duration(days: 6));
+
       for (var order in orders) {
         final createdAt = DateTime.tryParse(order['created_at'] ?? '');
         if (createdAt == null) continue;
-        
+
         final amount = (order['total_amount'] as num?)?.toDouble() ?? 0.0;
-        
+
         // Check if it belongs to current week (last 7 days)
         if (createdAt.isAfter(sevenDaysAgo)) {
           currentWeekRevenue += amount;
@@ -376,7 +400,7 @@ class FarmerService {
           .select('total_amount')
           .eq('farmer_id', farmerId)
           .not('order_status_id', 'in', '(5, 6)');
-      
+
       double totalRevenue = 0;
       for (var order in lifetimeResponse as List) {
         totalRevenue += (order['total_amount'] as num?)?.toDouble() ?? 0;
@@ -390,7 +414,7 @@ class FarmerService {
           .eq('farmer_id', farmerId)
           .gte('created_at', startOfYear)
           .not('order_status_id', 'in', '(5, 6)');
-      
+
       double yearlySales = 0;
       for (var order in yearlyResponse as List) {
         yearlySales += (order['total_amount'] as num?)?.toDouble() ?? 0;
@@ -399,8 +423,12 @@ class FarmerService {
       // Calculate trends
       String revenueTrend = '+0%';
       if (previousWeekRevenue > 0) {
-        final percent = ((currentWeekRevenue - previousWeekRevenue) / previousWeekRevenue * 100);
-        revenueTrend = '${percent >= 0 ? '+' : ''}${percent.toStringAsFixed(1)}%';
+        final percent =
+            ((currentWeekRevenue - previousWeekRevenue) /
+            previousWeekRevenue *
+            100);
+        revenueTrend =
+            '${percent >= 0 ? '+' : ''}${percent.toStringAsFixed(1)}%';
       } else if (currentWeekRevenue > 0) {
         revenueTrend = '+100%';
       }
@@ -408,6 +436,8 @@ class FarmerService {
       return {
         'totalRevenue': totalRevenue,
         'activeListings': activeListings,
+        'followers': followers,
+        'communityPosts': communityPosts,
         'yearlySales': yearlySales,
         'revenueTrend': revenueTrend,
         'listingsTrend': '0%', // Trends for listings would need product history
@@ -418,6 +448,8 @@ class FarmerService {
       return {
         'totalRevenue': 0.0,
         'activeListings': 0,
+        'followers': 0,
+        'communityPosts': 0,
         'yearlySales': 0.0,
         'revenueTrend': '0%',
         'listingsTrend': '0%',

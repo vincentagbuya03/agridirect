@@ -31,13 +31,24 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     _loadCustomerData();
   }
 
-  Future<void> _loadCustomerData() async {
+  Future<void> _loadCustomerData({int attempt = 0}) async {
     final auth = AuthService();
+    final userId = (SupabaseConfig.currentUser?.id ?? auth.userId).trim();
+    if (userId.isEmpty) {
+      // Auth state can still be initializing when this screen mounts.
+      if (attempt < 5) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        if (!mounted) return;
+        return _loadCustomerData(attempt: attempt + 1);
+      }
+      return;
+    }
+
     try {
       final users = await SupabaseConfig.client
           .from('users')
           .select('avatar_url')
-          .eq('user_id', auth.userId)
+          .eq('user_id', userId)
           .limit(1);
 
       if (users.isNotEmpty && mounted) {
@@ -152,18 +163,29 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                   GestureDetector(
                     onTap: _handleSwitchToFarmer,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.accent.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: AppColors.accent.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.agriculture, size: 18, color: AppColors.accent),
+                          const Icon(
+                            Icons.agriculture,
+                            size: 18,
+                            color: AppColors.accent,
+                          ),
                           const SizedBox(width: 8),
                           Text(
-                            auth.isSeller ? 'Switch to Selling' : 'Start Selling',
+                            auth.isSeller
+                                ? 'Switch to Selling'
+                                : 'Start Selling',
                             style: AppTextStyles.labelSmall.copyWith(
                               color: AppColors.accent,
                               fontWeight: FontWeight.w700,
@@ -191,11 +213,16 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                         const SizedBox(height: 4),
                         Text(
                           auth.userEmail,
-                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textSubtle,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
@@ -231,11 +258,14 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
       child: ClipOval(
         child: (_customerImageUrl != null && _customerImageUrl!.isNotEmpty)
             ? CachedNetworkImage(
-                key: ValueKey(_customerImageUrl), // 🟢 Force refresh when URL changes
+                key: ValueKey(
+                  _customerImageUrl,
+                ), // 🟢 Force refresh when URL changes
                 imageUrl: _customerImageUrl!,
                 fit: BoxFit.cover,
                 placeholder: (_, _) => Container(color: Colors.grey[100]),
-                errorWidget: (_, _, _) => const Icon(Icons.person, size: 40, color: Colors.grey),
+                errorWidget: (_, _, _) =>
+                    const Icon(Icons.person, size: 40, color: Colors.grey),
               )
             : Container(
                 color: Colors.grey[100],
@@ -251,10 +281,15 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Account Settings', style: AppTextStyles.headline3.copyWith(fontSize: 18)),
+          Text(
+            'Account Settings',
+            style: AppTextStyles.headline3.copyWith(fontSize: 18),
+          ),
           const SizedBox(height: 16),
           Container(
-            decoration: AppDecorations.cardDecoration.copyWith(borderRadius: BorderRadius.circular(24)),
+            decoration: AppDecorations.cardDecoration.copyWith(
+              borderRadius: BorderRadius.circular(24),
+            ),
             child: Column(
               children: [
                 _buildMenuItem(
@@ -273,6 +308,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                   title: 'Address Book',
                   subtitle: 'Manage delivery addresses',
                   color: Colors.orange,
+                  onTap: () => context.push(AppRoutes.addressBook),
                 ),
                 _buildDivider(),
                 _buildMenuItem(
@@ -280,6 +316,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                   title: 'Favorites',
                   subtitle: 'Saved products and farms',
                   color: Colors.pink,
+                  onTap: () => context.push(AppRoutes.favorites),
                 ),
                 _buildDivider(),
                 _buildMenuItem(
@@ -296,19 +333,23 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           Text('Other', style: AppTextStyles.headline3.copyWith(fontSize: 18)),
           const SizedBox(height: 16),
           Container(
-            decoration: AppDecorations.cardDecoration.copyWith(borderRadius: BorderRadius.circular(24)),
+            decoration: AppDecorations.cardDecoration.copyWith(
+              borderRadius: BorderRadius.circular(24),
+            ),
             child: Column(
               children: [
                 _buildMenuItem(
                   icon: Icons.help_center_outlined,
                   title: 'Help Center',
                   color: Colors.purple,
+                  onTap: () => context.push(AppRoutes.helpCenter),
                 ),
                 _buildDivider(),
                 _buildMenuItem(
                   icon: Icons.settings_outlined,
                   title: 'App Settings',
                   color: Colors.blueGrey,
+                  onTap: () => context.push(AppRoutes.appSettings),
                 ),
               ],
             ),
@@ -344,20 +385,35 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: AppTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.w600)),
+                  Text(
+                    title,
+                    style: AppTextStyles.bodyLarge.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   if (subtitle != null)
-                    Text(subtitle, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
+                    Text(
+                      subtitle,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSubtle,
+                      ),
+                    ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: Colors.grey,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDivider() => Divider(height: 1, indent: 70, endIndent: 20, color: Colors.grey[200]);
+  Widget _buildDivider() =>
+      Divider(height: 1, indent: 70, endIndent: 20, color: Colors.grey[200]);
 
   Widget _buildLogoutButton() {
     return Padding(
@@ -368,7 +424,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           foregroundColor: AppColors.error,
           backgroundColor: AppColors.error.withValues(alpha: 0.1),
           minimumSize: const Size(double.infinity, 56),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
         ),
         child: const Text('Log Out'),
       ),

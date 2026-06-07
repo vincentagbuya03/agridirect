@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../shared/services/auth/auth_service.dart';
+import '../shared/router/app_routes.dart';
 import 'screens/consumer/web_marketplace_home.dart';
 import 'screens/consumer/web_shop_screen.dart';
 import 'screens/farmer/web_sales_dashboard.dart';
@@ -12,20 +14,26 @@ import 'screens/admin/admin_dashboard_redesigned.dart';
 
 class WebNavigation extends StatefulWidget {
   final VoidCallback onLogout;
+  final int initialIndex;
 
-  const WebNavigation({super.key, required this.onLogout});
+  const WebNavigation({
+    super.key,
+    required this.onLogout,
+    this.initialIndex = 0,
+  });
 
   @override
   State<WebNavigation> createState() => _WebNavigationState();
 }
 
 class _WebNavigationState extends State<WebNavigation> {
-  int _currentIndex = 0;
+  late int _currentIndex;
   final _auth = AuthService();
 
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex;
     _auth.addListener(_onAuthChanged);
   }
 
@@ -46,6 +54,9 @@ class _WebNavigationState extends State<WebNavigation> {
       return;
     }
     setState(() => _currentIndex = index);
+    if (!_auth.isViewingAsFarmer) {
+      context.go(AppRoutes.webTabRoute(index));
+    }
   }
 
   void _showLoginDialog() {

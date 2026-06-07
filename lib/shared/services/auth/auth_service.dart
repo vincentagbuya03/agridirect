@@ -87,9 +87,8 @@ class AuthService extends ChangeNotifier {
   // Brute-force getters
   bool get isLockedOut =>
       _lockoutUntil != null && _lockoutUntil!.isAfter(DateTime.now());
-  int get remainingLockoutSeconds => isLockedOut
-      ? _lockoutUntil!.difference(DateTime.now()).inSeconds
-      : 0;
+  int get remainingLockoutSeconds =>
+      isLockedOut ? _lockoutUntil!.difference(DateTime.now()).inSeconds : 0;
   int get remainingAttempts => _maxAttempts - _consecutiveFailures;
 
   static String _sellerKey(String userId) => 'auth.isSeller.$userId';
@@ -152,6 +151,29 @@ class AuthService extends ChangeNotifier {
       return 'Password must include at least one number.';
     }
     return null;
+  }
+
+  Future<bool> changePassword({required String newPassword}) async {
+    _isLoading = true;
+    _errorMessage = '';
+    notifyListeners();
+
+    try {
+      final validationError = validatePassword(newPassword);
+      if (validationError != null) {
+        _errorMessage = validationError;
+        return false;
+      }
+
+      await _client.auth.updateUser(UserAttributes(password: newPassword));
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to update password: $e';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> _restoreCachedUserState(String userId) async {
@@ -248,7 +270,9 @@ class AuthService extends ChangeNotifier {
     await prefs.setInt(_failuresKey, _consecutiveFailures);
 
     if (_consecutiveFailures >= _maxAttempts) {
-      _lockoutUntil = DateTime.now().add(const Duration(minutes: _lockoutMinutes));
+      _lockoutUntil = DateTime.now().add(
+        const Duration(minutes: _lockoutMinutes),
+      );
       await prefs.setString(_lockoutKey, _lockoutUntil!.toIso8601String());
       debugPrint('🛡️ Brute-force: User locked out until $_lockoutUntil');
       _startLockoutTimer();
@@ -309,6 +333,8 @@ class AuthService extends ChangeNotifier {
     List<String> roles, {
     String? email,
   }) async {
+    final cleanUserId = userId.trim();
+
     final isKnown =
         (email != null && _isKnownAdminEmail(email)) ||
         (userEmail.isNotEmpty && _isKnownAdminEmail(userEmail)) ||
@@ -323,11 +349,18 @@ class AuthService extends ChangeNotifier {
       debugPrint('✅ Admin access granted by role');
       return true;
     }
+
+    if (cleanUserId.isEmpty) {
+      // Avoid DB role checks with invalid UUID input.
+      debugPrint('ℹ️ Admin DB role check skipped (empty userId)');
+      return false;
+    }
+
     final dbHasRole = await SupabaseDatabase.hasRole(
-      userId: userId,
+      userId: cleanUserId,
       roleName: 'admin',
     );
-    debugPrint('ℹ️ Admin DB role check for $userId: $dbHasRole');
+    debugPrint('ℹ️ Admin DB role check for $cleanUserId: $dbHasRole');
     return dbHasRole;
   }
 
@@ -418,6 +451,16 @@ class AuthService extends ChangeNotifier {
 
     // Proceed if user exists - our custom verification flow handles the confirmed status
     if (user == null) {
+      // During some auth transitions (especially around OAuth / userUpdated / tokenRefreshed),
+      // Supabase can briefly report `currentUser == null`. Treat this as transient unless
+      // we are explicitly handling a sign-out event.
+      if (event != null && event != AuthChangeEvent.signedOut) {
+        debugPrint(
+          '🟡 AuthService.initialize: currentUser is null for event=$event; keeping existing session state',
+        );
+        return;
+      }
+
       // 🟢 OFFLINE RECOVERY LOGIC
       // If we are offline and were previously logged in, stay logged in to allow browsing cached data.
       try {

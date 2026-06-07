@@ -57,6 +57,14 @@ CREATE TABLE IF NOT EXISTS public.farmers (
   pcn text
 );
 
+CREATE TABLE IF NOT EXISTS public.farmer_follows (
+  follow_id uuid NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
+  follower_user_id uuid NOT NULL REFERENCES public.users(user_id),
+  farmer_id uuid NOT NULL REFERENCES public.farmers(farmer_id),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  UNIQUE (follower_user_id, farmer_id)
+);
+
 -- Community Content
 CREATE TABLE IF NOT EXISTS public.admin_articles (
   article_id uuid NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -640,6 +648,7 @@ ALTER TABLE public.forum_posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.forum_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.forum_post_likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.forum_comment_likes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.farmer_follows ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS forum_posts_select_authenticated ON public.forum_posts;
 CREATE POLICY forum_posts_select_authenticated
@@ -740,6 +749,30 @@ ON public.forum_comment_likes
 FOR DELETE
 TO authenticated
 USING (user_id = auth.uid() OR public.current_user_is_admin());
+
+DROP POLICY IF EXISTS farmer_follows_select_authenticated ON public.farmer_follows;
+CREATE POLICY farmer_follows_select_authenticated
+ON public.farmer_follows
+FOR SELECT
+TO authenticated
+USING (true);
+
+DROP POLICY IF EXISTS farmer_follows_insert_customer_own ON public.farmer_follows;
+CREATE POLICY farmer_follows_insert_customer_own
+ON public.farmer_follows
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  follower_user_id = auth.uid()
+  AND public.current_user_is_customer()
+);
+
+DROP POLICY IF EXISTS farmer_follows_delete_own ON public.farmer_follows;
+CREATE POLICY farmer_follows_delete_own
+ON public.farmer_follows
+FOR DELETE
+TO authenticated
+USING (follower_user_id = auth.uid() OR public.current_user_is_admin());
 
 GRANT EXECUTE ON FUNCTION public.current_user_is_farmer() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.current_user_is_customer() TO authenticated;
