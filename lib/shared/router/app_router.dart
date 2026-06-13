@@ -13,7 +13,9 @@ import '../../mobile/screens/common/face_capture_screen.dart';
 import '../../mobile/screens/farmer/add_product_screen.dart';
 import '../../mobile/screens/farmer/farmer_followers_screen.dart';
 import '../../mobile/screens/consumer/cart_screen.dart';
+import '../../mobile/screens/consumer/marketplace_screen.dart';
 import '../../mobile/screens/consumer/preorder_details_screen.dart';
+import '../../mobile/screens/consumer/preorder_hub_screen.dart';
 import '../../mobile/screens/consumer/farmers_map_screen.dart';
 import '../../mobile/screens/consumer/my_details_screen.dart';
 import '../../mobile/screens/profile/address_book_screen.dart';
@@ -30,6 +32,8 @@ import '../../web/screens/auth/web_password_reset_with_code_screen.dart';
 import '../../web/screens/consumer/web_cart_screen.dart';
 import '../../web/screens/consumer/web_farmer_public_profile_screen.dart';
 import '../../web/screens/consumer/web_preorder_details.dart';
+import '../../web/screens/consumer/web_product_details.dart';
+import '../../web/screens/consumer/web_preorder_hub.dart';
 import '../../web/screens/admin/admin_dashboard_redesigned.dart';
 import '../../web/screens/common/web_welcome_screen.dart';
 import '../screens/messages/messages_screen.dart';
@@ -244,11 +248,15 @@ GoRouter createAppRouter() {
       ),
       GoRoute(
         path: AppRoutes.shop,
-        builder: (context, state) => LayoutBuilder(
+        builder: (context, state) {
+          final showPreOrders =
+              state.uri.queryParameters['mode'] == 'preorders';
+          return LayoutBuilder(
           builder: (context, constraints) {
             if (constraints.maxWidth > 800) {
               return WebNavigation(
                 initialIndex: 1,
+                showPreOrdersInShop: showPreOrders,
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
@@ -263,7 +271,8 @@ GoRouter createAppRouter() {
               },
             );
           },
-        ),
+        );
+        },
       ),
       GoRoute(
         path: AppRoutes.community,
@@ -319,6 +328,20 @@ GoRouter createAppRouter() {
               return const WebCartScreen();
             }
             return const CartScreen();
+          },
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.preorders,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 800) {
+              return WebPreOrderHub(
+                currentIndex: 1,
+                onNavigate: (index) => context.go(AppRoutes.webTabRoute(index)),
+              );
+            }
+            return const PreOrderHubScreen();
           },
         ),
       ),
@@ -569,6 +592,27 @@ GoRouter createAppRouter() {
             }
 
             return WebPreorderDetails(initialProduct: product);
+          },
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.productDetails,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) {
+            final product = state.extra is ProductItem
+                ? state.extra as ProductItem
+                : null;
+
+            if (constraints.maxWidth <= 800) {
+              if (product == null) {
+                return const Scaffold(
+                  body: Center(child: Text('Product not found')),
+                );
+              }
+              return ProductViewScreen(product: product);
+            }
+
+            return WebProductDetails(initialProduct: product);
           },
         ),
       ),

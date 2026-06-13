@@ -13,16 +13,16 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/user/user_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
 
-class WebPreorderDetails extends StatefulWidget {
-  const WebPreorderDetails({super.key, this.initialProduct});
+class WebProductDetails extends StatefulWidget {
+  const WebProductDetails({super.key, this.initialProduct});
 
   final ProductItem? initialProduct;
 
   @override
-  State<WebPreorderDetails> createState() => _WebPreorderDetailsState();
+  State<WebProductDetails> createState() => _WebProductDetailsState();
 }
 
-class _WebPreorderDetailsState extends State<WebPreorderDetails> {
+class _WebProductDetailsState extends State<WebProductDetails> {
   static const Color _primary = Color(0xFF16A34A);
   static const Color _dark = Color(0xFF0F172A);
   static const Color _muted = Color(0xFF64748B);
@@ -167,7 +167,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
 
   String _currencyLabel(String raw) {
     if (raw.trim().startsWith('P')) return raw;
-    if (raw.trim().startsWith('₱')) {
+    if (raw.trim().startsWith('â‚±')) {
       return 'P${raw.trim().substring(1)}';
     }
     return 'P$raw';
@@ -187,20 +187,14 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
     return 'Fresh produce';
   }
 
-  double _priceValue() {
-    final raw = _product?.price ?? '0';
-    return double.tryParse(raw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
-  }
-
   String _unitLabel() {
     final unit = _product?.unit.trim();
     return unit == null || unit.isEmpty ? 'unit' : unit;
   }
 
-  String _harvestLabel() {
-    final days = int.tryParse(_product?.harvestDays ?? '');
-    if (days == null || days <= 0) return 'Available now';
-    return 'Harvest in $days days';
+  double _priceValue() {
+    final raw = _product?.price ?? '0';
+    return double.tryParse(raw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
   }
 
   double _averageReviewRating() {
@@ -211,7 +205,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
 
   Future<void> _addToCart() async {
     if (_product == null) return;
-    await CartService().addItem(_product!);
+    await CartService().addItem(_product!, _quantity);
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
@@ -219,8 +213,15 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
   }
 
   Future<void> _submitOrder() async {
-    final productId = _product?.productId;
-    if (productId == null || productId.isEmpty) return;
+    final product = _product;
+    final productId = product?.productId;
+    final farmerId = product?.farmerId;
+    if (productId == null ||
+        productId.isEmpty ||
+        farmerId == null ||
+        farmerId.isEmpty) {
+      return;
+    }
 
     if (_selectedPaymentMethod == 'COD' && _selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -231,32 +232,25 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
 
     setState(() => _isSubmittingOrder = true);
     try {
-      final instructions = _instructionsController.text.trim();
-      final result = await _orderService.createOfflinePreOrderByProductId(
-        productId: productId,
-        quantity: _quantity.toDouble(),
+      await _orderService.createOfflineOrder(
+        farmerId: farmerId,
+        items: [
+          OrderItemInput(
+            productId: productId,
+            quantity: _quantity.toDouble(),
+            unitPrice: _priceValue(),
+          ),
+        ],
         paymentMethod: _selectedPaymentMethod,
         deliveryAddressId:
             _selectedPaymentMethod == 'COP' ? null : _selectedAddress?.addressId,
-        notes: instructions.isNotEmpty
-            ? instructions
-            : _selectedPaymentMethod == 'COD'
-            ? 'Customer selected Cash on Delivery for this pre-order.'
-            : 'Customer selected Cash on Pickup for this pre-order.',
+        notes: _instructionsController.text.trim(),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pre-order placed successfully.')),
+        const SnackBar(content: Text('Order placed successfully.')),
       );
-      final conversationId = result['conversation_id']?.toString();
-      if (conversationId != null && conversationId.isNotEmpty) {
-        context.go(
-          AppRoutes.messages,
-          extra: {'conversationId': conversationId, 'asFarmer': false},
-        );
-      } else {
-        context.go(AppRoutes.customerOrders);
-      }
+      context.go(AppRoutes.customerOrders);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -345,7 +339,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         child: Row(
           children: [
             IconButton(
-              onPressed: () => context.go('${AppRoutes.shop}?mode=preorders'),
+              onPressed: () => context.go(AppRoutes.shop),
               icon: const Icon(Icons.arrow_back_rounded, color: _dark),
             ),
             const SizedBox(width: 8),
@@ -421,23 +415,19 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: _border),
       ),
-      child: Column(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: AspectRatio(
-              aspectRatio: 1.1,
-              child: productImage.isNotEmpty
-                  ? SafeNetworkImage(
-                      imageUrl: productImage,
-                      fit: BoxFit.cover,
-                      placeholder: Container(color: Colors.grey[100]),
-                      errorWidget: _buildImageFallback(),
-                    )
-                  : _buildImageFallback(),
-            ),
-          ),
-        ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: AspectRatio(
+          aspectRatio: 1.1,
+          child: productImage.isNotEmpty
+              ? SafeNetworkImage(
+                  imageUrl: productImage,
+                  fit: BoxFit.cover,
+                  placeholder: Container(color: Colors.grey[100]),
+                  errorWidget: _buildImageFallback(),
+                )
+              : _buildImageFallback(),
+        ),
       ),
     );
   }
@@ -498,19 +488,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
             spacing: 18,
             runSpacing: 8,
             children: [
-              _metaRow(
-                Icons.storefront_rounded,
-                _farmName(),
-                _primary,
-                onTap:
-                    _farmerProfile?['farmer_id']?.toString().isNotEmpty == true
-                    ? () => context.go(
-                        AppRoutes.farmerProfile(
-                          _farmerProfile!['farmer_id'].toString(),
-                        ),
-                      )
-                    : null,
-              ),
+              _metaRow(Icons.storefront_rounded, _farmName(), _primary),
               _metaRow(
                 Icons.star_rounded,
                 averageRating.toStringAsFixed(1),
@@ -547,7 +525,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                 child: _infoTile(
                   Icons.schedule_rounded,
                   'Availability',
-                  _harvestLabel(),
+                  'Available now',
                 ),
               ),
               const SizedBox(width: 12),
@@ -563,15 +541,61 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
             ],
           ),
           const SizedBox(height: 22),
-          _buildQuantityRow(),
-          const SizedBox(height: 18),
+          Row(
+            children: [
+              const Text(
+                'Quantity',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _dark,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                decoration: BoxDecoration(
+                  color: _surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: _border),
+                ),
+                child: Row(
+                  children: [
+                    _qtyButton(Icons.remove_rounded, () {
+                      if (_quantity > 1) setState(() => _quantity--);
+                    }),
+                    Container(
+                      constraints: const BoxConstraints(minWidth: 44),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '$_quantity',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: _dark,
+                        ),
+                      ),
+                    ),
+                    _qtyButton(Icons.add_rounded, () {
+                      if (_quantity < 99) setState(() => _quantity++);
+                    }),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                _unitLabel(),
+                style: const TextStyle(fontSize: 13, color: _muted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
           DropdownButtonFormField<String>(
             initialValue: _selectedPaymentMethod,
             items: _paymentOptions
                 .map(
-                  (option) => DropdownMenuItem<String>(
-                    value: option,
-                    child: Text(option),
+                  (method) => DropdownMenuItem<String>(
+                    value: method,
+                    child: Text(method),
                   ),
                 )
                 .toList(),
@@ -579,9 +603,11 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
               if (value == null) return;
               setState(() => _selectedPaymentMethod = value);
             },
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Payment method',
-              border: OutlineInputBorder(),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -606,13 +632,13 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildAddressPanel(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
               ],
             )
           else
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: _surface,
                 borderRadius: BorderRadius.circular(16),
@@ -647,43 +673,44 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
               ),
             ),
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 20),
           _buildOrderSummary(),
-          const SizedBox(height: 22),
+          const SizedBox(height: 20),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _addToCart,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _primary,
+                    side: BorderSide(color: _primary.withValues(alpha: 0.35)),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
                   icon: const Icon(Icons.shopping_cart_outlined),
                   label: const Text(
                     'Add to Cart',
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _primary,
-                    side: BorderSide(color: _primary.withValues(alpha: 0.28)),
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: FilledButton(
                   onPressed: _isSubmittingOrder ? null : _submitOrder,
                   style: FilledButton.styleFrom(
                     backgroundColor: _primary,
+                    foregroundColor: _white,
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(18),
                     ),
                   ),
                   child: Text(
                     _isSubmittingOrder ? 'Ordering...' : 'Buy Now',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -691,130 +718,15 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Total: P${(_priceValue() * _quantity).toStringAsFixed(2)}',
+            'Total: ${_currencyLabel((_priceValue() * _quantity).toStringAsFixed(2))}',
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
               color: _dark,
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _metaRow(
-    IconData icon,
-    String value,
-    Color color, {
-    VoidCallback? onTap,
-  }) {
-    final child = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 6),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: _dark,
-          ),
-        ),
-      ],
-    );
-
-    if (onTap == null) return child;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(onTap: onTap, child: child),
-    );
-  }
-
-  Widget _infoTile(IconData icon, String label, String value) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: _primary),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: _muted,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: _dark,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuantityRow() {
-    return Row(
-      children: [
-        const Text(
-          'Quantity',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: _dark,
-          ),
-        ),
-        const Spacer(),
-        Container(
-          decoration: BoxDecoration(
-            color: _surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _border),
-          ),
-          child: Row(
-            children: [
-              _qtyButton(Icons.remove_rounded, () {
-                if (_quantity > 1) setState(() => _quantity--);
-              }),
-              Container(
-                width: 54,
-                alignment: Alignment.center,
-                child: Text(
-                  '$_quantity',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: _dark,
-                  ),
-                ),
-              ),
-              _qtyButton(Icons.add_rounded, () {
-                if (_quantity < 99) setState(() => _quantity++);
-              }),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        Text(_unitLabel(), style: const TextStyle(fontSize: 13, color: _muted)),
-      ],
     );
   }
 
@@ -855,7 +767,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                 (address) => DropdownMenuItem<String>(
                   value: address.addressId,
                   child: Text(
-                    '${address.label} - ${address.city}',
+                    '${address.label} • ${address.city}',
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -980,6 +892,71 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
     );
   }
 
+  Widget _infoTile(IconData icon, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: _primary),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _muted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: _dark,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _metaRow(
+    IconData icon,
+    String label,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: _dark,
+          ),
+        ),
+      ],
+    );
+
+    if (onTap == null) return content;
+    return InkWell(onTap: onTap, child: content);
+  }
+
   Widget _buildSellerSection() {
     if (_farmerProfile == null) return const SizedBox.shrink();
 
@@ -1035,12 +1012,8 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             ),
-            child: const Text(
-              'View Farm',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
+            child: const Text('View Farm'),
           ),
         ],
       ),
@@ -1048,7 +1021,8 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
   }
 
   Widget _buildReviewsSection() {
-    if (_reviews.isEmpty) return const SizedBox.shrink();
+    final reviews = _reviews.take(4).toList();
+    if (reviews.isEmpty) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -1060,29 +1034,16 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Text(
-                'Ratings & Reviews',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: _dark,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                _averageReviewRating().toStringAsFixed(1),
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: _primary,
-                ),
-              ),
-            ],
+          const Text(
+            'Recent Reviews',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: _dark,
+            ),
           ),
           const SizedBox(height: 18),
-          ..._reviews.take(4).map(_buildReviewCard),
+          ...reviews.map(_buildReviewCard),
         ],
       ),
     );
@@ -1115,44 +1076,31 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        review.userName?.trim().isNotEmpty == true
-                            ? review.userName!
-                            : 'Customer',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: _dark,
-                        ),
-                      ),
-                      Text(
-                        '${review.createdAt.month}/${review.createdAt.day}/${review.createdAt.year}',
-                        style: const TextStyle(fontSize: 12, color: _muted),
-                      ),
-                    ],
+                  child: Text(
+                    review.userName?.trim().isNotEmpty == true
+                        ? review.userName!
+                        : 'Customer',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _dark,
+                    ),
                   ),
                 ),
-                Row(
-                  children: List.generate(5, (index) {
-                    return Icon(
-                      index < review.rating.round()
-                          ? Icons.star_rounded
-                          : Icons.star_outline_rounded,
-                      size: 15,
-                      color: const Color(0xFFF59E0B),
-                    );
-                  }),
+                Text(
+                  review.rating.toStringAsFixed(1),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: _primary,
+                  ),
                 ),
               ],
             ),
             if (review.reviewText?.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Text(
                 review.reviewText!,
-                style: const TextStyle(fontSize: 14, color: _dark, height: 1.7),
+                style: const TextStyle(fontSize: 13, color: _muted, height: 1.6),
               ),
             ],
           ],
@@ -1231,30 +1179,11 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.star_rounded,
-                                  size: 14,
-                                  color: Color(0xFFF59E0B),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  item.rating ?? '0.0',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: _dark,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
                             Text(
-                              '${item.price} ${item.unit}',
+                              _currencyLabel(item.price),
                               style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
                                 color: _primary,
                               ),
                             ),

@@ -15,6 +15,7 @@ class AppRoutes {
   static const String customerMessages = '/customer-messages';
   static const String farmerMessages = '/farmer-messages';
   static const String loading = '/loading';
+  static const String productDetails = '/product-details';
 
   // Mobile-specific
   static const String farmerRegister = '/farmer-register';
@@ -37,6 +38,7 @@ class AppRoutes {
   static const String community = '/community';
   static const String profile = '/profile';
   static const String cart = '/cart';
+  static const String preorders = '/preorders';
   static const String farmerProfileBase = '/farm';
   static const String farmerDashboard = '/farmer-dashboard';
   static const String webFarmerRegister = '/web-farmer-register';

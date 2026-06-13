@@ -3,8 +3,12 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../shared/data/app_data.dart';
+import '../../../shared/models/auth/user_address_model.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/commerce/cart_service.dart';
+import '../../../shared/services/commerce/order_service.dart';
+import '../../../shared/services/user/user_service.dart';
+import '../../../shared/widgets/image_widgets.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 
 class WebCartScreen extends StatefulWidget {
@@ -21,15 +25,432 @@ class _WebCartScreenState extends State<WebCartScreen> {
   static const Color _border = Color(0xFFE2E8F0);
   static const Color _surface = Color(0xFFF8FAFC);
   static const Color _white = Colors.white;
+  final UserService _userService = UserService();
+  final TextEditingController _instructionsController = TextEditingController();
+  List<UserAddress> _addresses = const [];
+  UserAddress? _selectedAddress;
+  String _paymentMethod = 'COD';
+  bool _isLoadingAddresses = true;
+  bool _isOrdering = false;
 
   @override
   void initState() {
     super.initState();
     CartService().loadCart();
+    _loadAddresses();
+  }
+
+  @override
+  void dispose() {
+    _instructionsController.dispose();
+    super.dispose();
   }
 
   void _handleNav(int index) {
     context.go(AppRoutes.webTabRoute(index));
+  }
+
+  Future<void> _loadAddresses() async {
+    setState(() => _isLoadingAddresses = true);
+    try {
+      final addresses = await _userService.getAllUserAddresses();
+      if (!mounted) return;
+      setState(() {
+        _addresses = addresses;
+        _selectedAddress = addresses.cast<UserAddress?>().firstWhere(
+          (address) => address?.isDefault == true,
+          orElse: () => addresses.isNotEmpty ? addresses.first : null,
+        );
+        _isLoadingAddresses = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingAddresses = false);
+    }
+  }
+
+  Future<void> _openAddressBook() async {
+    await context.push(AppRoutes.addressBook);
+    if (!mounted) return;
+    await _loadAddresses();
+  }
+
+  Future<void> _showCheckoutDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final requiresAddress = _paymentMethod == 'COD';
+            final canSubmit =
+                !_isOrdering &&
+                CartService().selectedItems.isNotEmpty &&
+                (!requiresAddress || _selectedAddress != null);
+
+            return AlertDialog(
+              backgroundColor: _white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              contentPadding: const EdgeInsets.all(24),
+              content: SizedBox(
+                width: 560,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Checkout',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: _dark,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Choose payment, confirm your delivery details, and place the order.',
+                      style: GoogleFonts.inter(fontSize: 14, color: _muted),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Payment Method',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _dark,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildPaymentOption(
+                            title: 'COD',
+                            subtitle: 'Cash on Delivery',
+                            isSelected: _paymentMethod == 'COD',
+                            onTap: () {
+                              setDialogState(() => _paymentMethod = 'COD');
+                              setState(() => _paymentMethod = 'COD');
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildPaymentOption(
+                            title: 'COP',
+                            subtitle: 'Cash on Pickup',
+                            isSelected: _paymentMethod == 'COP',
+                            onTap: () {
+                              setDialogState(() => _paymentMethod = 'COP');
+                              setState(() => _paymentMethod = 'COP');
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      requiresAddress ? 'Shipping Address' : 'Pickup',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _dark,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (_isLoadingAddresses)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: CircularProgressIndicator(color: _primary),
+                        ),
+                      )
+                    else if (!requiresAddress)
+                      _buildAddressPanel(
+                        title: 'Pickup at the farm',
+                        subtitle:
+                            'No delivery address is required for Cash on Pickup.',
+                        actions: const [],
+                      )
+                    else if (_addresses.isEmpty)
+                      _buildAddressPanel(
+                        title: 'No saved address',
+                        subtitle:
+                            'Add a delivery address first so COD orders can be placed on web.',
+                        actions: [
+                          TextButton(
+                            onPressed: _openAddressBook,
+                            child: const Text('Manage Addresses'),
+                          ),
+                        ],
+                      )
+                    else
+                      _buildAddressSelector(setDialogState),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Special Instructions',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _dark,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _instructionsController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText:
+                            'e.g. Leave at the gate, call upon arrival...',
+                        hintStyle: GoogleFonts.inter(color: _muted),
+                        filled: true,
+                        fillColor: _surface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: _border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: _border),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: _surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: _border),
+                      ),
+                      child: _buildSummaryRow(
+                        'Total',
+                        'P${CartService().totalAmount.toStringAsFixed(2)}',
+                        emphasize: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: _isOrdering
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: canSubmit
+                      ? () async {
+                          Navigator.of(dialogContext).pop();
+                          await _submitCheckout();
+                        }
+                      : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text(_isOrdering ? 'Ordering...' : 'Confirm Order'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPaymentOption({
+    required String title,
+    required String subtitle,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected ? _primary.withValues(alpha: 0.08) : _white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? _primary : _border,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: isSelected ? _primary : _dark,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(fontSize: 12, color: _muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddressPanel({
+    required String title,
+    required String subtitle,
+    required List<Widget> actions,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: _dark,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: GoogleFonts.inter(fontSize: 13, color: _muted, height: 1.5),
+          ),
+          if (actions.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, children: actions),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddressSelector(StateSetter setDialogState) {
+    return Column(
+      children: [
+        DropdownButtonFormField<String>(
+          initialValue: _selectedAddress?.addressId,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: _surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: _border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: _border),
+            ),
+          ),
+          items: _addresses
+              .map(
+                (address) => DropdownMenuItem<String>(
+                  value: address.addressId,
+                  child: Text(
+                    '${address.label} • ${address.city}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            final address = _addresses.cast<UserAddress?>().firstWhere(
+              (item) => item?.addressId == value,
+              orElse: () => null,
+            );
+            setDialogState(() => _selectedAddress = address);
+            setState(() => _selectedAddress = address);
+          },
+        ),
+        const SizedBox(height: 12),
+        if (_selectedAddress != null)
+          _buildAddressPanel(
+            title: _selectedAddress!.label,
+            subtitle:
+                '${_selectedAddress!.recipientName}\n${_selectedAddress!.fullAddress}\n${_selectedAddress!.recipientPhone}',
+            actions: [
+              TextButton(
+                onPressed: _openAddressBook,
+                child: const Text('Manage Addresses'),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  Future<void> _submitCheckout() async {
+    final cartItems = CartService().selectedItems;
+    if (cartItems.isEmpty) return;
+
+    setState(() => _isOrdering = true);
+    try {
+      final orderService = OrderService();
+      final Map<String, List<OrderItemInput>> itemsByFarmer = {};
+      for (final item in cartItems) {
+        itemsByFarmer.putIfAbsent(item.farmerId, () => []);
+        itemsByFarmer[item.farmerId]!.add(
+          OrderItemInput(
+            productId: item.productId,
+            quantity: item.quantity.toDouble(),
+            unitPrice: item.priceValue,
+          ),
+        );
+      }
+
+      for (final entry in itemsByFarmer.entries) {
+        await orderService.createOfflineOrder(
+          farmerId: entry.key,
+          items: entry.value,
+          paymentMethod: _paymentMethod,
+          deliveryAddressId:
+              _paymentMethod == 'COP' ? null : _selectedAddress?.addressId,
+          notes: _instructionsController.text.trim(),
+        );
+      }
+
+      await CartService().removeSelected();
+      _instructionsController.clear();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order(s) placed successfully!'),
+          backgroundColor: _primary,
+        ),
+      );
+      context.go(AppRoutes.customerOrders);
+    } catch (e) {
+      if (!mounted) return;
+      final rawMessage = e.toString().replaceFirst('Exception: ', '');
+      final message = rawMessage.contains('Customer profile not found')
+          ? 'Customer profile not found. Please complete your consumer profile first.'
+          : rawMessage;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to place order: $message'),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isOrdering = false);
+    }
   }
 
   @override
@@ -192,12 +613,12 @@ class _WebCartScreenState extends State<WebCartScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: item.imageUrl.isNotEmpty
-                ? Image.network(
-                    item.imageUrl,
+                ? SafeNetworkImage(
+                    imageUrl: item.imageUrl,
                     width: 110,
                     height: 110,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => _buildImageFallback(),
+                    errorWidget: _buildImageFallback(),
                   )
                 : _buildImageFallback(),
           ),
@@ -348,15 +769,7 @@ class _WebCartScreenState extends State<WebCartScreen> {
             child: FilledButton(
               onPressed: selectedCount == 0
                   ? null
-                  : () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Checkout on web is not connected yet, but your cart is saved.',
-                          ),
-                        ),
-                      );
-                    },
+                  : _showCheckoutDialog,
               style: FilledButton.styleFrom(
                 backgroundColor: _primary,
                 disabledBackgroundColor: _border,

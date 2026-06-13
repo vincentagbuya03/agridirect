@@ -15,11 +15,13 @@ import 'screens/admin/admin_dashboard_redesigned.dart';
 class WebNavigation extends StatefulWidget {
   final VoidCallback onLogout;
   final int initialIndex;
+  final bool showPreOrdersInShop;
 
   const WebNavigation({
     super.key,
     required this.onLogout,
     this.initialIndex = 0,
+    this.showPreOrdersInShop = false,
   });
 
   @override
@@ -98,7 +100,11 @@ class _WebNavigationState extends State<WebNavigation> {
     }
     return [
       WebMarketplaceHome(onNavigate: _navigateTo, currentIndex: _currentIndex),
-      WebShopScreen(onNavigate: _navigateTo, currentIndex: _currentIndex),
+      WebShopScreen(
+        onNavigate: _navigateTo,
+        currentIndex: _currentIndex,
+        initialShowPreOrders: widget.showPreOrdersInShop,
+      ),
       WebCommunityHub(onNavigate: _navigateTo, currentIndex: _currentIndex),
       WebProfileScreen(
         onModeChanged: () => setState(() => _currentIndex = 0),

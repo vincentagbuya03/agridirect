@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/commerce/cart_service.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/widgets/image_widgets.dart';
 import '../../widgets/animated_components.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 
@@ -15,11 +15,13 @@ import '../../widgets/web_consumer_nav_bar.dart';
 class WebShopScreen extends StatefulWidget {
   final Function(int) onNavigate;
   final int currentIndex;
+  final bool initialShowPreOrders;
 
   const WebShopScreen({
     super.key,
     required this.onNavigate,
     required this.currentIndex,
+    this.initialShowPreOrders = false,
   });
 
   @override
@@ -51,6 +53,7 @@ class _WebShopScreenState extends State<WebShopScreen>
   List<ProductItem> _filteredProducts = [];
   bool _isLoading = true;
   bool _isGridView = true;
+  bool _showPreOrders = false;
   String _selectedCategory = 'All';
   String _sortBy = 'Newest';
   String _searchQuery = '';
@@ -74,7 +77,21 @@ class _WebShopScreenState extends State<WebShopScreen>
       vsync: this,
     )..repeat();
     _productControllers = [];
+    _showPreOrders = widget.initialShowPreOrders;
     _loadProducts();
+  }
+
+  @override
+  void didUpdateWidget(covariant WebShopScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialShowPreOrders != widget.initialShowPreOrders) {
+      _showPreOrders = widget.initialShowPreOrders;
+      _selectedCategory = 'All';
+      _searchQuery = '';
+      _searchController.clear();
+      _currentPage = 1;
+      _loadProducts();
+    }
   }
 
   @override
@@ -91,19 +108,36 @@ class _WebShopScreenState extends State<WebShopScreen>
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
     try {
-      final products = await _dataService.getAllProducts();
-      final categories = await _dataService.getMarketplaceCategories();
+      final products = _showPreOrders
+          ? await _dataService.getPreOrderProducts()
+          : await _dataService.getNearbyProducts();
+      final categories = _deriveCategories(products);
+      if (!mounted) return;
 
       setState(() {
         _allProducts = products;
         _filteredProducts = products;
-        _categories = ['All', ...categories];
+        _categories = categories;
         _isLoading = false;
       });
+      if (!mounted) return;
       _createProductAnimations();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
+  }
+
+  List<String> _deriveCategories(List<ProductItem> products) {
+    final categories =
+        products
+            .map((product) => product.categoryName?.trim())
+            .where((category) => category != null && category.isNotEmpty)
+            .cast<String>()
+            .toSet()
+            .toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return ['All', ...categories];
   }
 
   void _createProductAnimations() {
@@ -325,7 +359,17 @@ class _WebShopScreenState extends State<WebShopScreen>
   }
 
   void _openProduct(ProductItem product) {
-    context.push(AppRoutes.preorderDetails, extra: product);
+    context.push(
+      _showPreOrders ? AppRoutes.preorderDetails : AppRoutes.productDetails,
+      extra: product,
+    );
+  }
+
+  void _setShopMode(bool showPreOrders) {
+    final target = showPreOrders
+        ? '${AppRoutes.shop}?mode=preorders'
+        : AppRoutes.shop;
+    context.go(target);
   }
 
   // ─────────────────────────────────────────────
@@ -470,7 +514,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '\$0',
+                    '\₱0',
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -701,7 +745,9 @@ class _WebShopScreenState extends State<WebShopScreen>
           child: Icon(Icons.chevron_right, size: 16, color: _muted),
         ),
         Text(
-          _selectedCategory == 'All' ? 'Fresh Produce' : _selectedCategory,
+          _selectedCategory == 'All'
+              ? (_showPreOrders ? 'Pre-Orders' : 'Fresh Produce')
+              : _selectedCategory,
           style: GoogleFonts.inter(fontSize: 13, color: _muted),
         ),
       ],
@@ -712,6 +758,7 @@ class _WebShopScreenState extends State<WebShopScreen>
   // TOOLBAR (modern)
   // ─────────────────────────────────────────────
   Widget _buildFeaturedSection() {
+    if (_showPreOrders) return const SizedBox.shrink();
     var featuredProducts = _allProducts.where((p) => p.isFeatured).toList();
     if (featuredProducts.isEmpty) {
       featuredProducts = List<ProductItem>.from(_allProducts);
@@ -876,15 +923,13 @@ class _WebShopScreenState extends State<WebShopScreen>
                               top: Radius.circular(18),
                             ),
                             child: product.imageUrl.isNotEmpty
-                                ? CachedNetworkImage(
+                                ? SafeNetworkImage(
                                     imageUrl: product.imageUrl,
                                     fit: BoxFit.cover,
                                     width: double.infinity,
                                     height: double.infinity,
-                                    placeholder: (ctx, url) =>
-                                        _buildImagePlaceholder(),
-                                    errorWidget: (ctx, url, err) =>
-                                        _buildImagePlaceholder(),
+                                    placeholder: _buildImagePlaceholder(),
+                                    errorWidget: _buildImagePlaceholder(),
                                   )
                                 : _buildImagePlaceholder(),
                           ),
@@ -1154,7 +1199,7 @@ class _WebShopScreenState extends State<WebShopScreen>
               ).createShader(bounds),
               child: Text(
                 _selectedCategory == 'All'
-                    ? "Today's Harvest"
+                    ? (_showPreOrders ? 'Upcoming Harvests' : "Today's Harvest")
                     : _selectedCategory,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 32,
@@ -1177,7 +1222,9 @@ class _WebShopScreenState extends State<WebShopScreen>
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${_filteredProducts.length} fresh items available',
+                  _showPreOrders
+                      ? '${_filteredProducts.length} pre-orders available'
+                      : '${_filteredProducts.length} fresh items available',
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     color: _muted,
@@ -1190,6 +1237,44 @@ class _WebShopScreenState extends State<WebShopScreen>
         ),
         Row(
           children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: _white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  _buildModeToggle(
+                    label: 'Available Now',
+                    isSelected: !_showPreOrders,
+                    onTap: () {
+                      if (_showPreOrders) {
+                        _setShopMode(false);
+                      }
+                    },
+                  ),
+                  _buildModeToggle(
+                    label: 'Pre-Orders',
+                    isSelected: _showPreOrders,
+                    onTap: () {
+                      if (!_showPreOrders) {
+                        _setShopMode(true);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 14),
             // Grid/List toggle with premium style
             Container(
               decoration: BoxDecoration(
@@ -1214,7 +1299,9 @@ class _WebShopScreenState extends State<WebShopScreen>
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: _isGridView ? _primaryLight : Colors.transparent,
+                          color: _isGridView
+                              ? _primaryLight
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(9),
                         ),
                         child: Icon(
@@ -1233,7 +1320,9 @@ class _WebShopScreenState extends State<WebShopScreen>
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: !_isGridView ? _primaryLight : Colors.transparent,
+                          color: !_isGridView
+                              ? _primaryLight
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(9),
                         ),
                         child: Icon(
@@ -1304,6 +1393,35 @@ class _WebShopScreenState extends State<WebShopScreen>
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildModeToggle({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? _primaryLight : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: isSelected ? _primary : _muted,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1453,11 +1571,11 @@ class _WebShopScreenState extends State<WebShopScreen>
                     fit: StackFit.expand,
                     children: [
                       product.imageUrl.isNotEmpty
-                          ? CachedNetworkImage(
+                          ? SafeNetworkImage(
                               imageUrl: product.imageUrl,
                               fit: BoxFit.cover,
-                              placeholder: (ctx, url) => _buildImagePlaceholder(),
-                              errorWidget: (ctx, url, err) => _buildImagePlaceholder(),
+                              placeholder: _buildImagePlaceholder(),
+                              errorWidget: _buildImagePlaceholder(),
                             )
                           : _buildImagePlaceholder(),
                       Positioned(
@@ -1523,7 +1641,11 @@ class _WebShopScreenState extends State<WebShopScreen>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.store_rounded, size: 12, color: _primary),
+                            Icon(
+                              Icons.store_rounded,
+                              size: 12,
+                              color: _primary,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               product.farm,
@@ -1722,15 +1844,13 @@ class _WebShopScreenState extends State<WebShopScreen>
                         child: Stack(
                           children: [
                             product.imageUrl.isNotEmpty
-                                ? CachedNetworkImage(
+                                ? SafeNetworkImage(
                                     imageUrl: product.imageUrl,
                                     fit: BoxFit.cover,
                                     width: double.infinity,
                                     height: double.infinity,
-                                    placeholder: (ctx, url) =>
-                                        _buildImagePlaceholder(),
-                                    errorWidget: (ctx, url, err) =>
-                                        _buildImagePlaceholder(),
+                                    placeholder: _buildImagePlaceholder(),
+                                    errorWidget: _buildImagePlaceholder(),
                                   )
                                 : _buildImagePlaceholder(),
                             if (isHovered)
@@ -2224,7 +2344,7 @@ class _WebShopScreenState extends State<WebShopScreen>
             ),
             const SizedBox(height: 24),
             Text(
-              'No products found',
+              _showPreOrders ? 'No pre-orders found' : 'No products found',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
@@ -2235,6 +2355,8 @@ class _WebShopScreenState extends State<WebShopScreen>
             Text(
               _searchQuery.isNotEmpty
                   ? 'Try adjusting your search or filters.'
+                  : _showPreOrders
+                  ? 'No pre-orders in this category yet.'
                   : 'No products in this category yet.',
               style: GoogleFonts.inter(fontSize: 14, color: _muted),
             ),

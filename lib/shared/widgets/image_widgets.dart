@@ -48,10 +48,12 @@ class NetworkImageWithFallback extends StatelessWidget {
       child: _hasImageUrl
           ? ClipRRect(
               borderRadius: borderRadius ?? BorderRadius.zero,
-              child: CachedNetworkImage(
+              child: SafeNetworkImage(
                 imageUrl: imageUrl!,
                 fit: fit,
-                placeholder: (context, url) => Container(
+                width: size,
+                height: size,
+                placeholder: Container(
                   color: Colors.grey[100],
                   child: Center(
                     child: SizedBox(
@@ -61,7 +63,7 @@ class NetworkImageWithFallback extends StatelessWidget {
                     ),
                   ),
                 ),
-                errorWidget: (context, url, error) => Container(
+                errorWidget: Container(
                   color: backgroundColor ?? Colors.grey[200],
                   child: Icon(
                     fallbackIcon,
@@ -133,12 +135,15 @@ class CircularAvatarWithFallback extends StatelessWidget {
       ),
       child: ClipOval(
         child: _hasImageUrl
-            ? CachedNetworkImage(
+            ? SafeNetworkImage(
                 imageUrl: imageUrl!,
+                width: radius * 2,
+                height: radius * 2,
                 fit: BoxFit.cover,
-                placeholder: (context, url) =>
-                    Container(color: backgroundColor ?? Colors.grey[100]),
-                errorWidget: (context, url, error) => Container(
+                placeholder: Container(
+                  color: backgroundColor ?? Colors.grey[100],
+                ),
+                errorWidget: Container(
                   color: backgroundColor ?? Colors.grey[200],
                   child: Icon(
                     fallbackIcon,

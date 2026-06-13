@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +8,7 @@ import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/offline/offline_cache_service.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../shared/widgets/image_widgets.dart';
 
 import '../../../shared/services/auth/auth_service.dart';
 
@@ -149,7 +149,9 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
   }
 
   Widget _buildHero(ProductItem product) {
-    final imageUrl = product.imageUrl.trim();
+    final imageUrl = product.imageUrl.trim().isNotEmpty
+        ? product.imageUrl.trim()
+        : (product.farmerImageUrl ?? '').trim();
 
     return Stack(
       children: [
@@ -157,12 +159,12 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
           aspectRatio: 1.08,
           child: imageUrl.isEmpty
               ? _buildImageFallback()
-              : CachedNetworkImage(
+              : SafeNetworkImage(
                   imageUrl: imageUrl,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  placeholder: (_, _) => Container(color: AppColors.background),
-                  errorWidget: (_, _, _) => _buildImageFallback(),
+                  placeholder: Container(color: AppColors.background),
+                  errorWidget: _buildImageFallback(),
                 ),
         ),
         Positioned(
@@ -300,7 +302,8 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
   }
 
   Widget _buildBottomBar(ProductItem product) {
-    final isOwnProduct = AuthService().userId.isNotEmpty &&
+    final isOwnProduct =
+        AuthService().userId.isNotEmpty &&
         product.farmerId == AuthService().userId;
 
     if (isOwnProduct) {

@@ -11,7 +11,7 @@ import '../../../shared/router/app_router.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../../shared/widgets/brand_logo.dart';
 
-/// Web Profile screen.
+// Web Profile screen.
 /// Shows user info, "Start Selling" button, and account settings.
 class WebProfileScreen extends StatefulWidget {
   final VoidCallback onModeChanged;
@@ -79,7 +79,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     )..forward();
     final auth = AuthService();
     _registrationStatusSubscription =
-        SupabaseDatabase.watchFarmerRegistrationStatus(auth.userId).listen((status) {
+        SupabaseDatabase.watchFarmerRegistrationStatus(auth.userId).listen((
+          status,
+        ) {
           if (!mounted) return;
           setState(() {
             _registrationStatus = status;
@@ -162,7 +164,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       } else {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Could not start download.')),
+                            const SnackBar(
+                              content: Text('Could not start download.'),
+                            ),
                           );
                         }
                       }
@@ -170,7 +174,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [_accent, primary]),
+                        gradient: const LinearGradient(
+                          colors: [_accent, primary],
+                        ),
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
@@ -211,7 +217,6 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       ),
     );
   }
-
 
   Future<void> _confirmLogout() async {
     final shouldLogout = await showDialog<bool>(
@@ -475,7 +480,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         ? (_farmerProfile!['location']?.toString() ?? '')
         : null;
 
-    final profileImageUrl = isFarmer && _farmerProfile != null && _farmerProfile!['image_url'] != null && _farmerProfile!['image_url'].toString().isNotEmpty
+    final profileImageUrl =
+        isFarmer &&
+            _farmerProfile != null &&
+            _farmerProfile!['image_url'] != null &&
+            _farmerProfile!['image_url'].toString().isNotEmpty
         ? _farmerProfile!['image_url'].toString()
         : auth.userAvatarUrl;
 
@@ -501,7 +510,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               shape: BoxShape.circle,
               border: Border.all(color: primary, width: 3),
               boxShadow: [
-                BoxShadow(color: primary.withValues(alpha: 0.3), blurRadius: 16),
+                BoxShadow(
+                  color: primary.withValues(alpha: 0.3),
+                  blurRadius: 16,
+                ),
               ],
             ),
             child: ClipOval(
@@ -547,7 +559,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.location_on_rounded, size: 14, color: Colors.grey),
+                const Icon(
+                  Icons.location_on_rounded,
+                  size: 14,
+                  color: Colors.grey,
+                ),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
@@ -776,7 +792,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   Colors.orange.withValues(alpha: 0.05),
                   Colors.orange.withValues(alpha: 0.02),
                 ]
-              : [primary.withValues(alpha: 0.05), primary.withValues(alpha: 0.02)],
+              : [
+                  primary.withValues(alpha: 0.05),
+                  primary.withValues(alpha: 0.02),
+                ],
         ),
         border: Border.all(
           color: _registrationStatus == 'pending'
@@ -873,7 +892,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
+                    border: Border.all(
+                      color: Colors.orange.withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -1100,7 +1121,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (ctx, setModalState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
           title: Text(
             isFarmer ? 'Edit Farm Profile' : 'Edit Personal Profile',
             style: GoogleFonts.plusJakartaSans(
@@ -1109,7 +1132,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               color: _dark,
             ),
           ),
-          content: Container(
+          content: SizedBox(
             width: 480,
             child: SingleChildScrollView(
               child: Form(
@@ -1123,9 +1146,13 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       decoration: InputDecoration(
                         labelText: isFarmer ? 'Farm Name' : 'Full Name',
                         prefixIcon: const Icon(Icons.person_outline_rounded),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                      validator: (v) => (v == null || v.isEmpty) ? 'Please enter a name' : null,
+                      validator: (v) => (v == null || v.isEmpty)
+                          ? 'Please enter a name'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     if (isFarmer) ...[
@@ -1134,9 +1161,13 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         decoration: InputDecoration(
                           labelText: 'Specialty',
                           prefixIcon: const Icon(Icons.spa_outlined),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        validator: (v) => (v == null || v.isEmpty) ? 'Please enter farm specialty' : null,
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? 'Please enter farm specialty'
+                            : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -1144,7 +1175,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         decoration: InputDecoration(
                           labelText: 'Farm Location Address',
                           prefixIcon: const Icon(Icons.location_on_outlined),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1152,9 +1185,13 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                     TextFormField(
                       controller: imageController,
                       decoration: InputDecoration(
-                        labelText: isFarmer ? 'Farm Cover Image URL' : 'Avatar Image URL',
+                        labelText: isFarmer
+                            ? 'Farm Cover Image URL'
+                            : 'Avatar Image URL',
                         prefixIcon: const Icon(Icons.image_outlined),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1164,7 +1201,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       decoration: InputDecoration(
                         labelText: isFarmer ? 'Farm Bio / Description' : 'Bio',
                         prefixIcon: const Icon(Icons.description_outlined),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ],
@@ -1172,13 +1211,19 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               ),
             ),
           ),
-          actionsPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          actionsPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 16,
+          ),
           actions: [
             TextButton(
               onPressed: isSaving ? null : () => Navigator.of(dialogCtx).pop(),
               child: Text(
                 'Cancel',
-                style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             ElevatedButton(
@@ -1191,22 +1236,29 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         if (isFarmer) {
                           // Find farmer row first or update if exists
                           final userId = auth.userId;
-                          await SupabaseConfig.client.from('farmers').update({
-                            'farm_name': nameController.text.trim(),
-                            'specialty': specialtyController.text.trim(),
-                            'location': locationController.text.trim(),
-                            'image_url': imageController.text.trim(),
-                            'residential_address': bioController.text.trim(),
-                          }).eq('user_id', userId);
+                          await SupabaseConfig.client
+                              .from('farmers')
+                              .update({
+                                'farm_name': nameController.text.trim(),
+                                'specialty': specialtyController.text.trim(),
+                                'location': locationController.text.trim(),
+                                'image_url': imageController.text.trim(),
+                                'residential_address': bioController.text
+                                    .trim(),
+                              })
+                              .eq('user_id', userId);
                         } else {
                           final userId = auth.userId;
-                          await SupabaseConfig.client.from('users').update({
-                            'name': nameController.text.trim(),
-                            'avatar_url': imageController.text.trim(),
-                            'bio': bioController.text.trim(),
-                          }).eq('user_id', userId);
+                          await SupabaseConfig.client
+                              .from('users')
+                              .update({
+                                'name': nameController.text.trim(),
+                                'avatar_url': imageController.text.trim(),
+                                'bio': bioController.text.trim(),
+                              })
+                              .eq('user_id', userId);
                         }
-                        
+
                         await auth.initialize();
                         await _loadFarmerProfile();
                         if (mounted) {
@@ -1234,16 +1286,27 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
               child: isSaving
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
                     )
-                  : const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+                  : const Text(
+                      'Save Changes',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
             ),
           ],
         ),

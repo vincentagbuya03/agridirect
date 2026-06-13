@@ -5,6 +5,20 @@ import '../core/supabase_config.dart';
 
 /// Weather Service using OpenWeatherMap API
 class WeatherService {
+  static const Duration _requestTimeout = Duration(seconds: 15);
+
+  bool _isIgnorableWebFetchError(Object error) {
+    if (!kIsWeb) return false;
+    final message = error.toString().toLowerCase();
+    return message.contains('failed to fetch') ||
+        message.contains('clientexception');
+  }
+
+  void _logWeatherError(String prefix, Object error) {
+    if (_isIgnorableWebFetchError(error)) return;
+    debugPrint('$prefix$error');
+  }
+
   /// Fetch weather data for a location
   Future<WeatherData?> getWeatherByCoordinates({
     required double latitude,
@@ -21,7 +35,7 @@ class WeatherService {
           'type': 'current',
           'userId': SupabaseConfig.client.auth.currentUser?.id,
         },
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(_requestTimeout);
 
       if (response.status == 200) {
         final jsonData = response.data;
@@ -50,7 +64,7 @@ class WeatherService {
         return _getDefaultWeatherData();
       }
     } catch (e) {
-      debugPrint('Weather service error: $e');
+      _logWeatherError('Weather service error: ', e);
       return _getDefaultWeatherData();
     }
   }
@@ -65,7 +79,7 @@ class WeatherService {
           'type': 'current',
           'userId': SupabaseConfig.client.auth.currentUser?.id,
         },
-      );
+      ).timeout(_requestTimeout);
 
       if (response.status == 200) {
         final jsonData = response.data;
@@ -93,7 +107,7 @@ class WeatherService {
         return _getDefaultWeatherData();
       }
     } catch (e) {
-      debugPrint('Weather service error: $e');
+      _logWeatherError('Weather service error: ', e);
       return _getDefaultWeatherData();
     }
   }
@@ -112,7 +126,7 @@ class WeatherService {
           'type': 'forecast',
           'userId': SupabaseConfig.client.auth.currentUser?.id,
         },
-      );
+      ).timeout(_requestTimeout);
 
       if (response.status == 200) {
         return WeatherForecast.fromJson(response.data);
@@ -121,7 +135,7 @@ class WeatherService {
         return _getDefaultForecast();
       }
     } catch (e) {
-      debugPrint('Forecast service error: $e');
+      _logWeatherError('Forecast service error: ', e);
       return _getDefaultForecast();
     }
   }
@@ -136,7 +150,7 @@ class WeatherService {
           'type': 'forecast',
           'userId': SupabaseConfig.client.auth.currentUser?.id,
         },
-      );
+      ).timeout(_requestTimeout);
 
       if (response.status == 200) {
         return WeatherForecast.fromJson(response.data);
@@ -145,7 +159,7 @@ class WeatherService {
         return _getDefaultForecast();
       }
     } catch (e) {
-      debugPrint('Forecast service error: $e');
+      _logWeatherError('Forecast service error: ', e);
       return _getDefaultForecast();
     }
   }
