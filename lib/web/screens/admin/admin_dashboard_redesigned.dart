@@ -11,6 +11,7 @@ import 'admin_moderation_tab.dart';
 import 'admin_content_tab.dart';
 import 'admin_logs_tab.dart';
 import 'admin_announcements_tab.dart';
+import 'admin_settings_tab.dart';
 import '../../../shared/widgets/brand_logo.dart';
 
 class AdminDashboardRedesigned extends StatefulWidget {
@@ -429,98 +430,138 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
       case 7:
         return AdminAnnouncementsTab(adminService: _adminService);
       case 8:
-        return const Center(child: Text('Settings'));
+        return const AdminSettingsTab();
       default:
         return _buildDashboardView();
     }
   }
 
   Widget _buildDashboardView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AdminDashboardHeader(
-          title: 'Overview',
-          subtitle: 'Growth metrics and logistics for the AgriDirect platform.',
-          actions: [
-            ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Generating platform report...'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-              style: AdminUi.secondaryButton,
-              child: const Text('Download Report'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                setState(() => _selectedIndex = 4);
-              },
-              style: AdminUi.primaryButton,
-              child: const Text('Manage Assets'),
-            ),
-          ],
-        ),
-        _isLoading
-            ? const Padding(
-                padding: EdgeInsets.all(100),
-                child: Center(
-                  child: CircularProgressIndicator(color: AdminUi.brand),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final stackMetrics = width < 1380;
+        final stackPanels = width < 1220;
+        final metricWidth = stackMetrics ? (width - 24) / 2 : (width - 72) / 4;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AdminDashboardHeader(
+              title: 'Overview',
+              subtitle:
+                  'Growth metrics and logistics for the AgriDirect platform.',
+              actions: [
+                ElevatedButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Generating platform report...'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  style: AdminUi.secondaryButton,
+                  child: const Text('Download Report'),
                 ),
-              )
-            : Row(
-                children: [
-                  AdminMetricCard(
-                    label: 'Total Revenue',
-                    value: '₱${_counts['revenue']?.toStringAsFixed(0)}',
-                    icon: Icons.payments_rounded,
-                    trend: 'Realtime',
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() => _selectedIndex = 4);
+                  },
+                  style: AdminUi.primaryButton,
+                  child: const Text('Manage Assets'),
+                ),
+              ],
+            ),
+            _isLoading
+                ? const Padding(
+                    padding: EdgeInsets.all(100),
+                    child: Center(
+                      child: CircularProgressIndicator(color: AdminUi.brand),
+                    ),
+                  )
+                : Wrap(
+                    spacing: 24,
+                    runSpacing: 24,
+                    children: [
+                      SizedBox(
+                        width: metricWidth,
+                        child: AdminMetricCard(
+                          label: 'Total Revenue',
+                          value: '₱${_counts['revenue']?.toStringAsFixed(0)}',
+                          icon: Icons.payments_rounded,
+                          trend: 'Realtime',
+                        ),
+                      ),
+                      SizedBox(
+                        width: metricWidth,
+                        child: AdminMetricCard(
+                          label: 'Active Farmers',
+                          value: '${_counts['farmers']}',
+                          icon: Icons.agriculture_rounded,
+                          trend: 'Updated',
+                        ),
+                      ),
+                      SizedBox(
+                        width: metricWidth,
+                        child: AdminMetricCard(
+                          label: 'Total Products',
+                          value: '${_counts['products']}',
+                          icon: Icons.inventory_2_rounded,
+                          badge: 'Catalog',
+                        ),
+                      ),
+                      SizedBox(
+                        width: metricWidth,
+                        child: AdminMetricCard(
+                          label: 'Pending Verifications',
+                          value: '${_counts['pending']}',
+                          icon: Icons.verified_user_rounded,
+                          badge: _counts['pending'] > 0 ? 'Urgent' : null,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 24),
-                  AdminMetricCard(
-                    label: 'Active Farmers',
-                    value: '${_counts['farmers']}',
-                    icon: Icons.agriculture_rounded,
-                    trend: 'Updated',
+            const SizedBox(height: 32),
+            stackPanels
+                ? Column(
+                    children: [
+                      _buildChartCard(),
+                      const SizedBox(height: 24),
+                      _buildAdminLogsCard(),
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 2, child: _buildChartCard()),
+                      const SizedBox(width: 24),
+                      Expanded(flex: 1, child: _buildAdminLogsCard()),
+                    ],
                   ),
-                  const SizedBox(width: 24),
-                  AdminMetricCard(
-                    label: 'Total Products',
-                    value: '${_counts['products']}',
-                    icon: Icons.inventory_2_rounded,
-                    badge: 'Catalog',
+            const SizedBox(height: 32),
+            stackPanels
+                ? Column(
+                    children: [
+                      _buildPendingRegistrationsCard(),
+                      const SizedBox(height: 24),
+                      _buildPlatformIntegrityCard(),
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: _buildPendingRegistrationsCard(),
+                      ),
+                      const SizedBox(width: 24),
+                      Expanded(flex: 1, child: _buildPlatformIntegrityCard()),
+                    ],
                   ),
-                  const SizedBox(width: 24),
-                  AdminMetricCard(
-                    label: 'Pending Verifications',
-                    value: '${_counts['pending']}',
-                    icon: Icons.verified_user_rounded,
-                    badge: _counts['pending'] > 0 ? 'Urgent' : null,
-                  ),
-                ],
-              ),
-        const SizedBox(height: 32),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(flex: 2, child: _buildChartCard()),
-            const SizedBox(width: 24),
-            Expanded(flex: 1, child: _buildAdminLogsCard()),
           ],
-        ),
-        const SizedBox(height: 32),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(flex: 2, child: _buildPendingRegistrationsCard()),
-            const SizedBox(width: 24),
-            Expanded(flex: 1, child: _buildPlatformIntegrityCard()),
-          ],
-        ),
-      ],
+        );
+      },
     );
   }
 

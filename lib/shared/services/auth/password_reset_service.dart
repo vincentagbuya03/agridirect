@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 import 'otp_service.dart';
 import '../integration/email_service.dart';
 import '../core/supabase_config.dart';
@@ -55,6 +59,10 @@ class PasswordResetService {
     if (msg.contains('rate') || msg.contains('too many')) {
       return 'Too many reset attempts. Please wait a few minutes and try again.';
     }
+    if (msg.contains('error sending recovery email') ||
+        msg.contains('unexpected_failure')) {
+      return 'We could not send the password reset email right now. Please try again later or contact support.';
+    }
     if (_isRetryableRecoveryError(e)) {
       return 'Temporary email delivery issue. Please try again in a moment.';
     }
@@ -84,11 +92,64 @@ class PasswordResetService {
     await _client.auth.resetPasswordForEmail(normalizedEmail);
   }
 
+  static String get _webEmailApiBase {
+    final configured = dotenv.env['WEB_EMAIL_API_BASE']?.trim() ?? '';
+    if (configured.isNotEmpty) return configured.replaceAll(RegExp(r'/$'), '');
+
+    final currentOrigin = Uri.base.origin;
+    final host = Uri.base.host.toLowerCase();
+    if (host != 'localhost' && host != '127.0.0.1' && host != '::1') {
+      return currentOrigin;
+    }
+
+    return 'https://agridirect-app.vercel.app';
+  }
+
+  static Future<void> _sendResetCodeViaWebApi(String normalizedEmail) async {
+    final uri = Uri.parse('$_webEmailApiBase/api/password-reset/send-code');
+
+    try {
+      final response = await http
+          .post(
+            uri,
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': normalizedEmail}),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return;
+      }
+
+      final data = jsonDecode(response.body);
+      if (data is Map && data['error'] is String) {
+        throw data['error'] as String;
+      }
+
+      throw 'Unable to send password reset email right now.';
+    } catch (e) {
+      debugPrint('[PasswordResetService] Web reset-code API failed: $e');
+      final message = e.toString().toLowerCase();
+      if (message.contains('failed to fetch') ||
+          message.contains('xmlhttprequest error') ||
+          message.contains('clientexception')) {
+        throw 'Password reset email service is not reachable. Please deploy the web email API or check its environment variables.';
+      }
+
+      throw 'Unable to send password reset email right now. Please try again later or contact support.';
+    }
+  }
+
   /// Send a 6-digit password reset code to the user's email
   static Future<PasswordResetDeliveryMode> sendResetCode(String email) async {
     try {
       final normalizedEmail = _normalizeEmail(email);
       final userId = await _findUserIdByEmail(normalizedEmail);
+
+      if (kIsWeb) {
+        await _sendResetCodeViaWebApi(normalizedEmail);
+        return PasswordResetDeliveryMode.code;
+      }
 
       // If users/profile row is missing, still allow Supabase recovery email.
       if (userId == null) {
@@ -96,22 +157,7 @@ class PasswordResetService {
         return PasswordResetDeliveryMode.recoveryLink;
       }
 
-      final existingCode = await OTPService().getActiveOTPCode(
-        userId: userId,
-        type: 'password_reset',
-      );
-
-      // 2. Reuse an active code if it is still valid; otherwise generate a new one.
-      final code =
-          existingCode ??
-          await OTPService().generateAndStoreOTP(
-            userId: userId,
-            type: 'password_reset',
-          );
-
-      if (code == null) {
-        throw 'Failed to generate reset code. Please try again later.';
-      }
+      final code = await _getOrCreatePasswordResetCode(userId);
 
       // 3. Send via Gmail SMTP
       final sent = await EmailService.sendPasswordResetCode(
@@ -120,14 +166,38 @@ class PasswordResetService {
       );
 
       if (!sent) {
-        throw 'Failed to send reset email. Check your SMTP configuration.';
+        debugPrint(
+          '[PasswordResetService] Password reset code email failed, falling back to recovery link for $normalizedEmail',
+        );
+        await _sendRecoveryEmailWithFallback(normalizedEmail: normalizedEmail);
+        return PasswordResetDeliveryMode.recoveryLink;
       }
 
       return PasswordResetDeliveryMode.code;
     } catch (e) {
       debugPrint('[PasswordResetService] Error sending reset code: $e');
-      rethrow;
+      throw _friendlyRecoveryError(e);
     }
+  }
+
+  static Future<String> _getOrCreatePasswordResetCode(String userId) async {
+    final existingCode = await OTPService().getActiveOTPCode(
+      userId: userId,
+      type: 'password_reset',
+    );
+
+    final code =
+        existingCode ??
+        await OTPService().generateAndStoreOTP(
+          userId: userId,
+          type: 'password_reset',
+        );
+
+    if (code == null) {
+      throw 'Failed to generate reset code. Please try again later.';
+    }
+
+    return code;
   }
 
   /// Verify code and update password securely

@@ -2121,13 +2121,21 @@ class AdminService extends ChangeNotifier {
         actionFilter: actionFilter,
       );
 
-      final userLogs = await _getUserSessionLogRows(
+      final activityLogs = await _getSystemActivityLogRows(
         page: page,
         pageSize: pageSize,
         actionFilter: actionFilter,
       );
 
-      final combined = [...adminLogs, ...userLogs];
+      final sessionLogs = _isSessionActionFilter(actionFilter)
+          ? await _getUserSessionLogRows(
+              page: page,
+              pageSize: pageSize,
+              actionFilter: actionFilter,
+            )
+          : <Map<String, dynamic>>[];
+
+      final combined = [...adminLogs, ...activityLogs, ...sessionLogs];
       combined.sort((a, b) {
         final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '');
         final bDate = DateTime.tryParse(b['created_at']?.toString() ?? '');
@@ -2205,6 +2213,87 @@ class AdminService extends ChangeNotifier {
     }).toList();
 
     return List<Map<String, dynamic>>.from(enriched);
+  }
+
+  bool _isSessionActionFilter(String? actionFilter) {
+    return actionFilter == 'user_session_start' ||
+        actionFilter == 'farmer_session_start' ||
+        actionFilter == 'customer_session_start';
+  }
+
+  Future<List<Map<String, dynamic>>> _getSystemActivityLogRows({
+    required int page,
+    required int pageSize,
+    String? actionFilter,
+  }) async {
+    if (_isSessionActionFilter(actionFilter)) return [];
+
+    try {
+      var query = _client
+          .from('system_activity_logs')
+          .select(
+            'log_id, actor_user_id, actor_role, action, details, entity_type, entity_id, severity, metadata, created_at',
+          );
+
+      if (actionFilter != null && actionFilter != 'all') {
+        query = query.eq('action', actionFilter);
+      }
+
+      final response = await query
+          .order('created_at', ascending: false)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      final logs = List<Map<String, dynamic>>.from(
+        (response as List).map((row) => Map<String, dynamic>.from(row)),
+      );
+
+      if (logs.isEmpty) return [];
+
+      final actorIds = logs
+          .map((log) => log['actor_user_id']?.toString())
+          .whereType<String>()
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
+
+      final userById = <String, Map<String, dynamic>>{};
+      if (actorIds.isNotEmpty) {
+        final users = await _client
+            .from('users')
+            .select('user_id, name, email')
+            .inFilter('user_id', actorIds);
+
+        for (final user in users as List) {
+          final row = Map<String, dynamic>.from(user);
+          final userId = row['user_id']?.toString();
+          if (userId != null) userById[userId] = row;
+        }
+      }
+
+      return logs.map((log) {
+        final actorId = log['actor_user_id']?.toString();
+        final user = actorId == null ? null : userById[actorId];
+        final role = (log['actor_role'] ?? 'User').toString();
+        final fallbackName = role == 'Farmer'
+            ? 'Farmer'
+            : role == 'Customer'
+            ? 'Customer'
+            : 'System';
+
+        return {
+          ...log,
+          'target_user_id': actorId,
+          'actor_name': user?['name'] ?? fallbackName,
+          'actor_email': user?['email'] ?? '',
+          'actor_role': role,
+          'admin_name': user?['name'] ?? fallbackName,
+          'admin_email': user?['email'] ?? '',
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('Failed to load system activity logs: $e');
+      return [];
+    }
   }
 
   Future<List<Map<String, dynamic>>> _getUserSessionLogRows({
@@ -2714,83 +2803,77 @@ class AdminService extends ChangeNotifier {
   /// Get recent dashboard activity (combined feed)
   Future<List<Map<String, dynamic>>> getDashboardActivity() async {
     try {
-      final results = await Future.wait([
-        // Recent 3 pending farmers
-        _client
-            .from('farmer_registrations')
-            .select(
-              'registration_id, farmers(farm_name, user_id, users!fk_farmers_user(name, email, phone, avatar_url)), created_at',
-            )
-            .eq('status', 'pending')
-            .order('created_at', ascending: false)
-            .limit(3),
-        // Recent 3 orders
-        _client
-            .from('v_orders')
-            .select(
-              'order_id, order_number, total:total_amount, status:status_code, created_at, customer_name',
-            )
-            .order('created_at', ascending: false)
-            .limit(3),
-        // Recent 3 reports
-        _client
-            .from('reported_content')
-            .select('report_id, content_type_id, reason, created_at')
-            .order('created_at', ascending: false)
-            .limit(3),
-      ]);
-
-      final List<Map<String, dynamic>> activity = [];
-
-      // Add registrations
-      for (var reg in (results[0] as List)) {
-        final farmers = _normalizeUserRelation(reg['farmers']);
-        final users = _normalizeUserRelation(farmers?['users']);
-        final farmName = farmers?['farm_name'] ?? users?['name'] ?? 'Someone';
-        activity.add({
-          'type': 'registration',
-          'title': 'New Farmer Signup',
-          'subtitle': '$farmName applied',
-          'time': reg['created_at'],
-          'color': const Color(0xFF10B981),
-          'icon': Icons.person_add_rounded,
-        });
-      }
-
-      // Add orders
-      for (var order in (results[1] as List)) {
-        activity.add({
-          'type': 'order',
-          'title': 'New Order #${order['order_number']}',
-          'subtitle':
-              'Total: ₱${order['total']} by ${order['customer_name'] ?? 'Customer'}',
-          'time': order['created_at'],
-          'color': const Color(0xFF3B82F6),
-          'icon': Icons.shopping_bag_rounded,
-        });
-      }
-
-      // Add reports
-      for (var report in (results[2] as List)) {
-        activity.add({
-          'type': 'report',
-          'title': 'Content Reported',
-          'subtitle': 'Reason: ${report['reason']}',
-          'time': report['created_at'],
-          'color': const Color(0xFFEF4444),
-          'icon': Icons.warning_rounded,
-        });
-      }
-
-      // Sort by time descending
-      activity.sort(
-        (a, b) => (b['time'] as String).compareTo(a['time'] as String),
-      );
-      return activity;
+      final logs = await getSystemActivityLogs(pageSize: 4);
+      return logs.map((log) {
+        final action = (log['action'] ?? 'system_event').toString();
+        final severity = (log['severity'] ?? '').toString();
+        return {
+          'type': action,
+          'title': _dashboardActivityTitle(action, log),
+          'subtitle': (log['details'] ?? 'No details available').toString(),
+          'time': log['created_at'],
+          'color': _dashboardActivityColor(action, severity),
+          'icon': Icons.event_note_rounded,
+        };
+      }).toList();
     } catch (e) {
       debugPrint('Error fetching activity: $e');
       return [];
     }
+  }
+
+  String _dashboardActivityTitle(String action, Map<String, dynamic> log) {
+    final metadata = log['metadata'] is Map
+        ? Map<String, dynamic>.from(log['metadata'] as Map)
+        : <String, dynamic>{};
+    final orderNumber = metadata['order_number']?.toString();
+    final productName = metadata['product_name']?.toString();
+
+    switch (action) {
+      case 'order_created':
+        return orderNumber == null || orderNumber.isEmpty
+            ? 'Order Placed'
+            : 'Order Placed #$orderNumber';
+      case 'preorder_created':
+        return orderNumber == null || orderNumber.isEmpty
+            ? 'Pre-order Placed'
+            : 'Pre-order Placed #$orderNumber';
+      case 'order_status_updated':
+        return orderNumber == null || orderNumber.isEmpty
+            ? 'Order Status Updated'
+            : 'Order Updated #$orderNumber';
+      case 'order_cancelled':
+        return orderNumber == null || orderNumber.isEmpty
+            ? 'Order Cancelled'
+            : 'Order Cancelled #$orderNumber';
+      case 'product_created':
+        return productName == null || productName.isEmpty
+            ? 'Product Added'
+            : 'Product Added: $productName';
+      case 'product_updated':
+        return productName == null || productName.isEmpty
+            ? 'Product Edited'
+            : 'Product Edited: $productName';
+      case 'product_archived':
+        return productName == null || productName.isEmpty
+            ? 'Product Archived'
+            : 'Product Archived: $productName';
+      default:
+        return action
+            .split('_')
+            .where((part) => part.isNotEmpty)
+            .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+            .join(' ');
+    }
+  }
+
+  Color _dashboardActivityColor(String action, String severity) {
+    if (severity == 'critical') return const Color(0xFFEF4444);
+    if (severity == 'warning') return const Color(0xFFF59E0B);
+
+    if (action.startsWith('product_')) return const Color(0xFF10B981);
+    if (action.contains('order')) return const Color(0xFF3B82F6);
+    return const Color(0xFF0F766E);
   }
 
   /// Get signed URL for a file in storage

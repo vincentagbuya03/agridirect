@@ -340,16 +340,15 @@ class AdminDashboardHeader extends StatelessWidget {
               children: [
                 Text(title, style: AdminUi.display(context, size: 32)),
                 const SizedBox(height: 4),
-                Text(subtitle, style: AdminUi.body(color: AdminUi.textSecondary)),
+                Text(
+                  subtitle,
+                  style: AdminUi.body(color: AdminUi.textSecondary),
+                ),
               ],
             ),
           ),
           if (actions.isNotEmpty)
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: actions,
-            ),
+            Wrap(spacing: 12, runSpacing: 12, children: actions),
         ],
       ),
     );
@@ -377,98 +376,90 @@ class AdminMetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        height: 140,
-        padding: const EdgeInsets.all(24),
-        decoration: AdminUi.cardDecoration().copyWith(
-          image: const DecorationImage(
-            image: NetworkImage(
-              'https://www.transparenttextures.com/patterns/cubes.png',
-            ),
-            opacity: 0.02,
-            repeat: ImageRepeat.repeat,
-          ),
+    return Container(
+      height: 140,
+      padding: const EdgeInsets.all(24),
+      decoration: AdminUi.cardDecoration().copyWith(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, iconColor.withValues(alpha: 0.035)],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: iconColor.withValues(alpha: 0.1),
-                    borderRadius: AdminUi.radiusSm,
-                  ),
-                  child: Icon(icon, size: 20, color: iconColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.1),
+                  borderRadius: AdminUi.radiusSm,
                 ),
-                if (trend != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AdminUi.brandSoft,
-                      borderRadius: AdminUi.radiusFull,
-                    ),
-                    child: Text(
-                      trend!,
-                      style: AdminUi.label(
-                        size: 10,
-                        color: AdminUi.brand,
-                        weight: FontWeight.w700,
-                      ),
-                    ),
-                  )
-                else if (badge != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: badge == 'Urgent'
-                          ? AdminUi.danger.withValues(alpha: 0.1)
-                          : AdminUi.brandSoft,
-                      borderRadius: AdminUi.radiusFull,
-                    ),
-                    child: Text(
-                      badge!,
-                      style: AdminUi.label(
-                        size: 10,
-                        color: badge == 'Urgent'
-                            ? AdminUi.danger
-                            : AdminUi.brand,
-                        weight: FontWeight.w700,
-                      ),
+                child: Icon(icon, size: 20, color: iconColor),
+              ),
+              if (trend != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AdminUi.brandSoft,
+                    borderRadius: AdminUi.radiusFull,
+                  ),
+                  child: Text(
+                    trend!,
+                    style: AdminUi.label(
+                      size: 10,
+                      color: AdminUi.brand,
+                      weight: FontWeight.w700,
                     ),
                   ),
-              ],
+                )
+              else if (badge != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: badge == 'Urgent'
+                        ? AdminUi.danger.withValues(alpha: 0.1)
+                        : AdminUi.brandSoft,
+                    borderRadius: AdminUi.radiusFull,
+                  ),
+                  child: Text(
+                    badge!,
+                    style: AdminUi.label(
+                      size: 10,
+                      color: badge == 'Urgent' ? AdminUi.danger : AdminUi.brand,
+                      weight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const Spacer(),
+          Text(
+            label.toUpperCase(),
+            style: AdminUi.label(
+              size: 10,
+              color: AdminUi.textMuted,
+              weight: FontWeight.w700,
+              letterSpacing: 0.5,
             ),
-            const Spacer(),
-            Text(
-              label.toUpperCase(),
-              style: AdminUi.label(
-                size: 10,
-                color: AdminUi.textMuted,
-                weight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: AdminUi.display(
-                context,
-                size: 24,
-                weight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AdminUi.display(context, size: 24, weight: FontWeight.w800),
+          ),
+        ],
       ),
     );
   }

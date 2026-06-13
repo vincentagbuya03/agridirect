@@ -28,6 +28,20 @@ CREATE TABLE public.admin_logs (
   CONSTRAINT fk_admin_logs_admin_id FOREIGN KEY (admin_id) REFERENCES public.admins(admin_id),
   CONSTRAINT fk_admin_logs_target FOREIGN KEY (target_user_id) REFERENCES public.users(user_id)
 );
+CREATE TABLE public.system_activity_logs (
+  log_id uuid NOT NULL DEFAULT gen_random_uuid(),
+  actor_user_id uuid NOT NULL,
+  actor_role text NOT NULL DEFAULT 'User'::text CHECK (actor_role = ANY (ARRAY['Admin'::text, 'Farmer'::text, 'Customer'::text, 'User'::text, 'System'::text])),
+  action text NOT NULL,
+  details text NOT NULL,
+  entity_type text NOT NULL,
+  entity_id uuid,
+  severity text NOT NULL DEFAULT 'info'::text CHECK (severity = ANY (ARRAY['info'::text, 'warning'::text, 'critical'::text])),
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT system_activity_logs_pkey PRIMARY KEY (log_id),
+  CONSTRAINT system_activity_logs_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES public.users(user_id) ON DELETE CASCADE
+);
 CREATE TABLE public.admins (
   admin_id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL UNIQUE,

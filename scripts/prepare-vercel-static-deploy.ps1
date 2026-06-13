@@ -4,7 +4,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $flutterOutputDir = Join-Path $projectRoot "build\app\outputs\flutter-apk"
 $splitOutputDir = Join-Path $projectRoot "build\app\outputs\apk\release"
 $webOutputDir = Join-Path $projectRoot "build\web"
-$canonicalUniversalApkName = "agridirect-android-universal-release.apk"
+$canonicalUniversalApkName = "AgriDirect-Installer.apk"
 
 Push-Location $projectRoot
 try {
@@ -18,8 +18,10 @@ try {
         Remove-Item -Force
 
     $universalSource = @(
-        Get-ChildItem -LiteralPath $flutterOutputDir -Filter "AgriDirect-Installer-*.apk" -File -ErrorAction SilentlyContinue
-        Get-ChildItem -LiteralPath $flutterOutputDir -Filter "agridirect-android-universal-release.apk" -File -ErrorAction SilentlyContinue
+        Get-ChildItem -LiteralPath $flutterOutputDir -Filter "AgriDirect-Installer-v*-release.apk" -File -ErrorAction SilentlyContinue
+        Get-ChildItem -LiteralPath $flutterOutputDir -Filter "app-release.apk" -File -ErrorAction SilentlyContinue
+        Get-ChildItem -LiteralPath $projectRoot -Filter $canonicalUniversalApkName -File -ErrorAction SilentlyContinue
+        Get-ChildItem -LiteralPath (Join-Path $projectRoot "web") -Filter $canonicalUniversalApkName -File -ErrorAction SilentlyContinue
     ) |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1 -ExpandProperty FullName

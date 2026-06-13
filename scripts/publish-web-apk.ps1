@@ -4,13 +4,16 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $flutterApkDir = Join-Path $projectRoot "build\app\outputs\flutter-apk"
 $splitApkDir = Join-Path $projectRoot "build\app\outputs\apk\release"
 $webDir = Join-Path $projectRoot "web"
-$universalWebName = "agridirect-android-universal-release.apk"
+$universalWebName = "AgriDirect-Installer.apk"
 
 if (-not (Test-Path $webDir)) {
     throw "Web directory not found at $webDir"
 }
 
-$universalSource = Get-ChildItem -LiteralPath $flutterApkDir -Filter "AgriDirect-Installer-*.apk" -File -ErrorAction SilentlyContinue |
+$universalSource = @(
+    Get-ChildItem -LiteralPath $flutterApkDir -Filter "AgriDirect-Installer-v*-release.apk" -File -ErrorAction SilentlyContinue
+    Get-ChildItem -LiteralPath $flutterApkDir -Filter "app-release.apk" -File -ErrorAction SilentlyContinue
+) |
     Sort-Object LastWriteTime -Descending |
     Select-Object -First 1
 

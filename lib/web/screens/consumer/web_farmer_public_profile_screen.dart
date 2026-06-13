@@ -240,27 +240,6 @@ class _WebFarmerPublicProfileScreenState
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Container(
-                          width: 92,
-                          height: 92,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
-                            color: _primary.withValues(alpha: 0.18),
-                          ),
-                          child: ClipOval(
-                            child: avatarUrl != null && avatarUrl.isNotEmpty
-                                ? SafeNetworkImage(
-                                    imageUrl: avatarUrl,
-                                    defaultBucket: 'uploads',
-                                    fit: BoxFit.cover,
-                                    placeholder: _buildAvatarFallback(farmName),
-                                    errorWidget: _buildAvatarFallback(farmName),
-                                  )
-                                : _buildAvatarFallback(farmName),
-                          ),
-                        ),
-                        const SizedBox(width: 18),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

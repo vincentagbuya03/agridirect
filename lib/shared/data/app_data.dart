@@ -23,6 +23,7 @@ class ProductItem {
   final double? targetQuantity;
   final double? latitude;
   final double? longitude;
+  final bool isFeatured;
 
   const ProductItem({
     this.productId,
@@ -45,6 +46,7 @@ class ProductItem {
     this.targetQuantity,
     this.latitude,
     this.longitude,
+    this.isFeatured = false,
   });
 }
 

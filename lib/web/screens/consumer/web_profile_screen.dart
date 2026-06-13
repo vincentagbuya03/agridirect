@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../../shared/widgets/brand_logo.dart';
@@ -46,6 +47,29 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   String? _registrationStatus; // 'pending', 'approved', 'rejected', or null
   StreamSubscription<String?>? _registrationStatusSubscription;
 
+  Map<String, dynamic>? _farmerProfile;
+  bool _isLoadingFarmerProfile = false;
+
+  Future<void> _loadFarmerProfile() async {
+    final auth = AuthService();
+    if (!auth.isLoggedIn) return;
+    setState(() => _isLoadingFarmerProfile = true);
+    try {
+      final profile = await SupabaseDataService().getFarmerProfile(auth.userId);
+      if (mounted) {
+        setState(() {
+          _farmerProfile = profile;
+          _isLoadingFarmerProfile = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading farmer profile in web_profile_screen: $e');
+      if (mounted) {
+        setState(() => _isLoadingFarmerProfile = false);
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +85,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             _registrationStatus = status;
           });
         });
+    _loadFarmerProfile();
   }
 
   @override
@@ -339,7 +364,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
 
   // ─── Navigation Bar ───
   Widget _buildNavBar() {
-    final navItems = ['Home', 'Shop', 'Community'];
+    final auth = AuthService();
+    final navItems = auth.isViewingAsFarmer
+        ? ['Dashboard', 'Products', 'Orders', 'Community']
+        : ['Home', 'Shop', 'Community'];
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
@@ -358,7 +386,13 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       child: Row(
         children: [
           // Logo with pulsing glow
-          const BrandLogo(size: BrandLogoSize.medium),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => widget.onNavigate(0),
+              child: const BrandLogo(size: BrandLogoSize.medium),
+            ),
+          ),
           const SizedBox(width: 48),
           // Nav items
           ...List.generate(navItems.length, (i) {
@@ -407,15 +441,21 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           }),
           const Spacer(),
           // Circle person icon (active — profile page)
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFFDCFCE7),
-              shape: BoxShape.circle,
-              border: Border.all(color: primary, width: 1.5),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => widget.onNavigate(auth.isViewingAsFarmer ? 4 : 3),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: primary, width: 1.5),
+                ),
+                child: Icon(Icons.person_rounded, color: primary, size: 22),
+              ),
             ),
-            child: Icon(Icons.person_rounded, color: primary, size: 22),
           ),
         ],
       ),
@@ -423,6 +463,22 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   }
 
   Widget _buildProfileCard(AuthService auth) {
+    final isFarmer = auth.isViewingAsFarmer;
+    final displayName = isFarmer && _farmerProfile != null
+        ? (_farmerProfile!['farm_name']?.toString() ?? auth.userName)
+        : auth.userName;
+    final displaySpecialty = isFarmer && _farmerProfile != null
+        ? (_farmerProfile!['specialty']?.toString() ?? 'Fresh Produce')
+        : null;
+    final displayEmail = auth.userEmail;
+    final displayLocation = isFarmer && _farmerProfile != null
+        ? (_farmerProfile!['location']?.toString() ?? '')
+        : null;
+
+    final profileImageUrl = isFarmer && _farmerProfile != null && _farmerProfile!['image_url'] != null && _farmerProfile!['image_url'].toString().isNotEmpty
+        ? _farmerProfile!['image_url'].toString()
+        : auth.userAvatarUrl;
+
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
@@ -450,7 +506,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             ),
             child: ClipOval(
               child: SafeNetworkImage(
-                imageUrl: auth.userAvatarUrl,
+                imageUrl: profileImageUrl,
                 defaultBucket: 'uploads',
                 fit: BoxFit.cover,
                 placeholder: Container(color: Colors.grey[200]),
@@ -460,18 +516,50 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           ),
           const SizedBox(height: 18),
           Text(
-            auth.userName.isNotEmpty ? auth.userName : 'User',
+            displayName.isNotEmpty ? displayName : 'User',
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.3,
             ),
+            textAlign: TextAlign.center,
           ),
+          if (displaySpecialty != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              displaySpecialty,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: primary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
           const SizedBox(height: 4),
           Text(
-            auth.userEmail.isNotEmpty ? auth.userEmail : 'user@email.com',
+            displayEmail.isNotEmpty ? displayEmail : 'user@email.com',
             style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+            textAlign: TextAlign.center,
           ),
+          if (displayLocation != null && displayLocation.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.location_on_rounded, size: 14, color: Colors.grey),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    displayLocation,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 14),
           if (auth.isSeller)
             Container(
@@ -499,20 +587,23 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           const SizedBox(height: 14),
           MouseRegion(
             cursor: SystemMouseCursors.click,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Center(
-                child: Text(
-                  'Edit Profile',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF475569),
+            child: GestureDetector(
+              onTap: () => _showEditProfileDialog(auth),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Text(
+                    'Edit Profile',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF475569),
+                    ),
                   ),
                 ),
               ),
@@ -971,6 +1062,192 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           ),
         );
       }).toList(),
+    );
+  }
+
+  void _showEditProfileDialog(AuthService auth) {
+    final isFarmer = auth.isViewingAsFarmer;
+    final nameController = TextEditingController(
+      text: isFarmer && _farmerProfile != null
+          ? (_farmerProfile!['farm_name']?.toString() ?? auth.userName)
+          : auth.userName,
+    );
+    final specialtyController = TextEditingController(
+      text: isFarmer && _farmerProfile != null
+          ? (_farmerProfile!['specialty']?.toString() ?? 'Fresh Produce')
+          : '',
+    );
+    final locationController = TextEditingController(
+      text: isFarmer && _farmerProfile != null
+          ? (_farmerProfile!['location']?.toString() ?? '')
+          : '',
+    );
+    final imageController = TextEditingController(
+      text: isFarmer && _farmerProfile != null
+          ? (_farmerProfile!['image_url']?.toString() ?? '')
+          : auth.userAvatarUrl,
+    );
+    final bioController = TextEditingController(
+      text: isFarmer && _farmerProfile != null
+          ? (_farmerProfile!['residential_address']?.toString() ?? '')
+          : '',
+    );
+
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setModalState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Text(
+            isFarmer ? 'Edit Farm Profile' : 'Edit Personal Profile',
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              color: _dark,
+            ),
+          ),
+          content: Container(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        labelText: isFarmer ? 'Farm Name' : 'Full Name',
+                        prefixIcon: const Icon(Icons.person_outline_rounded),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      validator: (v) => (v == null || v.isEmpty) ? 'Please enter a name' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    if (isFarmer) ...[
+                      TextFormField(
+                        controller: specialtyController,
+                        decoration: InputDecoration(
+                          labelText: 'Specialty',
+                          prefixIcon: const Icon(Icons.spa_outlined),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        validator: (v) => (v == null || v.isEmpty) ? 'Please enter farm specialty' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: locationController,
+                        decoration: InputDecoration(
+                          labelText: 'Farm Location Address',
+                          prefixIcon: const Icon(Icons.location_on_outlined),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    TextFormField(
+                      controller: imageController,
+                      decoration: InputDecoration(
+                        labelText: isFarmer ? 'Farm Cover Image URL' : 'Avatar Image URL',
+                        prefixIcon: const Icon(Icons.image_outlined),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: bioController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: isFarmer ? 'Farm Bio / Description' : 'Bio',
+                        prefixIcon: const Icon(Icons.description_outlined),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actionsPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          actions: [
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.of(dialogCtx).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setModalState(() => isSaving = true);
+                      try {
+                        if (isFarmer) {
+                          // Find farmer row first or update if exists
+                          final userId = auth.userId;
+                          await SupabaseConfig.client.from('farmers').update({
+                            'farm_name': nameController.text.trim(),
+                            'specialty': specialtyController.text.trim(),
+                            'location': locationController.text.trim(),
+                            'image_url': imageController.text.trim(),
+                            'residential_address': bioController.text.trim(),
+                          }).eq('user_id', userId);
+                        } else {
+                          final userId = auth.userId;
+                          await SupabaseConfig.client.from('users').update({
+                            'name': nameController.text.trim(),
+                            'avatar_url': imageController.text.trim(),
+                            'bio': bioController.text.trim(),
+                          }).eq('user_id', userId);
+                        }
+                        
+                        await auth.initialize();
+                        await _loadFarmerProfile();
+                        if (mounted) {
+                          Navigator.of(dialogCtx).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Profile updated successfully!'),
+                              backgroundColor: primary,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        debugPrint('Error updating profile: $e');
+                        setModalState(() => isSaving = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to save changes: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: isSaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                    )
+                  : const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

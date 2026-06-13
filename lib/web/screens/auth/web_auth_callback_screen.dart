@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../shared/services/auth/auth_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../shared/router/app_router.dart';
+import '../../../shared/services/auth/auth_service.dart';
 
 /// Web OAuth callback handler screen.
 /// This screen is shown after Google OAuth redirect and handles the authentication result.
@@ -27,60 +29,76 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
 
   Future<void> _handleAuthCallback() async {
     try {
-      // Wait a moment for Supabase to process the OAuth callback
-      await Future.delayed(const Duration(milliseconds: 1000));
-
-      // Check if user is now logged in after OAuth
-      final user = _auth.client.auth.currentUser;
-
-      if (user != null) {
-        // User successfully authenticated
-        setState(() {
-          _status = 'Login successful! Redirecting...';
-        });
-
-        // Initialize auth state
-        debugPrint('🔵 OAuth successful for email: ${user.email}');
-        await _auth.initialize();
-        debugPrint('🔵 Auth initialized. isAdmin: ${_auth.isAdmin}');
-
-        // Wait a moment before redirect
-        await Future.delayed(const Duration(milliseconds: 1500));
-
-        if (mounted) {
-          // Check if new user needs profile completion
-          if (_auth.needsProfileCompletion) {
-            context.go(AppRoutes.completeProfile);
-          } else {
-            // Redirect to appropriate home page
-            context.go(AppRoutes.home);
+      // The PKCE code exchange should already be done by main.dart during bootstrap.
+      // As a fallback, try exchanging if currentUser is still null.
+      if (_auth.client.auth.currentUser == null) {
+        final code = Uri.base.queryParameters['code'];
+        if (code != null && code.isNotEmpty) {
+          try {
+            debugPrint('OAuth callback: Fallback code exchange...');
+            await _auth.client.auth.exchangeCodeForSession(code);
+            debugPrint('OAuth callback: Fallback exchange complete!');
+          } catch (e) {
+            debugPrint('OAuth callback fallback exchange error: $e');
           }
         }
-      } else {
-        // Authentication failed
+      }
+
+      final user = await _waitForAuthenticatedUser();
+
+      if (user == null) {
         setState(() {
-          _status = 'Authentication failed. Please try again.';
+          _status =
+              'Authentication timed out. Please try again from the login page.';
           _isError = true;
         });
 
-        // Redirect to login after a delay
         await Future.delayed(const Duration(seconds: 3));
         if (mounted) {
           context.go(AppRoutes.login);
         }
+        return;
       }
+
+      // Ensure AuthService is fully initialized with the new session
+      await _auth.initialize(event: AuthChangeEvent.signedIn);
+
+      setState(() {
+        _status = 'Login successful! Redirecting...';
+      });
+
+      debugPrint('OAuth successful for email: ${user.email}');
+
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (!mounted) return;
+
+      context.go(AppRoutes.loading);
     } catch (e) {
+      debugPrint('OAuth callback error: $e');
       setState(() {
         _status = 'An error occurred during authentication.';
         _isError = true;
       });
 
-      // Redirect to login after a delay
       await Future.delayed(const Duration(seconds: 3));
       if (mounted) {
         context.go(AppRoutes.login);
       }
     }
+  }
+
+  Future<User?> _waitForAuthenticatedUser() async {
+    final currentUser = _auth.client.auth.currentUser;
+    if (currentUser != null) return currentUser;
+
+    for (var attempt = 0; attempt < 20; attempt++) {
+      await Future.delayed(const Duration(milliseconds: 400));
+      final user = _auth.client.auth.currentUser;
+      if (user != null) return user;
+    }
+
+    return null;
   }
 
   @override
@@ -91,7 +109,6 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Logo
             Container(
               width: 64,
               height: 64,
@@ -111,8 +128,6 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
-            // Loading indicator or error icon
             if (!_isError)
               const SizedBox(
                 width: 32,
@@ -136,10 +151,7 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
                   size: 24,
                 ),
               ),
-
             const SizedBox(height: 24),
-
-            // Status text
             Text(
               _status,
               textAlign: TextAlign.center,
@@ -151,9 +163,7 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
                     : const Color(0xFF111827),
               ),
             ),
-
             const SizedBox(height: 8),
-
             if (!_isError)
               Text(
                 'Please wait while we complete your authentication...',
@@ -169,4 +179,3 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
     );
   }
 }
-

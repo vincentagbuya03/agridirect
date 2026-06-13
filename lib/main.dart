@@ -52,6 +52,10 @@ class _BootstrapAppState extends State<_BootstrapApp> {
   late final Future<void> _initializationFuture = _initializeAppWithMinDelay();
   bool _isAnimationDone = false;
 
+  Route<dynamic> _startupRoute(Widget child) {
+    return MaterialPageRoute<void>(builder: (_) => child);
+  }
+
   Future<void> _initializeAppWithMinDelay() async {
     final startTime = DateTime.now();
     await _initializeApp();
@@ -92,23 +96,44 @@ class _BootstrapAppState extends State<_BootstrapApp> {
       }
     }
 
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    debugPrint('✅ Firebase initialized');
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+        debugPrint('✅ Firebase initialized');
+      } else {
+        debugPrint('✅ Firebase already initialized');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Firebase initialization error: $e');
+    }
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    await SupabaseConfig.initialize();
+    try {
+      await SupabaseConfig.initialize();
+      debugPrint('✅ SupabaseConfig initialized');
+    } catch (e) {
+      debugPrint('⚠️ SupabaseConfig initialization error: $e');
+    }
+
+    // Note: On web, Supabase SDK auto-handles PKCE code exchange during
+    // initialize() when it detects ?code= in the URL (see 'handle deeplink uri' log).
+    // No manual exchangeCodeForSession() call is needed here.
 
     try {
+      debugPrint('🔄 Priming product metadata cache...');
       await BootstrapCacheService().primeProductMetadataCache();
+      debugPrint('✅ Product metadata cache primed');
     } catch (e) {
       debugPrint('⚠️ Bootstrap cache initialization error: $e');
     }
 
     try {
+      debugPrint('🔄 Initializing AuthService...');
       await AuthService().initialize(event: AuthChangeEvent.initialSession);
+      debugPrint('✅ AuthService initialized');
     } catch (e) {
       debugPrint('⚠️ Auth initialization error: $e');
     }
@@ -119,21 +144,40 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     return FutureBuilder<void>(
       future: _initializationFuture,
       builder: (context, snapshot) {
+        debugPrint('🎨 FutureBuilder: connectionState=${snapshot.connectionState}, hasError=${snapshot.hasError}, error=${snapshot.error}');
         if (snapshot.hasError) {
           return _StartupErrorScreen(error: snapshot.error.toString());
         }
 
         if (snapshot.connectionState == ConnectionState.done) {
           final auth = AuthService();
+          debugPrint('   auth.isLoggedIn=${auth.isLoggedIn}, _isAnimationDone=$_isAnimationDone');
 
-          // If NOT logged in, skip the loading animation and go straight to the app (Login)
-          if (!auth.isLoggedIn || _isAnimationDone) {
+          // Skip the loading animation if:
+          // - Running on Web (go straight to web apps/dashboards)
+          // - Not logged in (go straight to login/welcome)
+          // - Animation already done
+          // - Coming from OAuth callback (the callback screen handles its own transition)
+          final isOAuthCallback = kIsWeb && Uri.base.path.contains('/auth/callback');
+          if (kIsWeb || !auth.isLoggedIn || _isAnimationDone || isOAuthCallback) {
+            debugPrint('   → Launching AgriDirectApp()');
             return const AgriDirectApp();
           }
 
           // If logged in, show the premium loading screen
           return MaterialApp(
             debugShowCheckedModeBanner: false,
+            onGenerateRoute: (_) => _startupRoute(
+              LoadingScreen(
+                onFinished: () {
+                  if (mounted) {
+                    setState(() {
+                      _isAnimationDone = true;
+                    });
+                  }
+                },
+              ),
+            ),
             home: LoadingScreen(
               onFinished: () {
                 if (mounted) {
@@ -149,6 +193,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
         // While initializing, show a simple background or short-lived splash
         return const MaterialApp(
           debugShowCheckedModeBanner: false,
+          onGenerateRoute: _startupSplashRoute,
           home: Scaffold(
             backgroundColor: Color(0xFF064E3B), // Match brand green
             body: Center(
@@ -168,6 +213,24 @@ class _BootstrapAppState extends State<_BootstrapApp> {
   }
 }
 
+Route<dynamic> _startupSplashRoute(RouteSettings settings) {
+  return MaterialPageRoute<void>(
+    builder: (_) => const Scaffold(
+      backgroundColor: Color(0xFF064E3B),
+      body: Center(
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: CircularProgressIndicator(
+            color: Colors.white24,
+            strokeWidth: 2,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class _StartupErrorScreen extends StatelessWidget {
   final String error;
 
@@ -177,6 +240,21 @@ class _StartupErrorScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      onGenerateRoute: (_) => MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          backgroundColor: AppColors.background,
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'App failed to start.\n\n$error',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.bodyLarge.copyWith(color: AppColors.error),
+              ),
+            ),
+          ),
+        ),
+      ),
       home: Scaffold(
         backgroundColor: AppColors.background,
         body: Center(
@@ -221,24 +299,23 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
     _initializeDatabaseSync();
     _initializeOfflineProductSync();
     _initializeAppSession();
-    _authStateSubscription = SupabaseConfig.client.auth.onAuthStateChange.listen((
-      data,
-    ) async {
-      final event = data.event;
-      debugPrint('🔔 Auth State Change: $event');
+    _authStateSubscription = SupabaseConfig.client.auth.onAuthStateChange
+        .listen((data) async {
+          final event = data.event;
+          debugPrint('🔔 Auth State Change: $event');
 
-      if (event == AuthChangeEvent.signedIn) {
-        debugPrint('🔵 User signed in, initializing auth service...');
-        await _auth.initialize(event: event);
-      } else if (event == AuthChangeEvent.signedOut) {
-        debugPrint('🟠 User signed out, cleaning up...');
-        await _auth.initialize(event: event);
-      } else if (event == AuthChangeEvent.tokenRefreshed ||
-          event == AuthChangeEvent.userUpdated ||
-          event == AuthChangeEvent.initialSession) {
-        await _auth.initialize(event: event);
-      }
-    });
+          if (event == AuthChangeEvent.signedIn) {
+            debugPrint('🔵 User signed in, initializing auth service...');
+            await _auth.initialize(event: event);
+          } else if (event == AuthChangeEvent.signedOut) {
+            debugPrint('🟠 User signed out, cleaning up...');
+            await _auth.initialize(event: event);
+          } else if (event == AuthChangeEvent.tokenRefreshed ||
+              event == AuthChangeEvent.userUpdated ||
+              event == AuthChangeEvent.initialSession) {
+            await _auth.initialize(event: event);
+          }
+        });
   }
 
   void _handleAuthSyncState() {
@@ -295,7 +372,6 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
         _sessionStartedByLifecycle = true;
 
         // Also check weather on app resume (non-blocking)
-
       }
     } catch (e) {
       debugPrint('⚠️ Analytics session resume error: $e');
@@ -348,6 +424,7 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
     _analyticsService.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(

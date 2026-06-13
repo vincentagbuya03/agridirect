@@ -28,9 +28,12 @@ class _WebPasswordResetWithCodeScreenState
   bool _codeSent = false;
   bool _codeVerified = false;
   bool _resetSuccess = false;
+  String? _feedbackMessage;
+  bool _feedbackIsError = false;
 
   static const Color _primary = Color(0xFF16A34A);
   static const Color _danger = Color(0xFFEF4444);
+  static const Color _mutedDark = Color(0xFF6B7280);
 
   @override
   void dispose() {
@@ -44,11 +47,14 @@ class _WebPasswordResetWithCodeScreenState
   Future<void> _handleSendCode() async {
     final email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
-      _showSnackBar('Please enter a valid email address', isError: true);
+      _setFeedback('Please enter a valid email address', isError: true);
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _feedbackMessage = null;
+    });
 
     try {
       final mode = await PasswordResetService.sendResetCode(email);
@@ -58,7 +64,7 @@ class _WebPasswordResetWithCodeScreenState
           _isLoading = false;
           _codeSent = true;
         });
-        _showSnackBar(
+        _setFeedback(
           'Reset code sent! Check your email, then set your new password below.',
           isError: false,
         );
@@ -67,8 +73,8 @@ class _WebPasswordResetWithCodeScreenState
           _isLoading = false;
           _resetSuccess = true;
         });
-        _showSnackBar(
-          'Reset link sent! Check your email to continue.',
+        _setFeedback(
+          'We sent a secure reset link to your email. Check your inbox to continue.',
           isError: false,
         );
 
@@ -78,7 +84,7 @@ class _WebPasswordResetWithCodeScreenState
       }
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnackBar('Failed: $e', isError: true);
+      _setFeedback(e.toString(), isError: true);
     }
   }
 
@@ -87,11 +93,14 @@ class _WebPasswordResetWithCodeScreenState
     final code = _codeController.text.trim();
 
     if (email.isEmpty || code.isEmpty) {
-      _showSnackBar('Please fill in all fields', isError: true);
+      _setFeedback('Please fill in all fields', isError: true);
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _feedbackMessage = null;
+    });
 
     try {
       await PasswordResetService.verifyResetCode(email: email, code: code);
@@ -99,10 +108,10 @@ class _WebPasswordResetWithCodeScreenState
         _isLoading = false;
         _codeVerified = true;
       });
-      _showSnackBar('Code verified! Set your new password.', isError: false);
+      _setFeedback('Code verified! Set your new password.', isError: false);
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnackBar('Invalid code: $e', isError: true);
+      _setFeedback('Invalid code: $e', isError: true);
     }
   }
 
@@ -112,26 +121,29 @@ class _WebPasswordResetWithCodeScreenState
     final confirmPassword = _confirmPasswordController.text.trim();
 
     if (email.isEmpty || !email.contains('@')) {
-      _showSnackBar('Please enter a valid email address', isError: true);
+      _setFeedback('Please enter a valid email address', isError: true);
       return;
     }
 
     if (password.isEmpty || confirmPassword.isEmpty) {
-      _showSnackBar('Please fill in all fields', isError: true);
+      _setFeedback('Please fill in all fields', isError: true);
       return;
     }
 
     if (password.length < 6) {
-      _showSnackBar('Password must be at least 6 characters', isError: true);
+      _setFeedback('Password must be at least 6 characters', isError: true);
       return;
     }
 
     if (password != confirmPassword) {
-      _showSnackBar('Passwords do not match', isError: true);
+      _setFeedback('Passwords do not match', isError: true);
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _feedbackMessage = null;
+    });
 
     try {
       await PasswordResetService.resetPasswordWithCode(
@@ -145,27 +157,22 @@ class _WebPasswordResetWithCodeScreenState
         _resetSuccess = true;
       });
 
-      _showSnackBar('Password reset successfully!', isError: false);
+      _setFeedback('Password reset successfully!', isError: false);
       await Future.delayed(const Duration(seconds: 2));
       if (!mounted) return;
       context.go(AppRoutes.login);
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnackBar('Failed to reset password: $e', isError: true);
+      _setFeedback('Failed to reset password: $e', isError: true);
     }
   }
 
-  void _showSnackBar(String message, {required bool isError}) {
+  void _setFeedback(String message, {required bool isError}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? _danger : _primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
+    setState(() {
+      _feedbackMessage = message;
+      _feedbackIsError = isError;
+    });
   }
 
   @override
@@ -240,6 +247,10 @@ class _WebPasswordResetWithCodeScreenState
           'Enter your email to receive a reset code. If a valid code already exists, it will be reused.',
           textAlign: TextAlign.center,
         ),
+        if (_feedbackMessage != null) ...[
+          const SizedBox(height: 20),
+          _buildFeedbackBanner(),
+        ],
         const SizedBox(height: 36),
         _buildTextField(
           _emailController,
@@ -295,6 +306,10 @@ class _WebPasswordResetWithCodeScreenState
           'Please enter the 6-digit verification code sent to your email.',
           textAlign: TextAlign.center,
         ),
+        if (_feedbackMessage != null) ...[
+          const SizedBox(height: 20),
+          _buildFeedbackBanner(),
+        ],
         const SizedBox(height: 36),
         _buildTextField(
           _codeController,
@@ -348,6 +363,10 @@ class _WebPasswordResetWithCodeScreenState
           'Your identity is verified. Please set your new secure password.',
           textAlign: TextAlign.center,
         ),
+        if (_feedbackMessage != null) ...[
+          const SizedBox(height: 20),
+          _buildFeedbackBanner(),
+        ],
         const SizedBox(height: 36),
         _buildTextField(
           _passwordController,
@@ -453,5 +472,45 @@ class _WebPasswordResetWithCodeScreenState
       ],
     );
   }
-}
 
+  Widget _buildFeedbackBanner() {
+    final color = _feedbackIsError ? _danger : _primary;
+    final bgColor = _feedbackIsError
+        ? _danger.withValues(alpha: 0.08)
+        : _primary.withValues(alpha: 0.08);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            _feedbackIsError
+                ? Icons.error_outline_rounded
+                : Icons.check_circle_outline_rounded,
+            color: color,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _feedbackMessage!,
+              style: TextStyle(
+                color: _feedbackIsError ? const Color(0xFF991B1B) : _mutedDark,
+                fontSize: 14,
+                height: 1.45,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

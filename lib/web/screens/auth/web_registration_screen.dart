@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/integration/email_service.dart';
 import '../../../shared/services/auth/otp_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/router/app_routes.dart';
 import 'web_otp_verification_screen.dart' show WebOTPVerificationScreen;
 import 'web_complete_profile_screen.dart';
 
@@ -75,7 +77,6 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
         password: temporaryPassword,
       );
 
-      // Step 1: Create user via AuthService
       final String? userId = await AuthService().register(
         name: name,
         email: email,
@@ -382,9 +383,7 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
                               ),
                             ),
                             child: _isLoading
-                                ? const AppShimmerLoader(
-                                    color: Colors.white,
-                                  )
+                                ? const AppShimmerLoader(color: Colors.white)
                                 : const Text(
                                     'Create Account',
                                     style: TextStyle(
@@ -402,7 +401,7 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
                             GestureDetector(
                               onTap: _isLoading
                                   ? null
-                                  : () => Navigator.pop(context),
+                                  : () => context.go(AppRoutes.login),
                               child: const Text(
                                 'Login',
                                 style: TextStyle(
@@ -464,16 +463,19 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
                                 width: double.infinity,
                                 child: OutlinedButton.icon(
                                   onPressed: () {
-                                    // Redirect logic - could be a URL or showing a download modal
-                                    // For now, we'll assume there's a download section on the home page
-                                    Navigator.pop(context);
+                                    context.go(AppRoutes.home);
                                   },
-                                  icon: const Icon(Icons.file_download_rounded, size: 18),
+                                  icon: const Icon(
+                                    Icons.file_download_rounded,
+                                    size: 18,
+                                  ),
                                   label: const Text('Download Mobile App'),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: _primary,
                                     side: const BorderSide(color: _primary),
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -523,4 +525,3 @@ class _WebRegistrationScreenState extends State<WebRegistrationScreen> {
     );
   }
 }
-

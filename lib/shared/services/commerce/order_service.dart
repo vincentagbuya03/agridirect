@@ -7,9 +7,11 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/order/order_model.dart';
 import '../../models/order/order_item_model.dart';
+import '../logging/system_activity_logger.dart';
 
 class OrderService {
   final SupabaseClient _supabase = Supabase.instance.client;
+  final SystemActivityLogger _activityLogger = SystemActivityLogger();
 
   // ============================================================================
   // ORDERS OPERATIONS
@@ -207,6 +209,24 @@ class OrderService {
       if (createdOrder == null) {
         throw Exception('Order was created but could not be reloaded');
       }
+
+      await _activityLogger.log(
+        action: 'order_created',
+        details:
+            'Order placed: ${createdOrder.orderNumber} (${items.length} item${items.length == 1 ? '' : 's'})',
+        entityType: 'order',
+        entityId: createdOrder.orderId,
+        metadata: {
+          'order_id': createdOrder.orderId,
+          'order_number': createdOrder.orderNumber,
+          'customer_id': customerId,
+          'farmer_id': farmerId,
+          'payment_method': normalizedMethod,
+          'item_count': items.length,
+          'total_amount': createdOrder.total,
+        },
+      );
+
       return createdOrder;
     } catch (e) {
       throw Exception('Failed to create order: $e');
@@ -228,6 +248,24 @@ class OrderService {
       if (updatedOrder == null) {
         throw Exception('Order was updated but could not be reloaded');
       }
+
+      final normalizedStatus = newStatus.trim().toLowerCase();
+      await _activityLogger.log(
+        action: normalizedStatus == 'cancelled'
+            ? 'order_cancelled'
+            : 'order_status_updated',
+        details:
+            'Order ${updatedOrder.orderNumber} status changed to ${normalizedStatus.toUpperCase()}',
+        entityType: 'order',
+        entityId: updatedOrder.orderId,
+        severity: normalizedStatus == 'cancelled' ? 'warning' : 'info',
+        metadata: {
+          'order_id': updatedOrder.orderId,
+          'order_number': updatedOrder.orderNumber,
+          'new_status': normalizedStatus,
+        },
+      );
+
       return updatedOrder;
     } catch (e) {
       throw Exception('Failed to update order status: $e');
@@ -280,7 +318,10 @@ class OrderService {
       recipientUserId: farmerUserId,
     );
 
-    if (notes != null && notes.trim().isNotEmpty && notes.trim() != 'Customer selected Cash on Delivery for this order.' && notes.trim() != 'Customer selected Cash on Pickup for this order.') {
+    if (notes != null &&
+        notes.trim().isNotEmpty &&
+        notes.trim() != 'Customer selected Cash on Delivery for this order.' &&
+        notes.trim() != 'Customer selected Cash on Pickup for this order.') {
       await _sendConversationMessage(
         conversationId: conversationId,
         messageText: notes.trim(),
@@ -345,10 +386,10 @@ class OrderService {
           messageText: '[ORDER_NOTICE:$orderId:PRE_ORDER:$normalizedMethod]',
           recipientUserId: farmerUserId,
         );
-        
+
         // Only send additional notes if they aren't the default auto-generated ones
-        if (notes != null && 
-            notes.trim().isNotEmpty && 
+        if (notes != null &&
+            notes.trim().isNotEmpty &&
             !notes.contains('Customer selected Cash on')) {
           await _sendConversationMessage(
             conversationId: conversationId,
@@ -357,6 +398,23 @@ class OrderService {
           );
         }
       }
+
+      await _activityLogger.log(
+        action: 'preorder_created',
+        details:
+            'Pre-order placed: ${createdOrder.orderNumber} for ${result['product_name'] ?? productId}',
+        entityType: 'order',
+        entityId: createdOrder.orderId,
+        metadata: {
+          'order_id': createdOrder.orderId,
+          'order_number': createdOrder.orderNumber,
+          'product_id': productId,
+          'product_name': result['product_name'],
+          'farmer_id': result['farmer_id'],
+          'payment_method': normalizedMethod,
+          'quantity': quantity,
+        },
+      );
 
       return {
         'order': createdOrder.toJson(),

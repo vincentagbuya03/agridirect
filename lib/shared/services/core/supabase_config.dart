@@ -71,16 +71,22 @@ class SupabaseConfig {
 
   /// Initialize Supabase - call this in main() before runApp()
   static Future<void> initialize() async {
-    await Supabase.initialize(
-      url: supabaseUrl,
-      anonKey: supabaseAnonKey,
-      authOptions: const FlutterAuthClientOptions(
-        authFlowType: AuthFlowType.pkce,
-      ),
-      realtimeClientOptions: RealtimeClientOptions(
-        logLevel: kReleaseMode ? RealtimeLogLevel.error : RealtimeLogLevel.info,
-      ),
-    );
+    try {
+      Supabase.instance;
+      debugPrint('✅ Supabase already initialized');
+    } catch (_) {
+      await Supabase.initialize(
+        url: supabaseUrl,
+        anonKey: supabaseAnonKey,
+        authOptions: const FlutterAuthClientOptions(
+          authFlowType: AuthFlowType.pkce,
+        ),
+        realtimeClientOptions: RealtimeClientOptions(
+          logLevel: kReleaseMode ? RealtimeLogLevel.error : RealtimeLogLevel.info,
+        ),
+      );
+      debugPrint('✅ Supabase initialized successfully');
+    }
 
     // Listen for auth state changes to handle password reset
     Supabase.instance.client.auth.onAuthStateChange.listen((data) {

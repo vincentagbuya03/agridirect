@@ -1875,9 +1875,8 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               borderRadius: BorderRadius.circular(20),
               child: Builder(
                 builder: (context) {
-                  final apkUrl = Uri.base
-                      .resolve('/AgriDirect-Installer.apk')
-                      .toString();
+                  final apkUrl =
+                      Uri.base.resolve('/AgriDirect-Installer.apk').toString();
                   final qrUrl =
                       'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${Uri.encodeComponent(apkUrl)}';
                   return Image.network(

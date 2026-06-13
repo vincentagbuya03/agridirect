@@ -9,10 +9,12 @@ import '../../models/product/product_model.dart';
 import '../../models/product/category_model.dart';
 import '../../models/product/unit_model.dart';
 import '../../models/product/product_review_model.dart';
+import '../logging/system_activity_logger.dart';
 import '../social/follow_service.dart';
 
 class ProductService {
   final SupabaseClient _supabase = Supabase.instance.client;
+  final SystemActivityLogger _activityLogger = SystemActivityLogger();
 
   // ============================================================================
   // PRODUCTS OPERATIONS
@@ -246,11 +248,32 @@ class ProductService {
           farmerId: farmerId,
           productId: product.productId,
           productName: product.name,
-          farmName: farmName?.isNotEmpty == true ? farmName! : 'A farm you follow',
+          farmName: farmName?.isNotEmpty == true
+              ? farmName!
+              : 'A farm you follow',
         );
       } catch (e) {
         debugPrint('⚠️ Error notifying followers: $e');
       }
+
+      await _activityLogger.log(
+        action: 'product_created',
+        details:
+            'Product added: ${product.name} (${isPreorder ? 'pre-order' : 'regular'})',
+        entityType: 'product',
+        entityId: product.productId,
+        metadata: {
+          'product_id': product.productId,
+          'product_name': product.name,
+          'farmer_id': farmerId,
+          'farm_name': farmName,
+          'price': price,
+          'category_id': categoryId,
+          'unit_id': unitId,
+          'available_quantity': availableQuantity,
+          'is_preorder': isPreorder,
+        },
+      );
 
       return product;
     } catch (e) {
@@ -312,7 +335,7 @@ class ProductService {
           .single();
 
       // Convert snake_case database response to camelCase for Product model
-      return Product.fromJson({
+      final product = Product.fromJson({
         'productId': response['product_id'],
         'name': response['name'],
         'price': response['price'],
@@ -326,6 +349,22 @@ class ProductService {
         'createdAt': response['created_at'],
         'updatedAt': response['updated_at'],
       });
+
+      await _activityLogger.log(
+        action: 'product_updated',
+        details: 'Product edited: ${product.name}',
+        entityType: 'product',
+        entityId: product.productId,
+        metadata: {
+          'product_id': product.productId,
+          'product_name': product.name,
+          'farmer_id': product.farmerId,
+          'price': product.price,
+          'changed_fields': updateData.keys.toList(),
+        },
+      );
+
+      return product;
     } catch (e) {
       throw Exception('Failed to update product: $e');
     }
@@ -334,7 +373,26 @@ class ProductService {
   /// Delete product
   Future<void> deleteProduct(String productId) async {
     try {
+      final existing = await _supabase
+          .from('products')
+          .select('product_id, name, farmer_id')
+          .eq('product_id', productId)
+          .maybeSingle();
+
       await _supabase.from('products').delete().eq('product_id', productId);
+
+      await _activityLogger.log(
+        action: 'product_archived',
+        details: 'Product archived: ${existing?['name'] ?? productId}',
+        entityType: 'product',
+        entityId: productId,
+        severity: 'warning',
+        metadata: {
+          'product_id': productId,
+          'product_name': existing?['name'],
+          'farmer_id': existing?['farmer_id'],
+        },
+      );
     } catch (e) {
       throw Exception('Failed to delete product: $e');
     }
@@ -458,10 +516,7 @@ class ProductService {
     try {
       final response = await _supabase
           .from('product_reviews')
-          .update({
-            'rating': ?rating,
-            'review_text': ?reviewText,
-          })
+          .update({'rating': ?rating, 'review_text': ?reviewText})
           .eq('review_id', reviewId)
           .select()
           .single();

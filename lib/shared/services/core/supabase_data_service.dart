@@ -705,6 +705,7 @@ class SupabaseDataService {
       targetQuantity: (item['target_quantity'] as num?)?.toDouble(),
       latitude: (item['latitude'] as num?)?.toDouble(),
       longitude: (item['longitude'] as num?)?.toDouble(),
+      isFeatured: item['is_featured'] == true,
     );
   }
 

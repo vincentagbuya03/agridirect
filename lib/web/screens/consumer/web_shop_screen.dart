@@ -50,6 +50,7 @@ class _WebShopScreenState extends State<WebShopScreen>
   List<ProductItem> _allProducts = [];
   List<ProductItem> _filteredProducts = [];
   bool _isLoading = true;
+  bool _isGridView = true;
   String _selectedCategory = 'All';
   String _sortBy = 'Newest';
   String _searchQuery = '';
@@ -711,7 +712,16 @@ class _WebShopScreenState extends State<WebShopScreen>
   // TOOLBAR (modern)
   // ─────────────────────────────────────────────
   Widget _buildFeaturedSection() {
-    final featuredProducts = _filteredProducts.take(4).toList();
+    var featuredProducts = _allProducts.where((p) => p.isFeatured).toList();
+    if (featuredProducts.isEmpty) {
+      featuredProducts = List<ProductItem>.from(_allProducts);
+      featuredProducts.sort((a, b) {
+        final ra = double.tryParse(a.rating ?? '0') ?? 0.0;
+        final rb = double.tryParse(b.rating ?? '0') ?? 0.0;
+        return rb.compareTo(ra);
+      });
+    }
+    featuredProducts = featuredProducts.take(4).toList();
     if (featuredProducts.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -788,7 +798,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 crossAxisCount: crossAxisCount,
                 crossAxisSpacing: 20,
                 mainAxisSpacing: 20,
-                mainAxisExtent: 372,
+                mainAxisExtent: 392,
               ),
               itemCount: featuredProducts
                   .take(
@@ -869,6 +879,8 @@ class _WebShopScreenState extends State<WebShopScreen>
                                 ? CachedNetworkImage(
                                     imageUrl: product.imageUrl,
                                     fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    height: double.infinity,
                                     placeholder: (ctx, url) =>
                                         _buildImagePlaceholder(),
                                     errorWidget: (ctx, url, err) =>
@@ -1196,27 +1208,39 @@ class _WebShopScreenState extends State<WebShopScreen>
                 children: [
                   MouseRegion(
                     cursor: SystemMouseCursors.click,
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: _primaryLight,
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      child: Icon(
-                        Icons.grid_view_rounded,
-                        size: 17,
-                        color: _primary,
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isGridView = true),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: _isGridView ? _primaryLight : Colors.transparent,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Icon(
+                          Icons.grid_view_rounded,
+                          size: 17,
+                          color: _isGridView ? _primary : _mutedLight,
+                        ),
                       ),
                     ),
                   ),
                   MouseRegion(
                     cursor: SystemMouseCursors.click,
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      child: Icon(
-                        Icons.view_list_rounded,
-                        size: 17,
-                        color: _mutedLight,
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isGridView = false),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: !_isGridView ? _primaryLight : Colors.transparent,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Icon(
+                          Icons.view_list_rounded,
+                          size: 17,
+                          color: !_isGridView ? _primary : _mutedLight,
+                        ),
                       ),
                     ),
                   ),
@@ -1290,6 +1314,24 @@ class _WebShopScreenState extends State<WebShopScreen>
     final products = _paginatedProducts;
     return LayoutBuilder(
       builder: (context, constraints) {
+        if (!_isGridView) {
+          return ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: products.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            itemBuilder: (context, index) {
+              final globalIndex = (_currentPage - 1) * _itemsPerPage + index;
+              return globalIndex < _productControllers.length
+                  ? _buildAnimatedProductListCard(
+                      products[index],
+                      _productControllers[globalIndex],
+                    )
+                  : _buildProductListCard(products[index]);
+            },
+          );
+        }
+
         final crossAxisCount = constraints.maxWidth > 1200
             ? 4
             : constraints.maxWidth > 900
@@ -1304,7 +1346,7 @@ class _WebShopScreenState extends State<WebShopScreen>
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: 20,
             mainAxisSpacing: 20,
-            mainAxisExtent: 372,
+            mainAxisExtent: 392,
           ),
           itemCount: products.length,
           itemBuilder: (context, index) {
@@ -1336,6 +1378,279 @@ class _WebShopScreenState extends State<WebShopScreen>
               CurvedAnimation(parent: controller, curve: Curves.easeOutCubic),
             ),
         child: _buildProductCard(product),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedProductListCard(
+    ProductItem product,
+    AnimationController controller,
+  ) {
+    return FadeTransition(
+      opacity: Tween<double>(
+        begin: 0,
+        end: 1,
+      ).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut)),
+      child: SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0.05, 0), end: Offset.zero)
+            .animate(
+              CurvedAnimation(parent: controller, curve: Curves.easeOutCubic),
+            ),
+        child: _buildProductListCard(product),
+      ),
+    );
+  }
+
+  Widget _buildProductListCard(ProductItem product) {
+    final isHovered = _hoveredProducts.contains(product.hashCode);
+    final badgeIndex = product.hashCode.abs() % _badgeData.length;
+    final badge = _badgeData[badgeIndex];
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hoveredProducts.add(product.hashCode)),
+      onExit: (_) => setState(() => _hoveredProducts.remove(product.hashCode)),
+      child: GestureDetector(
+        onTap: () => _openProduct(product),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 350),
+          transform: Matrix4.translationValues(isHovered ? 8 : 0, 0, 0),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isHovered ? _border.withValues(alpha: 0.5) : _border,
+              width: isHovered ? 1.5 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _primary.withValues(alpha: 0.08),
+                blurRadius: isHovered ? 24 : 0,
+                offset: const Offset(0, 0),
+                spreadRadius: isHovered ? 2 : 0,
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: isHovered ? 16 : 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Image
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: _surface,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      product.imageUrl.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: product.imageUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (ctx, url) => _buildImagePlaceholder(),
+                              errorWidget: (ctx, url, err) => _buildImagePlaceholder(),
+                            )
+                          : _buildImagePlaceholder(),
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: (badge['color'] as Color).withValues(
+                              alpha: 0.15,
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            badge['label'] as String,
+                            style: GoogleFonts.inter(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 20),
+              // Details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      product.name,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: _dark,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () => _openFarmerProfile(product.farmerId),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _primaryLight,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: _primary.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.store_rounded, size: 12, color: _primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              product.farm,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: _primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (product.rating != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          ...List.generate(5, (s) {
+                            final rating =
+                                double.tryParse(product.rating!) ?? 0;
+                            return Icon(
+                              s < rating.floor()
+                                  ? Icons.star_rounded
+                                  : Icons.star_outline_rounded,
+                              size: 13,
+                              color: s < rating.floor()
+                                  ? const Color(0xFFFCA5A5)
+                                  : _border,
+                            );
+                          }),
+                          const SizedBox(width: 6),
+                          Text(
+                            product.rating!,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _dark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 20),
+              // Price and Actions
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    product.price,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: _primary,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  Text(
+                    product.unit,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: _mutedLight,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () => _addToCart(product),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: isHovered
+                              ? LinearGradient(
+                                  colors: [
+                                    _primary,
+                                    _primary.withValues(alpha: 0.7),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : LinearGradient(
+                                  colors: [_primaryLight, _primaryLight],
+                                ),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isHovered
+                                ? _primary
+                                : _primary.withValues(alpha: 0.2),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.shopping_bag,
+                              size: 15,
+                              color: isHovered ? _white : _primary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Add to Cart',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: isHovered ? _white : _primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1410,6 +1725,8 @@ class _WebShopScreenState extends State<WebShopScreen>
                                 ? CachedNetworkImage(
                                     imageUrl: product.imageUrl,
                                     fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    height: double.infinity,
                                     placeholder: (ctx, url) =>
                                         _buildImagePlaceholder(),
                                     errorWidget: (ctx, url, err) =>

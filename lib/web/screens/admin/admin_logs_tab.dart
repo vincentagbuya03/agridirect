@@ -66,6 +66,41 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
       _Severity.info,
       Icons.check_circle_rounded,
     ),
+    'product_created': _ActionMeta(
+      'Product Added',
+      _Severity.info,
+      Icons.add_box_rounded,
+    ),
+    'product_updated': _ActionMeta(
+      'Product Edited',
+      _Severity.info,
+      Icons.edit_rounded,
+    ),
+    'product_archived': _ActionMeta(
+      'Product Archived',
+      _Severity.warning,
+      Icons.archive_rounded,
+    ),
+    'order_created': _ActionMeta(
+      'Order Placed',
+      _Severity.info,
+      Icons.shopping_bag_rounded,
+    ),
+    'preorder_created': _ActionMeta(
+      'Pre-order Placed',
+      _Severity.info,
+      Icons.event_available_rounded,
+    ),
+    'order_status_updated': _ActionMeta(
+      'Order Status Updated',
+      _Severity.info,
+      Icons.local_shipping_rounded,
+    ),
+    'order_cancelled': _ActionMeta(
+      'Order Cancelled',
+      _Severity.warning,
+      Icons.cancel_outlined,
+    ),
     'approve_farmer': _ActionMeta(
       'Farmer Approved',
       _Severity.info,
@@ -559,6 +594,34 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
                 DropdownMenuItem(
                   value: 'approve_product',
                   child: Text('Product Approval'),
+                ),
+                DropdownMenuItem(
+                  value: 'product_created',
+                  child: Text('Product Added'),
+                ),
+                DropdownMenuItem(
+                  value: 'product_updated',
+                  child: Text('Product Edited'),
+                ),
+                DropdownMenuItem(
+                  value: 'product_archived',
+                  child: Text('Product Archived'),
+                ),
+                DropdownMenuItem(
+                  value: 'order_created',
+                  child: Text('Orders Placed'),
+                ),
+                DropdownMenuItem(
+                  value: 'preorder_created',
+                  child: Text('Pre-orders'),
+                ),
+                DropdownMenuItem(
+                  value: 'order_status_updated',
+                  child: Text('Order Status'),
+                ),
+                DropdownMenuItem(
+                  value: 'order_cancelled',
+                  child: Text('Cancelled Orders'),
                 ),
                 DropdownMenuItem(
                   value: 'approve_farmer',

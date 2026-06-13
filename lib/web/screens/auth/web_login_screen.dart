@@ -15,8 +15,13 @@ import 'web_otp_verification_screen.dart';
 /// Modern split layout with animated branding on left, form on right.
 class WebLoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
+  final bool initialIsRegister;
 
-  const WebLoginScreen({super.key, required this.onLoginSuccess});
+  const WebLoginScreen({
+    super.key,
+    required this.onLoginSuccess,
+    this.initialIsRegister = false,
+  });
 
   @override
   State<WebLoginScreen> createState() => _WebLoginScreenState();
@@ -24,7 +29,7 @@ class WebLoginScreen extends StatefulWidget {
 
 class _WebLoginScreenState extends State<WebLoginScreen>
     with TickerProviderStateMixin {
-  bool _isRegister = false;
+  late bool _isRegister;
   final _loginEmailController = TextEditingController();
   final _loginPasswordController = TextEditingController();
   final _registerNameController = TextEditingController();
@@ -52,6 +57,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
   @override
   void initState() {
     super.initState();
+    _isRegister = widget.initialIsRegister;
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -341,7 +347,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
               phoneNumber: phone.isNotEmpty ? phone : null,
               onVerificationSuccess: () {
                 _showSnackBar('Verified! Welcome to AgriDirect.');
-                setState(() => _isRegister = false);
+                context.go(AppRoutes.login);
               },
             ),
           ),
@@ -759,7 +765,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
         _buildSwitchPrompt(
           'Don\'t have an account?',
           'Create one',
-          () => setState(() => _isRegister = true),
+          () => context.go(AppRoutes.register),
         ),
       ],
     );
@@ -864,7 +870,7 @@ class _WebLoginScreenState extends State<WebLoginScreen>
         _buildSwitchPrompt(
           'Already have an account?',
           'Sign in',
-          () => setState(() => _isRegister = false),
+          () => context.go(AppRoutes.login),
         ),
       ],
     );
@@ -1018,24 +1024,10 @@ class _WebLoginScreenState extends State<WebLoginScreen>
   }
 
   Widget _buildSocialButtons() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildSocialButton(
-            Icons.g_mobiledata_rounded,
-            'Google',
-            onPressed: _loginLoading ? null : _handleGoogleLogin,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildSocialButton(
-            Icons.facebook_rounded,
-            'Facebook',
-            onPressed: null, // Not implemented yet
-          ),
-        ),
-      ],
+    return _buildSocialButton(
+      Icons.g_mobiledata_rounded,
+      'Google',
+      onPressed: _loginLoading ? null : _handleGoogleLogin,
     );
   }
 

@@ -158,13 +158,17 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  value,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: AdminUi.textPrimary,
-                    letterSpacing: -0.5,
+                Flexible(
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: value.length > 12 ? 18 : 32,
+                      fontWeight: FontWeight.w800,
+                      color: AdminUi.textPrimary,
+                      letterSpacing: -0.5,
+                    ),
                   ),
                 ),
                 if (trend != null) ...[
