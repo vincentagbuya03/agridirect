@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS public.farmers (
   id_type text,
   sex text,
   place_of_birth text,
-  pcn text
+  pcn text,
+  free_delivery_min_amount numeric DEFAULT 0 CHECK (free_delivery_min_amount >= 0)
 );
 
 CREATE TABLE IF NOT EXISTS public.farmer_follows (
@@ -369,7 +370,8 @@ SELECT
   u.phone AS farmer_phone,
   u.avatar_url,
   f.farm_latitude,
-  f.farm_longitude
+  f.farm_longitude,
+  f.free_delivery_min_amount
 FROM farmers f
 JOIN users u ON f.user_id = u.user_id
 LEFT JOIN farmer_registrations fr ON f.farmer_id = fr.farmer_id;

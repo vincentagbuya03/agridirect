@@ -9,6 +9,8 @@ import '../../../shared/models/auth/user_address_model.dart';
 import 'orders_screen.dart';
 import 'marketplace_screen.dart'; // AddressEditorSheet, AddressSelectorSheet
 import '../../../shared/data/app_data.dart';
+import '../../../shared/models/farmer/farmer_profile_model.dart';
+import '../../../shared/services/farmer/farmer_service.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -459,13 +461,52 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  void _showCheckoutSheet() {
+  void _showCheckoutSheet() async {
+    final cartItems = CartService().selectedItems;
+    if (cartItems.isEmpty) return;
+
+    final farmerIds = cartItems.map((item) => item.farmerId).toSet().toList();
+    List<FarmerProfile> farmerProfiles = [];
+    try {
+      farmerProfiles = await FarmerService().getFarmerProfilesByIds(farmerIds);
+    } catch (e) {
+      debugPrint('Error pre-fetching farmer profiles: $e');
+    }
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) => Container(
+        builder: (sheetContext, setSheetState) {
+          double totalDeliveryFee = 0.0;
+          if (_paymentMethod == 'COD') {
+            final Map<String, double> subtotalByFarmer = {};
+            for (final item in cartItems) {
+              subtotalByFarmer[item.farmerId] = (subtotalByFarmer[item.farmerId] ?? 0.0) + (item.priceValue * item.quantity);
+            }
+
+            for (final entry in subtotalByFarmer.entries) {
+              final farmerId = entry.key;
+              final subtotal = entry.value;
+              final profile = farmerProfiles.cast<FarmerProfile?>().firstWhere(
+                (p) => p?.profileId == farmerId,
+                orElse: () => null,
+              );
+              final minAmount = profile?.freeDeliveryMinAmount ?? 0.0;
+              if (minAmount > 0 && subtotal >= minAmount) {
+                // Free delivery
+              } else {
+                totalDeliveryFee += 50.0;
+              }
+            }
+          }
+
+          final grandTotal = CartService().totalAmount + totalDeliveryFee;
+
+          return Container(
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
@@ -838,16 +879,47 @@ class _CartScreenState extends State<CartScreen> {
               const SizedBox(height: 32),
 
               // Order Summary
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Column(
                 children: [
-                  Text('Total Amount', style: AppTextStyles.bodyLarge),
-                  Text(
-                    '₱${CartService().totalAmount.toStringAsFixed(2)}',
-                    style: AppTextStyles.headline1.copyWith(
-                      color: AppColors.primary,
-                      fontSize: 24,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Subtotal', style: AppTextStyles.bodyMedium),
+                      Text(
+                        '₱${CartService().totalAmount.toStringAsFixed(2)}',
+                        style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Delivery Fee', style: AppTextStyles.bodyMedium),
+                      Text(
+                        totalDeliveryFee > 0
+                            ? '₱${totalDeliveryFee.toStringAsFixed(2)}'
+                            : 'Free',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: totalDeliveryFee > 0 ? AppColors.textHeadline : AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Total Amount', style: AppTextStyles.bodyLarge),
+                      Text(
+                        '₱${grandTotal.toStringAsFixed(2)}',
+                        style: AppTextStyles.headline1.copyWith(
+                          color: AppColors.primary,
+                          fontSize: 24,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -882,9 +954,10 @@ class _CartScreenState extends State<CartScreen> {
             ],
           ),
         ),
-      ),
-    ),
-  );
+      );
+    },
+  ),
+);
 }
 
   Widget _buildPaymentOption({
@@ -955,10 +1028,32 @@ class _CartScreenState extends State<CartScreen> {
         );
       }
 
+      final farmerIds = itemsByFarmer.keys.toList();
+      final farmerProfiles = await FarmerService().getFarmerProfilesByIds(farmerIds);
+
       // Process orders for each farmer
       for (var entry in itemsByFarmer.entries) {
         final farmerId = entry.key;
         final items = entry.value;
+
+        final subtotal = items.fold<double>(
+          0.0,
+          (sum, item) => sum + (item.quantity * item.unitPrice),
+        );
+
+        double deliveryFee = 0.0;
+        if (_paymentMethod == 'COD') {
+          final profile = farmerProfiles.cast<FarmerProfile?>().firstWhere(
+            (p) => p?.profileId == farmerId,
+            orElse: () => null,
+          );
+          final minAmount = profile?.freeDeliveryMinAmount ?? 0.0;
+          if (minAmount > 0 && subtotal >= minAmount) {
+            deliveryFee = 0.0;
+          } else {
+            deliveryFee = 50.0;
+          }
+        }
 
         await orderService.createOfflineOrder(
           farmerId: farmerId,
@@ -966,6 +1061,7 @@ class _CartScreenState extends State<CartScreen> {
           paymentMethod: _paymentMethod,
           deliveryAddressId: _paymentMethod == 'COP' ? null : _address?.addressId,
           notes: _instructionsController.text.trim(),
+          deliveryFee: deliveryFee,
         );
       }
 

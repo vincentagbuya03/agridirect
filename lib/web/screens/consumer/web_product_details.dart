@@ -2,15 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/data/app_data.dart';
-import '../../../shared/models/auth/user_address_model.dart';
 import '../../../shared/models/product/product_review_model.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/commerce/cart_service.dart';
-import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/services/commerce/product_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
-import '../../../shared/services/user/user_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
 
 class WebProductDetails extends StatefulWidget {
@@ -31,59 +28,23 @@ class _WebProductDetailsState extends State<WebProductDetails> {
   static const Color _white = Colors.white;
 
   final ProductService _productService = ProductService();
-  final OrderService _orderService = OrderService();
-  final UserService _userService = UserService();
-  final TextEditingController _instructionsController = TextEditingController();
 
   ProductItem? _product;
   Map<String, dynamic>? _farmerProfile;
   List<ProductReview> _reviews = const [];
   List<ProductItem> _moreFromFarmer = const [];
-  List<UserAddress> _addresses = const [];
-  UserAddress? _selectedAddress;
   bool _isLoading = true;
-  bool _isLoadingAddresses = true;
-  bool _isSubmittingOrder = false;
   int _quantity = 1;
-  String _selectedPaymentMethod = 'COD';
-
-  static const List<String> _paymentOptions = ['COD', 'COP'];
 
   @override
   void initState() {
     super.initState();
     _loadPage();
-    _loadAddresses();
   }
 
   @override
   void dispose() {
-    _instructionsController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadAddresses() async {
-    try {
-      final addresses = await _userService.getAllUserAddresses();
-      if (!mounted) return;
-      setState(() {
-        _addresses = addresses;
-        _selectedAddress = addresses.cast<UserAddress?>().firstWhere(
-          (address) => address?.isDefault == true,
-          orElse: () => addresses.isNotEmpty ? addresses.first : null,
-        );
-        _isLoadingAddresses = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isLoadingAddresses = false);
-    }
-  }
-
-  Future<void> _openAddressBook() async {
-    await context.push(AppRoutes.addressBook);
-    if (!mounted) return;
-    await _loadAddresses();
   }
 
   Future<void> _loadPage([ProductItem? target]) async {
@@ -166,11 +127,12 @@ class _WebProductDetailsState extends State<WebProductDetails> {
   }
 
   String _currencyLabel(String raw) {
-    if (raw.trim().startsWith('P')) return raw;
-    if (raw.trim().startsWith('â‚±')) {
-      return 'P${raw.trim().substring(1)}';
+    final trimmed = raw.trim();
+    if (trimmed.startsWith('₱')) return trimmed;
+    if (trimmed.startsWith('P')) {
+      return '₱${trimmed.substring(1)}';
     }
-    return 'P$raw';
+    return '₱$trimmed';
   }
 
   String _farmName() {
@@ -192,10 +154,6 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     return unit == null || unit.isEmpty ? 'unit' : unit;
   }
 
-  double _priceValue() {
-    final raw = _product?.price ?? '0';
-    return double.tryParse(raw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
-  }
 
   double _averageReviewRating() {
     if (_reviews.isEmpty) return double.tryParse(_product?.rating ?? '0') ?? 0;
@@ -212,56 +170,7 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     ).showSnackBar(SnackBar(content: Text('${_product!.name} added to cart')));
   }
 
-  Future<void> _submitOrder() async {
-    final product = _product;
-    final productId = product?.productId;
-    final farmerId = product?.farmerId;
-    if (productId == null ||
-        productId.isEmpty ||
-        farmerId == null ||
-        farmerId.isEmpty) {
-      return;
-    }
 
-    if (_selectedPaymentMethod == 'COD' && _selectedAddress == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a delivery address.')),
-      );
-      return;
-    }
-
-    setState(() => _isSubmittingOrder = true);
-    try {
-      await _orderService.createOfflineOrder(
-        farmerId: farmerId,
-        items: [
-          OrderItemInput(
-            productId: productId,
-            quantity: _quantity.toDouble(),
-            unitPrice: _priceValue(),
-          ),
-        ],
-        paymentMethod: _selectedPaymentMethod,
-        deliveryAddressId:
-            _selectedPaymentMethod == 'COP' ? null : _selectedAddress?.addressId,
-        notes: _instructionsController.text.trim(),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order placed successfully.')),
-      );
-      context.go(AppRoutes.customerOrders);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmittingOrder = false);
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -446,7 +355,6 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     final reviewCount = _reviews.isNotEmpty
         ? _reviews.length
         : int.tryParse(_product!.reviews ?? '0') ?? 0;
-    final requiresAddress = _selectedPaymentMethod == 'COD';
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -588,94 +496,7 @@ class _WebProductDetailsState extends State<WebProductDetails> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          DropdownButtonFormField<String>(
-            initialValue: _selectedPaymentMethod,
-            items: _paymentOptions
-                .map(
-                  (method) => DropdownMenuItem<String>(
-                    value: method,
-                    child: Text(method),
-                  ),
-                )
-                .toList(),
-            onChanged: (value) {
-              if (value == null) return;
-              setState(() => _selectedPaymentMethod = value);
-            },
-            decoration: InputDecoration(
-              labelText: 'Payment method',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            requiresAddress ? 'Shipping Address' : 'Pickup Location (at Farm)',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: _dark,
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (_isLoadingAddresses)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: CircularProgressIndicator(color: _primary),
-              ),
-            )
-          else if (requiresAddress)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildAddressPanel(),
-                const SizedBox(height: 12),
-              ],
-            )
-          else
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: _surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Pickup will be arranged directly with the farmer.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: _dark,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _farmName(),
-                    style: const TextStyle(fontSize: 13, color: _muted),
-                  ),
-                ],
-              ),
-            ),
-          TextField(
-            controller: _instructionsController,
-            maxLines: 2,
-            decoration: InputDecoration(
-              hintText: 'Special instructions (optional)',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          _buildOrderSummary(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 32),
           Row(
             children: [
               Expanded(
@@ -699,7 +520,15 @@ class _WebProductDetailsState extends State<WebProductDetails> {
               const SizedBox(width: 14),
               Expanded(
                 child: FilledButton(
-                  onPressed: _isSubmittingOrder ? null : _submitOrder,
+                  onPressed: () {
+                    context.push(
+                      AppRoutes.checkout,
+                      extra: {
+                        'product': _product,
+                        'quantity': _quantity,
+                      },
+                    );
+                  },
                   style: FilledButton.styleFrom(
                     backgroundColor: _primary,
                     foregroundColor: _white,
@@ -708,182 +537,19 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                       borderRadius: BorderRadius.circular(18),
                     ),
                   ),
-                  child: Text(
-                    _isSubmittingOrder ? 'Ordering...' : 'Buy Now',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  child: const Text(
+                    'Buy Now',
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Total: ${_currencyLabel((_priceValue() * _quantity).toStringAsFixed(2))}',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: _dark,
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildAddressPanel() {
-    if (_addresses.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _border),
-        ),
-        child: Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'No saved address found. Add one first to use Cash on Delivery.',
-                style: TextStyle(fontSize: 13, color: _muted),
-              ),
-            ),
-            TextButton(
-              onPressed: _openAddressBook,
-              child: const Text('Manage'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DropdownButtonFormField<String>(
-          initialValue: _selectedAddress?.addressId,
-          items: _addresses
-              .map(
-                (address) => DropdownMenuItem<String>(
-                  value: address.addressId,
-                  child: Text(
-                    '${address.label} • ${address.city}',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedAddress = _addresses.cast<UserAddress?>().firstWhere(
-                (address) => address?.addressId == value,
-                orElse: () => null,
-              );
-            });
-          },
-          decoration: InputDecoration(
-            labelText: 'Delivery address',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        if (_selectedAddress != null)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _border),
-            ),
-            child: Text(
-              '${_selectedAddress!.recipientName}\n${_selectedAddress!.fullAddress}\n${_selectedAddress!.recipientPhone}',
-              style: const TextStyle(fontSize: 13, color: _muted, height: 1.5),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildOrderSummary() {
-    final subtotal = _priceValue() * _quantity;
-    final requiresAddress = _selectedPaymentMethod == 'COD';
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Order Summary',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: _dark,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _summaryRow('Unit price', _currencyLabel(_product!.price)),
-          _summaryRow('Quantity', '$_quantity ${_unitLabel()}'),
-          _summaryRow(
-            'Fulfillment',
-            requiresAddress ? 'Delivery' : 'Pickup at farm',
-          ),
-          _summaryRow(
-            'Payment',
-            _selectedPaymentMethod == 'COD'
-                ? 'Cash on Delivery'
-                : 'Cash on Pickup',
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Divider(height: 1),
-          ),
-          _summaryRow(
-            'Total',
-            _currencyLabel(subtotal.toStringAsFixed(2)),
-            isEmphasized: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryRow(String label, String value, {bool isEmphasized = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: isEmphasized ? _dark : _muted,
-                fontWeight: isEmphasized ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: isEmphasized ? 15 : 13,
-              color: _dark,
-              fontWeight: isEmphasized ? FontWeight.w800 : FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _qtyButton(IconData icon, VoidCallback onTap) {
     return IconButton(

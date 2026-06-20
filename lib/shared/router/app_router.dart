@@ -34,6 +34,8 @@ import '../../web/screens/consumer/web_farmer_public_profile_screen.dart';
 import '../../web/screens/consumer/web_preorder_details.dart';
 import '../../web/screens/consumer/web_product_details.dart';
 import '../../web/screens/consumer/web_preorder_hub.dart';
+import '../../web/screens/consumer/web_checkout_screen.dart';
+import '../../web/screens/consumer/web_cart_checkout_screen.dart';
 import '../../web/screens/admin/admin_dashboard_redesigned.dart';
 import '../../web/screens/common/web_welcome_screen.dart';
 import '../screens/messages/messages_screen.dart';
@@ -139,6 +141,7 @@ GoRouter createAppRouter() {
           AppRoutes.community,
           AppRoutes.cart,
           AppRoutes.preorderDetails,
+          AppRoutes.checkout,
         };
 
         if (protectedRoutes.contains(location)) {
@@ -615,6 +618,29 @@ GoRouter createAppRouter() {
             return WebProductDetails(initialProduct: product);
           },
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.checkout,
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final product = extra?['product'] as ProductItem?;
+          final quantity = extra?['quantity'] as int? ?? 1;
+
+          if (product == null) {
+            return const Scaffold(
+              body: Center(child: Text('No checkout details provided')),
+            );
+          }
+
+          return WebCheckoutScreen(
+            product: product,
+            initialQuantity: quantity,
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.cartCheckout,
+        builder: (context, state) => const WebCartCheckoutScreen(),
       ),
       GoRoute(
         path: AppRoutes.customerOrders,

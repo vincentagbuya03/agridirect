@@ -34,6 +34,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   late TextEditingController _addressController;
   late TextEditingController _latitudeController;
   late TextEditingController _longitudeController;
+  late TextEditingController _freeDeliveryMinAmountController;
 
   // Customer-only fields
   late TextEditingController _bioController;
@@ -61,6 +62,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     _addressController = TextEditingController();
     _latitudeController = TextEditingController();
     _longitudeController = TextEditingController();
+    _freeDeliveryMinAmountController = TextEditingController();
     _bioController = TextEditingController();
     _phoneController = TextEditingController();
     _imageUrlController = TextEditingController();
@@ -86,6 +88,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     _addressController.dispose();
     _latitudeController.dispose();
     _longitudeController.dispose();
+    _freeDeliveryMinAmountController.dispose();
     _bioController.dispose();
     _phoneController.dispose();
     _imageUrlController.dispose();
@@ -156,6 +159,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             _latitudeController.text = latitudeText;
             _longitudeController.text = longitudeText;
             _imageUrlController.text = rawImagePath;
+            _freeDeliveryMinAmountController.text = (farmer['free_delivery_min_amount'] ?? '0').toString();
             _farmerId = farmer['farmer_id']?.toString(); // 🟢 NEW: Save farmer_id
             _farmerImageUrl = await SupabaseDatabase.getSafeUrl(
               rawImagePath,
@@ -410,6 +414,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           'farm_latitude': _parseCoordinate(_latitudeController.text),
           'farm_longitude': _parseCoordinate(_longitudeController.text),
           'image_url': _imageUrlController.text.trim(),
+          'free_delivery_min_amount': double.tryParse(_freeDeliveryMinAmountController.text) ?? 0.0,
         });
 
         if (_farmerId != null && _farmerId!.isNotEmpty) {
@@ -621,6 +626,25 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         icon: Icons.home,
                         enabled: _isEditing,
                         maxLines: 2,
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildTextField(
+                        controller: _freeDeliveryMinAmountController,
+                        label: 'Minimum Order for Free Delivery (₱)',
+                        icon: Icons.local_shipping,
+                        enabled: _isEditing,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        isRequired: false,
+                        validator: (value) {
+                          final text = value?.trim() ?? '';
+                          if (text.isEmpty) return null;
+                          final parsed = double.tryParse(text);
+                          if (parsed == null || parsed < 0) {
+                            return 'Please enter a valid positive number';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 16),
 

@@ -42,6 +42,8 @@ class FarmerProfile {
   final double? averageRating;
   @JsonKey(name: 'total_reviews')
   final int? totalReviews;
+  @JsonKey(name: 'free_delivery_min_amount')
+  final double? freeDeliveryMinAmount;
 
   FarmerProfile({
     required this.profileId,
@@ -61,6 +63,7 @@ class FarmerProfile {
     this.farmerPhone,
     this.averageRating,
     this.totalReviews,
+    this.freeDeliveryMinAmount,
   });
 
   factory FarmerProfile.fromJson(Map<String, dynamic> json) =>
@@ -85,6 +88,7 @@ class FarmerProfile {
     String? farmerPhone,
     double? averageRating,
     int? totalReviews,
+    double? freeDeliveryMinAmount,
   }) {
     return FarmerProfile(
       profileId: profileId ?? this.profileId,
@@ -104,6 +108,7 @@ class FarmerProfile {
       farmerPhone: farmerPhone ?? this.farmerPhone,
       averageRating: averageRating ?? this.averageRating,
       totalReviews: totalReviews ?? this.totalReviews,
+      freeDeliveryMinAmount: freeDeliveryMinAmount ?? this.freeDeliveryMinAmount,
     );
   }
 }

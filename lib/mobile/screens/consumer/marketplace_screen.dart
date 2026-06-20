@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -18,6 +19,8 @@ import '../../../shared/services/commerce/cart_service.dart';
 import 'package:agridirect/shared/widgets/image_widgets.dart';
 import '../../../shared/services/user/user_service.dart';
 import '../../../shared/models/auth/user_address_model.dart';
+import '../../../shared/models/farmer/farmer_profile_model.dart';
+import '../../../shared/services/farmer/farmer_service.dart';
 import '../../../shared/services/integration/reverse_geocoding_service.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_router.dart';
@@ -1035,13 +1038,41 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   int _getReviewCount() => widget.product.reviews != null ? int.tryParse(widget.product.reviews!) ?? 0 : 0;
   String _getDescription() => (widget.product.description != null && widget.product.description!.isNotEmpty) ? widget.product.description! : 'No product description available.';
 
-  void _showCheckoutSheet() {
+  void _showCheckoutSheet() async {
+    final farmerId = widget.product.farmerId;
+    FarmerProfile? farmerProfile;
+    if (farmerId != null && farmerId.isNotEmpty) {
+      try {
+        farmerProfile = await FarmerService().getFarmerProfileByFarmerId(farmerId);
+      } catch (e) {
+        debugPrint('Error loading farmer profile: $e');
+      }
+    }
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) => Container(
+        builder: (sheetContext, setSheetState) {
+          final price = double.tryParse(widget.product.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+          final subtotal = price * _quantity;
+
+          double deliveryFee = 0.0;
+          if (_paymentMethod == 'COD') {
+            final minAmount = farmerProfile?.freeDeliveryMinAmount ?? 0.0;
+            if (minAmount > 0 && subtotal >= minAmount) {
+              deliveryFee = 0.0;
+            } else {
+              deliveryFee = 50.0;
+            }
+          }
+
+          final grandTotal = subtotal + deliveryFee;
+
+          return Container(
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
@@ -1150,29 +1181,67 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Column(
                   children: [
-                    Text('Total Amount', style: AppTextStyles.bodyLarge),
-                    Text('₱${(double.tryParse(widget.product.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0) * _quantity}', style: AppTextStyles.headline1.copyWith(color: AppColors.primary, fontSize: 24)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Subtotal', style: AppTextStyles.bodyMedium),
+                        Text(
+                          '₱${subtotal.toStringAsFixed(2)}',
+                          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Delivery Fee', style: AppTextStyles.bodyMedium),
+                        Text(
+                          deliveryFee > 0
+                              ? '₱${deliveryFee.toStringAsFixed(2)}'
+                              : 'Free',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: deliveryFee > 0 ? AppColors.textHeadline : AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Total Amount', style: AppTextStyles.bodyLarge),
+                        Text(
+                          '₱${grandTotal.toStringAsFixed(2)}',
+                          style: AppTextStyles.headline1.copyWith(
+                            color: AppColors.primary,
+                            fontSize: 24,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: (_paymentMethod == 'COD' && _address == null || _isOrdering) ? null : () { Navigator.pop(sheetContext); _handleOrderNow(); },
+                    onPressed: (_paymentMethod == 'COD' && _address == null || _isOrdering) ? null : () { Navigator.pop(sheetContext); _handleOrderNow(deliveryFee); },
                     style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                     child: Text(_isOrdering ? 'Ordering...' : 'Confirm Order', style: AppTextStyles.headline3.copyWith(color: Colors.white, fontSize: 18)),
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  ),
+);
+}
 
   Widget _buildFarmPickupSection() {
     return Column(
@@ -1229,7 +1298,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     );
   }
 
-  Future<void> _handleOrderNow() async {
+  Future<void> _handleOrderNow(double deliveryFee) async {
     if (widget.product.productId == null || widget.product.farmerId == null) return;
     setState(() => _isOrdering = true);
     try {
@@ -1240,6 +1309,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         paymentMethod: _paymentMethod,
         deliveryAddressId: _paymentMethod == 'COP' ? null : _address?.addressId,
         notes: _instructionsController.text.trim(),
+        deliveryFee: deliveryFee,
       );
       if (!mounted) return;
       context.pushReplacement(AppRoutes.customerOrders);
@@ -1710,33 +1780,1011 @@ class _AddressSelectorSheetState extends State<AddressSelectorSheet> {
 
 class AddressEditorSheet extends StatefulWidget {
   final UserAddress? initialAddress;
-  const AddressEditorSheet({super.key, this.initialAddress});
-  @override State<AddressEditorSheet> createState() => _AddressEditorSheetState();
+  final bool? isDialog;
+  const AddressEditorSheet({super.key, this.initialAddress, this.isDialog});
+
+  @override
+  State<AddressEditorSheet> createState() => _AddressEditorSheetState();
 }
+
 class _AddressEditorSheetState extends State<AddressEditorSheet> {
-  final _formKey = GlobalKey<FormState>(); final _labels = ['Home', 'Office', 'Farm', 'Warehouse', 'Other']; String _selectedLabel = 'Home';
-  final _recipientController = TextEditingController(); final _phoneController = TextEditingController(); final _streetController = TextEditingController(); final _barangayController = TextEditingController(); final _cityController = TextEditingController(); final _provinceController = TextEditingController();
-  bool _isDefault = false; bool _isSaving = false; double? _latitude; double? _longitude;
-  @override void initState() { super.initState(); if (widget.initialAddress != null) { _selectedLabel = _labels.contains(widget.initialAddress!.label) ? widget.initialAddress!.label : 'Other'; _recipientController.text = widget.initialAddress!.recipientName; _phoneController.text = widget.initialAddress!.recipientPhone; _streetController.text = widget.initialAddress!.street; _barangayController.text = widget.initialAddress!.barangay; _cityController.text = widget.initialAddress!.city; _provinceController.text = widget.initialAddress!.province; _isDefault = widget.initialAddress!.isDefault; _latitude = widget.initialAddress!.latitude; _longitude = widget.initialAddress!.longitude; } }
+  final _formKey = GlobalKey<FormState>();
+  final _labels = ['Home', 'Office', 'Farm', 'Warehouse', 'Other'];
+  String _selectedLabel = 'Home';
+
+  final _recipientController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _streetController = TextEditingController();
+  final _barangayController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _provinceController = TextEditingController();
+
+  bool _isDefault = false;
+  bool _isSaving = false;
+  double? _latitude;
+  double? _longitude;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialAddress != null) {
+      _selectedLabel = _labels.contains(widget.initialAddress!.label)
+          ? widget.initialAddress!.label
+          : 'Other';
+      _recipientController.text = widget.initialAddress!.recipientName;
+      _phoneController.text = widget.initialAddress!.recipientPhone;
+      _streetController.text = widget.initialAddress!.street;
+      _barangayController.text = widget.initialAddress!.barangay;
+      _cityController.text = widget.initialAddress!.city;
+      _provinceController.text = widget.initialAddress!.province;
+      _isDefault = widget.initialAddress!.isDefault;
+      _latitude = widget.initialAddress!.latitude;
+      _longitude = widget.initialAddress!.longitude;
+    }
+  }
+
+  @override
+  void dispose() {
+    _recipientController.dispose();
+    _phoneController.dispose();
+    _streetController.dispose();
+    _barangayController.dispose();
+    _cityController.dispose();
+    _provinceController.dispose();
+    super.dispose();
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_latitude == null || _longitude == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select your exact delivery location on the map'), backgroundColor: AppColors.error)); return; }
-    setState(() => _isSaving = true); try { final res = await UserService().upsertAddress(addressId: widget.initialAddress?.addressId, label: _selectedLabel, recipientName: _recipientController.text, recipientPhone: _phoneController.text, street: _streetController.text, barangay: _barangayController.text, city: _cityController.text, province: _provinceController.text, zipCode: '0000', isDefault: _isDefault, latitude: _latitude, longitude: _longitude); if (mounted && res != null) Navigator.pop(context, res); } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red)); } finally { if (mounted) setState(() => _isSaving = false); }
+    if (_latitude == null || _longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select your exact delivery location on the map'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+    setState(() => _isSaving = true);
+    try {
+      final res = await UserService().upsertAddress(
+        addressId: widget.initialAddress?.addressId,
+        label: _selectedLabel,
+        recipientName: _recipientController.text.trim(),
+        recipientPhone: _phoneController.text.trim(),
+        street: _streetController.text.trim(),
+        barangay: _barangayController.text.trim(),
+        city: _cityController.text.trim(),
+        province: _provinceController.text.trim(),
+        zipCode: '0000',
+        isDefault: _isDefault,
+        latitude: _latitude,
+        longitude: _longitude,
+      );
+      if (mounted && res != null) Navigator.pop(context, res);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
-  @override Widget build(BuildContext context) { return Container(padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom), decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(32))), child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Form(key: _formKey, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [Text(widget.initialAddress == null ? 'Add Address' : 'Edit Address', style: AppTextStyles.headline1.copyWith(fontSize: 22)), const SizedBox(height: 24), Text('Label', style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.bold)), const SizedBox(height: 8), DropdownButtonFormField<String>(initialValue: _selectedLabel, items: _labels.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(), onChanged: (v) { if (v != null) setState(() => _selectedLabel = v); }, decoration: InputDecoration(filled: true, fillColor: AppColors.background, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none))), const SizedBox(height: 16), _buildField(_recipientController, 'Recipient Name', 'Juan Dela Cruz'), const SizedBox(height: 16), _buildField(_phoneController, 'Phone Number', '09123456789', keyboard: TextInputType.phone), const SizedBox(height: 16), _buildField(_streetController, 'Street / House No.', '123 Agri St.'), const SizedBox(height: 16), _buildField(_barangayController, 'Barangay', 'Brgy. San Jose'), const SizedBox(height: 16), _buildField(_cityController, 'City', 'Cabanatuan'), const SizedBox(height: 16), _buildField(_provinceController, 'Province', 'Nueva Ecija'), const SizedBox(height: 16), Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: (_latitude != null) ? AppColors.primary.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: (_latitude != null) ? AppColors.primary.withValues(alpha: 0.2) : AppColors.error.withValues(alpha: 0.3))), child: Row(children: [Icon(Icons.location_on_rounded, color: (_latitude != null) ? AppColors.primary : AppColors.textSubtle), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Delivery Pin', style: AppTextStyles.labelSmall.copyWith(fontWeight: FontWeight.w800, color: (_latitude != null) ? AppColors.primary : AppColors.textHeadline)), Text((_latitude != null) ? 'Location Pinned' : 'Required: Please pin your location', style: AppTextStyles.bodySmall.copyWith(fontSize: 11, color: (_latitude == null) ? AppColors.error : AppColors.textSubtle))])), TextButton.icon(onPressed: () async { final res = await showModalBottomSheet<Map<String, dynamic>>(context: context, isScrollControlled: true, useRootNavigator: true, backgroundColor: Colors.transparent, builder: (context) => const LocationPickerSheet()); if (res != null && mounted) { setState(() { _latitude = res['lat']; _longitude = res['lng']; if (res['address'] != null) { final ResolvedFarmLocation a = res['address']; _streetController.text = a.street; _barangayController.text = a.barangay; _cityController.text = a.city; _provinceController.text = a.province; } }); } }, icon: const Icon(Icons.map_rounded), label: Text((_latitude != null) ? 'Change' : 'Select'))])), const SizedBox(height: 20), SwitchListTile(title: const Text('Set as default'), value: _isDefault, onChanged: (v) => setState(() => _isDefault = v), contentPadding: EdgeInsets.zero), const SizedBox(height: 32), SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _isSaving ? null : _save, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: _isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Save Address', style: TextStyle(color: Colors.white))))])))); }
-  Widget _buildField(TextEditingController c, String l, String h, {TextInputType? keyboard}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(l, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.bold)), const SizedBox(height: 8), TextFormField(controller: c, keyboardType: keyboard, decoration: InputDecoration(hintText: h, filled: true, fillColor: AppColors.background, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)), validator: (v) => (v == null || v.isEmpty) ? 'Required' : null)]);
+
+  Future<void> _openLocationPicker() async {
+    final isMobile = MediaQuery.of(context).size.width <= 800;
+    final res = isMobile
+        ? await showModalBottomSheet<Map<String, dynamic>>(
+            context: context,
+            isScrollControlled: true,
+            useRootNavigator: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => const LocationPickerSheet(),
+          )
+        : await showDialog<Map<String, dynamic>>(
+            context: context,
+            builder: (context) => Dialog(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 750, maxHeight: 600),
+                child: const LocationPickerSheet(isDialog: true),
+              ),
+            ),
+          );
+
+    if (res != null && mounted) {
+      setState(() {
+        _latitude = res['lat'];
+        _longitude = res['lng'];
+        if (res['address'] != null) {
+          final ResolvedFarmLocation a = res['address'];
+          _streetController.text = a.street;
+          _barangayController.text = a.barangay;
+          _cityController.text = a.city;
+          _provinceController.text = a.province;
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isWeb = MediaQuery.of(context).size.width > 800;
+    final useDialog = widget.isDialog ?? isWeb;
+
+    // ─── Form content ────────────────────────────────────────────────────────
+    Widget formContent = Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Title row ────────────────────────────────────────────────────
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primaryDark, AppColors.primary],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.location_on_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.initialAddress == null
+                          ? 'Add New Address'
+                          : 'Edit Address',
+                      style: GoogleFonts.poppins(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textHeadline,
+                      ),
+                    ),
+                    Text(
+                      'Fill in your delivery details below',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: AppColors.textSubtle,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (useDialog)
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    foregroundColor: AppColors.textSubtle,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.all(8),
+                    minimumSize: const Size(36, 36),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // ── Address Tag ──────────────────────────────────────────────────
+          _buildSectionLabel('Address Tag'),
+          const SizedBox(height: 8),
+          _buildLabelSelector(),
+          const SizedBox(height: 20),
+
+          // ── Recipient details ────────────────────────────────────────────
+          _buildSectionLabel('Recipient Details'),
+          const SizedBox(height: 8),
+          if (useDialog) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                    child: _buildField(
+                  _recipientController,
+                  'Recipient Name',
+                  'Juan Dela Cruz',
+                  icon: Icons.person_outline_rounded,
+                )),
+                const SizedBox(width: 14),
+                Expanded(
+                    child: _buildField(
+                  _phoneController,
+                  'Phone Number',
+                  '09123456789',
+                  keyboard: TextInputType.phone,
+                  icon: Icons.phone_outlined,
+                )),
+              ],
+            ),
+          ] else ...[
+            _buildField(
+              _recipientController,
+              'Recipient Name',
+              'Juan Dela Cruz',
+              icon: Icons.person_outline_rounded,
+            ),
+            const SizedBox(height: 14),
+            _buildField(
+              _phoneController,
+              'Phone Number',
+              '09123456789',
+              keyboard: TextInputType.phone,
+              icon: Icons.phone_outlined,
+            ),
+          ],
+          const SizedBox(height: 20),
+
+          // ── Address fields ───────────────────────────────────────────────
+          _buildSectionLabel('Address Details'),
+          const SizedBox(height: 8),
+          if (useDialog) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                    child: _buildField(
+                  _streetController,
+                  'Street / House No.',
+                  '123 Agri St.',
+                  icon: Icons.home_outlined,
+                )),
+                const SizedBox(width: 14),
+                Expanded(
+                    child: _buildField(
+                  _barangayController,
+                  'Barangay',
+                  'Brgy. San Jose',
+                  icon: Icons.location_city_outlined,
+                )),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                    child: _buildField(
+                  _cityController,
+                  'City',
+                  'Cabanatuan',
+                  icon: Icons.apartment_outlined,
+                )),
+                const SizedBox(width: 14),
+                Expanded(
+                    child: _buildField(
+                  _provinceController,
+                  'Province',
+                  'Nueva Ecija',
+                  icon: Icons.map_outlined,
+                )),
+              ],
+            ),
+          ] else ...[
+            _buildField(
+              _streetController,
+              'Street / House No.',
+              '123 Agri St.',
+              icon: Icons.home_outlined,
+            ),
+            const SizedBox(height: 14),
+            _buildField(
+              _barangayController,
+              'Barangay',
+              'Brgy. San Jose',
+              icon: Icons.location_city_outlined,
+            ),
+            const SizedBox(height: 14),
+            _buildField(
+              _cityController,
+              'City',
+              'Cabanatuan',
+              icon: Icons.apartment_outlined,
+            ),
+            const SizedBox(height: 14),
+            _buildField(
+              _provinceController,
+              'Province',
+              'Nueva Ecija',
+              icon: Icons.map_outlined,
+            ),
+          ],
+          const SizedBox(height: 20),
+
+          // ── Location pin ─────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: (_latitude != null)
+                  ? AppColors.primary.withValues(alpha: 0.06)
+                  : AppColors.error.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: (_latitude != null)
+                    ? AppColors.primary.withValues(alpha: 0.3)
+                    : AppColors.error.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: (_latitude != null)
+                        ? AppColors.primary.withValues(alpha: 0.12)
+                        : AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.location_on_rounded,
+                    color: (_latitude != null)
+                        ? AppColors.primary
+                        : AppColors.error,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Delivery Pin Location',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textHeadline,
+                        ),
+                      ),
+                      Text(
+                        (_latitude != null)
+                            ? '📍 ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}'
+                            : 'Tap "Select" to pin your location on the map',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: (_latitude != null)
+                              ? AppColors.primary
+                              : AppColors.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: _openLocationPicker,
+                  icon: Icon(
+                    (_latitude != null)
+                        ? Icons.edit_location_alt_rounded
+                        : Icons.map_rounded,
+                    size: 15,
+                  ),
+                  label: Text((_latitude != null) ? 'Change' : 'Select'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary, width: 1.5),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    textStyle: GoogleFonts.inter(
+                        fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Default toggle ───────────────────────────────────────────────
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                'Set as default address',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textHeadline,
+                ),
+              ),
+              subtitle: Text(
+                'Used automatically at checkout',
+                style: GoogleFonts.inter(
+                    fontSize: 12, color: AppColors.textSubtle),
+              ),
+              value: _isDefault,
+              onChanged: (v) => setState(() => _isDefault = v),
+              activeColor: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // ── Save button ──────────────────────────────────────────────────
+          Row(
+            children: [
+              if (!useDialog) ...[
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      side: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSubtle,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                flex: 2,
+                child: _isSaving
+                    ? Container(
+                        height: 54,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              AppColors.primaryDark,
+                              AppColors.primary,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          ),
+                        ),
+                      )
+                    : InkWell(
+                        onTap: _save,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Ink(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                AppColors.primaryDark,
+                                AppColors.primary,
+                                Color(0xFF10B981),
+                              ],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Container(
+                            height: 54,
+                            alignment: Alignment.center,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.save_alt_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Save Address',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    if (useDialog) {
+      return Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: SingleChildScrollView(child: formContent),
+      );
+    }
+
+    return Container(
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+        child: formContent,
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(String label) {
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 14,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.primaryDark, AppColors.primary],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textHeadline,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLabelSelector() {
+    final icons = {
+      'Home': Icons.home_rounded,
+      'Office': Icons.business_rounded,
+      'Farm': Icons.agriculture_rounded,
+      'Warehouse': Icons.warehouse_rounded,
+      'Other': Icons.location_on_rounded,
+    };
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: _labels.map((label) {
+        final isSelected = _selectedLabel == label;
+        return GestureDetector(
+          onTap: () => setState(() => _selectedLabel = label),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              gradient: isSelected
+                  ? const LinearGradient(
+                      colors: [AppColors.primaryDark, AppColors.primary],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: isSelected ? null : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected
+                    ? AppColors.primary
+                    : const Color(0xFFE2E8F0),
+                width: isSelected ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icons[label] ?? Icons.location_on_rounded,
+                  size: 15,
+                  color: isSelected ? Colors.white : AppColors.textSubtle,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isSelected
+                        ? Colors.white
+                        : AppColors.textHeadline,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildField(
+    TextEditingController controller,
+    String label,
+    String hint, {
+    TextInputType? keyboard,
+    IconData? icon,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSubtle,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboard,
+          style: GoogleFonts.inter(
+              fontSize: 14,
+              color: AppColors.textBody,
+              fontWeight: FontWeight.w500),
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixIcon: icon != null
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Icon(icon, size: 18, color: AppColors.textSubtle),
+                  )
+                : null,
+            prefixIconConstraints:
+                const BoxConstraints(minWidth: 0, minHeight: 0),
+            hintStyle: GoogleFonts.inter(
+                fontSize: 13,
+                color: AppColors.textSubtle.withValues(alpha: 0.5)),
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide:
+                  const BorderSide(color: AppColors.primary, width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide:
+                  const BorderSide(color: AppColors.error, width: 1.5),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide:
+                  const BorderSide(color: AppColors.error, width: 2),
+            ),
+          ),
+          validator: (v) =>
+              (v == null || v.isEmpty) ? '$label is required' : null,
+        ),
+      ],
+    );
+  }
 }
 
 class LocationPickerSheet extends StatefulWidget {
-  const LocationPickerSheet({super.key});
-  @override State<LocationPickerSheet> createState() => _LocationPickerSheetState();
+  final bool isDialog;
+  const LocationPickerSheet({super.key, this.isDialog = false});
+
+  @override
+  State<LocationPickerSheet> createState() => _LocationPickerSheetState();
 }
+
 class _LocationPickerSheetState extends State<LocationPickerSheet> {
-  final MapController _mapController = MapController(); LatLng _currentCenter = const LatLng(15.4828, 120.9714); bool _isLoading = true; bool _isResolving = false; ResolvedFarmLocation? _resolvedLocation;
-  @override void initState() { super.initState(); _moveToCurrentLocation(); }
-  Future<void> _moveToCurrentLocation() async { try { final pos = await Geolocator.getCurrentPosition(); final nw = LatLng(pos.latitude, pos.longitude); if (mounted) { setState(() { _currentCenter = nw; _isLoading = false; }); _mapController.move(nw, 16); _resolveAddress(nw); } } catch (_) { if (mounted) setState(() => _isLoading = false); } }
-  Future<void> _resolveAddress(LatLng p) async { setState(() => _isResolving = true); try { final res = await ReverseGeocodingService.resolveFromCoordinates(latitude: p.latitude, longitude: p.longitude); if (mounted) { setState(() { _resolvedLocation = res; _isResolving = false; }); } } catch (_) { if (mounted) setState(() => _isResolving = false); } }
-  @override Widget build(BuildContext context) { return Container(height: MediaQuery.of(context).size.height * 0.85, decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(32))), child: Stack(children: [ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(32)), child: FlutterMap(mapController: _mapController, options: MapOptions(initialCenter: _currentCenter, initialZoom: 16, onTap: (tp, p) { setState(() => _currentCenter = p); _mapController.move(p, _mapController.camera.zoom); _resolveAddress(p); }, onPositionChanged: (pos, hasGesture) { if (hasGesture) setState(() => _currentCenter = pos.center); }, onMapEvent: (ev) { if (ev is MapEventMoveEnd) _resolveAddress(_currentCenter); }), children: [TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.agridirect.app')])), Center(child: Padding(padding: const EdgeInsets.only(bottom: 35), child: Icon(Icons.location_on_rounded, color: AppColors.primary, size: 40, shadows: [Shadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 5))]))), Positioned(top: 20, left: 20, right: 20, child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [CircleAvatar(backgroundColor: Colors.white, child: IconButton(icon: const Icon(Icons.close_rounded, color: Colors.black), onPressed: () => Navigator.pop(context))), Text('Select Delivery Pin', style: AppTextStyles.headline3.copyWith(backgroundColor: Colors.white.withValues(alpha: 0.9))), const SizedBox(width: 40)])), Positioned(bottom: 20, left: 20, right: 20, child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [FloatingActionButton(onPressed: _moveToCurrentLocation, backgroundColor: Colors.white, mini: true, child: const Icon(Icons.my_location_rounded, color: AppColors.primary)), const SizedBox(height: 16), Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, -5))]), child: Column(mainAxisSize: MainAxisSize.min, children: [Row(children: [const Icon(Icons.location_on_rounded, color: AppColors.primary), const SizedBox(width: 12), Expanded(child: Text(_isResolving ? 'Resolving...' : (_resolvedLocation?.fullAddress.isNotEmpty == true ? _resolvedLocation!.fullAddress : 'Location: ${_currentCenter.latitude.toStringAsFixed(4)}, ${_currentCenter.longitude.toStringAsFixed(4)}'), style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600), maxLines: 2, overflow: TextOverflow.ellipsis))]), const SizedBox(height: 20), SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _isResolving ? null : () => Navigator.pop(context, {'lat': _currentCenter.latitude, 'lng': _currentCenter.longitude, 'address': _resolvedLocation}), style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: const Text('Confirm Location', style: TextStyle(color: Colors.white))))]))])), if (_isLoading) const Center(child: CircularProgressIndicator())])); }
+  final MapController _mapController = MapController();
+  LatLng _currentCenter = const LatLng(15.4828, 120.9714);
+  bool _isLoading = true;
+  bool _isResolving = false;
+  ResolvedFarmLocation? _resolvedLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    _moveToCurrentLocation();
+  }
+
+  Future<void> _moveToCurrentLocation() async {
+    try {
+      final pos = await Geolocator.getCurrentPosition();
+      final nw = LatLng(pos.latitude, pos.longitude);
+      if (mounted) {
+        setState(() {
+          _currentCenter = nw;
+          _isLoading = false;
+        });
+        _mapController.move(nw, 16);
+        _resolveAddress(nw);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _resolveAddress(LatLng p) async {
+    setState(() => _isResolving = true);
+    try {
+      final res = await ReverseGeocodingService.resolveFromCoordinates(
+        latitude: p.latitude,
+        longitude: p.longitude,
+      );
+      if (mounted) {
+        setState(() {
+          _resolvedLocation = res;
+          _isResolving = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isResolving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isWeb = MediaQuery.of(context).size.width > 800;
+    final useDialog = widget.isDialog || isWeb;
+
+    Widget body = Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(useDialog ? 24 : 32),
+            bottom: Radius.circular(useDialog ? 24 : 0),
+          ),
+          child: FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: _currentCenter,
+              initialZoom: 16,
+              onTap: (tp, p) {
+                setState(() => _currentCenter = p);
+                _mapController.move(p, _mapController.camera.zoom);
+                _resolveAddress(p);
+              },
+              onPositionChanged: (pos, hasGesture) {
+                if (hasGesture) setState(() => _currentCenter = pos.center);
+              },
+              onMapEvent: (ev) {
+                if (ev is MapEventMoveEnd) _resolveAddress(_currentCenter);
+              },
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.agridirect.app',
+              )
+            ],
+          ),
+        ),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 35),
+            child: Icon(
+              Icons.location_on_rounded,
+              color: AppColors.primary,
+              size: 44,
+              shadows: [
+                Shadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                )
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          top: 20,
+          left: 20,
+          right: 20,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              CircleAvatar(
+                backgroundColor: Colors.white,
+                child: IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.black),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+                child: Text(
+                  'Pin Delivery Location',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textHeadline,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 40),
+            ],
+          ),
+        ),
+        Positioned(
+          bottom: 20,
+          left: 20,
+          right: 20,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              FloatingActionButton(
+                onPressed: _moveToCurrentLocation,
+                backgroundColor: Colors.white,
+                mini: true,
+                child: const Icon(Icons.my_location_rounded, color: AppColors.primary),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 24,
+                      offset: const Offset(0, -4),
+                    )
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _isResolving
+                                ? 'Resolving Address...'
+                                : (_resolvedLocation?.fullAddress.isNotEmpty == true
+                                    ? _resolvedLocation!.fullAddress
+                                    : 'Location: ${_currentCenter.latitude.toStringAsFixed(4)}, ${_currentCenter.longitude.toStringAsFixed(4)}'),
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textHeadline,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        )
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isResolving
+                            ? null
+                            : () => Navigator.pop(context, {
+                                  'lat': _currentCenter.latitude,
+                                  'lng': _currentCenter.longitude,
+                                  'address': _resolvedLocation
+                                }),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          'Confirm Location',
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    )
+                  ],
+                ),
+              )
+            ],
+          ),
+        ),
+        if (_isLoading)
+          const Center(child: CircularProgressIndicator(color: AppColors.primary))
+      ],
+    );
+
+    if (useDialog) {
+      return Container(
+        height: 600,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: body,
+      );
+    }
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: body,
+    );
+  }
 }
 class _FlyingIconAnimation extends StatefulWidget {
   final Offset startPosition;

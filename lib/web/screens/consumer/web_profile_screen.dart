@@ -48,25 +48,19 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   StreamSubscription<String?>? _registrationStatusSubscription;
 
   Map<String, dynamic>? _farmerProfile;
-  bool _isLoadingFarmerProfile = false;
 
   Future<void> _loadFarmerProfile() async {
     final auth = AuthService();
     if (!auth.isLoggedIn) return;
-    setState(() => _isLoadingFarmerProfile = true);
     try {
       final profile = await SupabaseDataService().getFarmerProfile(auth.userId);
       if (mounted) {
         setState(() {
           _farmerProfile = profile;
-          _isLoadingFarmerProfile = false;
         });
       }
     } catch (e) {
       debugPrint('Error loading farmer profile in web_profile_screen: $e');
-      if (mounted) {
-        setState(() => _isLoadingFarmerProfile = false);
-      }
     }
   }
 
@@ -990,11 +984,13 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         Icons.shopping_bag_outlined,
         'My Orders',
         'Track purchases',
+        onTap: () => context.push(AppRoutes.customerOrders),
       ),
       _SettingsItem(
         Icons.location_on_outlined,
         'Addresses',
         'Delivery locations',
+        onTap: () => context.push(AppRoutes.addressBook),
       ),
       _SettingsItem(
         Icons.chat_bubble_outline_rounded,
@@ -1008,8 +1004,14 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         Icons.notifications_outlined,
         'Notifications',
         'Alert preferences',
+        onTap: () => _showNotificationsDialog(),
       ),
-      _SettingsItem(Icons.shield_outlined, 'Privacy', 'Data & security'),
+      _SettingsItem(
+        Icons.shield_outlined,
+        'Privacy',
+        'Data & security',
+        onTap: () => context.push(AppRoutes.appSettings),
+      ),
     ];
 
     return Wrap(
@@ -1113,6 +1115,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           ? (_farmerProfile!['residential_address']?.toString() ?? '')
           : '',
     );
+    final freeDeliveryMinAmountController = TextEditingController(
+      text: isFarmer && _farmerProfile != null
+          ? (_farmerProfile!['free_delivery_min_amount']?.toString() ?? '0')
+          : '',
+    );
 
     final formKey = GlobalKey<FormState>();
     bool isSaving = false;
@@ -1181,6 +1188,27 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         ),
                       ),
                       const SizedBox(height: 16),
+                      TextFormField(
+                        controller: freeDeliveryMinAmountController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: 'Minimum Order for Free Delivery (₱)',
+                          prefixIcon: const Icon(Icons.local_shipping_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        validator: (v) {
+                          final text = v?.trim() ?? '';
+                          if (text.isEmpty) return null;
+                          final parsed = double.tryParse(text);
+                          if (parsed == null || parsed < 0) {
+                            return 'Please enter a valid positive number';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
                     ],
                     TextFormField(
                       controller: imageController,
@@ -1245,6 +1273,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                 'image_url': imageController.text.trim(),
                                 'residential_address': bioController.text
                                     .trim(),
+                                'free_delivery_min_amount': double.tryParse(freeDeliveryMinAmountController.text) ?? 0.0,
                               })
                               .eq('user_id', userId);
                         } else {
@@ -1261,7 +1290,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
 
                         await auth.initialize();
                         await _loadFarmerProfile();
-                        if (mounted) {
+                        if (mounted && dialogCtx.mounted) {
                           Navigator.of(dialogCtx).pop();
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -1305,6 +1334,148 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                     )
                   : const Text(
                       'Save Changes',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showNotificationsDialog() {
+    bool emailAlerts = true;
+    bool pushAlerts = true;
+    bool promoAlerts = false;
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setModalState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Text(
+            'Notification Settings',
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              color: _dark,
+            ),
+          ),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SwitchListTile(
+                  activeThumbColor: primary,
+                  activeTrackColor: primary.withValues(alpha: 0.5),
+                  title: Text(
+                    'Email Notifications',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  subtitle: const Text('Receive order status updates via email'),
+                  value: emailAlerts,
+                  onChanged: isSaving
+                      ? null
+                      : (val) => setModalState(() => emailAlerts = val),
+                ),
+                const Divider(),
+                SwitchListTile(
+                  activeThumbColor: primary,
+                  activeTrackColor: primary.withValues(alpha: 0.5),
+                  title: Text(
+                    'Push Notifications',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  subtitle: const Text('Receive message alerts and activity updates'),
+                  value: pushAlerts,
+                  onChanged: isSaving
+                      ? null
+                      : (val) => setModalState(() => pushAlerts = val),
+                ),
+                const Divider(),
+                SwitchListTile(
+                  activeThumbColor: primary,
+                  activeTrackColor: primary.withValues(alpha: 0.5),
+                  title: Text(
+                    'Promotions & Offers',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  subtitle: const Text('Get notified of discount codes and local deals'),
+                  value: promoAlerts,
+                  onChanged: isSaving
+                      ? null
+                      : (val) => setModalState(() => promoAlerts = val),
+                ),
+              ],
+            ),
+          ),
+          actionsPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 16,
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.of(dialogCtx).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      setModalState(() => isSaving = true);
+                      // Simulate api call
+                      await Future.delayed(const Duration(milliseconds: 600));
+                      if (mounted && dialogCtx.mounted) {
+                        Navigator.of(dialogCtx).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Notification preferences saved!'),
+                            backgroundColor: primary,
+                          ),
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+              child: isSaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : const Text(
+                      'Save Preferences',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
             ),

@@ -210,6 +210,7 @@ CREATE TABLE public.farmers (
   pcn text,
   valid_id_back_path text,
   full_name text,
+  free_delivery_min_amount numeric DEFAULT 0 CHECK (free_delivery_min_amount >= 0),
   CONSTRAINT farmers_pkey PRIMARY KEY (farmer_id),
   CONSTRAINT fk_farmers_user FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );

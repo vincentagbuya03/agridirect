@@ -48,6 +48,39 @@ class FarmerService {
     }
   }
 
+  /// Get farmer profile by farmer ID
+  Future<FarmerProfile?> getFarmerProfileByFarmerId(String farmerId) async {
+    try {
+      final response = await _supabase
+          .from('v_farmer_profiles')
+          .select()
+          .eq('farmer_id', farmerId)
+          .single();
+
+      return FarmerProfile.fromJson(response);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Get multiple farmer profiles by farmer IDs
+  Future<List<FarmerProfile>> getFarmerProfilesByIds(List<String> farmerIds) async {
+    if (farmerIds.isEmpty) return [];
+    try {
+      final response = await _supabase
+          .from('v_farmer_profiles')
+          .select()
+          .inFilter('farmer_id', farmerIds);
+
+      return (response as List<dynamic>)
+          .map((json) => FarmerProfile.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting farmer profiles by ids: $e');
+      return [];
+    }
+  }
+
   /// Create farmer profile
   Future<FarmerProfile> createFarmerProfile({
     required String farmName,
