@@ -37,13 +37,21 @@ class SupabaseConfig {
     return parts.length == 3 && parts.every((part) => part.isNotEmpty);
   }
 
+  static String _safeGetEnv(String key) {
+    try {
+      return dotenv.env[key] ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   static String get supabaseUrl {
     final url = _sanitizeEnvValue(_urlEnv);
     if (url.isNotEmpty && !url.contains(r'$') && _looksLikeValidUrl(url)) {
       return url;
     }
 
-    final envValue = _sanitizeEnvValue(dotenv.env['SUPABASE_URL'] ?? '');
+    final envValue = _sanitizeEnvValue(_safeGetEnv('SUPABASE_URL'));
     if (envValue.isNotEmpty &&
         !envValue.contains(r'$') &&
         _looksLikeValidUrl(envValue)) {
@@ -59,7 +67,7 @@ class SupabaseConfig {
       return key;
     }
 
-    final envValue = _sanitizeEnvValue(dotenv.env['SUPABASE_ANON_KEY'] ?? '');
+    final envValue = _sanitizeEnvValue(_safeGetEnv('SUPABASE_ANON_KEY'));
     if (envValue.isNotEmpty &&
         !envValue.contains(r'$') &&
         _looksLikeJwt(envValue)) {
