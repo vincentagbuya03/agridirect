@@ -8,12 +8,14 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../widgets/animated_components.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/widgets/create_post_dialog.dart';
-import '../../../shared/widgets/comments_dialog.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/integration/weather_service.dart';
 import '../../../shared/models/weather_model.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
+import '../../../shared/widgets/image_widgets.dart';
+import '../../../shared/screens/article_detail_screen.dart';
+import '../../../shared/widgets/post_detail_dialog.dart';
 
 /// Web-only Community Hub — two-column layout with sidebar.
 /// Completely separate UI from the mobile community hub.
@@ -390,7 +392,22 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   Widget _buildMainContent() {
     return TabBarView(
       controller: _tabController,
-      children: [_buildForumFeed(), _buildArticlesFeed()],
+      children: [
+        Align(
+          alignment: Alignment.topCenter,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 680),
+            child: _buildForumFeed(),
+          ),
+        ),
+        Align(
+          alignment: Alignment.topCenter,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: _buildArticlesFeed(),
+          ),
+        ),
+      ],
     );
   }
 
@@ -420,17 +437,24 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
         return ListView.builder(
           padding: const EdgeInsets.all(32),
-          itemCount: posts.length,
+          itemCount: posts.length + 1,
           itemBuilder: (context, i) {
-            if (i < _postControllers.length) {
+            if (i == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: _buildFacebookCreatePostCard(),
+              );
+            }
+            final postIndex = i - 1;
+            if (postIndex < _postControllers.length) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 20),
-                child: _buildAnimatedForumCard(i, posts[i]),
+                child: _buildAnimatedForumCard(postIndex, posts[postIndex]),
               );
             }
             return Padding(
               padding: const EdgeInsets.only(bottom: 20),
-              child: _buildForumCard(posts[i]),
+              child: _buildForumCard(posts[postIndex]),
             );
           },
         );
@@ -465,46 +489,71 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildForumCard(ForumPostItem post, [bool isHovered = false]) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isHovered ? _primary : _border,
-          width: isHovered ? 2 : 1,
+    return GestureDetector(
+      onTap: () => _showPostDetailFlow(post),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isHovered ? _primary : _border,
+            width: isHovered ? 2 : 1,
+          ),
+          boxShadow: isHovered
+              ? [
+                  BoxShadow(
+                    color: _primary.withValues(alpha: 0.2),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [],
         ),
-        boxShadow: isHovered
-            ? [
-                BoxShadow(
-                  color: _primary.withValues(alpha: 0.2),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : [],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           // Author row
           Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: _primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: _primary.withValues(alpha: 0.2), width: 1.5),
                 ),
-                child: Center(
-                  child: Text(
-                    post.userName.split(' ').map((w) => w[0]).take(2).join(),
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: _primary,
+                child: ClipOval(
+                  child: SafeNetworkImage(
+                    imageUrl: post.authorAvatarUrl,
+                    defaultBucket: 'uploads',
+                    fit: BoxFit.cover,
+                    placeholder: Container(
+                      color: _primary.withValues(alpha: 0.1),
+                      child: Center(
+                        child: Text(
+                          post.userName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: _primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    errorWidget: Container(
+                      color: _primary.withValues(alpha: 0.1),
+                      child: Center(
+                        child: Text(
+                          post.userName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: _primary,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -541,113 +590,323 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             ],
           ),
           const SizedBox(height: 16),
-          // Title
-          Text(
-            post.title,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: _dark,
+          // Title & Body
+          if (post.title.isNotEmpty) ...[
+            Text(
+              post.title,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: _dark,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
+            const SizedBox(height: 6),
+          ],
           Text(
             post.body,
-            style: TextStyle(fontSize: 14, color: _muted, height: 1.6),
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: const Color(0xFF334155),
+              height: 1.5,
+            ),
           ),
-          // Image
-          if (post.imageUrl != null) ...[
-            const SizedBox(height: 16),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: AspectRatio(
-                aspectRatio: 16 / 8,
-                child: CachedNetworkImage(
-                  imageUrl: post.imageUrl!,
-                  fit: BoxFit.cover,
-                  placeholder: (ctx, url) => Container(color: Colors.grey[100]),
-                  errorWidget: (ctx, url, err) =>
-                      Container(color: Colors.grey[100]),
+          // Image - Constrained small picture
+          if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _border.withValues(alpha: 0.8)),
+                color: const Color(0xFFF8FAFC),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(11),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxHeight: 340,
+                    ),
+                    child: SafeNetworkImage(
+                      imageUrl: post.imageUrl!,
+                      defaultBucket: 'uploads',
+                      fit: BoxFit.contain,
+                      placeholder: Container(
+                        height: 200,
+                        color: const Color(0xFFF1F5F9),
+                        child: const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2, color: _primary),
+                        ),
+                      ),
+                      errorWidget: Container(
+                        height: 100,
+                        color: const Color(0xFFF1F5F9),
+                        child: const Icon(Icons.broken_image_outlined, color: _muted),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
           ],
-          const SizedBox(height: 16),
-          // Actions
-          Container(
-            padding: const EdgeInsets.only(top: 16),
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: _border)),
-            ),
-            child: Row(
+          // Like and comment counts summary
+          if (post.likes > 0 || post.comments > 0) ...[
+            const SizedBox(height: 12),
+            Row(
               children: [
-                _buildPostAction(
-                  icon: post.isLiked
-                      ? Icons.thumb_up_rounded
-                      : Icons.thumb_up_outlined,
-                  label: '${post.likes}',
-                  active: post.isLiked,
+                if (post.likes > 0) ...[
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF3B82F6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.thumb_up_rounded, size: 10, color: Colors.white),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${post.likes}',
+                    style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                  ),
+                ],
+                const Spacer(),
+                if (post.comments > 0)
+                  Text(
+                    '${post.comments} ${post.comments == 1 ? "comment" : "comments"}',
+                    style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 8),
+          const Divider(height: 1, thickness: 1),
+          const SizedBox(height: 6),
+          // Actions row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              Expanded(
+                child: _buildFacebookActionBtn(
+                  icon: post.isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_alt_outlined,
+                  label: 'Like',
+                  color: post.isLiked ? const Color(0xFF3B82F6) : _muted,
                   onTap: () async {
                     await SupabaseDataService().togglePostLike(post.id);
                     if (mounted) _refreshForumPosts();
                   },
                 ),
-                const SizedBox(width: 20),
-                _buildPostAction(
+              ),
+              Expanded(
+                child: _buildFacebookActionBtn(
                   icon: Icons.chat_bubble_outline_rounded,
-                  label: '${post.comments}',
-                  onTap: () async {
-                    final updated = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => CommentsDialog(postId: post.id),
+                  label: 'Comment',
+                  color: _muted,
+                  onTap: () => _showPostDetailFlow(post),
+                ),
+              ),
+              Expanded(
+                child: _buildFacebookActionBtn(
+                  icon: Icons.share_outlined,
+                  label: 'Share',
+                  color: _muted,
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Link copied to clipboard!')),
                     );
-                    if (updated == true && mounted) {
-                      _refreshForumPosts();
-                    }
                   },
                 ),
-                const Spacer(),
-                _buildPostAction(
-                  icon: Icons.bookmark_border_rounded,
-                  label: 'Save',
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+  Widget _buildFacebookActionBtn({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: color,
                 ),
-                const SizedBox(width: 16),
-                _buildPostAction(icon: Icons.share_rounded, label: 'Share'),
-              ],
-            ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFacebookCreatePostCard() {
+    final auth = AuthService();
+    final displayName = auth.isLoggedIn ? auth.userName : 'Guest';
+    final avatarUrl = auth.isLoggedIn ? auth.userAvatarUrl : null;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: _primary.withValues(alpha: 0.2), width: 1.5),
+                ),
+                child: ClipOval(
+                  child: SafeNetworkImage(
+                    imageUrl: avatarUrl,
+                    defaultBucket: 'uploads',
+                    fit: BoxFit.cover,
+                    placeholder: Container(color: Colors.grey[200]),
+                    errorWidget: const Icon(Icons.person, color: _muted),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: _showCreatePostFlow,
+                    child: Container(
+                      height: 40,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        "What's on your mind, ${displayName.split(' ').first}?",
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: _muted,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 24, thickness: 1),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildCreatePostAction(
+                icon: Icons.photo_library_rounded,
+                label: 'Photo/video',
+                color: const Color(0xFF22C55E),
+                onTap: _showCreatePostFlow,
+              ),
+              _buildCreatePostAction(
+                icon: Icons.label_important_rounded,
+                label: 'Tag Farmer',
+                color: const Color(0xFF3B82F6),
+                onTap: _showCreatePostFlow,
+              ),
+              _buildCreatePostAction(
+                icon: Icons.emoji_emotions_rounded,
+                label: 'Feeling/activity',
+                color: const Color(0xFFEAB308),
+                onTap: _showCreatePostFlow,
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPostAction({
+  Widget _buildCreatePostAction({
     required IconData icon,
     required String label,
-    bool active = false,
-    VoidCallback? onTap,
+    required Color color,
+    required VoidCallback onTap,
   }) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onTap,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 18, color: active ? _primary : _muted),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                color: active ? _primary : _muted,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _muted,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _showCreatePostFlow() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => const CreatePostDialog(),
+    );
+    if (result == true && mounted) {
+      _refreshForumPosts();
+    }
+  }
+
+  Future<void> _showPostDetailFlow(ForumPostItem post) async {
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (context) => PostDetailDialog(post: post),
+    );
+    if (updated == true && mounted) {
+      _refreshForumPosts();
+    }
   }
 
   Widget _buildArticlesFeed() {
@@ -684,103 +943,112 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   Widget _buildArticleCard(ArticleItem article) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _border),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'FEATURED ARTICLE',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: _primary,
-                        letterSpacing: 1.2,
+      child: GestureDetector(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => ArticleDetailScreen(article: article),
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _border),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    article.title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: _dark,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    article.excerpt,
-                    style: TextStyle(fontSize: 13, color: _muted, height: 1.4),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Text(
-                        'By ${article.author}',
-                        style: TextStyle(fontSize: 12, color: _muted),
+                      decoration: BoxDecoration(
+                        color: _primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 4,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: _muted,
-                          shape: BoxShape.circle,
+                      child: Text(
+                        'FEATURED ARTICLE',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: _primary,
+                          letterSpacing: 1.2,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        article.readTime,
-                        style: TextStyle(fontSize: 12, color: _muted),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      article.title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: _dark,
                       ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            if (article.imageUrl != null) ...[
-              const SizedBox(width: 20),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: CachedNetworkImage(
-                  imageUrl: article.imageUrl!,
-                  width: 120,
-                  height: 90,
-                  fit: BoxFit.cover,
-                  placeholder: (ctx, url) => Container(
-                    width: 120,
-                    height: 90,
-                    color: Colors.grey[100],
-                  ),
-                  errorWidget: (ctx, url, err) => Container(
-                    width: 120,
-                    height: 90,
-                    color: Colors.grey[100],
-                  ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      article.excerpt,
+                      style: TextStyle(fontSize: 13, color: _muted, height: 1.4),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text(
+                          'By ${article.author}',
+                          style: TextStyle(fontSize: 12, color: _muted),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: _muted,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          article.readTime,
+                          style: TextStyle(fontSize: 12, color: _muted),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
+              if (article.imageUrl != null) ...[
+                const SizedBox(width: 20),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CachedNetworkImage(
+                    imageUrl: article.imageUrl!,
+                    width: 120,
+                    height: 90,
+                    fit: BoxFit.cover,
+                    placeholder: (ctx, url) => Container(
+                      width: 120,
+                      height: 90,
+                      color: Colors.grey[100],
+                    ),
+                    errorWidget: (ctx, url, err) => Container(
+                      width: 120,
+                      height: 90,
+                      color: Colors.grey[100],
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

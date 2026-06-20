@@ -4,6 +4,9 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import '../../widgets/animated_components.dart';
+import '../../../shared/services/commerce/order_service.dart';
+import '../../../shared/models/order/order_model.dart';
+import '../../../mobile/screens/farmer/farmer_order_details_screen.dart';
 
 class WebFarmerOrders extends StatefulWidget {
   final Function(int) onNavigate;
@@ -377,18 +380,158 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
             children: [
               IconButton(
                 icon: const Icon(Icons.visibility_outlined, size: 20),
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FarmerOrderDetailsScreen(
+                        order: Order(
+                          orderId: o['rawOrderId'].toString(),
+                          orderNumber: o['orderId'].toString().replaceFirst('#', ''),
+                          customerId: o['customerId'] ?? '',
+                          farmerId: '',
+                          status: o['status'] ?? 'PENDING',
+                          createdAt: o['createdAt'] as DateTime,
+                          updatedAt: o['createdAt'] as DateTime,
+                          deliveryAddressId: o['deliveryAddressId'],
+                          total: o['rawTotal'] as double?,
+                          subtotal: o['subtotal'] as double?,
+                          deliveryFee: o['deliveryFee'] as double?,
+                          paymentMethod: o['paymentMethod'],
+                        ),
+                        customerName: o['customerName'] ?? 'Customer',
+                        customerImage: o['customerImage']?.toString() ?? '',
+                      ),
+                    ),
+                  ).then((_) => setState(() {}));
+                },
                 tooltip: 'View Details',
               ),
               IconButton(
-                icon: const Icon(Icons.check_circle_outline, size: 20, color: _primary),
-                onPressed: () {},
-                tooltip: 'Complete Order',
+                icon: Icon(
+                  Icons.check_circle_outline,
+                  size: 20,
+                  color: (status == 'DELIVERED' || status == 'CANCELLED')
+                      ? Colors.grey
+                      : _primary,
+                ),
+                onPressed: (status == 'DELIVERED' || status == 'CANCELLED')
+                    ? null
+                    : () => _processOrderConfirmation(o),
+                tooltip: status == 'PENDING'
+                    ? 'Confirm Order'
+                    : status == 'CONFIRMED'
+                        ? 'Prepare Order'
+                        : status == 'PROCESSING'
+                            ? 'Ship Order'
+                            : status == 'SHIPPED'
+                                ? 'Deliver Order'
+                                : 'Order Completed',
               ),
             ],
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _processOrderConfirmation(Map<String, dynamic> o) async {
+    final orderIdStr = o['orderId'] ?? '#0000';
+    final rawOrderId = o['rawOrderId']?.toString();
+    if (rawOrderId == null) return;
+
+    final status = o['status']?.toString().toUpperCase() ?? 'PENDING';
+    
+    String nextStatus = 'CONFIRMED';
+    String actionText = 'Confirm Order';
+    String confirmationMsg = 'Are you sure you want to mark Order $orderIdStr as CONFIRMED?';
+
+    if (status == 'CONFIRMED') {
+      nextStatus = 'PROCESSING';
+      actionText = 'Prepare Order';
+      confirmationMsg = 'Are you sure you want to mark Order $orderIdStr as PROCESSING?';
+    } else if (status == 'PROCESSING') {
+      nextStatus = 'SHIPPED';
+      actionText = 'Ship Order';
+      confirmationMsg = 'Are you sure you want to mark Order $orderIdStr as SHIPPED?';
+    } else if (status == 'SHIPPED') {
+      nextStatus = 'DELIVERED';
+      actionText = 'Deliver Order';
+      confirmationMsg = 'Are you sure you want to mark Order $orderIdStr as DELIVERED?';
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          actionText,
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          confirmationMsg,
+          style: GoogleFonts.inter(color: _muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Cancel', style: GoogleFonts.inter(color: _muted)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text(actionText, style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              ),
+              SizedBox(width: 12),
+              Text('Updating order status...'),
+            ],
+          ),
+          duration: Duration(seconds: 10),
+        ),
+      );
+
+      try {
+        await OrderService().updateOrderStatus(rawOrderId, nextStatus);
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Order $orderIdStr status updated to $nextStatus'),
+              backgroundColor: _primary,
+            ),
+          );
+          setState(() {}); // Refresh list
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update status: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 }

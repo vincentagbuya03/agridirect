@@ -463,12 +463,35 @@ GoRouter createAppRouter() {
             final isMobile = constraints.maxWidth <= 800;
             final auth = AuthService();
 
+            if (!isMobile) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!auth.isLoggedIn) {
+                  context.go(AppRoutes.webWelcome);
+                  return;
+                }
+                if (auth.isAdmin) {
+                  context.go(AppRoutes.admin);
+                  return;
+                }
+                context.go(
+                  auth.isViewingAsFarmer
+                      ? AppRoutes.farmerDashboard
+                      : AppRoutes.marketplace,
+                );
+              });
+              return const Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF16A34A),
+                  ),
+                ),
+              );
+            }
+
             return LoadingScreen(
               onFinished: () {
                 if (!auth.isLoggedIn) {
-                  context.go(
-                    isMobile ? AppRoutes.onboarding : AppRoutes.webWelcome,
-                  );
+                  context.go(AppRoutes.onboarding);
                   return;
                 }
 
@@ -477,16 +500,7 @@ GoRouter createAppRouter() {
                   return;
                 }
 
-                if (isMobile) {
-                  context.go(AppRoutes.home);
-                  return;
-                }
-
-                context.go(
-                  auth.isViewingAsFarmer
-                      ? AppRoutes.farmerDashboard
-                      : AppRoutes.marketplace,
-                );
+                context.go(AppRoutes.home);
               },
             );
           },
@@ -627,8 +641,15 @@ GoRouter createAppRouter() {
           final quantity = extra?['quantity'] as int? ?? 1;
 
           if (product == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              context.go(AppRoutes.shop);
+            });
             return const Scaffold(
-              body: Center(child: Text('No checkout details provided')),
+              body: Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFF16A34A),
+                ),
+              ),
             );
           }
 

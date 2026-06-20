@@ -77,12 +77,27 @@ class SupabaseConfig {
     return _fallbackKey;
   }
 
+  static bool _initialized = false;
+
   /// Initialize Supabase - call this in main() before runApp()
   static Future<void> initialize() async {
+    if (_initialized) {
+      debugPrint('✅ Supabase already initialized (flag)');
+      return;
+    }
+
     try {
-      Supabase.instance;
-      debugPrint('✅ Supabase already initialized');
+      final instance = Supabase.instance;
+      if (instance.client != null) {
+        _initialized = true;
+        debugPrint('✅ Supabase already initialized (instance check)');
+        return;
+      }
     } catch (_) {
+      // Proceed to initialize
+    }
+
+    try {
       await Supabase.initialize(
         url: supabaseUrl,
         anonKey: supabaseAnonKey,
@@ -90,10 +105,21 @@ class SupabaseConfig {
           authFlowType: AuthFlowType.implicit,
         ),
         realtimeClientOptions: RealtimeClientOptions(
-          logLevel: kReleaseMode ? RealtimeLogLevel.error : RealtimeLogLevel.info,
+          logLevel: kReleaseMode
+              ? RealtimeLogLevel.error
+              : RealtimeLogLevel.info,
         ),
       );
+      _initialized = true;
       debugPrint('✅ Supabase initialized successfully');
+    } catch (e) {
+      if (e.toString().contains('already initialized') || e.toString().contains('has already been initialized')) {
+        _initialized = true;
+        debugPrint('✅ Supabase already initialized (caught exception)');
+      } else {
+        debugPrint('❌ Supabase initialization failed: $e');
+        rethrow;
+      }
     }
 
     // Listen for auth state changes to handle password reset

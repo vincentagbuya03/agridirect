@@ -98,7 +98,9 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: IconButton(
-              onPressed: () => _showStatusUpdateSheet(),
+              onPressed: (_currentStatus == 'DELIVERED' || _currentStatus == 'CANCELLED')
+                  ? null
+                  : () => _showStatusUpdateSheet(),
               icon: const Icon(Icons.edit_note_rounded, color: AppColors.primary, size: 22),
             ),
           ),
@@ -114,31 +116,38 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
             : SingleChildScrollView(
                 key: const ValueKey('content'),
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeroCard(),
-                    const SizedBox(height: 28),
-                    _buildSectionLabel('Timeline'),
-                    const SizedBox(height: 14),
-                    _buildTimeline(),
-                    const SizedBox(height: 28),
-                    _buildCustomerCard(),
-                    const SizedBox(height: 28),
-                    _buildSectionLabel('Order Items'),
-                    const SizedBox(height: 14),
-                    _buildItemsList(),
-                    const SizedBox(height: 28),
-                    _buildSectionLabel('Price Breakdown'),
-                    const SizedBox(height: 14),
-                    _buildPriceBreakdown(),
-                    const SizedBox(height: 28),
-                    _buildSectionLabel('Delivery Location'),
-                    const SizedBox(height: 14),
-                    _buildDeliverySection(),
-                    const SizedBox(height: 20),
-                  ],
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 680),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildHeroCard(),
+                          const SizedBox(height: 28),
+                          _buildSectionLabel('Timeline'),
+                          const SizedBox(height: 14),
+                          _buildTimeline(),
+                          const SizedBox(height: 28),
+                          _buildCustomerCard(),
+                          const SizedBox(height: 28),
+                          _buildSectionLabel('Order Items'),
+                          const SizedBox(height: 14),
+                          _buildItemsList(),
+                          const SizedBox(height: 28),
+                          _buildSectionLabel('Price Breakdown'),
+                          const SizedBox(height: 14),
+                          _buildPriceBreakdown(),
+                          const SizedBox(height: 28),
+                          _buildSectionLabel('Delivery Location'),
+                          const SizedBox(height: 14),
+                          _buildDeliverySection(),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
       ),
@@ -153,17 +162,22 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 20, offset: const Offset(0, 8)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
+              color: AppColors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 24),
           ),
@@ -177,6 +191,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                   style: AppTextStyles.headline3.copyWith(fontSize: 16),
                   overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 4),
                 Text(
                   '${_items.length} items · ₱${(widget.order.total ?? 0).toStringAsFixed(2)}',
                   style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
@@ -185,16 +200,24 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: _currentStatus == 'CANCELLED' 
+                  ? Colors.red.withValues(alpha: 0.08)
+                  : AppColors.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _currentStatus == 'CANCELLED'
+                    ? Colors.red.withValues(alpha: 0.2)
+                    : AppColors.primary.withValues(alpha: 0.2),
+              ),
             ),
             child: Text(
               _currentStatus,
               style: AppTextStyles.labelSmall.copyWith(
-                color: AppColors.primary,
+                color: _currentStatus == 'CANCELLED' ? Colors.red : AppColors.primary,
                 fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
               ),
             ),
           ),
@@ -205,17 +228,27 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
 
   // ── Section Label ──
   Widget _buildSectionLabel(String text) {
-    return Text(text, style: AppTextStyles.headline3.copyWith(fontSize: 16));
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(text, style: AppTextStyles.headline3.copyWith(fontSize: 16, letterSpacing: 0.3)),
+    );
   }
 
   // ── Timeline ──
   Widget _buildTimeline() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.01),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: List.generate(_steps.length, (i) {
@@ -231,25 +264,42 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                 width: 36,
                 child: Column(
                   children: [
-                    Container(
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
                       width: 36, height: 36,
                       decoration: BoxDecoration(
-                        color: done ? AppColors.primary : Colors.transparent,
+                        color: current 
+                            ? AppColors.primary 
+                            : done 
+                                ? AppColors.primary.withValues(alpha: 0.15)
+                                : Colors.transparent,
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: done ? AppColors.primary : AppColors.textSubtle.withValues(alpha: 0.2),
                           width: 2,
                         ),
+                        boxShadow: current ? [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          )
+                        ] : null,
                       ),
                       child: Icon(
                         _steps[i]['icon'] as IconData, size: 18,
-                        color: done ? Colors.white : AppColors.textSubtle.withValues(alpha: 0.3),
+                        color: current 
+                            ? Colors.white 
+                            : done 
+                                ? AppColors.primary 
+                                : AppColors.textSubtle.withValues(alpha: 0.3),
                       ),
                     ),
                     if (!isLast)
-                      Container(
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
                         width: 2,
-                        height: 28, // Fixed height connector matches the text padding
+                        height: 32, // Fixed height connector
                         color: done && _currentStepIndex > i
                             ? AppColors.primary
                             : AppColors.textSubtle.withValues(alpha: 0.1),
@@ -261,7 +311,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
               // Right Column: Text Content
               Expanded(
                 child: Padding(
-                  padding: EdgeInsets.only(bottom: isLast ? 0 : 28),
+                  padding: EdgeInsets.only(bottom: isLast ? 0 : 32),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -269,12 +319,21 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                         _steps[i]['title'] as String,
                         style: AppTextStyles.bodyMedium.copyWith(
                           fontWeight: current ? FontWeight.w800 : FontWeight.w600,
-                          color: done ? AppColors.textHeadline : AppColors.textSubtle,
+                          fontSize: current ? 15 : 14,
+                          color: current 
+                              ? AppColors.textHeadline 
+                              : done 
+                                  ? AppColors.textHeadline.withValues(alpha: 0.8)
+                                  : AppColors.textSubtle,
                         ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
                         _steps[i]['desc'] as String,
-                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: current ? AppColors.textHeadline.withValues(alpha: 0.6) : AppColors.textSubtle,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -285,7 +344,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                   padding: const EdgeInsets.only(top: 2),
                   child: Text(
                     _formatTime(widget.order.createdAt),
-                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontWeight: FontWeight.w500),
                   ),
                 ),
             ],
@@ -298,16 +357,23 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
   // ── Customer Card ──
   Widget _buildCustomerCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.01),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            width: 48, height: 48,
+            width: 52, height: 52,
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
@@ -316,20 +382,21 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                 ? ClipOval(
                     child: SafeNetworkImage(
                       imageUrl: widget.customerImage,
-                      width: 48, height: 48, fit: BoxFit.cover,
+                      width: 52, height: 52, fit: BoxFit.cover,
                     ),
                   )
-                : const Icon(Icons.person_rounded, color: AppColors.primary, size: 24),
+                : const Icon(Icons.person_rounded, color: AppColors.primary, size: 26),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.customerName, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                Text(widget.customerName, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700, fontSize: 15)),
+                const SizedBox(height: 2),
                 Text(
                   'Payment: ${widget.order.paymentMethod ?? 'COD'}',
-                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -341,12 +408,12 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                 extra: {'customerId': widget.order.customerId},
               );
             },
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             child: Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primary, size: 20),
             ),
@@ -371,20 +438,27 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
     return Column(
       children: _items.map((item) => Container(
         margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.01),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(16),
               child: item.productImage != null
-                  ? SafeNetworkImage(imageUrl: item.productImage!, width: 56, height: 56, fit: BoxFit.cover)
-                  : Container(width: 56, height: 56, color: AppColors.background,
-                      child: const Icon(Icons.eco_rounded, size: 24, color: AppColors.textSubtle)),
+                  ? SafeNetworkImage(imageUrl: item.productImage!, width: 64, height: 64, fit: BoxFit.cover)
+                  : Container(width: 64, height: 64, color: AppColors.background,
+                      child: const Icon(Icons.eco_rounded, size: 28, color: AppColors.textSubtle)),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -392,6 +466,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(item.productName ?? 'Product', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
                   Text('Qty: ${item.quantity} x ₱${item.unitPrice.toStringAsFixed(2)}',
                       style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
                 ],
@@ -414,15 +489,15 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
       ),
       child: Column(
         children: [
           _priceRow('Subtotal', '₱${subtotal.toStringAsFixed(2)}'),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           _priceRow('Delivery Fee', fee > 0 ? '₱${fee.toStringAsFixed(2)}' : 'Free'),
-          Divider(color: AppColors.textHeadline.withValues(alpha: 0.08), height: 24),
+          Divider(color: AppColors.textHeadline.withValues(alpha: 0.06), height: 28),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -440,8 +515,8 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle)),
-        Text(value, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+        Text(label, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle, fontWeight: FontWeight.w500)),
+        Text(value, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600, color: AppColors.textHeadline)),
       ],
     );
   }
@@ -503,10 +578,10 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
           ),
           child: Column(
@@ -562,14 +637,14 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
           const SizedBox(height: 16),
           Container(
             key: ValueKey('map_${lat}_$lng'),
-            height: 200,
+            height: 220,
             width: double.infinity,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
               border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.08)),
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
               child: Stack(
                 children: [
                   FlutterMap(
@@ -607,36 +682,67 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
 
   // ── Bottom Bar ──
   Widget _buildBottomBar() {
+    final isFinished = _currentStatus == 'DELIVERED' || _currentStatus == 'CANCELLED';
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          )
+        ],
       ),
-      child: ElevatedButton.icon(
-        onPressed: () => _showStatusUpdateSheet(),
-        icon: const Icon(Icons.edit_note_rounded),
-        label: const Text('Update Status'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          minimumSize: const Size(double.infinity, 52),
-        ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width - 40,
+              child: ElevatedButton.icon(
+                onPressed: isFinished ? null : () => _showStatusUpdateSheet(),
+                icon: const Icon(Icons.edit_note_rounded),
+                label: const Text('Update Status'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isFinished ? Colors.grey.shade400 : AppColors.primary,
+                  foregroundColor: Colors.white,
+                  elevation: isFinished ? 0 : 6,
+                  shadowColor: isFinished ? Colors.transparent : AppColors.primary.withValues(alpha: 0.4),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  minimumSize: const Size(double.infinity, 54),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   // ── Status Update Sheet ──
   void _showStatusUpdateSheet() {
-    final statuses = [
+    final allStatuses = [
       {'label': 'CONFIRMED', 'icon': Icons.check_circle_outline, 'color': Colors.blue},
       {'label': 'PROCESSING', 'icon': Icons.loop_rounded, 'color': Colors.indigo},
       {'label': 'SHIPPED', 'icon': Icons.local_shipping_outlined, 'color': Colors.deepPurple},
       {'label': 'DELIVERED', 'icon': Icons.done_all_rounded, 'color': Colors.green},
       {'label': 'CANCELLED', 'icon': Icons.cancel_outlined, 'color': Colors.red},
     ];
+
+    List<Map<String, dynamic>> allowedStatuses = [];
+    if (_currentStatus == 'PENDING') {
+      allowedStatuses = allStatuses.where((s) => s['label'] == 'CONFIRMED' || s['label'] == 'CANCELLED').toList();
+    } else if (_currentStatus == 'CONFIRMED') {
+      allowedStatuses = allStatuses.where((s) => s['label'] == 'PROCESSING' || s['label'] == 'CANCELLED').toList();
+    } else if (_currentStatus == 'PROCESSING') {
+      allowedStatuses = allStatuses.where((s) => s['label'] == 'SHIPPED' || s['label'] == 'CANCELLED').toList();
+    } else if (_currentStatus == 'SHIPPED') {
+      allowedStatuses = allStatuses.where((s) => s['label'] == 'DELIVERED' || s['label'] == 'CANCELLED').toList();
+    }
 
     showModalBottomSheet(
       context: context,
@@ -653,31 +759,37 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
             const SizedBox(height: 20),
             Text('Update Order Status', style: AppTextStyles.headline3),
             const SizedBox(height: 6),
-            Text('Select the new status', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
+            Text('Select the next status step', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
             const SizedBox(height: 20),
-            ...statuses.map((s) => ListTile(
-              leading: Icon(s['icon'] as IconData, color: s['color'] as Color),
-              title: Text(s['label'] as String, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              onTap: () async {
-                Navigator.pop(ctx);
-                try {
-                  await OrderService().updateOrderStatus(widget.order.orderId, s['label'] as String);
-                  if (mounted) {
-                    setState(() => _currentStatus = (s['label'] as String).toUpperCase());
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Status updated to ${s['label']}'), backgroundColor: Colors.green),
-                    );
+            if (allowedStatuses.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Text('No further status updates available.', style: AppTextStyles.bodyMedium),
+              )
+            else
+              ...allowedStatuses.map((s) => ListTile(
+                leading: Icon(s['icon'] as IconData, color: s['color'] as Color),
+                title: Text(s['label'] as String, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await OrderService().updateOrderStatus(widget.order.orderId, s['label'] as String);
+                    if (mounted) {
+                      setState(() => _currentStatus = (s['label'] as String).toUpperCase());
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Status updated to ${s['label']}'), backgroundColor: Colors.green),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+                      );
+                    }
                   }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
-                    );
-                  }
-                }
-              },
-            )),
+                },
+              )),
           ],
         ),
       ),

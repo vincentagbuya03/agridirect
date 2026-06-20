@@ -76,6 +76,7 @@ class ForumPostItem {
   final int comments;
   final bool isLiked;
   final bool isPinned;
+  final String? authorAvatarUrl;
 
   const ForumPostItem({
     required this.id,
@@ -89,6 +90,7 @@ class ForumPostItem {
     required this.comments,
     required this.isLiked,
     this.isPinned = false,
+    this.authorAvatarUrl,
   });
 }
 

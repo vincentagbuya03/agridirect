@@ -979,25 +979,40 @@ class _WebProfileScreenState extends State<WebProfileScreen>
 
   Widget _buildSettingsGrid() {
     final auth = AuthService();
+    final isFarmer = auth.isViewingAsFarmer;
+
     final items = [
-      _SettingsItem(
-        Icons.shopping_bag_outlined,
-        'My Orders',
-        'Track purchases',
-        onTap: () => context.push(AppRoutes.customerOrders),
-      ),
-      _SettingsItem(
-        Icons.location_on_outlined,
-        'Addresses',
-        'Delivery locations',
-        onTap: () => context.push(AppRoutes.addressBook),
-      ),
+      if (isFarmer) ...[
+        _SettingsItem(
+          Icons.storefront_rounded,
+          'My Products',
+          'Manage Listings',
+          onTap: () => widget.onNavigate(1),
+        ),
+        _SettingsItem(
+          Icons.receipt_long_rounded,
+          'Farmer Orders',
+          'Manage customer orders',
+          onTap: () => widget.onNavigate(2),
+        ),
+      ] else ...[
+        _SettingsItem(
+          Icons.shopping_bag_outlined,
+          'My Orders',
+          'Track purchases',
+          onTap: () => context.push(AppRoutes.customerOrders),
+        ),
+        _SettingsItem(
+          Icons.location_on_outlined,
+          'Addresses',
+          'Delivery locations',
+          onTap: () => context.push(AppRoutes.addressBook),
+        ),
+      ],
       _SettingsItem(
         Icons.chat_bubble_outline_rounded,
         'Messages',
-        auth.isViewingAsFarmer
-            ? 'Messages from customers'
-            : 'Messages from farmers',
+        isFarmer ? 'Messages from customers' : 'Messages from farmers',
         onTap: () => context.push(_messagesRoute(auth)),
       ),
       _SettingsItem(

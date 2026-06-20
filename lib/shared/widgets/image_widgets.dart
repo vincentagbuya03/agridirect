@@ -282,6 +282,7 @@ class SafeCircleAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final centeredChild = child != null ? Center(child: child) : null;
     return CircleAvatar(
       radius: radius,
       backgroundColor: backgroundColor,
@@ -293,10 +294,10 @@ class SafeCircleAvatar extends StatelessWidget {
                 width: radius * 2,
                 height: radius * 2,
                 fit: BoxFit.cover,
-                placeholder: child,
-                errorWidget: child,
+                placeholder: centeredChild,
+                errorWidget: centeredChild,
               )
-            : child,
+            : centeredChild,
       ),
     );
   }

@@ -783,9 +783,26 @@ class SupabaseDataService {
             .toList();
       }
 
-      return (response as List).map((item) {
+      String? avatarUrl;
+      if ((response as List).isNotEmpty) {
+        final uId = response[0]['user_id']?.toString();
+        if (uId != null) {
+          try {
+            final userResponse = await _client
+                .from('users')
+                .select('avatar_url')
+                .eq('user_id', uId)
+                .maybeSingle();
+            avatarUrl = userResponse?['avatar_url']?.toString();
+          } catch (e) {
+            debugPrint('Error fetching user avatar: $e');
+          }
+        }
+      }
+
+      return (response).map((item) {
         final postId = item['post_id'].toString();
-        return _mapToForumPostItem(item, likedPostIds.contains(postId));
+        return _mapToForumPostItem(item, likedPostIds.contains(postId), avatarUrl);
       }).toList();
     } catch (e) {
       debugPrint('Error fetching forum posts by user: $e');
@@ -866,9 +883,38 @@ class SupabaseDataService {
             .toList();
       }
 
-      final posts = (response as List).map((item) {
+      // Fetch user avatars for enrichment
+      final userIds = (response as List)
+          .map((item) => item['user_id']?.toString())
+          .where((id) => id != null && id.isNotEmpty)
+          .cast<String>()
+          .toSet()
+          .toList();
+
+      final userAvatars = <String, String>{};
+      if (userIds.isNotEmpty) {
+        try {
+          final usersResponse = await _client
+              .from('users')
+              .select('user_id, avatar_url')
+              .inFilter('user_id', userIds);
+          for (final row in (usersResponse as List)) {
+            final uId = row['user_id']?.toString();
+            final avatar = row['avatar_url']?.toString();
+            if (uId != null && avatar != null && avatar.isNotEmpty) {
+              userAvatars[uId] = avatar;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error fetching user avatars for forum posts: $e');
+        }
+      }
+
+      final posts = (response).map((item) {
         final postId = item['post_id'].toString();
-        return _mapToForumPostItem(item, likedPostIds.contains(postId));
+        final uId = item['user_id']?.toString();
+        final avatar = uId != null ? userAvatars[uId] : null;
+        return _mapToForumPostItem(item, likedPostIds.contains(postId), avatar);
       }).toList();
 
       await _cacheMapList(
@@ -938,7 +984,22 @@ class SupabaseDataService {
         isLiked = like != null;
       }
 
-      return _mapToForumPostItem(response, isLiked);
+      String? avatarUrl;
+      final uId = response['user_id']?.toString();
+      if (uId != null) {
+        try {
+          final userResponse = await _client
+              .from('users')
+              .select('avatar_url')
+              .eq('user_id', uId)
+              .maybeSingle();
+          avatarUrl = userResponse?['avatar_url']?.toString();
+        } catch (e) {
+          debugPrint('Error fetching user avatar: $e');
+        }
+      }
+
+      return _mapToForumPostItem(response, isLiked, avatarUrl);
     } catch (e) {
       debugPrint('Error fetching forum post $postId: $e');
       return null;
@@ -1104,7 +1165,7 @@ class SupabaseDataService {
     }
   }
 
-  ForumPostItem _mapToForumPostItem(Map<String, dynamic> item, bool isLiked) {
+  ForumPostItem _mapToForumPostItem(Map<String, dynamic> item, bool isLiked, [String? authorAvatarUrl]) {
     final createdAt = DateTime.tryParse(item['created_at'] ?? '');
     final timeAgo = createdAt != null ? _formatTimeAgo(createdAt) : 'Recently';
 
@@ -1120,6 +1181,7 @@ class SupabaseDataService {
       comments: item['comments_count'] ?? 0,
       isLiked: isLiked,
       isPinned: item['is_pinned'] ?? false,
+      authorAvatarUrl: authorAvatarUrl,
     );
   }
 

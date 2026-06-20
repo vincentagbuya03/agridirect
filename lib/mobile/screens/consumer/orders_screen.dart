@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/models/order/order_model.dart';
+import '../../../shared/router/app_routes.dart';
 import 'package:agridirect/shared/widgets/image_widgets.dart';
 
 /// Orders Screen - Professional Order Management (Responsive Web & Mobile)
@@ -78,7 +80,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
             child: Row(
               children: [
                 IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go(AppRoutes.home);
+                    }
+                  },
                   icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textHeadline),
                 ),
                 const SizedBox(width: 12),

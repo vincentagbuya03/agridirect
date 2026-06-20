@@ -27,6 +27,12 @@ class AppColors {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+
+  static const LinearGradient accentGradient = LinearGradient(
+    colors: [accent, Color(0xFFFBBF24)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 }
 
 class AppTextStyles {

@@ -1,135 +1,130 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <base href="/" />
-    <meta charset="UTF-8" />
-    <meta content="IE=Edge" http-equiv="X-UA-Compatible" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="AgriDirect - Modern e-commerce platform connecting farmers and customers."
-    />
-    <meta
-      name="keywords"
-      content="agriculture, farm direct, fresh produce, e-commerce, farmers market, organic produce"
-    />
-    <meta name="author" content="AgriDirect" />
-    <meta property="og:title" content="AgriDirect - Farm Direct E-commerce" />
-    <meta
-      property="og:description"
-      content="Modern e-commerce platform connecting farmers with customers for fresh agricultural products."
-    />
-    <meta property="og:type" content="website" />
-    <meta name="theme-color" content="#10B981" />
 
-    <!-- iOS meta tags & icons -->
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent"
-    />
-    <meta name="apple-mobile-web-app-title" content="AgriDirect" />
-    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=7" />
+<head>
+  <base href="/" />
+  <meta charset="UTF-8" />
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="AgriDirect - Modern e-commerce platform connecting farmers and customers." />
+  <meta name="google-site-verification" content="k7md3FBHWZJjDaUHUTnGgdxWe2MfAhwsdcuz2xwQ7rA" />
+  <meta name="keywords"
+    content="agriculture, farm direct, fresh produce, e-commerce, farmers market, organic produce" />
+  <meta name="author" content="AgriDirect" />
+  <meta property="og:title" content="AgriDirect - Farm Direct E-commerce" />
+  <meta property="og:description"
+    content="Modern e-commerce platform connecting farmers with customers for fresh agricultural products." />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#10B981" />
 
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" sizes="48x48" href="favicon.png?v=7" />
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="AgriDirect" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=7" />
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="48x48" href="favicon.png?v=7" />
 
-    <!-- Google Identity Services SDK for Sign-In on web -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet" />
 
-    <!-- Modern CSS -->
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+  <!-- Google Identity Services SDK for Sign-In on web -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <!-- Modern CSS -->
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family:
+        "Inter",
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* Selection Color */
+    ::selection {
+      background: #10b981;
+      color: white;
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
       }
 
-      html,
-      body {
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        font-family:
-          "Inter",
-          -apple-system,
-          BlinkMacSystemFont,
-          "Segoe UI",
-          sans-serif;
-        background: #f8fafc;
-        color: #0f172a;
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
       }
 
-      #app {
-        width: 100%;
-        height: 100%;
+      to {
+        opacity: 1;
+        transform: translateY(0);
       }
+    }
 
-      /* Scrollbar Styling */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
+    body {
+      animation: fadeIn 0.3s ease-in-out;
+    }
+  </style>
 
-      ::-webkit-scrollbar-track {
-        background: #f1f5f9;
-      }
+  <title>AgriDirect - Farm Direct E-commerce</title>
+  <link rel="manifest" href="manifest.json?v=7" />
+</head>
 
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 4px;
-      }
+<body>
+  <div id="app"></div>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
 
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-      }
-
-      /* Selection Color */
-      ::selection {
-        background: #10b981;
-        color: white;
-      }
-
-      /* Animations */
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-        }
-        to {
-          opacity: 1;
-        }
-      }
-
-      @keyframes slideDown {
-        from {
-          opacity: 0;
-          transform: translateY(-10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      body {
-        animation: fadeIn 0.3s ease-in-out;
-      }
-    </style>
-
-    <title>AgriDirect - Farm Direct E-commerce</title>
-    <link rel="manifest" href="manifest.json?v=7" />
-  </head>
-  <body>
-    <div id="app"></div>
-    <script src="flutter_bootstrap.js" async></script>
-  </body>
 </html>

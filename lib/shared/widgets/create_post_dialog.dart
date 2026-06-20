@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import '../styles/app_theme.dart';
 import '../data/app_data.dart';
 import '../services/core/supabase_data_service.dart';
+import '../widgets/image_widgets.dart';
+import '../services/auth/auth_service.dart';
 
 class CreatePostDialog extends StatefulWidget {
   const CreatePostDialog({super.key});
@@ -36,12 +38,20 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
   }
 
   Future<void> _submit() async {
-    final title = _titleController.text.trim();
+    var title = _titleController.text.trim();
     final body = _bodyController.text.trim();
 
-    if (title.isEmpty || body.isEmpty) {
-      _showCustomSnackBar('Please provide both a title and a description', isError: true);
+    if (body.isEmpty) {
+      _showCustomSnackBar('Please write something first!', isError: true);
       return;
+    }
+
+    // Default title if empty
+    if (title.isEmpty) {
+      title = body.split('\n').first;
+      if (title.length > 40) {
+        title = '${title.substring(0, 37)}...';
+      }
     }
 
     setState(() => _isLoading = true);
@@ -115,174 +125,297 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = AuthService();
+    final displayName = auth.isLoggedIn ? auth.userName : 'Guest';
+    final avatarUrl = auth.isLoggedIn ? auth.userAvatarUrl : null;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: Container(
         width: double.infinity,
-        constraints: const BoxConstraints(maxWidth: 500),
+        constraints: const BoxConstraints(maxWidth: 550),
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(28),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 30,
-              offset: const Offset(0, 10),
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.fromLTRB(24, 24, 16, 16),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(Icons.forum_rounded, color: AppColors.primary, size: 24),
+              // Styled Header (Centered Title, Close X removed)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                child: Center(
+                  child: Text(
+                    'Create post',
+                    style: GoogleFonts.inter(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0F172A),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Ask the Community',
-                            style: AppTextStyles.headline2.copyWith(fontSize: 20),
+                  ),
+                ),
+              ),
+              const Divider(height: 1, thickness: 1),
+
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // User Info Row
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.2), width: 1.5),
                           ),
-                          Text(
-                            'Share your questions with other farmers',
-                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                          child: ClipOval(
+                            child: SafeNetworkImage(
+                              imageUrl: avatarUrl,
+                              defaultBucket: 'uploads',
+                              fit: BoxFit.cover,
+                              placeholder: Container(color: Colors.grey[200]),
+                              errorWidget: const Icon(Icons.person, color: Color(0xFF64748B)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                displayName,
+                                style: GoogleFonts.inter(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.public, size: 12, color: Color(0xFF64748B)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Public Community Hub',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.arrow_drop_down, size: 12, color: Color(0xFF64748B)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Title Input (Optional)
+                    TextField(
+                      controller: _titleController,
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF0F172A),
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Add a title (optional)...',
+                        hintStyle: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF94A3B8),
+                        ),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const Divider(height: 16, thickness: 0.5),
+
+                    // Body Input
+                    TextField(
+                      controller: _bodyController,
+                      maxLines: null,
+                      minLines: 4,
+                      style: GoogleFonts.inter(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w400,
+                        color: const Color(0xFF1E293B),
+                        height: 1.5,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: "What's on your mind, ${displayName.split(' ').first}?",
+                        hintStyle: GoogleFonts.inter(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w400,
+                          color: const Color(0xFF94A3B8),
+                        ),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Image attachment preview
+                    if (_selectedImage != null)
+                      Stack(
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            height: 240,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: kIsWeb
+                                  ? Image.network(_selectedImage!.path, width: double.infinity, fit: BoxFit.cover)
+                                  : Image.file(File(_selectedImage!.path), width: double.infinity, fit: BoxFit.cover),
+                            ),
+                          ),
+                          Positioned(
+                            right: 10,
+                            top: 10,
+                            child: GestureDetector(
+                              onTap: () => setState(() => _selectedImage = null),
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                child: const Icon(Icons.close, color: Colors.white, size: 16),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 18),
+
+                    // Facebook-style Toolbar Box
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        borderRadius: BorderRadius.circular(12),
+                        color: const Color(0xFFF8FAFC),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Add to your post',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF334155),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: _pickImage,
+                            icon: const Icon(Icons.photo_library_rounded, color: Color(0xFF22C55E)),
+                            tooltip: 'Photo/video',
+                          ),
+                          IconButton(
+                            onPressed: () {},
+                            icon: const Icon(Icons.label_important_rounded, color: Color(0xFF3B82F6)),
+                            tooltip: 'Tag Farmer',
+                          ),
+                          IconButton(
+                            onPressed: () {},
+                            icon: const Icon(Icons.emoji_emotions_rounded, color: Color(0xFFEAB308)),
+                            tooltip: 'Feeling/activity',
                           ),
                         ],
                       ),
                     ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded, color: AppColors.textSubtle),
-                    ),
-                  ],
-                ),
-              ),
-              
-              const Divider(height: 1),
-              
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('Topic Title'),
-                    TextField(
-                      controller: _titleController,
-                      style: AppTextStyles.bodyLarge,
-                      decoration: _buildInputDecoration('What is your question about?'),
-                    ),
-                    const SizedBox(height: 24),
-                    _buildLabel('Description'),
-                    TextField(
-                      controller: _bodyController,
-                      maxLines: 4,
-                      style: AppTextStyles.bodyMedium,
-                      decoration: _buildInputDecoration(
-                        'Explain your question in detail...',
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _buildLabel('Attachment'),
-                    GestureDetector(
-                      onTap: _pickImage,
-                      child: Container(
-                        width: double.infinity,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.2),
-                            width: 1.5,
-                            style: BorderStyle.solid,
+                    const SizedBox(height: 20),
+
+                    // Cancel & Post Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                foregroundColor: const Color(0xFF64748B),
+                              ),
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.inter(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                        child: _selectedImage != null
-                            ? Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: kIsWeb
-                                        ? Image.network(_selectedImage!.path, width: double.infinity, fit: BoxFit.cover)
-                                        : Image.file(File(_selectedImage!.path), width: double.infinity, fit: BoxFit.cover),
-                                  ),
-                                  Positioned(
-                                    right: 8,
-                                    top: 8,
-                                    child: GestureDetector(
-                                      onTap: () => setState(() => _selectedImage = null),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                                        child: const Icon(Icons.close, color: Colors.white, size: 16),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _submit,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                    )
+                                  : Text(
+                                      'Post',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                  ),
-                                ],
-                              )
-                            : Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.add_photo_alternate_outlined, color: AppColors.primary.withValues(alpha: 0.6), size: 32),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Add a photo',
-                                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _submit,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                          ),
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                              )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.send_rounded, size: 18),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    'Publish Post',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
@@ -290,39 +423,6 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8, left: 4),
-      child: Text(
-        text.toUpperCase(),
-        style: AppTextStyles.labelSmall.copyWith(
-          color: AppColors.primary,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.2,
-        ),
-      ),
-    );
-  }
-
-  InputDecoration _buildInputDecoration(String hint, {String? helperText}) {
-    return InputDecoration(
-      hintText: hint,
-      helperText: helperText,
-      hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle.withValues(alpha: 0.7)),
-      filled: true,
-      fillColor: AppColors.background,
-      contentPadding: const EdgeInsets.all(16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.primary, width: 2),
       ),
     );
   }

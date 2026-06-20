@@ -556,7 +556,12 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                     child: _buildActionButton(
                       Icons.check_circle_outline_rounded,
                       'Update Status',
-                      () => _showStatusUpdateSheet(order),
+                      (order['status']?.toString().toUpperCase() ==
+                                  'DELIVERED' ||
+                              order['status']?.toString().toUpperCase() ==
+                                  'CANCELLED')
+                          ? null
+                          : () => _showStatusUpdateSheet(order),
                       isPrimary: true,
                     ),
                   ),
@@ -587,11 +592,16 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   Widget _buildActionButton(
     IconData icon,
     String label,
-    VoidCallback onTap, {
+    VoidCallback? onTap, {
     bool isPrimary = false,
   }) {
+    final bool isDisabled = onTap == null;
     return Material(
-      color: isPrimary ? AppColors.primary : Colors.transparent,
+      color: isDisabled
+          ? Colors.grey.shade300
+          : isPrimary
+          ? AppColors.primary
+          : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -599,7 +609,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            border: isPrimary
+            border: isPrimary || isDisabled
                 ? null
                 : Border.all(
                     color: AppColors.textHeadline.withValues(alpha: 0.3),
@@ -612,13 +622,21 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
               Icon(
                 icon,
                 size: 16,
-                color: isPrimary ? Colors.white : AppColors.textHeadline,
+                color: isDisabled
+                    ? Colors.grey.shade600
+                    : isPrimary
+                    ? Colors.white
+                    : AppColors.textHeadline,
               ),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: AppTextStyles.labelSmall.copyWith(
-                  color: isPrimary ? Colors.white : AppColors.textHeadline,
+                  color: isDisabled
+                      ? Colors.grey.shade600
+                      : isPrimary
+                      ? Colors.white
+                      : AppColors.textHeadline,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -667,6 +685,56 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   }
 
   void _showStatusUpdateSheet(Map<String, dynamic> order) {
+    final currentStatus = (order['status']?.toString() ?? 'PENDING')
+        .toUpperCase();
+
+    final allStatuses = [
+      {
+        'label': 'CONFIRMED',
+        'icon': Icons.check_circle_outline,
+        'color': Colors.blue,
+      },
+      {
+        'label': 'PROCESSING',
+        'icon': Icons.loop_rounded,
+        'color': Colors.indigo,
+      },
+      {
+        'label': 'SHIPPED',
+        'icon': Icons.local_shipping_outlined,
+        'color': Colors.deepPurple,
+      },
+      {
+        'label': 'DELIVERED',
+        'icon': Icons.done_all_rounded,
+        'color': Colors.green,
+      },
+      {
+        'label': 'CANCELLED',
+        'icon': Icons.cancel_outlined,
+        'color': Colors.red,
+      },
+    ];
+
+    List<Map<String, dynamic>> allowedStatuses = [];
+    if (currentStatus == 'PENDING') {
+      allowedStatuses = allStatuses
+          .where((s) => s['label'] == 'CONFIRMED' || s['label'] == 'CANCELLED')
+          .toList();
+    } else if (currentStatus == 'CONFIRMED') {
+      allowedStatuses = allStatuses
+          .where((s) => s['label'] == 'PROCESSING' || s['label'] == 'CANCELLED')
+          .toList();
+    } else if (currentStatus == 'PROCESSING') {
+      allowedStatuses = allStatuses
+          .where((s) => s['label'] == 'SHIPPED' || s['label'] == 'CANCELLED')
+          .toList();
+    } else if (currentStatus == 'SHIPPED') {
+      allowedStatuses = allStatuses
+          .where((s) => s['label'] == 'DELIVERED' || s['label'] == 'CANCELLED')
+          .toList();
+    }
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -680,30 +748,27 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
             Text('Update Order Status', style: AppTextStyles.headline2),
             const SizedBox(height: 8),
             Text(
-              'Select the new status for Order #${order['orderId']}',
+              'Select the next status step for Order #${order['orderId']}',
               style: AppTextStyles.bodySmall,
             ),
             const SizedBox(height: 24),
-            _statusTile(
-              'CONFIRMED',
-              Icons.check_circle_outline,
-              Colors.blue,
-              order,
-            ),
-            _statusTile('PROCESSING', Icons.loop_rounded, Colors.blue, order),
-            _statusTile(
-              'SHIPPED',
-              Icons.local_shipping_outlined,
-              Colors.blue,
-              order,
-            ),
-            _statusTile(
-              'DELIVERED',
-              Icons.done_all_rounded,
-              Colors.green,
-              order,
-            ),
-            _statusTile('CANCELLED', Icons.cancel_outlined, Colors.red, order),
+            if (allowedStatuses.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Text(
+                  'No further status updates available.',
+                  style: AppTextStyles.bodyMedium,
+                ),
+              )
+            else
+              ...allowedStatuses.map(
+                (s) => _statusTile(
+                  s['label'] as String,
+                  s['icon'] as IconData,
+                  s['color'] as Color,
+                  order,
+                ),
+              ),
             const SizedBox(height: 20),
           ],
         ),
