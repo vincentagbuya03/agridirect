@@ -467,16 +467,30 @@ class ProductService {
     try {
       final response = await _supabase
           .from('product_reviews')
-          .select()
+          .select('*, customers(users(name, avatar_url))')
           .eq('product_id', productId)
           .limit(limit)
           .order('created_at', ascending: false);
 
       return (response as List<dynamic>)
-          .map((json) => ProductReview.fromJson(json as Map<String, dynamic>))
+          .map((json) => _reviewFromDatabase(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
       throw Exception('Failed to fetch reviews: $e');
+    }
+  }
+
+  /// Finds a completed order that qualifies the current customer to review.
+  Future<String?> getCompletedOrderIdForReview(String productId) async {
+    try {
+      final customerId = await _getCurrentCustomerId();
+      return _getCompletedOrderIdForCustomerProduct(
+        customerId: customerId,
+        productId: productId,
+      );
+    } catch (e) {
+      debugPrint('Failed to check review eligibility: $e');
+      return null;
     }
   }
 
@@ -487,21 +501,38 @@ class ProductService {
     String? reviewText,
   }) async {
     try {
-      final userId = _supabase.auth.currentUser?.id;
-      if (userId == null) throw Exception('User not authenticated');
+      if (rating < 1 || rating > 5) {
+        throw Exception('Rating must be between 1 and 5');
+      }
+
+      final customerId = await _getCurrentCustomerId();
+      final orderId = await _getCompletedOrderIdForCustomerProduct(
+        customerId: customerId,
+        productId: productId,
+      );
+
+      if (orderId == null) {
+        throw Exception(
+          'You can only review this product after completing an order for it.',
+        );
+      }
 
       final response = await _supabase
           .from('product_reviews')
           .insert({
             'product_id': productId,
-            'user_id': userId,
+            'customer_id': customerId,
+            'order_id': orderId,
             'rating': rating,
-            'review_text': reviewText,
+            'review_text': reviewText?.trim().isEmpty == true
+                ? null
+                : reviewText?.trim(),
+            'is_verified_purchase': true,
           })
-          .select()
+          .select('*, customers(users(name, avatar_url))')
           .single();
 
-      return ProductReview.fromJson(response);
+      return _reviewFromDatabase(response);
     } catch (e) {
       throw Exception('Failed to create review: $e');
     }
@@ -521,7 +552,7 @@ class ProductService {
           .select()
           .single();
 
-      return ProductReview.fromJson(response);
+      return _reviewFromDatabase(response);
     } catch (e) {
       throw Exception('Failed to update review: $e');
     }
@@ -554,5 +585,65 @@ class ProductService {
     } catch (e) {
       throw Exception('Failed to search products: $e');
     }
+  }
+
+  Future<String> _getCurrentCustomerId() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    final response = await _supabase
+        .from('customers')
+        .select('customer_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    final customerId = response?['customer_id']?.toString();
+    if (customerId == null || customerId.isEmpty) {
+      throw Exception('Customer profile not found');
+    }
+    return customerId;
+  }
+
+  Future<String?> _getCompletedOrderIdForCustomerProduct({
+    required String customerId,
+    required String productId,
+  }) async {
+    final response = await _supabase
+        .from('orders')
+        .select(
+          'order_id, order_items!inner(product_id), order_statuses!inner(code)',
+        )
+        .eq('customer_id', customerId)
+        .eq('order_items.product_id', productId)
+        .eq('order_statuses.code', 'completed')
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    return response?['order_id']?.toString();
+  }
+
+  ProductReview _reviewFromDatabase(Map<String, dynamic> json) {
+    final customer = json['customers'] as Map<String, dynamic>?;
+    final user = customer?['users'] as Map<String, dynamic>?;
+
+    return ProductReview(
+      reviewId: json['review_id']?.toString() ?? '',
+      productId: json['product_id']?.toString() ?? '',
+      userId:
+          json['customer_id']?.toString() ?? json['user_id']?.toString() ?? '',
+      rating: (json['rating'] as num?)?.toDouble() ?? 0,
+      reviewText: json['review_text']?.toString(),
+      createdAt:
+          DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(json['updated_at']?.toString() ?? '') ??
+          DateTime.now(),
+      userName: user?['name']?.toString(),
+      userAvatar: user?['avatar_url']?.toString(),
+    );
   }
 }

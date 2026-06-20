@@ -656,7 +656,7 @@ class AdminService extends ChangeNotifier {
       final response = await _client
           .from('v_products')
           .select(
-            'product_id, name, farm_name, price, average_rating, review_count, is_preorder, farmer_id, created_at, is_active, is_featured, category_name, stock_quantity, image_url, unit_abbr',
+            'product_id, name, farm_name, price, average_rating, review_count, is_preorder, farmer_id, created_at, is_active, is_featured, category_name, stock_quantity, image_url, unit_abbr, description',
           )
           .order('created_at', ascending: false)
           .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -1174,7 +1174,35 @@ class AdminService extends ChangeNotifier {
           .order('created_at', ascending: false)
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      final mapped = (response as List).map((row) {
+      final list = List<Map<String, dynamic>>.from(response);
+
+      // Self-heal: If registration is pending but the farmer is already verified,
+      // update the registration status in the database to 'approved' in background.
+      for (var row in list) {
+        final farmers = row['farmers'] as Map<String, dynamic>?;
+        final isVerified = farmers?['is_verified'] == true;
+        if (isVerified) {
+          final regId = row['registration_id'];
+          unawaited(
+            _client
+                .from('farmer_registrations')
+                .update({
+                  'status': 'approved',
+                  'updated_at': DateTime.now().toIso8601String(),
+                })
+                .eq('registration_id', regId)
+                .then((_) => debugPrint('Self-healed registration $regId to approved.'))
+          );
+        }
+      }
+
+      // Filter out registrations where the farmer is already verified
+      final pendingOnly = list.where((row) {
+        final farmers = row['farmers'] as Map<String, dynamic>?;
+        return farmers?['is_verified'] != true;
+      }).toList();
+
+      final mapped = pendingOnly.map((row) {
         final farmers = _normalizeUserRelation(row['farmers']);
         final users = _normalizeUserRelation(farmers?['users']);
         final statusName = _normalizeRegistrationStatus(row['status']);
@@ -1884,6 +1912,21 @@ class AdminService extends ChangeNotifier {
       // Log the verification action
       if (reviewNotes != null) {
         debugPrint('Review notes: $reviewNotes');
+      }
+
+      // Also update any pending registrations for this farmer to approved
+      try {
+        await _client
+            .from('farmer_registrations')
+            .update({
+              'status': 'approved',
+              'review_notes': reviewNotes ?? 'Verified directly from admin panel',
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('farmer_id', farmerId)
+            .eq('status', 'pending');
+      } catch (err) {
+        debugPrint('Non-blocking error updating farmer_registrations status: $err');
       }
 
       _notifyDataChanged();
@@ -2709,7 +2752,7 @@ class AdminService extends ChangeNotifier {
         _client.from('v_users_with_roles').select('user_id'),
         _client.from('farmers').select('farmer_id'),
         _client.from('farmers').select('farmer_id').eq('is_verified', true),
-        _client.from('products').select('product_id'),
+        _client.from('v_products').select('product_id'),
         _client.from('orders').select('order_id, total_amount'),
         _client
             .from('reported_content')
@@ -2781,13 +2824,12 @@ class AdminService extends ChangeNotifier {
     }
   }
 
-  /// Get specialized metrics for products
   Future<Map<String, dynamic>> getProductMetrics() async {
     try {
       final results = await Future.wait([
-        _client.from('products').select('product_id'),
-        _client.from('products').select('product_id').eq('is_active', true),
-        _client.from('products').select('product_id').eq('stock_quantity', 0),
+        _client.from('v_products').select('product_id'),
+        _client.from('v_products').select('product_id').eq('is_active', true),
+        _client.from('v_products').select('product_id').eq('stock_quantity', 0),
       ]);
 
       return {
@@ -2796,6 +2838,7 @@ class AdminService extends ChangeNotifier {
         'out_of_stock': (results[2] as List).length,
       };
     } catch (e) {
+      debugPrint('Error getting product metrics: $e');
       return {'total': 0, 'active': 0, 'out_of_stock': 0};
     }
   }

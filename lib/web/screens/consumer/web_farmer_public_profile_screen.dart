@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import '../../../shared/data/app_data.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/auth/auth_service.dart';
@@ -129,17 +128,6 @@ class _WebFarmerPublicProfileScreenState
       ? farmer['specialty'].toString()
       : 'Fresh produce';
 
-  String _initials(String value) {
-    final parts = value
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .take(2)
-        .toList();
-    if (parts.isEmpty) return 'F';
-    return parts.map((part) => part[0].toUpperCase()).join();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -178,6 +166,8 @@ class _WebFarmerPublicProfileScreenState
                     children: [
                       _buildHeader(farmer),
                       const SizedBox(height: 24),
+                      _buildStatsRow(farmer),
+                      const SizedBox(height: 24),
                       _buildContent(farmer),
                     ],
                   ),
@@ -192,176 +182,204 @@ class _WebFarmerPublicProfileScreenState
 
   Widget _buildHeader(Map<String, dynamic> farmer) {
     final coverImageUrl = farmer['image_url']?.toString();
-    final avatarUrl = farmer['avatar_url']?.toString();
-    final rating = farmer['average_rating']?.toString() ?? '0.0';
-    final totalReviews = farmer['total_reviews']?.toString() ?? '0';
     final farmName = _farmName(farmer);
     final ownProfile = _isOwnProfile(farmer);
 
     return Container(
       decoration: BoxDecoration(
         color: _white,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: _border),
       ),
-      child: Column(
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            child: SizedBox(
-              height: 260,
-              width: double.infinity,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  SafeNetworkImage(
-                    imageUrl: coverImageUrl,
-                    defaultBucket: 'uploads',
-                    fit: BoxFit.cover,
-                    placeholder: Container(color: _surface),
-                    errorWidget: Container(color: _surface),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: SizedBox(
+          height: 280,
+          width: double.infinity,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              SafeNetworkImage(
+                imageUrl: coverImageUrl,
+                defaultBucket: 'uploads',
+                fit: BoxFit.cover,
+                placeholder: Container(color: _surface),
+                errorWidget: Container(color: _surface),
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.1),
+                      Colors.black.withValues(alpha: 0.6),
+                    ],
                   ),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.18),
-                          Colors.black.withValues(alpha: 0.58),
+                ),
+              ),
+              Positioned(
+                left: 32,
+                right: 32,
+                bottom: 32,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            farmName,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 36,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _specialty(farmer),
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                  Positioned(
-                    left: 28,
-                    right: 28,
-                    bottom: 24,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                farmName,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 30,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _specialty(farmer),
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  color: Colors.white.withValues(alpha: 0.86),
-                                ),
-                              ),
-                            ],
+                    if (!ownProfile)
+                      FilledButton.icon(
+                        onPressed: _isFollowBusy
+                            ? null
+                            : () => _toggleFollow(farmer),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _isFollowing
+                              ? Colors.white
+                              : const Color(0xFF0F766E),
+                          foregroundColor: _isFollowing ? _dark : _white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 22,
+                            vertical: 18,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        if (!ownProfile)
-                          FilledButton.icon(
-                            onPressed: _isFollowBusy
-                                ? null
-                                : () => _toggleFollow(farmer),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: _isFollowing
-                                  ? Colors.white
-                                  : _primary,
-                              foregroundColor: _isFollowing ? _dark : _white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 16,
+                        icon: _isFollowBusy
+                            ? SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: _isFollowing ? _dark : _white,
+                                ),
+                              )
+                            : Icon(
+                                _isFollowing
+                                    ? Icons.check_rounded
+                                    : Icons.person_add_alt_1_rounded,
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            icon: _isFollowBusy
-                                ? SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: _isFollowing ? _dark : _white,
-                                    ),
-                                  )
-                                : Icon(
-                                    _isFollowing
-                                        ? Icons.check_rounded
-                                        : Icons.person_add_alt_1_rounded,
-                                  ),
-                            label: Text(
-                              _isFollowing ? 'Following' : 'Follow Farm',
-                              style: GoogleFonts.inter(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                      ],
+                        label: Text(
+                          _isFollowing ? 'Following' : 'Follow Farm',
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsRow(Map<String, dynamic> farmer) {
+    final rating = farmer['average_rating']?.toString() ?? '0.0';
+    final totalReviews = farmer['total_reviews']?.toString() ?? '0';
+    return Row(
+      children: [
+        _buildStatCard(
+          'AVERAGE RATING',
+          rating,
+          Icons.workspace_premium_rounded,
+          const Color(0xFFDCFCE7),
+          const Color(0xFF16A34A),
+        ),
+        const SizedBox(width: 14),
+        _buildStatCard(
+          'FOLLOWERS',
+          '$_followerCount',
+          Icons.favorite_rounded,
+          const Color(0xFFFFEDD5),
+          const Color(0xFFEA580C),
+        ),
+        const SizedBox(width: 14),
+        _buildStatCard(
+          'POSITIVE REVIEWS',
+          totalReviews,
+          Icons.thumb_up_rounded,
+          const Color(0xFFFFE4E6),
+          const Color(0xFFE11D48),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(
+    String label,
+    String value,
+    IconData icon,
+    Color iconBgColor,
+    Color iconColor,
+  ) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        decoration: BoxDecoration(
+          color: _white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    value,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _muted,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Row(
-              children: [
-                _buildStatCard('Rating', rating),
-                const SizedBox(width: 14),
-                _buildStatCard('Followers', '$_followerCount'),
-                const SizedBox(width: 14),
-                _buildStatCard('Reviews', totalReviews),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAvatarFallback(String farmName) {
-    return Container(
-      color: _primary.withValues(alpha: 0.12),
-      alignment: Alignment.center,
-      child: Text(
-        _initials(farmName),
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 28,
-          fontWeight: FontWeight.w800,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String label, String value) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-        decoration: BoxDecoration(
-          color: _surface,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              value,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: _dark,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.inter(fontSize: 13, color: _muted)),
           ],
         ),
       ),
@@ -369,51 +387,54 @@ class _WebFarmerPublicProfileScreenState
   }
 
   Widget _buildContent(Map<String, dynamic> farmer) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: _border),
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-            child: TabBar(
-              controller: _tabController,
-              labelColor: _primary,
-              unselectedLabelColor: _muted,
-              indicatorColor: _primary,
-              labelStyle: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-              tabs: const [
-                Tab(text: 'Products'),
-                Tab(text: 'Posts'),
-              ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            dividerColor: _border,
+            indicatorColor: _primary,
+            indicatorSize: TabBarIndicatorSize.label,
+            labelColor: _dark,
+            unselectedLabelColor: _muted,
+            labelStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
             ),
+            unselectedLabelStyle: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
+            tabs: const [
+              Tab(text: 'Products'),
+              Tab(text: 'Posts'),
+            ],
           ),
-          AnimatedBuilder(
-            animation: _tabController,
-            builder: (context, _) {
-              final showingPosts = _tabController.index == 1;
-              return AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                child: showingPosts
-                    ? _WebFarmerPostsTab(
-                        key: const ValueKey('posts'),
-                        farmerUserId: farmer['user_id']?.toString() ?? '',
-                      )
-                    : _WebFarmerProductsTab(
-                        key: const ValueKey('products'),
-                        farmerId: widget.farmerId,
-                      ),
-              );
-            },
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 16),
+        AnimatedBuilder(
+          animation: _tabController,
+          builder: (context, _) {
+            final showingPosts = _tabController.index == 1;
+            return AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: showingPosts
+                  ? _WebFarmerPostsTab(
+                      key: const ValueKey('posts'),
+                      farmerUserId: farmer['user_id']?.toString() ?? '',
+                    )
+                  : _WebFarmerProductsTab(
+                      key: const ValueKey('products'),
+                      farmerId: widget.farmerId,
+                    ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -459,16 +480,16 @@ class _WebFarmerProductsTab extends StatelessWidget {
             return GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 18,
-                mainAxisSpacing: 18,
-                mainAxisExtent: 360,
+                crossAxisSpacing: 24,
+                mainAxisSpacing: 24,
+                mainAxisExtent: 400,
               ),
               itemCount: products.length,
               itemBuilder: (context, index) =>
-                  _buildProductCard(context, products[index]),
+                  _buildProductCard(context, products[index], index),
             );
           },
         );
@@ -476,7 +497,11 @@ class _WebFarmerProductsTab extends StatelessWidget {
     );
   }
 
-  Widget _buildProductCard(BuildContext context, ProductItem product) {
+  Widget _buildProductCard(
+    BuildContext context,
+    ProductItem product,
+    int index,
+  ) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -490,77 +515,107 @@ class _WebFarmerProductsTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(20),
-                ),
-                child: product.imageUrl.isNotEmpty
-                    ? Image.network(
-                        product.imageUrl,
-                        height: 180,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => _buildImageFallback(),
-                      )
-                    : _buildImageFallback(),
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                    child: product.imageUrl.isNotEmpty
+                        ? Image.network(
+                            product.imageUrl,
+                            height: 200,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => _buildImageFallback(),
+                          )
+                        : _buildImageFallback(),
+                  ),
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: _buildTag(product, index),
+                  ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: _dark,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      product.price,
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: _primary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      product.unit,
-                      style: GoogleFonts.inter(fontSize: 12, color: _muted),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => context.push(
-                              AppRoutes.preorderDetails,
-                              extra: product,
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: _border),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
                             child: Text(
-                              'View',
-                              style: GoogleFonts.inter(
-                                fontWeight: FontWeight.w700,
+                              product.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
                                 color: _dark,
                               ),
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          Text(
+                            product.price,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: _primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        product.description ??
+                            'Fresh and high quality produce sourced directly from our farm.',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: _muted,
+                          height: 1.5,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: FilledButton(
+                      ),
+                      const Spacer(),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 14,
+                                  color: Color(0xFF0F766E),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'In Stock: ${product.targetQuantity?.toInt() ?? 50} ${product.unit.isNotEmpty ? product.unit : "units"}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF0F766E),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
                             onPressed: () async {
                               await CartService().addItem(product);
                               if (!context.mounted) return;
@@ -572,24 +627,20 @@ class _WebFarmerProductsTab extends StatelessWidget {
                                 ),
                               );
                             },
-                            style: FilledButton.styleFrom(
-                              backgroundColor: _primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            icon: const Icon(
+                              Icons.add_shopping_cart_rounded,
+                              size: 16,
                             ),
-                            child: Text(
-                              'Add',
-                              style: GoogleFonts.inter(
-                                fontWeight: FontWeight.w700,
-                              ),
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFFF1F5F9),
+                              foregroundColor: _dark,
+                              padding: const EdgeInsets.all(10),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -599,9 +650,44 @@ class _WebFarmerProductsTab extends StatelessWidget {
     );
   }
 
+  Widget _buildTag(ProductItem product, int index) {
+    String text = 'Organic';
+    Color bgColor = const Color(0xFF047857);
+
+    final cat = product.categoryName?.toLowerCase() ?? '';
+    if (product.isFeatured) {
+      text = "Farmer's Choice";
+      bgColor = const Color(0xFFB45309);
+    } else if (cat.contains('meat') ||
+        cat.contains('livestock') ||
+        index % 3 == 0) {
+      text = 'Fresh Today';
+      bgColor = const Color(0xFFEA580C);
+    } else {
+      text = 'Organic';
+      bgColor = const Color(0xFF16A34A);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.inter(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   Widget _buildImageFallback() {
     return Container(
-      height: 180,
+      height: 200,
       color: _surface,
       child: const Center(
         child: Icon(Icons.image_outlined, color: _muted, size: 30),
@@ -661,11 +747,16 @@ class _WebFarmerPostsTab extends StatelessWidget {
           );
         }
 
-        return ListView.separated(
+        return Padding(
           padding: const EdgeInsets.all(24),
-          itemCount: posts.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 16),
-          itemBuilder: (_, index) => _buildPostCard(posts[index]),
+          child: Column(
+            children: [
+              for (var index = 0; index < posts.length; index++) ...[
+                if (index > 0) const SizedBox(height: 16),
+                _buildPostCard(posts[index]),
+              ],
+            ],
+          ),
         );
       },
     );

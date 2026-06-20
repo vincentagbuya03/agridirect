@@ -59,7 +59,6 @@ class _WebShopScreenState extends State<WebShopScreen>
   String _searchQuery = '';
   final _searchController = TextEditingController();
   double _priceRange = 100.0;
-  bool _organicOnly = false;
   int _currentPage = 1;
   final int _itemsPerPage = 12;
 
@@ -176,7 +175,6 @@ class _WebShopScreenState extends State<WebShopScreen>
             (double.tryParse(p.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0) <=
             _priceRange;
 
-        // Note: organicOnly filter skipped for now as DB schema doesn't strictly flag it yet
         return matchesCategory &&
             matchesSearch &&
             (_priceRange >= 500 || matchesPrice);
@@ -565,32 +563,6 @@ class _WebShopScreenState extends State<WebShopScreen>
             ),
             const SizedBox(height: 28),
 
-            // Attributes
-            Text(
-              'Attributes',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: _dark,
-                letterSpacing: -0.2,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildAttributeToggle('Organic Certified', _organicOnly, (v) {
-              setState(() => _organicOnly = v);
-            }),
-
-            const SizedBox(height: 28),
-            Container(
-              height: 1.5,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [_border, _border.withValues(alpha: 0.1)],
-                ),
-              ),
-            ),
-            const SizedBox(height: 28),
-
             // Farm-to-Table info card (modernized)
             Container(
               padding: const EdgeInsets.all(16),
@@ -653,65 +625,6 @@ class _WebShopScreenState extends State<WebShopScreen>
                     ),
                   ),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAttributeToggle(
-    String label,
-    bool value,
-    ValueChanged<bool> onChanged,
-  ) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () => onChanged(!value),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.eco_rounded,
-                  size: 16,
-                  color: value ? _primary : _muted,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: value ? _dark : _muted,
-                  ),
-                ),
-              ],
-            ),
-            // Toggle switch
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 40,
-              height: 22,
-              decoration: BoxDecoration(
-                color: value ? _primary : _border,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: AnimatedAlign(
-                duration: const Duration(milliseconds: 200),
-                alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  margin: const EdgeInsets.all(2),
-                  width: 18,
-                  height: 18,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                ),
               ),
             ),
           ],

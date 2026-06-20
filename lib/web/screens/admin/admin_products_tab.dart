@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/services/admin/admin_service.dart';
+import '../../../shared/router/app_router.dart';
+import '../../../shared/data/app_data.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'admin_ui.dart';
 
@@ -347,7 +350,24 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
     return Material(
       color: Colors.white,
       child: InkWell(
-        onTap: () {},
+        onTap: () {
+          final productItem = ProductItem(
+            productId: product['product_id']?.toString(),
+            farmerId: product['farmer_id']?.toString(),
+            farmerName: product['farm_name']?.toString(),
+            name: product['name']?.toString() ?? '',
+            farm: product['farm_name']?.toString() ?? '',
+            price: product['price']?.toString() ?? '0.0',
+            unit: product['unit_abbr']?.toString() ?? 'units',
+            imageUrl: product['image_url']?.toString() ?? '',
+            categoryName: product['category_name']?.toString(),
+            rating: product['average_rating']?.toString(),
+            reviews: product['review_count']?.toString(),
+            isFeatured: product['is_featured'] == true,
+            description: product['description']?.toString(),
+          );
+          context.push(AppRoutes.productDetails, extra: productItem);
+        },
         hoverColor: AdminUi.panelAlt,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),

@@ -1,4 +1,3 @@
-import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -24,29 +23,37 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint('WebAuthCallbackScreen: initState triggered');
     _handleAuthCallback();
   }
 
   Future<void> _handleAuthCallback() async {
     try {
+      final code = Uri.base.queryParameters['code'];
+      debugPrint('WebAuthCallbackScreen: Detected OAuth code in URL: ${code != null}');
+      
       // The PKCE code exchange should already be done by main.dart during bootstrap.
       // As a fallback, try exchanging if currentUser is still null.
       if (_auth.client.auth.currentUser == null) {
-        final code = Uri.base.queryParameters['code'];
         if (code != null && code.isNotEmpty) {
           try {
-            debugPrint('OAuth callback: Fallback code exchange...');
+            debugPrint('OAuth callback: Fallback code exchange starting...');
             await _auth.client.auth.exchangeCodeForSession(code);
             debugPrint('OAuth callback: Fallback exchange complete!');
           } catch (e) {
             debugPrint('OAuth callback fallback exchange error: $e');
           }
+        } else {
+          debugPrint('OAuth callback: No code found in URL and currentUser is null');
         }
+      } else {
+        debugPrint('OAuth callback: currentUser is already logged in: ${_auth.client.auth.currentUser?.email}');
       }
 
       final user = await _waitForAuthenticatedUser();
 
       if (user == null) {
+        debugPrint('OAuth callback: Failed to resolve authenticated user (timeout)');
         setState(() {
           _status =
               'Authentication timed out. Please try again from the login page.';
@@ -61,6 +68,7 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
       }
 
       // Ensure AuthService is fully initialized with the new session
+      debugPrint('OAuth callback: Initializing AuthService for user ${user.email}...');
       await _auth.initialize(event: AuthChangeEvent.signedIn);
 
       setState(() {
@@ -73,6 +81,7 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
 
       if (!mounted) return;
 
+      debugPrint('OAuth callback: Redirecting to loading route...');
       context.go(AppRoutes.loading);
     } catch (e) {
       debugPrint('OAuth callback error: $e');
@@ -103,6 +112,7 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('WebAuthCallbackScreen: build() - Status: $_status, Error: $_isError');
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
@@ -132,7 +142,7 @@ class _WebAuthCallbackScreenState extends State<WebAuthCallbackScreen> {
               const SizedBox(
                 width: 32,
                 height: 32,
-                child: AppShimmerLoader(
+                child: CircularProgressIndicator(
                   strokeWidth: 3,
                   valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
                 ),

@@ -967,7 +967,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                       onExit: (_) => setState(() => _hoveredProducts.remove(i)),
                       child: GestureDetector(
                         onTap: () => context.push(
-                          AppRoutes.preorderDetails,
+                          AppRoutes.productDetails,
                           extra: _productFromMap(p),
                         ),
                         child: AnimatedContainer(
