@@ -1836,7 +1836,7 @@ class _OnboardFarmerDialogState extends State<_OnboardFarmerDialog> {
                             userId: _selectedUser!['user_id'],
                             newRole: 'farmer',
                           );
-                          if (mounted) Navigator.pop(context);
+                          if (context.mounted) Navigator.pop(context);
                         },
                   style: AdminUi.primaryButton,
                   child: const Text('Promote to Farmer'),

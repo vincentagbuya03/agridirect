@@ -929,6 +929,7 @@ class SupabaseDataService {
                 'title': post.title,
                 'body': post.body,
                 'image_url': post.imageUrl,
+                'video_url': post.videoUrl,
                 'likes': post.likes,
                 'comments': post.comments,
                 'is_liked': post.isLiked,
@@ -951,6 +952,7 @@ class SupabaseDataService {
               title: item['title']?.toString() ?? '',
               body: item['body']?.toString() ?? '',
               imageUrl: item['image_url']?.toString(),
+              videoUrl: item['video_url']?.toString(),
               likes: _toInt(item['likes']),
               comments: _toInt(item['comments']),
               isLiked: item['is_liked'] == true,
@@ -1013,6 +1015,7 @@ class SupabaseDataService {
         title: post.title,
         body: post.body,
         imageUrl: post.imageUrl,
+        videoUrl: post.videoUrl,
       );
     } catch (e) {
       debugPrint('Error adding forum post: $e');
@@ -1082,6 +1085,29 @@ class SupabaseDataService {
 
     if (result != null) {
       // Get the full public URL
+      return _client.storage.from('uploads').getPublicUrl(path);
+    }
+    return null;
+  }
+
+  /// Upload a forum post video
+  Future<String?> uploadForumVideo({
+    String? localPath,
+    Uint8List? bytes,
+  }) async {
+    if (localPath == null && bytes == null) return null;
+
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}.mp4';
+    final path = 'forum/$fileName';
+
+    final result = await SupabaseDatabase.uploadImage(
+      bucket: 'uploads',
+      path: path,
+      localPath: localPath,
+      bytes: bytes,
+    );
+
+    if (result != null) {
       return _client.storage.from('uploads').getPublicUrl(path);
     }
     return null;
@@ -1177,6 +1203,7 @@ class SupabaseDataService {
       title: item['title'] ?? '',
       body: item['body'] ?? '',
       imageUrl: item['image_url'],
+      videoUrl: item['video_url'],
       likes: item['likes_count'] ?? 0,
       comments: item['comments_count'] ?? 0,
       isLiked: isLiked,
@@ -1878,9 +1905,26 @@ class SupabaseDataService {
     }
   }
 
+
   int _toInt(dynamic value) {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '0') ?? 0;
+  }
+
+  /// Look up a farmer_id from a user_id.
+  /// Returns null if the user is not a farmer.
+  Future<String?> getFarmerIdByUserId(String userId) async {
+    try {
+      final response = await _client
+          .from('farmers')
+          .select('farmer_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+      return response?['farmer_id']?.toString();
+    } catch (e) {
+      debugPrint('Error looking up farmer_id by user_id: $e');
+      return null;
+    }
   }
 }

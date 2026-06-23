@@ -10,6 +10,7 @@ import '../../../shared/services/user/user_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../../shared/models/farmer/farmer_profile_model.dart';
 import '../../../shared/services/farmer/farmer_service.dart';
+import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
 
 
@@ -184,6 +185,14 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
         );
       }
 
+      String? firstCategory;
+      if (_cartItems.isNotEmpty) {
+        try {
+          final firstProduct = await SupabaseDataService().getProductById(_cartItems.first.productId);
+          firstCategory = firstProduct?.categoryName;
+        } catch (_) {}
+      }
+
       await CartService().removeSelected();
 
       if (!mounted) return;
@@ -193,7 +202,7 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
           backgroundColor: _primary,
         ),
       );
-      context.go(AppRoutes.customerOrders);
+      context.go(AppRoutes.orderSuccess, extra: firstCategory);
     } catch (e) {
       if (!mounted) return;
       final rawMessage = e.toString().replaceFirst('Exception: ', '');
@@ -744,13 +753,35 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              child: Text(
-                _isSubmittingOrder ? 'Placing Order...' : 'Place Order',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              child: _isSubmittingOrder
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Placing Order...',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Text(
+                      'Place Order',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
         ],

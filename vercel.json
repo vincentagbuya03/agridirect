@@ -11,7 +11,7 @@
     },
     {
       "source": "/((?!.*\\.).*)",
-      "destination": "/index"
+      "destination": "/index.html"
     }
   ],
   "headers": [

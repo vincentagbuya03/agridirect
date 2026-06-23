@@ -34,6 +34,9 @@ class _WebCartScreenState extends State<WebCartScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final isCompact = sw < 900;
+
     return Scaffold(
       backgroundColor: _surface,
       body: Column(
@@ -43,7 +46,12 @@ class _WebCartScreenState extends State<WebCartScreen> {
             onNavigate: _handleNav,
             onCartTap: () {},
             isCartActive: true,
-            margin: const EdgeInsets.fromLTRB(32, 20, 32, 12),
+            margin: EdgeInsets.fromLTRB(
+              isCompact ? 16 : 32,
+              20,
+              isCompact ? 16 : 32,
+              12,
+            ),
           ),
           Expanded(
             child: ListenableBuilder(
@@ -53,18 +61,23 @@ class _WebCartScreenState extends State<WebCartScreen> {
                 final items = cart.items;
 
                 if (items.isEmpty) {
-                  return _buildEmptyState();
+                  return _buildEmptyState(isCompact);
                 }
 
                 return SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(32, 8, 32, 32),
+                  padding: EdgeInsets.fromLTRB(
+                    isCompact ? 16 : 32,
+                    8,
+                    isCompact ? 16 : 32,
+                    32,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Your Cart',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 34,
+                          fontSize: isCompact ? 28 : 34,
                           fontWeight: FontWeight.w800,
                           color: _dark,
                         ),
@@ -72,31 +85,54 @@ class _WebCartScreenState extends State<WebCartScreen> {
                       const SizedBox(height: 8),
                       Text(
                         'Review what you added before checkout.',
-                        style: GoogleFonts.inter(fontSize: 14, color: _muted),
+                        style: GoogleFonts.inter(
+                          fontSize: isCompact ? 13 : 14,
+                          color: _muted,
+                        ),
                       ),
-                      const SizedBox(height: 28),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: Column(
-                              children: items
-                                  .map(
-                                    (item) => Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 16,
-                                      ),
-                                      child: _buildCartItem(item),
-                                    ),
-                                  )
-                                  .toList(),
+                      const SizedBox(height: 24),
+                      isCompact
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Column(
+                                  children: items
+                                      .map(
+                                        (item) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 16,
+                                          ),
+                                          child: _buildCartItem(item, true),
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                                const SizedBox(height: 12),
+                                _buildSummaryCard(cart),
+                              ],
+                            )
+                          : Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: Column(
+                                    children: items
+                                        .map(
+                                          (item) => Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 16,
+                                            ),
+                                            child: _buildCartItem(item, false),
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
+                                ),
+                                const SizedBox(width: 24),
+                                Expanded(child: _buildSummaryCard(cart)),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 24),
-                          Expanded(child: _buildSummaryCard(cart)),
-                        ],
-                      ),
                     ],
                   ),
                 );
@@ -108,11 +144,12 @@ class _WebCartScreenState extends State<WebCartScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(bool isCompact) {
     return Center(
       child: Container(
         width: 560,
-        padding: const EdgeInsets.all(40),
+        margin: EdgeInsets.all(isCompact ? 16 : 0),
+        padding: EdgeInsets.all(isCompact ? 24 : 40),
         decoration: BoxDecoration(
           color: _white,
           borderRadius: BorderRadius.circular(24),
@@ -122,15 +159,15 @@ class _WebCartScreenState extends State<WebCartScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 88,
-              height: 88,
+              width: isCompact ? 72 : 88,
+              height: isCompact ? 72 : 88,
               decoration: BoxDecoration(
                 color: _primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.shopping_cart_outlined,
-                size: 42,
+                size: isCompact ? 32 : 42,
                 color: _primary,
               ),
             ),
@@ -138,7 +175,7 @@ class _WebCartScreenState extends State<WebCartScreen> {
             Text(
               'Your cart is empty',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 26,
+                fontSize: isCompact ? 22 : 26,
                 fontWeight: FontWeight.w800,
                 color: _dark,
               ),
@@ -146,7 +183,7 @@ class _WebCartScreenState extends State<WebCartScreen> {
             const SizedBox(height: 8),
             Text(
               'Add products from the shop and they will appear here.',
-              style: GoogleFonts.inter(fontSize: 14, color: _muted),
+              style: GoogleFonts.inter(fontSize: isCompact ? 13 : 14, color: _muted),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -154,9 +191,9 @@ class _WebCartScreenState extends State<WebCartScreen> {
               onPressed: () => context.go(AppRoutes.shop),
               style: FilledButton.styleFrom(
                 backgroundColor: _primary,
-                padding: const EdgeInsets.symmetric(
+                padding: EdgeInsets.symmetric(
                   horizontal: 24,
-                  vertical: 16,
+                  vertical: isCompact ? 14 : 16,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -173,7 +210,116 @@ class _WebCartScreenState extends State<WebCartScreen> {
     );
   }
 
-  Widget _buildCartItem(CartItem item) {
+  Widget _buildCartItem(CartItem item, bool isCompact) {
+    if (isCompact) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: _white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Checkbox(
+                  value: item.isSelected,
+                  activeColor: _primary,
+                  onChanged: (_) => CartService().toggleSelection(item.productId),
+                ),
+                const SizedBox(width: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: item.imageUrl.isNotEmpty
+                      ? SafeNetworkImage(
+                          imageUrl: item.imageUrl,
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                          errorWidget: _buildImageFallback(size: 80),
+                        )
+                      : _buildImageFallback(size: 80),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: _dark,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.farm,
+                        style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${item.price} ${item.unit}',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildQuantityControl(item),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'P${item.total.toStringAsFixed(2)}',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: _dark,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => CartService().removeItem(item.productId),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'Remove',
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFFDC2626),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -263,12 +409,12 @@ class _WebCartScreenState extends State<WebCartScreen> {
     );
   }
 
-  Widget _buildImageFallback() {
+  Widget _buildImageFallback({double size = 110}) {
     return Container(
-      width: 110,
-      height: 110,
+      width: size,
+      height: size,
       color: _surface,
-      child: const Icon(Icons.image_outlined, color: _muted, size: 30),
+      child: Icon(Icons.image_outlined, color: _muted, size: size * 0.27),
     );
   }
 

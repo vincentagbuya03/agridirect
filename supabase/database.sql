@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS public.forum_posts (
   title text NOT NULL,
   body text NOT NULL,
   image_url text,
+  video_url text,
   is_pinned boolean DEFAULT false,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now()
@@ -310,15 +311,18 @@ CREATE TABLE IF NOT EXISTS public.farmer_ratings (
 CREATE OR REPLACE VIEW public.v_forum_posts AS
 SELECT 
     p.post_id,
-    u.name as author_name,
+    p.user_id,
+    COALESCE(u.name, 'AgriDirect Member') as author_name,
     p.created_at,
     p.title,
     p.body,
     p.image_url,
+    p.video_url,
+    p.is_pinned,
     COALESCE(l.likes_count, 0)::int as likes_count,
     COALESCE(c.comments_count, 0)::int as comments_count
 FROM forum_posts p
-JOIN users u ON p.user_id = u.user_id
+LEFT JOIN users u ON p.user_id = u.user_id
 LEFT JOIN (
     SELECT post_id, COUNT(*) as likes_count 
     FROM forum_post_likes GROUP BY post_id

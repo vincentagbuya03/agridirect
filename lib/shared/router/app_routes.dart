@@ -41,6 +41,7 @@ class AppRoutes {
   static const String preorders = '/preorders';
   static const String checkout = '/checkout';
   static const String cartCheckout = '/cart-checkout';
+  static const String orderSuccess = '/order-success';
   static const String farmerProfileBase = '/farm';
   static const String farmerDashboard = '/farmer-dashboard';
   static const String webFarmerRegister = '/web-farmer-register';

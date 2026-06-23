@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/comments_dialog.dart';
 import '../widgets/report_content_dialog.dart';
 import '../services/core/supabase_data_service.dart';
+import '../widgets/forum_video_player.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final ForumPostItem post;
@@ -160,7 +161,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ],
               ),
             ),
-            if (_post.imageUrl != null && _post.imageUrl!.isNotEmpty)
+            if (_post.videoUrl != null && _post.videoUrl!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: ForumVideoPlayer(videoUrl: _post.videoUrl!),
+                ),
+              )
+            else if (_post.imageUrl != null && _post.imageUrl!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 child: ClipRRect(

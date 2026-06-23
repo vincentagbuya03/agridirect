@@ -166,7 +166,7 @@ class _WebCheckoutScreenState extends State<WebCheckoutScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Order placed successfully!')),
       );
-      context.go(AppRoutes.customerOrders);
+      context.go(AppRoutes.orderSuccess, extra: widget.product.categoryName);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -749,13 +749,35 @@ class _WebCheckoutScreenState extends State<WebCheckoutScreen> {
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              child: Text(
-                _isSubmittingOrder ? 'Placing Order...' : 'Place Order',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              child: _isSubmittingOrder
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Placing Order...',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Text(
+                      'Place Order',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
         ],

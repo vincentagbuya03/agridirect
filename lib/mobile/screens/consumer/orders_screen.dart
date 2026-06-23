@@ -9,7 +9,8 @@ import 'package:agridirect/shared/widgets/image_widgets.dart';
 
 /// Orders Screen - Professional Order Management (Responsive Web & Mobile)
 class OrdersScreen extends StatefulWidget {
-  const OrdersScreen({super.key});
+  final String? initialOrderId;
+  const OrdersScreen({super.key, this.initialOrderId});
 
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
@@ -24,6 +25,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
   void initState() {
     super.initState();
     _ordersStream = OrderService().watchMyOrders();
+    if (widget.initialOrderId != null) {
+      _loadAndShowOrderDetails(widget.initialOrderId!);
+    }
+  }
+
+  Future<void> _loadAndShowOrderDetails(String orderId) async {
+    try {
+      final order = await OrderService().getOrderById(orderId);
+      if (order != null && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showOrderDetails(order);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading initial order details: $e');
+    }
   }
 
   @override

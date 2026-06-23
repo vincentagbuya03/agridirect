@@ -48,7 +48,9 @@ class ArticleDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final isWeb = MediaQuery.of(context).size.width > 800;
+
+    Widget content = Scaffold(
       backgroundColor: Colors.white,
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
@@ -60,6 +62,29 @@ class ArticleDetailScreen extends StatelessWidget {
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: _buildShareButton(),
     );
+
+    if (isWeb) {
+      content = Container(
+        color: const Color(0xFFF8FAFC),
+        alignment: Alignment.center,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 800),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: content,
+        ),
+      );
+    }
+
+    return content;
   }
 
   Widget _buildAppBar(BuildContext context) {
@@ -449,9 +474,10 @@ class ArticleDetailScreen extends StatelessWidget {
 
   Widget _buildShareButton() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
+      margin: const EdgeInsets.only(left: 24, right: 24, bottom: 16),
+      constraints: const BoxConstraints(maxWidth: 400),
       width: double.infinity,
-      height: 60,
+      height: 56,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         boxShadow: [

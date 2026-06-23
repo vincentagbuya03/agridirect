@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/widgets/create_post_dialog.dart';
 import '../../../shared/widgets/comments_dialog.dart';
@@ -7,6 +8,10 @@ import '../../../shared/data/app_data.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/screens/post_detail_screen.dart';
 import '../../../shared/screens/article_detail_screen.dart';
+import '../../../shared/router/app_routes.dart';
+
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/widgets/forum_video_player.dart';
 
 /// Farmer Community Hub - Professional Social Interface
 class FarmerCommunityHub extends StatefulWidget {
@@ -37,6 +42,20 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
     super.dispose();
   }
 
+  /// Navigate to the public profile of a farmer by their user_id.
+  Future<void> _navigateToFarmerProfile(String? userId) async {
+    if (userId == null || userId.isEmpty) return;
+    final farmerId = await SupabaseDataService().getFarmerIdByUserId(userId);
+    if (!mounted) return;
+    if (farmerId != null && farmerId.isNotEmpty) {
+      context.push(AppRoutes.farmerProfile(farmerId));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This user does not have a public farm profile.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,28 +73,30 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await showDialog<bool>(
-            context: context,
-            builder: (context) => const CreatePostDialog(),
-          );
-          if (result == true && mounted) {
-            setState(() {});
-          }
-        },
-        backgroundColor: AppColors.primary,
-        elevation: 6,
-        icon: const Icon(Icons.edit_square, color: Colors.white, size: 20),
-        label: Text(
-          'POST QUESTION',
-          style: AppTextStyles.labelSmall.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1,
-          ),
-        ),
-      ),
+      floatingActionButton: AuthService().isSeller
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                final result = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => const CreatePostDialog(),
+                );
+                if (result == true && mounted) {
+                  setState(() {});
+                }
+              },
+              backgroundColor: AppColors.primary,
+              elevation: 6,
+              icon: const Icon(Icons.edit_square, color: Colors.white, size: 20),
+              label: Text(
+                'POST QUESTION',
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1,
+                ),
+              ),
+            )
+          : null,
     );
   }
 
@@ -347,54 +368,63 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
               children: [
                 Row(
                   children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
-                      ),
-                      child: const Icon(Icons.person_rounded, size: 20, color: AppColors.textSubtle),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    GestureDetector(
+                      onTap: () => _navigateToFarmerProfile(post.userId),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Row(
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
+                            ),
+                            child: const Icon(Icons.person_rounded, size: 20, color: AppColors.textSubtle),
+                          ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(post.userName, style: AppTextStyles.headline3.copyWith(fontSize: 15)),
-                              if (post.isPinned) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.push_pin_rounded, size: 10, color: AppColors.primary),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'PINNED',
-                                        style: AppTextStyles.labelSmall.copyWith(
-                                          color: AppColors.primary,
-                                          fontSize: 8,
-                                          fontWeight: FontWeight.w900,
-                                        ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(post.userName, style: AppTextStyles.headline3.copyWith(fontSize: 15)),
+                                  if (post.isPinned) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(4),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.push_pin_rounded, size: 10, color: AppColors.primary),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'PINNED',
+                                            style: AppTextStyles.labelSmall.copyWith(
+                                              color: AppColors.primary,
+                                              fontSize: 8,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              Text(post.time, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontSize: 11)),
                             ],
                           ),
-                          Text(post.time, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontSize: 11)),
                         ],
                       ),
                     ),
+                    const Spacer(),
                     const Icon(Icons.more_horiz_rounded, color: AppColors.textSubtle),
                   ],
                 ),
@@ -405,7 +435,13 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                   post.body,
                   style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHeadline.withValues(alpha: 0.7), height: 1.5),
                 ),
-                if (post.imageUrl != null) ...[
+                if (post.videoUrl != null && post.videoUrl!.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: ForumVideoPlayer(videoUrl: post.videoUrl!),
+                  ),
+                ] else if (post.imageUrl != null) ...[
                   const SizedBox(height: 16),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(16),

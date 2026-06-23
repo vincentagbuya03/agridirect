@@ -428,317 +428,322 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildFormCard(
-                title: 'Media',
-                icon: Icons.photo_library_rounded,
-                child: _buildImagePicker(),
-              ),
-              const SizedBox(height: 20),
-              _buildFormCard(
-                title: 'Basic Information',
-                icon: Icons.info_outline_rounded,
-                child: Column(
-                  children: [
-                    _buildTextField(
-                      controller: _nameController,
-                      label: 'Product Name',
-                      hint: 'e.g., Fresh Organic Tomatoes',
-                      validator: (value) => value?.isEmpty ?? true
-                          ? 'Product name is required'
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _descriptionController,
-                      label: 'Description',
-                      hint: 'Highlight key details (organic, size, origin)...',
-                      maxLines: 4,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildFormCard(
-                title: 'Pricing & Category',
-                icon: Icons.sell_outlined,
-                child: Column(
-                  children: [
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final useStackedLayout = constraints.maxWidth < 360;
-
-                        if (useStackedLayout) {
-                          return Column(
-                            children: [
-                              _buildTextField(
-                                controller: _priceController,
-                                label: 'Price',
-                                hint: '0.00',
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                                prefixIcon: Icons.sell_outlined,
-                                prefixText: '₱ ',
-                                validator: (value) {
-                                  if (value?.isEmpty ?? true) return 'Required';
-                                  if (double.tryParse(value!) == null) {
-                                    return 'Invalid';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              _buildDropdownField(
-                                label: 'Unit',
-                                value: _selectedUnit,
-                                items: _units,
-                                onChanged: (value) =>
-                                    setState(() => _selectedUnit = value),
-                              ),
-                            ],
-                          );
-                        }
-
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: _buildTextField(
-                                controller: _priceController,
-                                label: 'Price',
-                                hint: '0.00',
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                                prefixIcon: Icons.sell_outlined,
-                                prefixText: '₱ ',
-                                validator: (value) {
-                                  if (value?.isEmpty ?? true) return 'Required';
-                                  if (double.tryParse(value!) == null) {
-                                    return 'Invalid';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              flex: 2,
-                              child: _buildDropdownField(
-                                label: 'Unit',
-                                value: _selectedUnit,
-                                items: _units,
-                                onChanged: (value) =>
-                                    setState(() => _selectedUnit = value),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final useStackedLayout = constraints.maxWidth < 360;
-
-                        if (useStackedLayout) {
-                          return Column(
-                            children: [
-                              _buildTextField(
-                                controller: _quantityController,
-                                label: 'Available Quantity',
-                                hint: '0',
-                                keyboardType: TextInputType.number,
-                                prefixIcon: Icons.inventory_2_outlined,
-                                validator: (value) {
-                                  if (value?.isEmpty ?? true) return 'Required';
-                                  if (double.tryParse(value!) == null) {
-                                    return 'Invalid';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF8FAFC),
-                                  border: Border.all(color: Colors.grey[200]!),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'Total Value',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.grey[500],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        _calculateTotalValue(),
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                          color: const Color(0xFF13EC5B),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        }
-
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              flex: 2,
-                              child: _buildTextField(
-                                controller: _quantityController,
-                                label: 'Available Quantity',
-                                hint: '0',
-                                keyboardType: TextInputType.number,
-                                prefixIcon: Icons.inventory_2_outlined,
-                                validator: (value) {
-                                  if (value?.isEmpty ?? true) return 'Required';
-                                  if (double.tryParse(value!) == null) {
-                                    return 'Invalid';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              flex: 2,
-                              child: Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF8FAFC),
-                                  border: Border.all(color: Colors.grey[200]!),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'Total Value',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.grey[500],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        _calculateTotalValue(),
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                          color: const Color(0xFF13EC5B),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _buildDropdownField(
-                      label: 'Category',
-                      value: _selectedCategory,
-                      items: _categories,
-                      onChanged: (value) =>
-                          setState(() => _selectedCategory = value),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildFormCard(
-                title: 'Farming Details',
-                icon: Icons.eco_outlined,
-                child: Column(
-                  children: [
-                    _buildTextField(
-                      controller: _harvestDaysController,
-                      label: 'Days to Harvest (Optional)',
-                      hint: 'e.g., 30',
-                      keyboardType: TextInputType.number,
-                      prefixIcon: Icons.calendar_month_rounded,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildCheckboxTile(
-                      title: 'Pre-order Product',
-                      subtitle: 'Allow customers to buy before harvest',
-                      value: _isPreorder,
-                      onChanged: (value) =>
-                          setState(() => _isPreorder = value ?? false),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _submitForm,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primary,
-                    disabledBackgroundColor: primary.withValues(alpha: 0.5),
-                    elevation: 4,
-                    shadowColor: primary.withValues(alpha: 0.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 680),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFormCard(
+                    title: 'Media',
+                    icon: Icons.photo_library_rounded,
+                    child: _buildImagePicker(),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildFormCard(
+                    title: 'Basic Information',
+                    icon: Icons.info_outline_rounded,
+                    child: Column(
+                      children: [
+                        _buildTextField(
+                          controller: _nameController,
+                          label: 'Product Name',
+                          hint: 'e.g., Fresh Organic Tomatoes',
+                          validator: (value) => value?.isEmpty ?? true
+                              ? 'Product name is required'
+                              : null,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _descriptionController,
+                          label: 'Description',
+                          hint: 'Highlight key details (organic, size, origin)...',
+                          maxLines: 4,
+                        ),
+                      ],
                     ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: AppShimmerLoader(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        )
-                      : Text(
-                          _isOnline
-                              ? 'Publish Product'
-                              : 'Save Offline & Publish Later',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
-                          ),
+                  const SizedBox(height: 20),
+                  _buildFormCard(
+                    title: 'Pricing & Category',
+                    icon: Icons.sell_outlined,
+                    child: Column(
+                      children: [
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final useStackedLayout = constraints.maxWidth < 360;
+
+                            if (useStackedLayout) {
+                              return Column(
+                                children: [
+                                  _buildTextField(
+                                    controller: _priceController,
+                                    label: 'Price',
+                                    hint: '0.00',
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                    prefixIcon: Icons.sell_outlined,
+                                    prefixText: '₱ ',
+                                    validator: (value) {
+                                      if (value?.isEmpty ?? true) return 'Required';
+                                      if (double.tryParse(value!) == null) {
+                                        return 'Invalid';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildDropdownField(
+                                    label: 'Unit',
+                                    value: _selectedUnit,
+                                    items: _units,
+                                    onChanged: (value) =>
+                                        setState(() => _selectedUnit = value),
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: _buildTextField(
+                                    controller: _priceController,
+                                    label: 'Price',
+                                    hint: '0.00',
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                    prefixIcon: Icons.sell_outlined,
+                                    prefixText: '₱ ',
+                                    validator: (value) {
+                                      if (value?.isEmpty ?? true) return 'Required';
+                                      if (double.tryParse(value!) == null) {
+                                        return 'Invalid';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 2,
+                                  child: _buildDropdownField(
+                                    label: 'Unit',
+                                    value: _selectedUnit,
+                                    items: _units,
+                                    onChanged: (value) =>
+                                        setState(() => _selectedUnit = value),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
-                ),
+                        const SizedBox(height: 16),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final useStackedLayout = constraints.maxWidth < 360;
+
+                            if (useStackedLayout) {
+                              return Column(
+                                children: [
+                                  _buildTextField(
+                                    controller: _quantityController,
+                                    label: 'Available Quantity',
+                                    hint: '0',
+                                    keyboardType: TextInputType.number,
+                                    prefixIcon: Icons.inventory_2_outlined,
+                                    validator: (value) {
+                                      if (value?.isEmpty ?? true) return 'Required';
+                                      if (double.tryParse(value!) == null) {
+                                        return 'Invalid';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFC),
+                                      border: Border.all(color: Colors.grey[200]!),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Total Value',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.grey[500],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _calculateTotalValue(),
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF13EC5B),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 2,
+                                  child: _buildTextField(
+                                    controller: _quantityController,
+                                    label: 'Available Quantity',
+                                    hint: '0',
+                                    keyboardType: TextInputType.number,
+                                    prefixIcon: Icons.inventory_2_outlined,
+                                    validator: (value) {
+                                      if (value?.isEmpty ?? true) return 'Required';
+                                      if (double.tryParse(value!) == null) {
+                                        return 'Invalid';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 2,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFC),
+                                      border: Border.all(color: Colors.grey[200]!),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Total Value',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.grey[500],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _calculateTotalValue(),
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF13EC5B),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildDropdownField(
+                          label: 'Category',
+                          value: _selectedCategory,
+                          items: _categories,
+                          onChanged: (value) =>
+                              setState(() => _selectedCategory = value),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildFormCard(
+                    title: 'Farming Details',
+                    icon: Icons.eco_outlined,
+                    child: Column(
+                      children: [
+                        _buildTextField(
+                          controller: _harvestDaysController,
+                          label: 'Days to Harvest (Optional)',
+                          hint: 'e.g., 30',
+                          keyboardType: TextInputType.number,
+                          prefixIcon: Icons.calendar_month_rounded,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildCheckboxTile(
+                          title: 'Pre-order Product',
+                          subtitle: 'Allow customers to buy before harvest',
+                          value: _isPreorder,
+                          onChanged: (value) =>
+                              setState(() => _isPreorder = value ?? false),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _submitForm,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primary,
+                        disabledBackgroundColor: primary.withValues(alpha: 0.5),
+                        elevation: 4,
+                        shadowColor: primary.withValues(alpha: 0.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: AppShimmerLoader(
+                                color: Colors.white,
+                                strokeWidth: 3,
+                              ),
+                            )
+                          : Text(
+                              _isOnline
+                                  ? 'Publish Product'
+                                  : 'Save Offline & Publish Later',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

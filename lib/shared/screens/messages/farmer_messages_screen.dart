@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:agridirect/shared/widgets/image_widgets.dart';
+import 'package:agridirect/shared/widgets/pulsing_status_indicator.dart';
 import 'package:agridirect/shared/styles/app_theme.dart';
 import 'package:agridirect/shared/router/app_routes.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 
 import '../../services/auth/auth_service.dart';
 import '../../services/core/supabase_config.dart';
@@ -608,15 +612,14 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                                       right: 0,
                                       bottom: 0,
                                       child: Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.success,
+                                        decoration: const BoxDecoration(
+                                          color: Colors.white,
                                           shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: Colors.white,
-                                            width: 2,
-                                          ),
+                                        ),
+                                        padding: const EdgeInsets.all(2),
+                                        child: PulsingStatusIndicator(
+                                          isOnline: true,
+                                          size: 8,
                                         ),
                                       ),
                                     );
@@ -782,15 +785,9 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                             final isOnline = onlineUsers.contains(
                               conversation.otherUserId,
                             );
-                            return Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: isOnline
-                                    ? AppColors.success
-                                    : Colors.grey.shade300,
-                                shape: BoxShape.circle,
-                              ),
+                            return PulsingStatusIndicator(
+                              isOnline: isOnline,
+                              size: 8,
                             );
                           },
                         ),
@@ -996,16 +993,22 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                                         message.messageText,
                                         isMine,
                                       )
-                                    : Text(
-                                        message.messageText,
-                                        style:
-                                            AppTextStyles.bodyMedium.copyWith(
-                                          color: isMine
-                                              ? Colors.white
-                                              : AppColors.textHeadline,
-                                          height: 1.4,
-                                        ),
-                                      ),
+                                    : message.messageText
+                                            .startsWith('[IMAGE:')
+                                        ? _buildImageMessageCard(
+                                            message.messageText,
+                                            isMine,
+                                          )
+                                        : Text(
+                                            message.messageText,
+                                            style:
+                                                AppTextStyles.bodyMedium.copyWith(
+                                              color: isMine
+                                                  ? Colors.white
+                                                  : AppColors.textHeadline,
+                                              height: 1.4,
+                                            ),
+                                          ),
                           ),
                         ),
                         if (isMine && index == 0)
@@ -1037,77 +1040,94 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
   }
 
   Widget _buildWebComposer() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0xFFF1F5F9), width: 1.5),
-        ),
-      ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(24),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 8),
+        _buildQuickReplies(),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: Color(0xFFF1F5F9), width: 1.5),
+            ),
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.image_rounded,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                    onPressed: _pickAndSendImage,
                   ),
-                  child: TextField(
-                    controller: _composerController,
-                    minLines: 1,
-                    maxLines: 5,
-                    style: AppTextStyles.bodyMedium,
-                    decoration: InputDecoration(
-                      hintText: 'Write a message...',
-                      hintStyle: AppTextStyles.bodyMedium.copyWith(
-                        color: Colors.grey.shade500,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 10,
-                      ),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      suffixIcon: IconButton(
-                        icon: const Icon(
-                          Icons.emoji_emotions_outlined,
-                          size: 22,
+                      child: TextField(
+                        controller: _composerController,
+                        minLines: 1,
+                        maxLines: 5,
+                        style: AppTextStyles.bodyMedium,
+                        decoration: InputDecoration(
+                          hintText: 'Write a message...',
+                          hintStyle: AppTextStyles.bodyMedium.copyWith(
+                            color: Colors.grey.shade500,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 10,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          suffixIcon: IconButton(
+                            icon: const Icon(
+                              Icons.emoji_emotions_outlined,
+                              size: 22,
+                            ),
+                            color: Colors.grey.shade500,
+                            onPressed: () {},
+                          ),
                         ),
-                        color: Colors.grey.shade500,
-                        onPressed: () {},
                       ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              GestureDetector(
-                onTap: _sendMessage,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: const BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.send_rounded,
-                      color: Colors.white,
-                      size: 20,
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: _sendMessage,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: const BoxDecoration(
+                        gradient: AppColors.primaryGradient,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.send_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -1118,12 +1138,60 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
     if (message.startsWith('[PRODUCT_INQUIRY:')) {
       return '💬 Product Inquiry';
     }
+    if (message.startsWith('[IMAGE:')) {
+      return '📷 Image';
+    }
     return message;
   }
 
   Widget _buildConversationList(List<MessageConversation> conversations) {
+    final filtered = conversations.where((c) {
+      return c.otherDisplayName
+          .toLowerCase()
+          .contains(_conversationSearchQuery.toLowerCase());
+    }).toList();
+
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Container(
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+              border: Border.all(
+                color: AppColors.textSubtle.withValues(alpha: 0.1),
+              ),
+            ),
+            child: TextField(
+              onChanged: (val) => setState(() => _conversationSearchQuery = val),
+              decoration: InputDecoration(
+                hintText: 'Search conversations...',
+                hintStyle: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.grey.shade400,
+                  fontSize: 14,
+                ),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: Colors.grey.shade400,
+                  size: 20,
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+        ),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _refreshInbox,
@@ -1132,7 +1200,7 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               itemBuilder: (context, index) {
-                final conversation = conversations[index];
+                final conversation = filtered[index];
                 final isSelected =
                     conversation.conversationId == _selectedConversationId;
 
@@ -1197,15 +1265,14 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                                   right: 0,
                                   bottom: 0,
                                   child: Container(
-                                    width: 16,
-                                    height: 16,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.success,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
                                       shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 2.5,
-                                      ),
+                                    ),
+                                    padding: const EdgeInsets.all(2.5),
+                                    child: PulsingStatusIndicator(
+                                      isOnline: true,
+                                      size: 11,
                                     ),
                                   ),
                                 );
@@ -1291,7 +1358,7 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                 );
               },
               separatorBuilder: (context, index) => const SizedBox(height: 8),
-              itemCount: conversations.length,
+              itemCount: filtered.length,
             ),
           ),
         ),
@@ -1366,17 +1433,9 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                             final isOnline = onlineUsers.contains(
                               conversation.otherUserId,
                             );
-                            return Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: isOnline
-                                    ? AppColors.success
-                                    : AppColors.textSubtle.withValues(
-                                        alpha: 0.2,
-                                      ),
-                                shape: BoxShape.circle,
-                              ),
+                            return PulsingStatusIndicator(
+                              isOnline: isOnline,
+                              size: 8,
                             );
                           },
                         ),
@@ -1581,15 +1640,17 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                                   ? _buildInquiryCard(message.messageText, isMine)
                                   : message.messageText.startsWith('[ORDER_NOTICE:')
                                       ? _buildOrderNoticeCard(message.messageText, isMine)
-                                      : Text(
-                                      message.messageText,
-                                      style: AppTextStyles.bodyMedium.copyWith(
-                                        color: isMine
-                                            ? Colors.white
-                                            : AppColors.textHeadline,
-                                        height: 1.5,
-                                      ),
-                                    ),
+                                      : message.messageText.startsWith('[IMAGE:')
+                                          ? _buildImageMessageCard(message.messageText, isMine)
+                                          : Text(
+                                              message.messageText,
+                                              style: AppTextStyles.bodyMedium.copyWith(
+                                                color: isMine
+                                                    ? Colors.white
+                                                    : AppColors.textHeadline,
+                                                height: 1.5,
+                                              ),
+                                            ),
                             ),
                           ),
                           if (isMine)
@@ -1630,80 +1691,97 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
         ),
 
         // Message Input
-        Container(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            12,
-            16,
-            MediaQuery.of(context).padding.bottom + 16,
-          ),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(
-              top: BorderSide(
-                color: Colors.grey.shade100,
-                width: 1,
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            _buildQuickReplies(),
+            const SizedBox(height: 8),
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                12,
+                16,
+                MediaQuery.of(context).padding.bottom + 16,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.grey.shade100,
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.image_rounded,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                    onPressed: _pickAndSendImage,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: TextField(
+                        controller: _composerController,
+                        minLines: 1,
+                        maxLines: 5,
+                        style: AppTextStyles.bodyMedium,
+                        decoration: InputDecoration(
+                          hintText: 'Write a message...',
+                          hintStyle: AppTextStyles.bodyMedium.copyWith(
+                            color: Colors.grey.shade500,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 10,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          suffixIcon: IconButton(
+                            icon: const Icon(
+                              Icons.emoji_emotions_outlined,
+                              size: 22,
+                            ),
+                            color: Colors.grey.shade500,
+                            onPressed: () {},
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: _sendMessage,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: const BoxDecoration(
+                        gradient: AppColors.primaryGradient,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.send_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: TextField(
-                    controller: _composerController,
-                    minLines: 1,
-                    maxLines: 5,
-                    style: AppTextStyles.bodyMedium,
-                    decoration: InputDecoration(
-                      hintText: 'Write a message...',
-                      hintStyle: AppTextStyles.bodyMedium.copyWith(
-                        color: Colors.grey.shade500,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 10,
-                      ),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      suffixIcon: IconButton(
-                        icon: const Icon(
-                          Icons.emoji_emotions_outlined,
-                          size: 22,
-                        ),
-                        color: Colors.grey.shade500,
-                        onPressed: () {},
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              GestureDetector(
-                onTap: _sendMessage,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: const BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.send_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
       ],
     );
@@ -2070,6 +2148,176 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildImageMessageCard(String text, bool isMine) {
+    final path = text.replaceFirst('[IMAGE:', '').replaceFirst(']', '').trim();
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        constraints: const BoxConstraints(
+          maxWidth: 250,
+          maxHeight: 200,
+        ),
+        child: SafeNetworkImage(
+          imageUrl: path,
+          defaultBucket: 'uploads',
+          fit: BoxFit.cover,
+          placeholder: Container(
+            width: 200,
+            height: 150,
+            color: Colors.grey.shade100,
+            child: const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: AppShimmerLoader(strokeWidth: 2),
+              ),
+            ),
+          ),
+          errorWidget: Container(
+            width: 200,
+            height: 150,
+            color: Colors.grey.shade100,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.broken_image_rounded,
+                  size: 32,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Failed to load image',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndSendImage() async {
+    final conversationId = _selectedConversationId;
+    if (conversationId == null) return;
+
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+      );
+      if (image == null) return;
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              ),
+              SizedBox(width: 16),
+              Text('Uploading image...'),
+            ],
+          ),
+          duration: Duration(days: 1),
+        ),
+      );
+
+      final bytes = await image.readAsBytes();
+      final path = 'chat_attachments/$conversationId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      
+      final relativePath = await SupabaseDatabase.uploadImage(
+        bucket: 'uploads',
+        path: path,
+        localPath: kIsWeb ? null : image.path,
+        bytes: bytes,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      if (relativePath == null) {
+        throw Exception('Failed to upload image.');
+      }
+
+      await _messageService.sendMessage(
+        conversationId: conversationId,
+        messageText: '[IMAGE:$relativePath]',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send image: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildQuickReplies() {
+    final replies = [
+      'Sure, the order is confirmed!',
+      'We are packing your items now.',
+      'Your order is ready for pick-up.',
+      'We will ship this tomorrow morning.',
+      'Thank you for supporting our local farm!',
+    ];
+
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(
+          dragDevices: {
+            PointerDeviceKind.touch,
+            PointerDeviceKind.mouse,
+            PointerDeviceKind.trackpad,
+          },
+        ),
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          itemCount: replies.length,
+          itemBuilder: (context, index) {
+            final reply = replies[index];
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ActionChip(
+                label: Text(
+                  reply,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+                backgroundColor: AppColors.primaryLight.withValues(alpha: 0.5),
+                side: BorderSide.none,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                onPressed: () {
+                  _composerController.text = reply;
+                  _sendMessage();
+                },
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }

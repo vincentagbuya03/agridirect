@@ -123,6 +123,7 @@ class ForumService {
     required String title,
     required String body,
     String? imageUrl,
+    String? videoUrl,
   }) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
@@ -138,6 +139,7 @@ class ForumService {
             'title': title,
             'body': body,
             'image_url': imageUrl,
+            'video_url': videoUrl,
           })
           .select()
           .single();
@@ -163,7 +165,7 @@ class ForumService {
 
       return ForumPost.fromJson(response);
     } catch (e) {
-      throw Exception('Failed to create post: \$e');
+      throw Exception('Failed to create post: $e');
     }
   }
 
@@ -173,18 +175,24 @@ class ForumService {
     String? title,
     String? body,
     String? imageUrl,
+    String? videoUrl,
   }) async {
     try {
       final response = await _supabase
           .from('forum_posts')
-          .update({'title': ?title, 'body': ?body, 'image_url': ?imageUrl})
+          .update({
+            'title': ?title,
+            'body': ?body,
+            'image_url': ?imageUrl,
+            'video_url': ?videoUrl,
+          })
           .eq('post_id', postId)
           .select()
           .single();
 
       return ForumPost.fromJson(response);
     } catch (e) {
-      throw Exception('Failed to update post: \$e');
+      throw Exception('Failed to update post: $e');
     }
   }
 

@@ -14,6 +14,7 @@ class ForumPost {
   final String title;
   final String body;
   final String? imageUrl;
+  final String? videoUrl;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -29,6 +30,7 @@ class ForumPost {
     required this.title,
     required this.body,
     this.imageUrl,
+    this.videoUrl,
     required this.createdAt,
     required this.updatedAt,
     this.authorName,
@@ -44,6 +46,7 @@ class ForumPost {
       'title': json['title'],
       'body': json['body'],
       'imageUrl': json['imageUrl'] ?? json['image_url'],
+      'videoUrl': json['videoUrl'] ?? json['video_url'],
       'createdAt': json['createdAt'] ?? json['created_at'],
       'updatedAt':
           json['updatedAt'] ?? json['updated_at'] ?? json['created_at'],
@@ -62,6 +65,7 @@ class ForumPost {
     String? title,
     String? body,
     String? imageUrl,
+    String? videoUrl,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? authorName,
@@ -75,6 +79,7 @@ class ForumPost {
       title: title ?? this.title,
       body: body ?? this.body,
       imageUrl: imageUrl ?? this.imageUrl,
+      videoUrl: videoUrl ?? this.videoUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       authorName: authorName ?? this.authorName,

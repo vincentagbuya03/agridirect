@@ -35,25 +35,28 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
 
   Future<void> _openEditor([UserAddress? address]) async {
     final isMobile = MediaQuery.of(context).size.width <= 800;
-    final result = isMobile
-        ? await showModalBottomSheet<UserAddress>(
-            context: context,
-            isScrollControlled: true,
-            useRootNavigator: true,
-            backgroundColor: Colors.transparent,
-            builder: (context) => AddressEditorSheet(initialAddress: address),
-          )
-        : await showDialog<UserAddress>(
-            context: context,
-            builder: (context) => Dialog(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 620),
-                child: AddressEditorSheet(initialAddress: address, isDialog: true),
-              ),
-            ),
-          );
+    UserAddress? result;
+    if (isMobile) {
+      result = await showModalBottomSheet<UserAddress>(
+        context: context,
+        isScrollControlled: true,
+        useRootNavigator: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => AddressEditorSheet(initialAddress: address),
+      );
+    } else {
+      result = await showDialog<UserAddress>(
+        context: context,
+        builder: (context) => Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: AddressEditorSheet(initialAddress: address, isDialog: true),
+          ),
+        ),
+      );
+    }
 
     if (result != null) {
       await _loadAddresses();

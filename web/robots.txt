@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Allow: /web-welcome
+Allow: /marketplace
+Allow: /shop
+Allow: /community
+
+# Host
+Host: https://agridirect-app.vercel.app
+
+# Sitemap
+Sitemap: https://agridirect-app.vercel.app/sitemap.xml

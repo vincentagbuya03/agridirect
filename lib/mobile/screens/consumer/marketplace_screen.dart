@@ -1875,32 +1875,36 @@ class _AddressEditorSheetState extends State<AddressEditorSheet> {
 
   Future<void> _openLocationPicker() async {
     final isMobile = MediaQuery.of(context).size.width <= 800;
-    final res = isMobile
-        ? await showModalBottomSheet<Map<String, dynamic>>(
-            context: context,
-            isScrollControlled: true,
-            useRootNavigator: true,
-            backgroundColor: Colors.transparent,
-            builder: (context) => const LocationPickerSheet(),
-          )
-        : await showDialog<Map<String, dynamic>>(
-            context: context,
-            builder: (context) => Dialog(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 750, maxHeight: 600),
-                child: const LocationPickerSheet(isDialog: true),
-              ),
-            ),
-          );
+    Map<String, dynamic>? res;
+    if (isMobile) {
+      res = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        isScrollControlled: true,
+        useRootNavigator: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => const LocationPickerSheet(),
+      );
+    } else {
+      res = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 750, maxHeight: 600),
+            child: const LocationPickerSheet(isDialog: true),
+          ),
+        ),
+      );
+    }
 
-    if (res != null && mounted) {
+    final actualRes = res;
+    if (actualRes != null && mounted) {
       setState(() {
-        _latitude = res['lat'];
-        _longitude = res['lng'];
-        if (res['address'] != null) {
-          final ResolvedFarmLocation a = res['address'];
+        _latitude = actualRes['lat'];
+        _longitude = actualRes['lng'];
+        if (actualRes['address'] != null) {
+          final ResolvedFarmLocation a = actualRes['address'];
           _streetController.text = a.street;
           _barangayController.text = a.barangay;
           _cityController.text = a.city;
@@ -2222,7 +2226,7 @@ class _AddressEditorSheetState extends State<AddressEditorSheet> {
               ),
               value: _isDefault,
               onChanged: (v) => setState(() => _isDefault = v),
-              activeColor: AppColors.primary,
+              activeTrackColor: AppColors.primary,
             ),
           ),
           const SizedBox(height: 24),

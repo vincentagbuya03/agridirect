@@ -7,6 +7,10 @@ import '../../widgets/animated_components.dart';
 import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/models/order/order_model.dart';
 import '../../../mobile/screens/farmer/farmer_order_details_screen.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../widgets/web_consumer_nav_bar.dart';
+import 'package:go_router/go_router.dart';
+import '../../../shared/router/app_routes.dart';
 
 class WebFarmerOrders extends StatefulWidget {
   final Function(int) onNavigate;
@@ -52,6 +56,9 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+
     return Scaffold(
       backgroundColor: _surface,
       body: Stack(
@@ -66,14 +73,14 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
               _buildNavBar(),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(40, 0, 40, 40),
+                  padding: EdgeInsets.fromLTRB(isMobile ? 16 : 40, 0, isMobile ? 16 : 40, 40),
                   child: FadeTransition(
                     opacity: _fadeInController,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildHeader(),
-                        const SizedBox(height: 32),
+                        SizedBox(height: isMobile ? 20 : 32),
                         _buildOrderTable(),
                       ],
                     ),
@@ -88,19 +95,38 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
   }
 
   Widget _buildNavBar() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+
+    if (!AuthService().isViewingAsFarmer) {
+      return WebConsumerNavBar(
+        currentIndex: widget.currentIndex,
+        onNavigate: widget.onNavigate,
+        onCartTap: () => context.go(AppRoutes.cart),
+        margin: isMobile
+            ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
+            : const EdgeInsets.fromLTRB(32, 24, 32, 12),
+      );
+    }
+
     final navItems = ['Dashboard', 'Products', 'Orders', 'Community'];
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+      margin: isMobile
+          ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
+          : const EdgeInsets.fromLTRB(32, 24, 32, 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 28,
+        vertical: isMobile ? 12 : 14,
+      ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: _border.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            color: _dark.withValues(alpha: 0.03),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -110,129 +136,243 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               onTap: () => widget.onNavigate(0),
-              child: const BrandLogo(size: BrandLogoSize.medium),
+              child: BrandLogo(
+                size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium,
+              ),
             ),
           ),
-          const SizedBox(width: 48),
-          ...List.generate(navItems.length, (i) {
-            final isActive = i == widget.currentIndex;
-            final isHovered = _hoveredNav == i;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                onEnter: (_) => setState(() => _hoveredNav = i),
-                onExit: (_) => setState(() => _hoveredNav = -1),
-                child: GestureDetector(
-                  onTap: () => widget.onNavigate(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: isActive
-                          ? _primary.withValues(alpha: 0.1)
-                          : isHovered
-                              ? _border.withValues(alpha: 0.5)
-                              : Colors.transparent,
-                    ),
-                    child: Text(
-                      navItems[i],
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                        color: isActive ? _primary : isHovered ? _dark : _muted,
+          if (!isMobile) ...[
+            const SizedBox(width: 48),
+            ...List.generate(navItems.length, (i) {
+              final isActive = i == widget.currentIndex;
+              final isHovered = _hoveredNav == i;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  onEnter: (_) => setState(() => _hoveredNav = i),
+                  onExit: (_) => setState(() => _hoveredNav = -1),
+                  child: GestureDetector(
+                    onTap: () => widget.onNavigate(i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        color: isActive
+                            ? _primary.withValues(alpha: 0.1)
+                            : isHovered
+                            ? _border.withValues(alpha: 0.35)
+                            : Colors.transparent,
+                      ),
+                      child: Text(
+                        navItems[i],
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: isActive
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: isActive
+                              ? _primary
+                              : isHovered
+                              ? _dark
+                              : _muted,
+                          letterSpacing: 0.2,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            );
-          }),
+              );
+            }),
+          ],
           const Spacer(),
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               onTap: () => widget.onNavigate(4),
               child: Container(
-                width: 44,
-                height: 44,
+                width: isMobile ? 38 : 46,
+                height: isMobile ? 38 : 46,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
+                  gradient: const LinearGradient(
+                    colors: [_primary, Color(0xFF059669)],
+                  ),
                   shape: BoxShape.circle,
-                  border: Border.all(color: _primary, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _primary.withValues(alpha: 0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                child: const Icon(Icons.person_rounded, color: _primary, size: 22),
+                child: Icon(
+                  Icons.person_outline_rounded,
+                  color: Colors.white,
+                  size: isMobile ? 20 : 24,
+                ),
               ),
             ),
           ),
+          if (isMobile) ...[
+            const SizedBox(width: 8),
+            PopupMenuButton<int>(
+              icon: const Icon(Icons.menu, color: _primary),
+              tooltip: '',
+              onSelected: (index) {
+                widget.onNavigate(index);
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 0,
+                  child: Row(
+                    children: [
+                      Icon(Icons.dashboard_rounded, color: widget.currentIndex == 0 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Dashboard', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 0 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 1,
+                  child: Row(
+                    children: [
+                      Icon(Icons.agriculture_rounded, color: widget.currentIndex == 1 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Products', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 1 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 2,
+                  child: Row(
+                    children: [
+                      Icon(Icons.receipt_long_rounded, color: widget.currentIndex == 2 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Orders', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 2 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 3,
+                  child: Row(
+                    children: [
+                      Icon(Icons.people_rounded, color: widget.currentIndex == 3 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Community', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 3 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 4,
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_rounded, color: widget.currentIndex == 4 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Profile', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 4 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildHeader() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+
+    final title = Text(
+      'Order Management',
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: isMobile ? 24 : 32,
+        fontWeight: FontWeight.w800,
+        color: _dark,
+      ),
+    );
+
+    final statusFiltersList = SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: List.generate(_statusFilters.length, (index) {
+          final status = _statusFilters[index];
+          final isSelected = _selectedStatus == status;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(status),
+              selected: isSelected,
+              onSelected: (val) => setState(() => _selectedStatus = status),
+              selectedColor: _primary.withValues(alpha: 0.1),
+              labelStyle: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? _primary : _muted,
+              ),
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(color: isSelected ? _primary : _border),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              showCheckmark: false,
+            ),
+          );
+        }),
+      ),
+    );
+
+    final searchField = Container(
+      width: isMobile ? double.infinity : 300,
+      height: 44,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _border),
+      ),
+      child: TextField(
+        onChanged: (val) => setState(() => _searchQuery = val),
+        decoration: InputDecoration(
+          hintText: 'Search order ID, customer...',
+          hintStyle: GoogleFonts.inter(color: _muted, fontSize: 13),
+          prefixIcon: const Icon(Icons.search_rounded, color: _muted, size: 18),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        ),
+      ),
+    );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          title,
+          const SizedBox(height: 20),
+          statusFiltersList,
+          const SizedBox(height: 16),
+          searchField,
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Order Management',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 32,
-            fontWeight: FontWeight.w800,
-            color: _dark,
-          ),
-        ),
+        title,
         const SizedBox(height: 24),
         Row(
           children: [
-            // Status filters
-            ...List.generate(_statusFilters.length, (index) {
-              final status = _statusFilters[index];
-              final isSelected = _selectedStatus == status;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(status),
-                  selected: isSelected,
-                  onSelected: (val) => setState(() => _selectedStatus = status),
-                  selectedColor: _primary.withValues(alpha: 0.1),
-                  labelStyle: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? _primary : _muted,
-                  ),
-                  backgroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    side: BorderSide(color: isSelected ? _primary : _border),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  showCheckmark: false,
-                ),
-              );
-            }),
-            const Spacer(),
-            // Search
-            Container(
-              width: 300,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _border),
-              ),
-              child: TextField(
-                onChanged: (val) => setState(() => _searchQuery = val),
-                decoration: InputDecoration(
-                  hintText: 'Search order ID, customer...',
-                  hintStyle: GoogleFonts.inter(color: _muted, fontSize: 13),
-                  prefixIcon: const Icon(Icons.search_rounded, color: _muted, size: 18),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                ),
-              ),
-            ),
+            Expanded(child: statusFiltersList),
+            const SizedBox(width: 16),
+            searchField,
           ],
         ),
       ],
@@ -286,24 +426,27 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
             );
           }
 
-          return Theme(
-            data: Theme.of(context).copyWith(dividerColor: _border.withValues(alpha: 0.5)),
-            child: DataTable(
-              headingRowHeight: 64,
-              dataRowMinHeight: 72,
-              dataRowMaxHeight: 72,
-              horizontalMargin: 24,
-              columnSpacing: 24,
-              columns: [
-                _buildColumn('Order ID'),
-                _buildColumn('Date'),
-                _buildColumn('Customer'),
-                _buildColumn('Items'),
-                _buildColumn('Total'),
-                _buildColumn('Status'),
-                _buildColumn('Actions'),
-              ],
-              rows: orders.map((o) => _buildDataRow(o)).toList(),
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Theme(
+              data: Theme.of(context).copyWith(dividerColor: _border.withValues(alpha: 0.5)),
+              child: DataTable(
+                headingRowHeight: 64,
+                dataRowMinHeight: 72,
+                dataRowMaxHeight: 72,
+                horizontalMargin: 24,
+                columnSpacing: 24,
+                columns: [
+                  _buildColumn('Order ID'),
+                  _buildColumn('Date'),
+                  _buildColumn('Customer'),
+                  _buildColumn('Items'),
+                  _buildColumn('Total'),
+                  _buildColumn('Status'),
+                  _buildColumn('Actions'),
+                ],
+                rows: orders.map((o) => _buildDataRow(o)).toList(),
+              ),
             ),
           );
         },

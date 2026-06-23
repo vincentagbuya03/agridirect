@@ -36,11 +36,16 @@ import '../../web/screens/consumer/web_product_details.dart';
 import '../../web/screens/consumer/web_preorder_hub.dart';
 import '../../web/screens/consumer/web_checkout_screen.dart';
 import '../../web/screens/consumer/web_cart_checkout_screen.dart';
+import '../../web/screens/consumer/web_order_success_screen.dart';
 import '../../web/screens/admin/admin_dashboard_redesigned.dart';
 import '../../web/screens/common/web_welcome_screen.dart';
 import '../screens/messages/messages_screen.dart';
 import '../../mobile/screens/common/loading_screen.dart';
 import '../../mobile/screens/consumer/orders_screen.dart';
+import '../../mobile/screens/farmer/farmer_order_details_screen.dart';
+import '../models/order/order_model.dart';
+import '../services/commerce/order_service.dart';
+import '../styles/app_theme.dart';
 
 import '../data/app_data.dart';
 import 'app_routes.dart';
@@ -65,7 +70,7 @@ GoRouter createAppRouter() {
       // Use View.of for a more stable width check that doesn't trigger loops
       final view = View.of(context);
       final width = view.physicalSize.width / view.devicePixelRatio;
-      final isMobile = width <= 800;
+      final isMobile = !kIsWeb && (width <= 800);
 
       // debugPrint('🔀 Router Redirect: [${isMobile ? "MOBILE" : "WEB"}] location=$location isLoggedIn=$isLoggedIn admin=$isAdmin needsProfile=${auth.needsProfileCompletion}');
 
@@ -206,7 +211,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.home,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return WebNavigation(
                 initialIndex: 0,
                 onLogout: () async {
@@ -230,7 +235,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.marketplace,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return WebNavigation(
                 initialIndex: 0,
                 onLogout: () async {
@@ -256,7 +261,7 @@ GoRouter createAppRouter() {
               state.uri.queryParameters['mode'] == 'preorders';
           return LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return WebNavigation(
                 initialIndex: 1,
                 showPreOrdersInShop: showPreOrders,
@@ -281,7 +286,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.community,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return WebNavigation(
                 initialIndex: AuthService().isViewingAsFarmer ? 3 : 2,
                 onLogout: () async {
@@ -304,7 +309,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.profile,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return WebNavigation(
                 initialIndex: AuthService().isViewingAsFarmer ? 4 : 3,
                 onLogout: () async {
@@ -327,7 +332,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.cart,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return const WebCartScreen();
             }
             return const CartScreen();
@@ -338,7 +343,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.preorders,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return WebPreOrderHub(
                 currentIndex: 1,
                 onNavigate: (index) => context.go(AppRoutes.webTabRoute(index)),
@@ -352,7 +357,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.farmerDashboard,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return WebNavigation(
                 initialIndex: 0,
                 onLogout: () async {
@@ -460,7 +465,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.loading,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            final isMobile = constraints.maxWidth <= 800;
+            final isMobile = !kIsWeb && (constraints.maxWidth <= 800);
             final auth = AuthService();
 
             if (!isMobile) {
@@ -512,7 +517,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.login,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return Scaffold(
                 body: Center(
                   child: WebLoginScreen(
@@ -533,7 +538,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.register,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return Scaffold(
                 body: Center(
                   child: WebRegistrationScreen(
@@ -604,7 +609,7 @@ GoRouter createAppRouter() {
                 ? state.extra as ProductItem
                 : null;
 
-            if (constraints.maxWidth <= 800) {
+            if (!kIsWeb && constraints.maxWidth <= 800) {
               return PreOrderDetailsScreen(initialProduct: product);
             }
 
@@ -620,7 +625,7 @@ GoRouter createAppRouter() {
                 ? state.extra as ProductItem
                 : null;
 
-            if (constraints.maxWidth <= 800) {
+            if (!kIsWeb && constraints.maxWidth <= 800) {
               if (product == null) {
                 return const Scaffold(
                   body: Center(child: Text('Product not found')),
@@ -664,8 +669,52 @@ GoRouter createAppRouter() {
         builder: (context, state) => const WebCartCheckoutScreen(),
       ),
       GoRoute(
+        path: AppRoutes.orderSuccess,
+        builder: (context, state) {
+          final categoryName = state.extra as String?;
+          return WebOrderSuccessScreen(categoryName: categoryName);
+        },
+      ),
+      GoRoute(
         path: AppRoutes.customerOrders,
         builder: (context, state) => const OrdersScreen(),
+      ),
+      GoRoute(
+        path: '/orders/:orderId',
+        builder: (context, state) {
+          final orderId = state.pathParameters['orderId'] ?? '';
+          return OrdersScreen(initialOrderId: orderId);
+        },
+      ),
+      GoRoute(
+        path: '/farmer/orders/:orderId',
+        builder: (context, state) {
+          final orderId = state.pathParameters['orderId'] ?? '';
+          return FutureBuilder<Order?>(
+            future: OrderService().getOrderById(orderId),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                  body: Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  ),
+                );
+              }
+              final order = snapshot.data;
+              if (order == null) {
+                return Scaffold(
+                  appBar: AppBar(
+                    title: const Text('Order Details'),
+                  ),
+                  body: const Center(
+                    child: Text('Order not found'),
+                  ),
+                );
+              }
+              return FarmerOrderDetailsScreen(order: order);
+            },
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.addressBook,

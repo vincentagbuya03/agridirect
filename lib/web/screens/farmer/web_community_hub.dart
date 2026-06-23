@@ -16,6 +16,7 @@ import '../../widgets/web_consumer_nav_bar.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../../shared/screens/article_detail_screen.dart';
 import '../../../shared/widgets/post_detail_dialog.dart';
+import '../../../shared/widgets/forum_video_player.dart';
 
 /// Web-only Community Hub — two-column layout with sidebar.
 /// Completely separate UI from the mobile community hub.
@@ -108,8 +109,26 @@ class _WebCommunityHubState extends State<WebCommunityHub>
     super.dispose();
   }
 
+  /// Navigate to the public profile of a farmer by their user_id.
+  /// Looks up the farmer_id from the farmers table, then routes to /farm/:farmerId.
+  Future<void> _navigateToFarmerProfile(String? userId) async {
+    if (userId == null || userId.isEmpty) return;
+    final farmerId = await SupabaseDataService().getFarmerIdByUserId(userId);
+    if (!mounted) return;
+    if (farmerId != null && farmerId.isNotEmpty) {
+      context.push(AppRoutes.farmerProfile(farmerId));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This user does not have a public farm profile.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final showSidebar = sw >= 850;
+
     return Scaffold(
       backgroundColor: _surface,
       body: Stack(
@@ -143,7 +162,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     // Main content
                     Expanded(flex: 3, child: _buildMainContent()),
                     // Right sidebar
-                    SizedBox(width: 320, child: _buildRightSidebar()),
+                    if (showSidebar)
+                      SizedBox(width: 320, child: _buildRightSidebar()),
                   ],
                 ),
               ),
@@ -151,59 +171,71 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           ),
         ],
       ),
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: AgriColors.primaryGradient,
-          boxShadow: [
-            BoxShadow(
-              color: AgriColors.emerald500.withValues(alpha: 0.3),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: FloatingActionButton.extended(
-          onPressed: () async {
-            final result = await showDialog<bool>(
-              context: context,
-              builder: (context) => const CreatePostDialog(),
-            );
-            if (result == true && mounted) {
-              _refreshForumPosts();
-            }
-          },
-          backgroundColor: Colors.transparent,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          icon: const Icon(Icons.edit_rounded, size: 20),
-          label: Text(
-            'New Post',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-      ),
+      floatingActionButton: AuthService().isSeller
+          ? Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: AgriColors.primaryGradient,
+                boxShadow: [
+                  BoxShadow(
+                    color: AgriColors.emerald500.withValues(alpha: 0.3),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: FloatingActionButton.extended(
+                onPressed: () async {
+                  final result = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => const CreatePostDialog(),
+                  );
+                  if (result == true && mounted) {
+                    _refreshForumPosts();
+                  }
+                },
+                backgroundColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                icon: const Icon(Icons.edit_rounded, size: 20),
+                label: Text(
+                  'New Post',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            )
+          : null,
     );
   }
 
   // ─── Site Header (consistent across all pages) ───
   Widget _buildNavBar() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+
     if (!AuthService().isViewingAsFarmer) {
       return WebConsumerNavBar(
         currentIndex: widget.currentIndex,
         onNavigate: widget.onNavigate,
         onCartTap: () => context.go(AppRoutes.cart),
-        margin: const EdgeInsets.fromLTRB(32, 24, 32, 12),
+        margin: isMobile
+            ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
+            : const EdgeInsets.fromLTRB(32, 24, 32, 12),
       );
     }
 
     final navItems = ['Dashboard', 'Products', 'Orders', 'Community'];
     return Container(
-      margin: const EdgeInsets.fromLTRB(32, 24, 32, 12),
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+      margin: isMobile
+          ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
+          : const EdgeInsets.fromLTRB(32, 24, 32, 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 28,
+        vertical: isMobile ? 12 : 14,
+      ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(24),
@@ -223,56 +255,60 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               onTap: () => widget.onNavigate(0),
-              child: const BrandLogo(size: BrandLogoSize.medium),
+              child: BrandLogo(
+                size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium,
+              ),
             ),
           ),
-          const SizedBox(width: 48),
-          // Nav items
-          ...List.generate(navItems.length, (i) {
-            final isActive = i == widget.currentIndex;
-            final isHovered = _hoveredNav == i;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                onEnter: (_) => setState(() => _hoveredNav = i),
-                onExit: (_) => setState(() => _hoveredNav = -1),
-                child: GestureDetector(
-                  onTap: () => widget.onNavigate(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      color: isActive
-                          ? _primary.withValues(alpha: 0.1)
-                          : isHovered
-                          ? _border.withValues(alpha: 0.3)
-                          : Colors.transparent,
-                    ),
-                    child: Text(
-                      navItems[i],
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: isActive
-                            ? FontWeight.w700
-                            : FontWeight.w500,
+          if (!isMobile) ...[
+            const SizedBox(width: 48),
+            // Nav items
+            ...List.generate(navItems.length, (i) {
+              final isActive = i == widget.currentIndex;
+              final isHovered = _hoveredNav == i;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  onEnter: (_) => setState(() => _hoveredNav = i),
+                  onExit: (_) => setState(() => _hoveredNav = -1),
+                  child: GestureDetector(
+                    onTap: () => widget.onNavigate(i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
                         color: isActive
-                            ? _primary
+                            ? _primary.withValues(alpha: 0.1)
                             : isHovered
-                            ? _dark
-                            : _muted,
-                        letterSpacing: 0.2,
+                            ? _border.withValues(alpha: 0.35)
+                            : Colors.transparent,
+                      ),
+                      child: Text(
+                        navItems[i],
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: isActive
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: isActive
+                              ? _primary
+                              : isHovered
+                              ? _dark
+                              : _muted,
+                          letterSpacing: 0.2,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            );
-          }),
+              );
+            }),
+          ],
           const Spacer(),
           // Circle person icon
           MouseRegion(
@@ -280,8 +316,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             child: GestureDetector(
               onTap: () => widget.onNavigate(4), // Profile is index 4
               child: Container(
-                width: 46,
-                height: 46,
+                width: isMobile ? 38 : 46,
+                height: isMobile ? 38 : 46,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [_primary, Color(0xFF059669)],
@@ -295,14 +331,76 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     ),
                   ],
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.person_outline_rounded,
                   color: Colors.white,
-                  size: 24,
+                  size: isMobile ? 20 : 24,
                 ),
               ),
             ),
           ),
+          if (isMobile) ...[
+            const SizedBox(width: 8),
+            PopupMenuButton<int>(
+              icon: const Icon(Icons.menu, color: _primary),
+              tooltip: '',
+              onSelected: (index) {
+                widget.onNavigate(index);
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 0,
+                  child: Row(
+                    children: [
+                      Icon(Icons.dashboard_rounded, color: widget.currentIndex == 0 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Dashboard', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 0 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 1,
+                  child: Row(
+                    children: [
+                      Icon(Icons.agriculture_rounded, color: widget.currentIndex == 1 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Products', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 1 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 2,
+                  child: Row(
+                    children: [
+                      Icon(Icons.receipt_long_rounded, color: widget.currentIndex == 2 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Orders', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 2 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 3,
+                  child: Row(
+                    children: [
+                      Icon(Icons.people_rounded, color: widget.currentIndex == 3 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Community', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 3 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 4,
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_rounded, color: widget.currentIndex == 4 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Profile', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 4 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -310,6 +408,91 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
   // ─── Top Bar ───
   Widget _buildTopBar() {
+    final sw = MediaQuery.of(context).size.width;
+    final isCompact = sw < 750;
+
+    if (isCompact) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: _border)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Community Hub',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _dark,
+                  ),
+                ),
+                const Spacer(),
+                // Tabs
+                Container(
+                  decoration: BoxDecoration(
+                    color: _surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _border),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    isScrollable: true,
+                    labelColor: _primary,
+                    unselectedLabelColor: _muted,
+                    indicatorSize: TabBarIndicatorSize.label,
+                    indicatorColor: _primary,
+                    indicatorWeight: 2,
+                    labelStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    dividerColor: Colors.transparent,
+                    tabAlignment: TabAlignment.center,
+                    tabs: const [
+                      Tab(text: 'Forum'),
+                      Tab(text: 'Articles'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Search
+            Container(
+              height: 40,
+              decoration: BoxDecoration(
+                color: _surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _border),
+              ),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search topics, pests, crops...',
+                  hintStyle: TextStyle(color: _muted, fontSize: 13),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: _muted,
+                    size: 18,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
       decoration: BoxDecoration(
@@ -412,6 +595,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildForumFeed() {
+    final sw = MediaQuery.of(context).size.width;
+    final padding = sw < 600 ? const EdgeInsets.all(16) : const EdgeInsets.all(32);
+
     return FutureBuilder<List<ForumPostItem>>(
       future: _forumPostsFuture,
       builder: (context, snapshot) {
@@ -435,27 +621,42 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           if (mounted) _syncPostControllers(posts.length);
         });
 
+        final showCreateCard = AuthService().isSeller;
         return ListView.builder(
-          padding: const EdgeInsets.all(32),
-          itemCount: posts.length + 1,
+          padding: padding,
+          itemCount: posts.length + (showCreateCard ? 1 : 0),
           itemBuilder: (context, i) {
-            if (i == 0) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 24),
-                child: _buildFacebookCreatePostCard(),
-              );
-            }
-            final postIndex = i - 1;
-            if (postIndex < _postControllers.length) {
+            if (showCreateCard) {
+              if (i == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  child: _buildFacebookCreatePostCard(),
+                );
+              }
+              final postIndex = i - 1;
+              if (postIndex < _postControllers.length) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: _buildAnimatedForumCard(postIndex, posts[postIndex]),
+                );
+              }
               return Padding(
                 padding: const EdgeInsets.only(bottom: 20),
-                child: _buildAnimatedForumCard(postIndex, posts[postIndex]),
+                child: _buildForumCard(posts[postIndex]),
+              );
+            } else {
+              final postIndex = i;
+              if (postIndex < _postControllers.length) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: _buildAnimatedForumCard(postIndex, posts[postIndex]),
+                );
+              }
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: _buildForumCard(posts[postIndex]),
               );
             }
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: _buildForumCard(posts[postIndex]),
-            );
           },
         );
       },
@@ -514,70 +715,80 @@ class _WebCommunityHubState extends State<WebCommunityHub>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-          // Author row
+          // Author row - clickable to visit farmer profile
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: _primary.withValues(alpha: 0.2), width: 1.5),
-                ),
-                child: ClipOval(
-                  child: SafeNetworkImage(
-                    imageUrl: post.authorAvatarUrl,
-                    defaultBucket: 'uploads',
-                    fit: BoxFit.cover,
-                    placeholder: Container(
-                      color: _primary.withValues(alpha: 0.1),
-                      child: Center(
-                        child: Text(
-                          post.userName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: _primary,
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => _navigateToFarmerProfile(post.userId),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: _primary.withValues(alpha: 0.2), width: 1.5),
+                        ),
+                        child: ClipOval(
+                          child: SafeNetworkImage(
+                            imageUrl: post.authorAvatarUrl,
+                            defaultBucket: 'uploads',
+                            fit: BoxFit.cover,
+                            placeholder: Container(
+                              color: _primary.withValues(alpha: 0.1),
+                              child: Center(
+                                child: Text(
+                                  post.userName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: _primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            errorWidget: Container(
+                              color: _primary.withValues(alpha: 0.1),
+                              child: Center(
+                                child: Text(
+                                  post.userName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: _primary,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    errorWidget: Container(
-                      color: _primary.withValues(alpha: 0.1),
-                      child: Center(
-                        child: Text(
-                          post.userName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: _primary,
+                      const SizedBox(width: 14),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            post.userName,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: _dark,
+                            ),
                           ),
-                        ),
+                          Text(
+                            post.time,
+                            style: TextStyle(fontSize: 12, color: _muted),
+                          ),
+                        ],
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      post.userName,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: _dark,
-                      ),
-                    ),
-                    Text(
-                      post.time,
-                      style: TextStyle(fontSize: 12, color: _muted),
-                    ),
-                  ],
-                ),
-              ),
+              const Spacer(),
               Container(
                 width: 32,
                 height: 32,
@@ -610,8 +821,28 @@ class _WebCommunityHubState extends State<WebCommunityHub>
               height: 1.5,
             ),
           ),
-          // Image - Constrained small picture
-          if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
+          // Video or Image display
+          if (post.videoUrl != null && post.videoUrl!.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _border.withValues(alpha: 0.8)),
+                color: const Color(0xFFF8FAFC),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(11),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxHeight: 340,
+                    ),
+                    child: ForumVideoPlayer(videoUrl: post.videoUrl!),
+                  ),
+                ),
+              ),
+            ),
+          ] else if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
             const SizedBox(height: 14),
             Container(
               decoration: BoxDecoration(
@@ -827,8 +1058,10 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             ],
           ),
           const Divider(height: 24, thickness: 1),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            alignment: WrapAlignment.spaceEvenly,
             children: [
               _buildCreatePostAction(
                 icon: Icons.photo_library_rounded,
@@ -910,6 +1143,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildArticlesFeed() {
+    final sw = MediaQuery.of(context).size.width;
+    final padding = sw < 600 ? const EdgeInsets.all(16) : const EdgeInsets.all(32);
+
     return FutureBuilder<List<ArticleItem>>(
       future: SupabaseDataService().getArticles(),
       builder: (context, snapshot) {
@@ -929,7 +1165,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(32),
+          padding: padding,
           itemCount: articles.length,
           itemBuilder: (context, i) => Padding(
             padding: const EdgeInsets.only(bottom: 20),
@@ -941,6 +1177,73 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildArticleCard(ArticleItem article) {
+    final sw = MediaQuery.of(context).size.width;
+    final isSmall = sw < 600;
+
+    Widget content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 4,
+          ),
+          decoration: BoxDecoration(
+            color: _primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            'FEATURED ARTICLE',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: _primary,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          article.title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: _dark,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          article.excerpt,
+          style: TextStyle(fontSize: 13, color: _muted, height: 1.4),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Text(
+              'By ${article.author}',
+              style: TextStyle(fontSize: 12, color: _muted),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _muted,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              article.readTime,
+              style: TextStyle(fontSize: 12, color: _muted),
+            ),
+          ],
+        ),
+      ],
+    );
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -958,97 +1261,59 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: _border),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: isSmall
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'FEATURED ARTICLE',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: _primary,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      article.title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: _dark,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      article.excerpt,
-                      style: TextStyle(fontSize: 13, color: _muted, height: 1.4),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Text(
-                          'By ${article.author}',
-                          style: TextStyle(fontSize: 12, color: _muted),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 4,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: _muted,
-                            shape: BoxShape.circle,
+                    if (article.imageUrl != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: CachedNetworkImage(
+                          imageUrl: article.imageUrl!,
+                          height: 180,
+                          fit: BoxFit.cover,
+                          placeholder: (ctx, url) => Container(
+                            height: 180,
+                            color: Colors.grey[100],
+                          ),
+                          errorWidget: (ctx, url, err) => Container(
+                            height: 180,
+                            color: Colors.grey[100],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          article.readTime,
-                          style: TextStyle(fontSize: 12, color: _muted),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    content,
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(child: content),
+                    if (article.imageUrl != null) ...[
+                      const SizedBox(width: 20),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: CachedNetworkImage(
+                          imageUrl: article.imageUrl!,
+                          width: 120,
+                          height: 90,
+                          fit: BoxFit.cover,
+                          placeholder: (ctx, url) => Container(
+                            width: 120,
+                            height: 90,
+                            color: Colors.grey[100],
+                          ),
+                          errorWidget: (ctx, url, err) => Container(
+                            width: 120,
+                            height: 90,
+                            color: Colors.grey[100],
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ],
                 ),
-              ),
-              if (article.imageUrl != null) ...[
-                const SizedBox(width: 20),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: CachedNetworkImage(
-                    imageUrl: article.imageUrl!,
-                    width: 120,
-                    height: 90,
-                    fit: BoxFit.cover,
-                    placeholder: (ctx, url) => Container(
-                      width: 120,
-                      height: 90,
-                      color: Colors.grey[100],
-                    ),
-                    errorWidget: (ctx, url, err) => Container(
-                      width: 120,
-                      height: 90,
-                      color: Colors.grey[100],
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
         ),
       ),
     );

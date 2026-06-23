@@ -979,6 +979,10 @@ class _WebProductDetailsState extends State<WebProductDetails> {
   Widget _buildMoreFromFarmerSection() {
     if (_moreFromFarmer.isEmpty) return const SizedBox.shrink();
 
+    final sw = MediaQuery.of(context).size.width;
+    final crossCount = sw < 600 ? 2 : (sw < 900 ? 3 : 4);
+    final aspect = sw < 600 ? 0.76 : 0.82;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -994,13 +998,13 @@ class _WebProductDetailsState extends State<WebProductDetails> {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossCount,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 0.82,
+            childAspectRatio: aspect,
           ),
-          itemCount: _moreFromFarmer.length.clamp(0, 4),
+          itemCount: _moreFromFarmer.length.clamp(0, crossCount),
           itemBuilder: (context, index) {
             final item = _moreFromFarmer[index];
             return MouseRegion(

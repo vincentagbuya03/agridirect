@@ -10,6 +10,7 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../../shared/widgets/brand_logo.dart';
+import '../../widgets/web_consumer_nav_bar.dart';
 
 // Web Profile screen.
 /// Shows user info, "Start Selling" button, and account settings.
@@ -260,6 +261,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   @override
   Widget build(BuildContext context) {
     final auth = AuthService();
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       body: Column(
@@ -267,7 +271,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           _buildNavBar(),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
+              padding: EdgeInsets.all(isMobile ? 16 : 32),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 860),
@@ -291,16 +295,24 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       const SizedBox(height: 32),
 
                       // Top row: profile card + seller card
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Profile card
-                          Expanded(flex: 3, child: _buildProfileCard(auth)),
-                          const SizedBox(width: 24),
-                          // Seller card
-                          Expanded(flex: 4, child: _buildSellerCard(auth)),
-                        ],
-                      ),
+                      isMobile
+                          ? Column(
+                              children: [
+                                _buildProfileCard(auth),
+                                const SizedBox(height: 24),
+                                _buildSellerCard(auth),
+                              ],
+                            )
+                          : Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Profile card
+                                Expanded(flex: 3, child: _buildProfileCard(auth)),
+                                const SizedBox(width: 24),
+                                // Seller card
+                                Expanded(flex: 4, child: _buildSellerCard(auth)),
+                              ],
+                            ),
                       const SizedBox(height: 24),
 
                       // Settings grid
@@ -363,101 +375,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
 
   // ─── Navigation Bar ───
   Widget _buildNavBar() {
-    final auth = AuthService();
-    final navItems = auth.isViewingAsFarmer
-        ? ['Dashboard', 'Products', 'Orders', 'Community']
-        : ['Home', 'Shop', 'Community'];
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _border.withValues(alpha: 0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Logo with pulsing glow
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(0),
-              child: const BrandLogo(size: BrandLogoSize.medium),
-            ),
-          ),
-          const SizedBox(width: 48),
-          // Nav items
-          ...List.generate(navItems.length, (i) {
-            final isActive = i == widget.currentIndex;
-            final isHovered = _hoveredNav == i;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                onEnter: (_) => setState(() => _hoveredNav = i),
-                onExit: (_) => setState(() => _hoveredNav = -1),
-                child: GestureDetector(
-                  onTap: () => widget.onNavigate(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: isActive
-                          ? primary.withValues(alpha: 0.1)
-                          : isHovered
-                          ? _border.withValues(alpha: 0.5)
-                          : Colors.transparent,
-                    ),
-                    child: Text(
-                      navItems[i],
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: isActive
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                        color: isActive
-                            ? primary
-                            : isHovered
-                            ? _dark
-                            : _muted,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
-          const Spacer(),
-          // Circle person icon (active — profile page)
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(auth.isViewingAsFarmer ? 4 : 3),
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: primary, width: 1.5),
-                ),
-                child: Icon(Icons.person_rounded, color: primary, size: 22),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return WebConsumerNavBar(
+      currentIndex: widget.currentIndex,
+      onNavigate: widget.onNavigate,
+      onCartTap: () => context.go(AppRoutes.cart),
     );
   }
 
@@ -1029,12 +950,15 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       ),
     ];
 
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+
     return Wrap(
       spacing: 16,
       runSpacing: 16,
       children: items.map((item) {
         return SizedBox(
-          width: 260,
+          width: isMobile ? double.infinity : 260,
           child: MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(

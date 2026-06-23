@@ -99,16 +99,24 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   Widget _buildNavBar() {
     final navItems = ['Home', 'Shop', 'Community'];
     final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+
+    final navRoutes = [
+      '/shop',
+      '/shop',
+      '/community',
+    ];
+
     return FadeTransition(
       opacity: CurvedAnimation(parent: _navCtrl, curve: Curves.easeOut),
       child: Container(
         margin: EdgeInsets.symmetric(
-          horizontal: sw < 768 ? 12 : 32,
-          vertical: sw < 768 ? 8 : 16,
+          horizontal: isMobile ? 16 : 32,
+          vertical: isMobile ? 12 : 16,
         ),
         padding: EdgeInsets.symmetric(
-          horizontal: sw < 768 ? 14 : 28,
-          vertical: sw < 768 ? 10 : 14,
+          horizontal: isMobile ? 16 : 28,
+          vertical: isMobile ? 12 : 14,
         ),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.85),
@@ -128,55 +136,54 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
                 onTap: () => context.go('/shop'),
-                child: const BrandLogo(size: BrandLogoSize.medium),
+                child: BrandLogo(
+                  size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium,
+                ),
               ),
             ),
-            const SizedBox(width: 48),
-            // Nav items
-            ...List.generate(navItems.length, (i) {
-              final isHovered = _hoveredNav == i;
-              final navRoutes = [
-                '/shop',
-                '/shop',
-                '/community',
-              ]; // Home, Shop, Community
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  onEnter: (_) => setState(() => _hoveredNav = i),
-                  onExit: (_) => setState(() => _hoveredNav = -1),
-                  child: GestureDetector(
-                    onTap: () => context.go(navRoutes[i]),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: isHovered
-                            ? AgriColors.emerald50
-                            : Colors.transparent,
-                      ),
-                      child: Text(
-                        navItems[i],
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: isHovered
-                              ? FontWeight.w600
-                              : FontWeight.w500,
+            if (!isMobile) ...[
+              const SizedBox(width: 48),
+              // Nav items
+              ...List.generate(navItems.length, (i) {
+                final isHovered = _hoveredNav == i;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    onEnter: (_) => setState(() => _hoveredNav = i),
+                    onExit: (_) => setState(() => _hoveredNav = -1),
+                    child: GestureDetector(
+                      onTap: () => context.go(navRoutes[i]),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
                           color: isHovered
-                              ? AgriColors.emerald700
-                              : AgriColors.muted,
+                              ? AgriColors.emerald50
+                              : Colors.transparent,
+                        ),
+                        child: Text(
+                          navItems[i],
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: isHovered
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                            color: isHovered
+                                ? AgriColors.emerald700
+                                : AgriColors.muted,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ],
             const Spacer(),
             // Sign In / Person Icon Button
             MouseRegion(
@@ -184,8 +191,8 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               child: GestureDetector(
                 onTap: () => context.go('/login'),
                 child: Container(
-                  width: 44,
-                  height: 44,
+                  width: isMobile ? 38 : 44,
+                  height: isMobile ? 38 : 44,
                   decoration: BoxDecoration(
                     color: AgriColors.emerald50,
                     shape: BoxShape.circle,
@@ -194,14 +201,70 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       width: 1.5,
                     ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.person_rounded,
                     color: AgriColors.emerald600,
-                    size: 22,
+                    size: isMobile ? 18 : 22,
                   ),
                 ),
               ),
             ),
+            if (isMobile) ...[
+              const SizedBox(width: 8),
+              PopupMenuButton<int>(
+                icon: const Icon(Icons.menu, color: AgriColors.emerald600),
+                tooltip: '',
+                onSelected: (index) {
+                  if (index == 3) {
+                    context.go('/login');
+                  } else {
+                    context.go(navRoutes[index]);
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 0,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.home_rounded, color: AgriColors.muted, size: 20),
+                        const SizedBox(width: 8),
+                        Text('Home', style: GoogleFonts.inter()),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 1,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.shopping_bag_rounded, color: AgriColors.muted, size: 20),
+                        const SizedBox(width: 8),
+                        Text('Shop', style: GoogleFonts.inter()),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 2,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.people_rounded, color: AgriColors.muted, size: 20),
+                        const SizedBox(width: 8),
+                        Text('Community', style: GoogleFonts.inter()),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 3,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.login_rounded, color: AgriColors.muted, size: 20),
+                        const SizedBox(width: 8),
+                        Text('Sign In', style: GoogleFonts.inter()),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1853,6 +1916,34 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   }
 
   Widget _buildQrAndButtonDark({required bool isCompact}) {
+    final actionColumn = Column(
+      crossAxisAlignment: isCompact
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Get it for Android',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'AgriDirect APK v1.0.0\nSafe & Verified Scan',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: Colors.white.withValues(alpha: 0.5),
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 24),
+        _downloadButton(),
+      ],
+    );
+
     final content = [
       // Glassmorphic QR Card
       Container(
@@ -1922,36 +2013,8 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
         ),
       ),
       const SizedBox(width: 32, height: 32),
-      // Action Column
-      Flexible(
-        child: Column(
-          crossAxisAlignment: isCompact
-              ? CrossAxisAlignment.center
-              : CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Get it for Android',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'AgriDirect APK v1.0.0\nSafe & Verified Scan',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                color: Colors.white.withValues(alpha: 0.5),
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            _downloadButton(),
-          ],
-        ),
-      ),
+      // Action Column (Flexible on desktop only)
+      isCompact ? actionColumn : Flexible(child: actionColumn),
     ];
 
     return isCompact

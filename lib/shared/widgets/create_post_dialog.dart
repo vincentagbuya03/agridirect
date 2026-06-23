@@ -20,8 +20,24 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
   bool _isLoading = false;
-  XFile? _selectedImage;
+  XFile? _selectedMedia;
+  bool _isVideo = false;
   final _picker = ImagePicker();
+
+  bool get _selectedMediaIsVideo {
+    if (_selectedMedia == null) return false;
+    final name = _selectedMedia!.name.toLowerCase();
+    final path = _selectedMedia!.path.toLowerCase();
+    return _isVideo ||
+        name.endsWith('.mp4') ||
+        name.endsWith('.mov') ||
+        name.endsWith('.avi') ||
+        name.endsWith('.mkv') ||
+        name.endsWith('.webm') ||
+        name.endsWith('.3gp') ||
+        path.contains('.mp4') ||
+        path.contains('.mov');
+  }
 
   Future<void> _pickImage() async {
     try {
@@ -30,10 +46,30 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
         imageQuality: 70,
       );
       if (image != null) {
-        setState(() => _selectedImage = image);
+        setState(() {
+          _selectedMedia = image;
+          _isVideo = false;
+        });
       }
     } catch (e) {
       _showCustomSnackBar('Error picking image: $e', isError: true);
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    try {
+      final video = await _picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(minutes: 5),
+      );
+      if (video != null) {
+        setState(() {
+          _selectedMedia = video;
+          _isVideo = true;
+        });
+      }
+    } catch (e) {
+      _showCustomSnackBar('Error picking video: $e', isError: true);
     }
   }
 
@@ -57,12 +93,22 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
     setState(() => _isLoading = true);
     try {
       String? imageUrl;
-      if (_selectedImage != null) {
-        if (kIsWeb) {
-          final bytes = await _selectedImage!.readAsBytes();
-          imageUrl = await SupabaseDataService().uploadForumImage(bytes: bytes);
+      String? videoUrl;
+      if (_selectedMedia != null) {
+        if (_selectedMediaIsVideo) {
+          if (kIsWeb) {
+            final bytes = await _selectedMedia!.readAsBytes();
+            videoUrl = await SupabaseDataService().uploadForumVideo(bytes: bytes);
+          } else {
+            videoUrl = await SupabaseDataService().uploadForumVideo(localPath: _selectedMedia!.path);
+          }
         } else {
-          imageUrl = await SupabaseDataService().uploadForumImage(localPath: _selectedImage!.path);
+          if (kIsWeb) {
+            final bytes = await _selectedMedia!.readAsBytes();
+            imageUrl = await SupabaseDataService().uploadForumImage(bytes: bytes);
+          } else {
+            imageUrl = await SupabaseDataService().uploadForumImage(localPath: _selectedMedia!.path);
+          }
         }
       }
 
@@ -74,6 +120,7 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
           title: title,
           body: body,
           imageUrl: imageUrl,
+          videoUrl: videoUrl,
           likes: 0,
           comments: 0,
           isLiked: false,
@@ -290,8 +337,8 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Image attachment preview
-                    if (_selectedImage != null)
+                    // Media attachment preview
+                    if (_selectedMedia != null)
                       Stack(
                         children: [
                           Container(
@@ -303,16 +350,54 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(12),
-                              child: kIsWeb
-                                  ? Image.network(_selectedImage!.path, width: double.infinity, fit: BoxFit.cover)
-                                  : Image.file(File(_selectedImage!.path), width: double.infinity, fit: BoxFit.cover),
+                              child: _selectedMediaIsVideo
+                                  ? Container(
+                                      color: const Color(0xFFF8FAFC),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(
+                                            Icons.video_file_rounded,
+                                            color: AppColors.primary,
+                                            size: 56,
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                                            child: Text(
+                                              _selectedMedia!.name,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                                color: const Color(0xFF1E293B),
+                                              ),
+                                              textAlign: TextAlign.center,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'Video selected (Ready to upload)',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                              color: const Color(0xFF64748B),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : (kIsWeb
+                                      ? Image.network(_selectedMedia!.path, width: double.infinity, fit: BoxFit.cover)
+                                      : Image.file(File(_selectedMedia!.path), width: double.infinity, fit: BoxFit.cover)),
                             ),
                           ),
                           Positioned(
                             right: 10,
                             top: 10,
                             child: GestureDetector(
-                              onTap: () => setState(() => _selectedImage = null),
+                              onTap: () => setState(() => _selectedMedia = null),
                               child: Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
@@ -347,7 +432,12 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                           IconButton(
                             onPressed: _pickImage,
                             icon: const Icon(Icons.photo_library_rounded, color: Color(0xFF22C55E)),
-                            tooltip: 'Photo/video',
+                            tooltip: 'Photo',
+                          ),
+                          IconButton(
+                            onPressed: _pickVideo,
+                            icon: const Icon(Icons.video_library_rounded, color: Color(0xFFE11D48)),
+                            tooltip: 'Video',
                           ),
                           IconButton(
                             onPressed: () {},

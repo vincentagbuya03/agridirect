@@ -72,6 +72,7 @@ class ForumPostItem {
   final String title;
   final String body;
   final String? imageUrl;
+  final String? videoUrl;
   final int likes;
   final int comments;
   final bool isLiked;
@@ -86,6 +87,7 @@ class ForumPostItem {
     required this.title,
     required this.body,
     this.imageUrl,
+    this.videoUrl,
     required this.likes,
     required this.comments,
     required this.isLiked,

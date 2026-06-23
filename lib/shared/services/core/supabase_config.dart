@@ -88,7 +88,9 @@ class SupabaseConfig {
 
     try {
       final instance = Supabase.instance;
-      if (instance.client != null) {
+      // ignore: unnecessary_null_comparison
+      final client = instance.client;
+      if (client.rest.url.isNotEmpty) {
         _initialized = true;
         debugPrint('✅ Supabase already initialized (instance check)');
         return;

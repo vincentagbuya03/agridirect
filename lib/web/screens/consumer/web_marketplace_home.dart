@@ -145,9 +145,423 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
   // HERO — Animated dark emerald background (matches Welcome Screen)
   // ─────────────────────────────────────────────
   Widget _buildHero() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 750;
+
+    final leftContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Badge — gold accent (matches welcome screen)
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AgriColors.gold400.withValues(alpha: 0.2),
+                AgriColors.emerald400.withValues(alpha: 0.2),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: AgriColors.gold300.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  gradient: AgriColors.goldGradient,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AgriColors.gold400.withValues(
+                        alpha: 0.4,
+                      ),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'FARM-TO-TABLE MARKETPLACE',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AgriColors.gold200,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        // Headline
+        Text(
+          'Fresh From\nFarmers',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: isMobile ? 38 : 52,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+            height: 1.05,
+            letterSpacing: -1,
+          ),
+        ),
+        Text(
+          'To Your Table',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: isMobile ? 38 : 52,
+            fontWeight: FontWeight.w900,
+            color: AgriColors.emerald300,
+            height: 1.1,
+            letterSpacing: -1,
+          ),
+        ),
+        const SizedBox(height: 18),
+        SizedBox(
+          width: isMobile ? double.infinity : 420,
+          child: Text(
+            'Experience the true taste of nature with direct-from-farm produce delivered to your doorstep within 24 hours.',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              color: Colors.white.withValues(alpha: 0.8),
+              height: 1.7,
+            ),
+          ),
+        ),
+        const SizedBox(height: 30),
+        // Search bar
+        Container(
+          width: isMobile ? double.infinity : 440,
+          height: 50,
+          decoration: BoxDecoration(
+            color: _white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(left: 14),
+                child: Icon(
+                  Icons.search,
+                  color: _muted,
+                  size: 20,
+                ),
+              ),
+              Expanded(
+                child: TextField(
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: _dark,
+                  ),
+                  decoration: InputDecoration(
+                    hintText:
+                        'Search for fresh vegetables, fruits...',
+                    hintStyle: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: _muted,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                margin: const EdgeInsets.all(5),
+                child: GestureDetector(
+                  onTap: () => widget.onNavigate(1),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _primary,
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: Text(
+                        'Search',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    final rightContent = SizedBox(
+      height: 360,
+      width: double.infinity,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Gradient overlay for enhanced background effect
+          ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                  colors: [
+                    _primary.withValues(alpha: 0.15),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Main image card with animated background
+          ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: SizedBox(
+              height: 360,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // ── Animated background (from welcome screen) ──
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          _heroMint,
+                          const Color(0xFFD1FAE5),
+                        ],
+                      ),
+                    ),
+                  ),
+                  AnimatedBuilder(
+                    animation: _waveController,
+                    builder: (context, _) => CustomPaint(
+                      painter: AuroraGlowPainter(
+                        animationValue: _waveController.value,
+                      ),
+                    ),
+                  ),
+                  CustomPaint(
+                    painter: HexPatternPainter(
+                      opacity: 0.04,
+                      color: _primary,
+                    ),
+                  ),
+                  AnimatedBuilder(
+                    animation: _waveController,
+                    builder: (context, _) => CustomPaint(
+                      painter: BlobPainter(
+                        animationValue: _waveController.value,
+                        color: _primary.withValues(alpha: 0.15),
+                        center: const Offset(0.8, 0.2),
+                        radius: 180,
+                      ),
+                    ),
+                  ),
+                  AnimatedBuilder(
+                    animation: _waveController,
+                    builder: (context, _) => CustomPaint(
+                      painter: BlobPainter(
+                        animationValue: 1 - _waveController.value,
+                        color: const Color(
+                          0xFF34D399,
+                        ).withValues(alpha: 0.15),
+                        center: const Offset(0.2, 0.8),
+                        radius: 140,
+                      ),
+                    ),
+                  ),
+                  AnimatedBuilder(
+                    animation: _waveController,
+                    builder: (context, _) => CustomPaint(
+                      painter: RibbonPainter(
+                        animationValue: _waveController.value,
+                        color: _primary.withValues(alpha: 0.1),
+                        strokeWidth: 1.0,
+                      ),
+                    ),
+                  ),
+                  const FloatingParticles(
+                    count: 22,
+                    maxSize: 2.8,
+                    color: Color(0xFF16A34A),
+                    height: 360,
+                  ),
+                  // Wave at bottom of card
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 80,
+                    child: AnimatedBuilder(
+                      animation: _waveController,
+                      builder: (context, _) => CustomPaint(
+                        painter: WavePainter(
+                          animationValue: _waveController.value,
+                          color: Colors.white.withValues(
+                            alpha: 0.2,
+                          ),
+                          amplitude: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // ── Photo overlay (semi-transparent so animation shows) ──
+                  Opacity(
+                    opacity: 0.45,
+                    child: CachedNetworkImage(
+                      imageUrl:
+                          'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&q=80',
+                      height: 360,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      placeholder: (ctx, url) =>
+                          const SizedBox.shrink(),
+                      errorWidget: (ctx, url, err) =>
+                          const SizedBox.shrink(),
+                    ),
+                  ),
+                  // Gradient scrim so text/badge reads cleanly
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          _primary.withValues(alpha: 0.4),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Floating delivery badge
+          Positioned(
+            bottom: 20,
+            left: 20,
+            child: AnimatedBuilder(
+              animation: _floatingCtrl,
+              builder: (context, child) {
+                final offsetY = Tween<double>(begin: 0, end: -6)
+                    .evaluate(
+                      CurvedAnimation(
+                        parent: _floatingCtrl,
+                        curve: Curves.easeInOut,
+                      ),
+                    );
+                return Transform.translate(
+                  offset: Offset(0, offsetY),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    onEnter: (_) => setState(
+                      () => _hoveringDeliveryBadge = true,
+                    ),
+                    onExit: (_) => setState(
+                      () => _hoveringDeliveryBadge = false,
+                    ),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(
+                              alpha: _hoveringDeliveryBadge
+                                  ? 0.12
+                                  : 0.08,
+                            ),
+                            blurRadius: _hoveringDeliveryBadge
+                                ? 20
+                                : 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: _surface,
+                              borderRadius: BorderRadius.circular(
+                                8,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Fast Delivery',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: _dark,
+                                ),
+                              ),
+                              Text(
+                                'Under 24 hours',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: _muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+
     return Container(
       width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 640),
+      constraints: BoxConstraints(minHeight: isMobile ? 800 : 640),
       child: Stack(
         children: [
           // Background gradient — warm dark hero (same as welcome screen)
@@ -248,20 +662,20 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
           ),
 
           // Floating particles — mixed green + gold
-          const Positioned.fill(
+          Positioned.fill(
             child: FloatingParticles(
               count: 35,
               maxSize: 3.5,
-              color: Color(0xFF34D399),
-              height: 640,
+              color: const Color(0xFF34D399),
+              height: isMobile ? 800 : 640,
             ),
           ),
-          const Positioned.fill(
+          Positioned.fill(
             child: FloatingParticles(
               count: 6,
               maxSize: 2,
-              color: Color(0xFFFBBF24),
-              height: 640,
+              color: const Color(0xFFFBBF24),
+              height: isMobile ? 800 : 640,
             ),
           ),
 
@@ -305,434 +719,33 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
 
           // Content
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 60),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Left content
-                Expanded(
-                  flex: 5,
-                  child: Column(
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 24 : 64,
+              vertical: isMobile ? 32 : 60,
+            ),
+            child: isMobile
+                ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Badge — gold accent (matches welcome screen)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              AgriColors.gold400.withValues(alpha: 0.2),
-                              AgriColors.emerald400.withValues(alpha: 0.2),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(
-                            color: AgriColors.gold300.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                gradient: AgriColors.goldGradient,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AgriColors.gold400.withValues(
-                                      alpha: 0.4,
-                                    ),
-                                    blurRadius: 6,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'FARM-TO-TABLE MARKETPLACE',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AgriColors.gold200,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
-                          ],
-                        ),
+                      leftContent,
+                      const SizedBox(height: 36),
+                      rightContent,
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: leftContent,
                       ),
-                      const SizedBox(height: 20),
-                      // Headline
-                      Text(
-                        'Fresh From\nFarmers',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 52,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          height: 1.05,
-                          letterSpacing: -1,
-                        ),
-                      ),
-                      Text(
-                        'To Your Table',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 52,
-                          fontWeight: FontWeight.w900,
-                          color: AgriColors.emerald300,
-                          height: 1.1,
-                          letterSpacing: -1,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      SizedBox(
-                        width: 420,
-                        child: Text(
-                          'Experience the true taste of nature with direct-from-farm produce delivered to your doorstep within 24 hours.',
-                          style: GoogleFonts.inter(
-                            fontSize: 15,
-                            color: Colors.white.withValues(alpha: 0.8),
-                            height: 1.7,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-                      // Search bar
-                      Container(
-                        width: 440,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: _white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: _border),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            const Padding(
-                              padding: EdgeInsets.only(left: 14),
-                              child: Icon(
-                                Icons.search,
-                                color: _muted,
-                                size: 20,
-                              ),
-                            ),
-                            Expanded(
-                              child: TextField(
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  color: _dark,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText:
-                                      'Search for fresh vegetables, fruits...',
-                                  hintStyle: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    color: _muted,
-                                  ),
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              margin: const EdgeInsets.all(5),
-                              child: GestureDetector(
-                                onTap: () => widget.onNavigate(1),
-                                child: MouseRegion(
-                                  cursor: SystemMouseCursors.click,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
-                                      vertical: 9,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _primary,
-                                      borderRadius: BorderRadius.circular(7),
-                                    ),
-                                    child: Text(
-                                      'Search',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: _white,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                      const SizedBox(width: 48),
+                      Expanded(
+                        flex: 4,
+                        child: rightContent,
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 48),
-                // Right: Image card with floating badge & overlay
-                Expanded(
-                  flex: 4,
-                  child: SizedBox(
-                    height: 360,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        // Gradient overlay for enhanced background effect
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topRight,
-                                end: Alignment.bottomLeft,
-                                colors: [
-                                  _primary.withValues(alpha: 0.15),
-                                  Colors.transparent,
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Main image card with animated background
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
-                          child: SizedBox(
-                            height: 360,
-                            width: double.infinity,
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                // ── Animated background (from welcome screen) ──
-                                Container(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        _heroMint,
-                                        const Color(0xFFD1FAE5),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                AnimatedBuilder(
-                                  animation: _waveController,
-                                  builder: (context, _) => CustomPaint(
-                                    painter: AuroraGlowPainter(
-                                      animationValue: _waveController.value,
-                                    ),
-                                  ),
-                                ),
-                                CustomPaint(
-                                  painter: HexPatternPainter(
-                                    opacity: 0.04,
-                                    color: _primary,
-                                  ),
-                                ),
-                                AnimatedBuilder(
-                                  animation: _waveController,
-                                  builder: (context, _) => CustomPaint(
-                                    painter: BlobPainter(
-                                      animationValue: _waveController.value,
-                                      color: _primary.withValues(alpha: 0.15),
-                                      center: const Offset(0.8, 0.2),
-                                      radius: 180,
-                                    ),
-                                  ),
-                                ),
-                                AnimatedBuilder(
-                                  animation: _waveController,
-                                  builder: (context, _) => CustomPaint(
-                                    painter: BlobPainter(
-                                      animationValue: 1 - _waveController.value,
-                                      color: const Color(
-                                        0xFF34D399,
-                                      ).withValues(alpha: 0.15),
-                                      center: const Offset(0.2, 0.8),
-                                      radius: 140,
-                                    ),
-                                  ),
-                                ),
-                                AnimatedBuilder(
-                                  animation: _waveController,
-                                  builder: (context, _) => CustomPaint(
-                                    painter: RibbonPainter(
-                                      animationValue: _waveController.value,
-                                      color: _primary.withValues(alpha: 0.1),
-                                      strokeWidth: 1.0,
-                                    ),
-                                  ),
-                                ),
-                                const FloatingParticles(
-                                  count: 22,
-                                  maxSize: 2.8,
-                                  color: Color(0xFF16A34A),
-                                  height: 360,
-                                ),
-                                // Wave at bottom of card
-                                Positioned(
-                                  bottom: 0,
-                                  left: 0,
-                                  right: 0,
-                                  height: 80,
-                                  child: AnimatedBuilder(
-                                    animation: _waveController,
-                                    builder: (context, _) => CustomPaint(
-                                      painter: WavePainter(
-                                        animationValue: _waveController.value,
-                                        color: Colors.white.withValues(
-                                          alpha: 0.2,
-                                        ),
-                                        amplitude: 16,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                // ── Photo overlay (semi-transparent so animation shows) ──
-                                Opacity(
-                                  opacity: 0.45,
-                                  child: CachedNetworkImage(
-                                    imageUrl:
-                                        'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&q=80',
-                                    height: 360,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    placeholder: (ctx, url) =>
-                                        const SizedBox.shrink(),
-                                    errorWidget: (ctx, url, err) =>
-                                        const SizedBox.shrink(),
-                                  ),
-                                ),
-                                // Gradient scrim so text/badge reads cleanly
-                                Container(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        Colors.transparent,
-                                        _primary.withValues(alpha: 0.4),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        // Floating delivery badge
-                        Positioned(
-                          bottom: 20,
-                          left: 20,
-                          child: AnimatedBuilder(
-                            animation: _floatingCtrl,
-                            builder: (context, child) {
-                              final offsetY = Tween<double>(begin: 0, end: -6)
-                                  .evaluate(
-                                    CurvedAnimation(
-                                      parent: _floatingCtrl,
-                                      curve: Curves.easeInOut,
-                                    ),
-                                  );
-                              return Transform.translate(
-                                offset: Offset(0, offsetY),
-                                child: MouseRegion(
-                                  cursor: SystemMouseCursors.click,
-                                  onEnter: (_) => setState(
-                                    () => _hoveringDeliveryBadge = true,
-                                  ),
-                                  onExit: (_) => setState(
-                                    () => _hoveringDeliveryBadge = false,
-                                  ),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 10,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _white,
-                                      borderRadius: BorderRadius.circular(14),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(
-                                            alpha: _hoveringDeliveryBadge
-                                                ? 0.12
-                                                : 0.08,
-                                          ),
-                                          blurRadius: _hoveringDeliveryBadge
-                                              ? 20
-                                              : 12,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 34,
-                                          height: 34,
-                                          decoration: BoxDecoration(
-                                            color: _surface,
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                          child: const Icon(
-                                            Icons.local_shipping_rounded,
-                                            size: 17,
-                                            color: _primary,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              'Fast Delivery',
-                                              style: GoogleFonts.inter(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w700,
-                                                color: _dark,
-                                              ),
-                                            ),
-                                            Text(
-                                              'Under 24 hours',
-                                              style: GoogleFonts.inter(
-                                                fontSize: 11,
-                                                color: _muted,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -777,8 +790,10 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                   style: GoogleFonts.inter(color: _muted),
                 );
               }
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.center,
                 children: List.generate(cats.length.clamp(0, 5), (i) {
                   final cat = cats[i];
                   final isHovered = _hoveredCategories.contains(i);
@@ -1218,121 +1233,137 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
               final farmName = farmer['farm_name'] ?? 'AgriDirect Farm';
               final specialty = farmer['specialty'] ?? 'Organic Vegetables';
 
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Left: Orange warm card
-                  Container(
-                    width: 260,
-                    height: 280,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
+              final sw = MediaQuery.of(context).size.width;
+              final isMobile = sw < 750;
+
+              final leftSpotlight = Container(
+                width: 260,
+                height: 280,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 130,
+                        height: 130,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl:
+                                (farmer['user'] != null &&
+                                    farmer['user']['avatar_url'] != null)
+                                ? farmer['user']['avatar_url']
+                                : '',
+                            fit: BoxFit.cover,
+                            placeholder: (ctx, url) =>
+                                _buildSpotlightAvatarFallback(farmerName),
+                            errorWidget: (ctx, url, err) =>
+                                _buildSpotlightAvatarFallback(farmerName),
+                          ),
+                        ),
                       ),
                     ),
-                    child: Stack(
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 130,
-                            height: 130,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: ClipOval(
-                              child: CachedNetworkImage(
-                                imageUrl:
-                                    (farmer['user'] != null &&
-                                        farmer['user']['avatar_url'] != null)
-                                    ? farmer['user']['avatar_url']
-                                    : '',
-                                fit: BoxFit.cover,
-                                placeholder: (ctx, url) =>
-                                    _buildSpotlightAvatarFallback(farmerName),
-                                errorWidget: (ctx, url, err) =>
-                                    _buildSpotlightAvatarFallback(farmerName),
-                              ),
-                            ),
-                          ),
+                    Positioned(
+                      top: 16,
+                      right: 16,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: _primary,
+                          shape: BoxShape.circle,
                         ),
-                        Positioned(
-                          top: 16,
-                          right: 16,
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: _primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.verified_rounded,
-                              size: 17,
-                              color: Colors.white,
-                            ),
-                          ),
+                        child: const Icon(
+                          Icons.verified_rounded,
+                          size: 17,
+                          color: Colors.white,
                         ),
-                      ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+              final rightSpotlight = Column(
+                crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'FARMER SPOTLIGHT',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _primary,
+                      letterSpacing: 1.5,
                     ),
                   ),
-                  const SizedBox(width: 52),
-                  // Right: Content
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'FARMER SPOTLIGHT',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: _primary,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Meet $farmerName',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            color: _dark,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'The face behind $farmName. Specializing in $specialty, $farmerName is dedicated to providing the community with the freshest produce.',
-                          style: GoogleFonts.inter(
-                            fontSize: 15,
-                            color: _muted,
-                            height: 1.6,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: () => _openFarmerProfile(farmerId),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _dark,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 16,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Text('Visit $farmName'),
-                        ),
-                      ],
+                  const SizedBox(height: 12),
+                  Text(
+                    'Meet $farmerName',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
                     ),
+                    textAlign: isMobile ? TextAlign.center : TextAlign.start,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'The face behind $farmName. Specializing in $specialty, $farmerName is dedicated to providing the community with the freshest produce.',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      color: _muted,
+                      height: 1.6,
+                    ),
+                    textAlign: isMobile ? TextAlign.center : TextAlign.start,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => _openFarmerProfile(farmerId),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _dark,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text('Visit $farmName'),
                   ),
                 ],
               );
+
+              return isMobile
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        leftSpotlight,
+                        const SizedBox(height: 32),
+                        rightSpotlight,
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        leftSpotlight,
+                        const SizedBox(width: 52),
+                        Expanded(
+                          child: rightSpotlight,
+                        ),
+                      ],
+                    );
             },
           ),
         ),

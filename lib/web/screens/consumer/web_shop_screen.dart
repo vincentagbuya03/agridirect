@@ -512,7 +512,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '\₱0',
+                    '₱0',
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -1097,216 +1097,244 @@ class _WebShopScreenState extends State<WebShopScreen>
   }
 
   Widget _buildToolbar() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 750;
+
+    final titleColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Heading with gradient effect
-            ShaderMask(
-              shaderCallback: (bounds) => LinearGradient(
-                colors: [_dark, _primary],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ).createShader(bounds),
-              child: Text(
-                _selectedCategory == 'All'
-                    ? (_showPreOrders ? 'Upcoming Harvests' : "Today's Harvest")
-                    : _selectedCategory,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: -0.8,
-                ),
-              ),
+        // Heading with gradient effect
+        ShaderMask(
+          shaderCallback: (bounds) => LinearGradient(
+            colors: [_dark, _primary],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ).createShader(bounds),
+          child: Text(
+            _selectedCategory == 'All'
+                ? (_showPreOrders ? 'Upcoming Harvests' : "Today's Harvest")
+                : _selectedCategory,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              letterSpacing: -0.8,
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: _primary,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _showPreOrders
-                      ? '${_filteredProducts.length} pre-orders available'
-                      : '${_filteredProducts.length} fresh items available',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: _muted,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
+        const SizedBox(height: 8),
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(4),
+              width: 4,
+              height: 4,
               decoration: BoxDecoration(
-                color: _white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _border),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  _buildModeToggle(
-                    label: 'Available Now',
-                    isSelected: !_showPreOrders,
-                    onTap: () {
-                      if (_showPreOrders) {
-                        _setShopMode(false);
-                      }
-                    },
-                  ),
-                  _buildModeToggle(
-                    label: 'Pre-Orders',
-                    isSelected: _showPreOrders,
-                    onTap: () {
-                      if (!_showPreOrders) {
-                        _setShopMode(true);
-                      }
-                    },
-                  ),
-                ],
+                color: _primary,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(width: 14),
-            // Grid/List toggle with premium style
-            Container(
-              decoration: BoxDecoration(
-                color: _white,
-                borderRadius: BorderRadius.circular(11),
-                border: Border.all(color: _border),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isGridView = true),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: _isGridView
-                              ? _primaryLight
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        child: Icon(
-                          Icons.grid_view_rounded,
-                          size: 17,
-                          color: _isGridView ? _primary : _mutedLight,
-                        ),
-                      ),
-                    ),
-                  ),
-                  MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    child: GestureDetector(
-                      onTap: () => setState(() => _isGridView = false),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: !_isGridView
-                              ? _primaryLight
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        child: Icon(
-                          Icons.view_list_rounded,
-                          size: 17,
-                          color: !_isGridView ? _primary : _mutedLight,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 14),
-            // Sort dropdown with premium styling
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                color: _white,
-                borderRadius: BorderRadius.circular(11),
-                border: Border.all(color: _border),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.sort_rounded, size: 17, color: _muted),
-                  const SizedBox(width: 8),
-                  DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _sortBy,
-                      isDense: true,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _dark,
-                      ),
-                      items:
-                          [
-                                'Newest',
-                                'Price: Low to High',
-                                'Price: High to Low',
-                                'Popular',
-                              ]
-                              .map(
-                                (e) =>
-                                    DropdownMenuItem(value: e, child: Text(e)),
-                              )
-                              .toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => _sortBy = val);
-                          _filterProducts();
-                        }
-                      },
-                    ),
-                  ),
-                  Icon(Icons.unfold_more, size: 16, color: _muted),
-                ],
+            const SizedBox(width: 8),
+            Text(
+              _showPreOrders
+                  ? '${_filteredProducts.length} pre-orders available'
+                  : '${_filteredProducts.length} fresh items available',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: _muted,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
         ),
       ],
     );
+
+    final controls = [
+      // Available Now / Pre-orders switcher
+      Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: _white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildModeToggle(
+              label: 'Available Now',
+              isSelected: !_showPreOrders,
+              onTap: () {
+                if (_showPreOrders) {
+                  _setShopMode(false);
+                }
+              },
+            ),
+            _buildModeToggle(
+              label: 'Pre-Orders',
+              isSelected: _showPreOrders,
+              onTap: () {
+                if (!_showPreOrders) {
+                  _setShopMode(true);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+      // Grid/List toggle with premium style
+      Container(
+        decoration: BoxDecoration(
+          color: _white,
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: _border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => setState(() => _isGridView = true),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _isGridView
+                        ? _primaryLight
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(
+                    Icons.grid_view_rounded,
+                    size: 17,
+                    color: _isGridView ? _primary : _mutedLight,
+                  ),
+                ),
+              ),
+            ),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => setState(() => _isGridView = false),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: !_isGridView
+                        ? _primaryLight
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(
+                    Icons.view_list_rounded,
+                    size: 17,
+                    color: !_isGridView ? _primary : _mutedLight,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      // Sort dropdown with premium styling
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: _white,
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: _border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.sort_rounded, size: 17, color: _muted),
+            const SizedBox(width: 8),
+            DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _sortBy,
+                isDense: true,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _dark,
+                ),
+                items:
+                    [
+                          'Newest',
+                          'Price: Low to High',
+                          'Price: High to Low',
+                          'Popular',
+                        ]
+                        .map(
+                          (e) =>
+                              DropdownMenuItem(value: e, child: Text(e)),
+                        )
+                        .toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _sortBy = val);
+                    _filterProducts();
+                  }
+                },
+              ),
+            ),
+            Icon(Icons.unfold_more, size: 16, color: _muted),
+          ],
+        ),
+      ),
+    ];
+
+    return isMobile
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              titleColumn,
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: controls,
+              ),
+            ],
+          )
+        : Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              titleColumn,
+              Row(
+                children: [
+                  controls[0],
+                  const SizedBox(width: 14),
+                  controls[1],
+                  const SizedBox(width: 14),
+                  controls[2],
+                ],
+              ),
+            ],
+          );
   }
 
   Widget _buildModeToggle({

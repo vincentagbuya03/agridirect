@@ -36,13 +36,14 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
   Widget build(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
     final compact = sw < 900;
+    final isMobile = sw < 650;
     final navItems = const ['Home', 'Shop', 'Community'];
 
     return Container(
       margin: widget.margin,
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 16 : 28,
-        vertical: compact ? 12 : 14,
+        horizontal: compact ? 12 : 28,
+        vertical: compact ? 10 : 14,
       ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.92),
@@ -63,56 +64,60 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
             child: GestureDetector(
               onTap: () => widget.onNavigate(0),
               child: BrandLogo(
-                size: compact ? BrandLogoSize.small : BrandLogoSize.medium,
+                size: isMobile
+                    ? BrandLogoSize.small
+                    : (compact ? BrandLogoSize.small : BrandLogoSize.medium),
               ),
             ),
           ),
-          SizedBox(width: compact ? 20 : 48),
-          ...List.generate(navItems.length, (i) {
-            final isActive = i == widget.currentIndex;
-            final isHovered = _hoveredNav == i;
+          if (!isMobile) ...[
+            SizedBox(width: compact ? 12 : 48),
+            ...List.generate(navItems.length, (i) {
+              final isActive = i == widget.currentIndex;
+              final isHovered = _hoveredNav == i;
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                onEnter: (_) => setState(() => _hoveredNav = i),
-                onExit: (_) => setState(() => _hoveredNav = -1),
-                child: GestureDetector(
-                  onTap: () => widget.onNavigate(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: compact ? 12 : 16,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      color: isActive
-                          ? _primary.withValues(alpha: 0.1)
-                          : isHovered
-                          ? _border.withValues(alpha: 0.55)
-                          : Colors.transparent,
-                    ),
-                    child: Text(
-                      navItems[i],
-                      style: GoogleFonts.inter(
-                        fontSize: compact ? 13 : 14,
-                        fontWeight: isActive
-                            ? FontWeight.w700
-                            : FontWeight.w500,
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  onEnter: (_) => setState(() => _hoveredNav = i),
+                  onExit: (_) => setState(() => _hoveredNav = -1),
+                  child: GestureDetector(
+                    onTap: () => widget.onNavigate(i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: compact ? 10 : 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
                         color: isActive
-                            ? _primary
+                            ? _primary.withValues(alpha: 0.1)
                             : isHovered
-                            ? _dark
-                            : _muted,
+                            ? _border.withValues(alpha: 0.55)
+                            : Colors.transparent,
+                      ),
+                      child: Text(
+                        navItems[i],
+                        style: GoogleFonts.inter(
+                          fontSize: compact ? 12 : 14,
+                          fontWeight: isActive
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: isActive
+                              ? _primary
+                              : isHovered
+                              ? _dark
+                              : _muted,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            );
-          }),
+              );
+            }),
+          ],
           const Spacer(),
           ListenableBuilder(
             listenable: CartService(),
@@ -123,8 +128,8 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                 child: GestureDetector(
                   onTap: widget.onCartTap,
                   child: Container(
-                    width: compact ? 40 : 44,
-                    height: compact ? 40 : 44,
+                    width: compact ? 36 : 44,
+                    height: compact ? 36 : 44,
                     decoration: BoxDecoration(
                       color: widget.isCartActive
                           ? _primary.withValues(alpha: 0.12)
@@ -143,7 +148,7 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                           child: Icon(
                             Icons.shopping_cart_outlined,
                             color: widget.isCartActive ? _primary : _dark,
-                            size: 20,
+                            size: compact ? 18 : 20,
                           ),
                         ),
                         if (cartCount > 0)
@@ -152,8 +157,8 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                             right: -4,
                             child: Container(
                               constraints: const BoxConstraints(
-                                minWidth: 18,
-                                minHeight: 18,
+                                minWidth: 16,
+                                minHeight: 16,
                               ),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 4,
@@ -166,7 +171,7 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                                 child: Text(
                                   cartCount > 99 ? '99+' : '$cartCount',
                                   style: GoogleFonts.inter(
-                                    fontSize: 9,
+                                    fontSize: 8,
                                     fontWeight: FontWeight.w700,
                                     color: Colors.white,
                                   ),
@@ -181,27 +186,93 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
               );
             },
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               onTap: () => widget.onNavigate(3),
               child: Container(
-                width: compact ? 40 : 44,
-                height: compact ? 40 : 44,
+                width: compact ? 36 : 44,
+                height: compact ? 36 : 44,
                 decoration: BoxDecoration(
                   color: const Color(0xFFDCFCE7),
                   shape: BoxShape.circle,
                   border: Border.all(color: _primary, width: 1.5),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.person_rounded,
                   color: _primary,
-                  size: 22,
+                  size: compact ? 18 : 22,
                 ),
               ),
             ),
           ),
+          if (isMobile) ...[
+            const SizedBox(width: 8),
+            PopupMenuButton<int>(
+              icon: const Icon(Icons.menu, color: _primary),
+              tooltip: '',
+              onSelected: (index) {
+                if (index == 4) {
+                  if (widget.onCartTap != null) widget.onCartTap!();
+                } else {
+                  widget.onNavigate(index);
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 0,
+                  child: Row(
+                    children: [
+                      Icon(Icons.home_rounded, color: widget.currentIndex == 0 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Home', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 0 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 1,
+                  child: Row(
+                    children: [
+                      Icon(Icons.shopping_bag_rounded, color: widget.currentIndex == 1 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Shop', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 1 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 2,
+                  child: Row(
+                    children: [
+                      Icon(Icons.people_rounded, color: widget.currentIndex == 2 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Community', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 2 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 3,
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_rounded, color: widget.currentIndex == 3 ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Profile', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 3 ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 4,
+                  child: Row(
+                    children: [
+                      Icon(Icons.shopping_cart_rounded, color: widget.isCartActive ? _primary : _muted, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Cart', style: GoogleFonts.inter(fontWeight: widget.isCartActive ? FontWeight.bold : FontWeight.normal)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
