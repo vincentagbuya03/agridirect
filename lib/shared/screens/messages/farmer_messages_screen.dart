@@ -802,8 +802,27 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                             final isOnline = onlineUsers.contains(
                               conversation.otherUserId,
                             );
+                            if (isOnline) {
+                              return Text(
+                                'Active now',
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  color: AppColors.success,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              );
+                            }
+
+                            final lastActiveLocal = NotificationService().getLastActive(conversation.otherUserId);
+                            DateTime? lastActive = lastActiveLocal;
+                            if (lastActive == null && conversation.otherUpdatedAt != null) {
+                              lastActive = DateTime.tryParse(conversation.otherUpdatedAt!);
+                            }
+
+                            final statusText = lastActive != null ? _formatLastActive(lastActive) : 'Offline';
+
                             return Text(
-                              isOnline ? 'Active now' : 'Offline',
+                              statusText,
                               style: AppTextStyles.labelSmall.copyWith(
                                 color: AppColors.textSubtle,
                                 fontSize: 11,
@@ -1476,8 +1495,27 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                             final isOnline = onlineUsers.contains(
                               conversation.otherUserId,
                             );
+                            if (isOnline) {
+                              return Text(
+                                'Active now',
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  color: AppColors.success,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              );
+                            }
+
+                            final lastActiveLocal = NotificationService().getLastActive(conversation.otherUserId);
+                            DateTime? lastActive = lastActiveLocal;
+                            if (lastActive == null && conversation.otherUpdatedAt != null) {
+                              lastActive = DateTime.tryParse(conversation.otherUpdatedAt!);
+                            }
+
+                            final statusText = lastActive != null ? _formatLastActive(lastActive) : 'Offline';
+
                             return Text(
-                              isOnline ? 'Active now' : 'Offline',
+                              statusText,
                               style: AppTextStyles.labelSmall.copyWith(
                                 color: AppColors.textSubtle,
                                 fontSize: 11,
@@ -2419,6 +2457,22 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
         isIncoming: false,
       ),
     );
+  }
+
+  String _formatLastActive(DateTime dateTime) {
+    final difference = DateTime.now().difference(dateTime);
+    if (difference.inSeconds < 60) {
+      return 'Active just now';
+    } else if (difference.inMinutes < 60) {
+      final mins = difference.inMinutes;
+      return 'Active $mins min${mins > 1 ? \'s\' : \'\'} ago';
+    } else if (difference.inHours < 24) {
+      final hours = difference.inHours;
+      return 'Active $hours hr${hours > 1 ? \'s\' : \'\'} ago';
+    } else {
+      final days = difference.inDays;
+      return 'Active $days day${days > 1 ? \'s\' : \'\'} ago';
+    }
   }
 }
 

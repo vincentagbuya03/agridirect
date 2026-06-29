@@ -14,6 +14,7 @@ class MessageConversation {
     required this.lastMessage,
     required this.lastMessageAt,
     required this.unreadCount,
+    this.otherUpdatedAt,
   });
 
   final String conversationId;
@@ -24,6 +25,7 @@ class MessageConversation {
   final String lastMessage;
   final DateTime? lastMessageAt;
   final int unreadCount;
+  final String? otherUpdatedAt;
 }
 
 enum MessageStatus { sending, sent, error }
@@ -88,7 +90,7 @@ class MessageService {
           last_message_at,
           customer:customers (
             customer_id,
-            user:users (user_id, name, email, avatar_url)
+            user:users (user_id, name, email, avatar_url, updated_at)
           ),
           farmer:farmers (
             farmer_id,
@@ -96,7 +98,7 @@ class MessageService {
             farm_name,
             specialty,
             image_url,
-            user:users (user_id, name, email, avatar_url)
+            user:users (user_id, name, email, avatar_url, updated_at)
           )
         ''');
 
@@ -143,6 +145,7 @@ class MessageService {
       late String displayName;
       late String subtitle;
       String? avatarUrl;
+      String? otherUpdatedAt;
 
       if (asFarmer) {
         // We are the farmer, the "other" is the customer
@@ -155,6 +158,7 @@ class MessageService {
             : (userData?['email'] as String?) ?? 'Customer';
         subtitle = 'Customer';
         avatarUrl = userData?['avatar_url'] as String?;
+        otherUpdatedAt = userData?['updated_at'] as String?;
       } else {
         // We are the customer, the "other" is the farmer
         final farmerData = row['farmer'] as Map<String, dynamic>?;
@@ -168,6 +172,7 @@ class MessageService {
             ? farmerData!['specialty'].toString()
             : 'Farmer';
         avatarUrl = farmerData?['image_url'] as String?;
+        otherUpdatedAt = userData?['updated_at'] as String?;
       }
 
       final lastMessage = lastMessageByConversation[conversationId];
@@ -186,6 +191,7 @@ class MessageService {
         lastMessage: displayMessage,
         lastMessageAt: lastMessage?.createdAt,
         unreadCount: unreadCountByConversation[conversationId] ?? 0,
+        otherUpdatedAt: otherUpdatedAt,
       );
     }).toList();
   }

@@ -37,6 +37,12 @@ class NotificationService {
   RealtimeChannel? _presenceChannel;
   String? _activeConversationId;
   final ValueNotifier<Set<String>> onlineUsersNotifier = ValueNotifier({});
+  final Map<String, DateTime> _lastActiveCache = {};
+  Timer? _activeStatusTimer;
+
+  DateTime? getLastActive(String userId) {
+    return _lastActiveCache[userId];
+  }
 
   /// Call this when entering a chat screen to suppress notifications for that chat
   void setActiveConversation(String? conversationId) {
@@ -53,6 +59,10 @@ class NotificationService {
     if (_initialized) {
       return;
     }
+
+    // Always listen to auth changes and track presence (Web + Mobile support)
+    _listenToAuthChanges();
+    _startPresenceTracking();
 
     if (_isWeb) {
       _initialized = true;
@@ -89,10 +99,6 @@ class NotificationService {
     if (initialMessage != null) {
       await _handleNotificationTap(initialMessage);
     }
-
-    _listenToAuthChanges();
-    // _startMessageListener(); // Disabled to avoid double notifications with FCM
-    _startPresenceTracking();
 
     _initialized = true;
   }
@@ -252,6 +258,19 @@ class NotificationService {
     });
   }
 
+  Future<void> _updateMyLastActive() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+      await supabase.from('users').update({
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('user_id', userId);
+      debugPrint('🟢 Updated user last active timestamp in database.');
+    } catch (e) {
+      debugPrint('⚠️ Error updating user last active: $e');
+    }
+  }
+
   void _startPresenceTracking() {
     final user = supabase.auth.currentUser;
     if (user == null) return;
@@ -263,12 +282,14 @@ class NotificationService {
     _presenceChannel!.onPresenceSync((payload) {
       final state = _presenceChannel!.presenceState();
       final onlineIds = <String>{};
+      final now = DateTime.now();
       
       for (final presenceState in state) {
         for (final presence in presenceState.presences) {
           final userId = presence.payload['user_id']?.toString();
           if (userId != null) {
             onlineIds.add(userId);
+            _lastActiveCache[userId] = now;
           }
         }
       }
@@ -283,11 +304,19 @@ class NotificationService {
     _presenceChannel!.subscribe((status, error) async {
       if (status == RealtimeSubscribeStatus.subscribed) {
         await _presenceChannel!.track({'user_id': user.id});
+        await _updateMyLastActive();
+        // Periodically update last active timestamp in DB every 4 minutes
+        _activeStatusTimer?.cancel();
+        _activeStatusTimer = Timer.periodic(const Duration(minutes: 4), (timer) async {
+          await _updateMyLastActive();
+        });
       }
     });
   }
 
   void _stopPresenceTracking() {
+    _activeStatusTimer?.cancel();
+    _activeStatusTimer = null;
     _presenceChannel?.unsubscribe();
     _presenceChannel = null;
     onlineUsersNotifier.value = {};
