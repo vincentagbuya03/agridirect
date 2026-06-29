@@ -1020,7 +1020,7 @@ class _StatusSuccessOverlayState extends State<_StatusSuccessOverlay> with Singl
     return FadeTransition(
       opacity: _opacityAnimation,
       child: Container(
-        color: Colors.black.withOpacity(0.85),
+        color: Colors.black.withValues(alpha: 0.85),
         child: Center(
           child: ScaleTransition(
             scale: _scaleAnimation,

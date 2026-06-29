@@ -772,8 +772,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ? steps[currentStep] 
         : {'title': 'Cancelled', 'desc': 'Order cancelled', 'icon': Icons.cancel_rounded};
 
-    final statusColor = _getStatusColor(order.status);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -994,7 +992,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.textHeadline.withOpacity(0.06)),
+            border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.06)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1004,7 +1002,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.08),
+                      color: AppColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: const Icon(
@@ -1061,7 +1059,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             boxShadow: [
               BoxShadow(
                 color: (status == 'CANCELLED' ? Colors.red : Colors.blue)
-                    .withOpacity(0.25),
+                    .withValues(alpha: 0.25),
                 blurRadius: 15,
                 offset: const Offset(0, 8),
               ),
@@ -1075,7 +1073,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -1100,7 +1098,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       Text(
                         activeStep['desc'] as String,
                         style: GoogleFonts.inter(
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                           fontSize: 13,
                         ),
                       ),
@@ -1175,14 +1173,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.textHeadline.withOpacity(0.06)),
+                border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.06)),
               ),
               child: ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: items.length,
                 separatorBuilder: (context, index) => Divider(
-                  color: AppColors.textHeadline.withOpacity(0.05),
+                  color: AppColors.textHeadline.withValues(alpha: 0.05),
                   height: 24,
                 ),
                 itemBuilder: (context, index) {
@@ -1269,7 +1267,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.textHeadline.withOpacity(0.06)),
+            border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.06)),
           ),
           child: Column(
             children: [
@@ -1305,7 +1303,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 ],
               ),
               Divider(
-                color: AppColors.textHeadline.withOpacity(0.06),
+                color: AppColors.textHeadline.withValues(alpha: 0.06),
                 height: 24,
               ),
               Row(
@@ -1350,7 +1348,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.textHeadline.withOpacity(0.06)),
+              border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.06)),
             ),
             child: Row(
               children: [
@@ -1375,7 +1373,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
         const SizedBox(height: 32),
       ],
     );
-  }
   }
 
   Widget _buildTimeline(Order order) {
@@ -1530,7 +1527,7 @@ class _CircularProgressRing extends StatelessWidget {
               child: CircularProgressIndicator(
                 value: value / 100.0,
                 strokeWidth: 4,
-                backgroundColor: color.withOpacity(0.1),
+                backgroundColor: color.withValues(alpha: 0.1),
                 valueColor: AlwaysStoppedAnimation<Color>(color),
               ),
             ),
@@ -1574,7 +1571,7 @@ class _HorizontalProgressLine extends StatelessWidget {
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: isActive ? activeColor : inactiveColor.withOpacity(0.3),
+              color: isActive ? activeColor : inactiveColor.withValues(alpha: 0.3),
               shape: BoxShape.circle,
             ),
           );
@@ -1585,7 +1582,7 @@ class _HorizontalProgressLine extends StatelessWidget {
           return Expanded(
             child: Container(
               height: 2,
-              color: isActive ? activeColor : inactiveColor.withOpacity(0.15),
+              color: isActive ? activeColor : inactiveColor.withValues(alpha: 0.15),
             ),
           );
         }
