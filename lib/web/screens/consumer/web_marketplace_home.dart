@@ -1028,7 +1028,12 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                   child: CircularProgressIndicator(color: _primary),
                 );
               }
-              final products = snapshot.data ?? [];
+              final currentUserId = SupabaseConfig.currentUser?.id;
+              final products = (snapshot.data ?? []).where((p) {
+                final fId = p['farmer_id']?.toString() ?? p['farmer']?['farmer_id']?.toString();
+                return currentUserId == null || fId != currentUserId;
+              }).toList();
+
               if (products.isEmpty) {
                 return Text(
                   'No products available',

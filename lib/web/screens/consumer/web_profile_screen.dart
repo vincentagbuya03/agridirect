@@ -150,7 +150,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   child: GestureDetector(
                     onTap: () async {
                       Navigator.of(ctx).pop();
-                      final uri = Uri.parse('/AgriDirect-Installer.apk');
+                      final uri = Uri.parse(
+                          'https://github.com/vincentagbuya03/agridirect/releases/latest/download/AgriDirect-Installer.apk');
                       if (await canLaunchUrl(uri)) {
                         await launchUrl(uri, webOnlyWindowName: '_self');
                       } else {

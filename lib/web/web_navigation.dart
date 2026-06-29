@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../shared/services/auth/auth_service.dart';
+import '../shared/services/communication/call_service.dart';
 import '../shared/router/app_routes.dart';
+import '../shared/screens/messages/in_app_call_screen.dart';
+import '../shared/services/user/user_service.dart';
 import 'screens/consumer/web_marketplace_home.dart';
 import 'screens/consumer/web_shop_screen.dart';
 import 'screens/farmer/web_sales_dashboard.dart';
@@ -32,22 +35,69 @@ class _WebNavigationState extends State<WebNavigation> {
   late int _currentIndex;
   final _auth = AuthService();
   String? _selectedCategoryFilter;
+  bool _isShowingIncomingCall = false;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
     _auth.addListener(_onAuthChanged);
+    _subscribeToIncomingCalls();
   }
 
   @override
   void dispose() {
     _auth.removeListener(_onAuthChanged);
+    CallService().unsubscribeIncomingCalls();
     super.dispose();
   }
 
   void _onAuthChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    _subscribeToIncomingCalls();
+  }
+
+  void _subscribeToIncomingCalls() {
+    if (!_auth.isLoggedIn) return;
+
+    CallService().subscribeToIncomingCalls(
+      onIncomingCall: (callData) async {
+        if (!mounted || _isShowingIncomingCall) return;
+
+        final callerId = callData['caller_id']?.toString() ?? '';
+        String callerName = 'AgriDirect User';
+        String? avatarUrl;
+
+        try {
+          final profile = await UserService().getUserById(callerId);
+          if (profile != null) {
+            callerName = profile.name;
+            avatarUrl = profile.avatarUrl;
+          }
+        } catch (_) {}
+
+        if (!mounted) return;
+        _isShowingIncomingCall = true;
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          useRootNavigator: false,
+          builder: (dialogContext) => InAppCallScreen(
+            name: callerName,
+            avatarUrl: avatarUrl,
+            callId: callData['call_id']?.toString() ?? '',
+            channelName: callData['channel_name']?.toString() ?? '',
+            isVideo: callData['is_video'] == true,
+            isIncoming: true,
+          ),
+        );
+        _isShowingIncomingCall = false;
+      },
+      onCallUpdated: (callData) {
+        // InAppCallScreen owns call-status dismissal once the dialog is shown.
+      },
+    );
   }
 
   void _navigateTo(int index, [String? category]) {

@@ -6,6 +6,7 @@ import '../../../shared/data/app_data.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/commerce/cart_service.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../widgets/animated_components.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
@@ -169,8 +170,13 @@ class _WebShopScreenState extends State<WebShopScreen>
   }
 
   void _filterProducts() {
+    final currentUserId = SupabaseConfig.currentUser?.id;
     setState(() {
       _filteredProducts = _allProducts.where((p) {
+        if (currentUserId != null && p.farmerId == currentUserId) {
+          return false;
+        }
+
         final matchesCategory =
             _selectedCategory == 'All' ||
             (p.categoryName?.toLowerCase() == _selectedCategory.toLowerCase());

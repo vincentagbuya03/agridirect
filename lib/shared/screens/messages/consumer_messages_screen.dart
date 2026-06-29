@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
@@ -10,6 +11,8 @@ import 'package:agridirect/shared/router/app_routes.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
+import '../../services/communication/call_service.dart';
+import 'in_app_call_screen.dart';
 
 import '../../services/auth/auth_service.dart';
 import '../../services/core/supabase_config.dart';
@@ -838,6 +841,32 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                 ),
               ),
               IconButton(
+                onPressed: () => _showCallDialog(
+                  conversation.otherDisplayName,
+                  conversation.otherAvatarUrl,
+                  conversation.otherUserId,
+                  isVideo: false,
+                ),
+                icon: const Icon(
+                  Icons.phone_rounded,
+                  color: AppColors.accent,
+                ),
+                tooltip: 'Voice Call',
+              ),
+              IconButton(
+                onPressed: () => _showCallDialog(
+                  conversation.otherDisplayName,
+                  conversation.otherAvatarUrl,
+                  conversation.otherUserId,
+                  isVideo: true,
+                ),
+                icon: const Icon(
+                  Icons.videocam_rounded,
+                  color: AppColors.accent,
+                ),
+                tooltip: 'Video Call',
+              ),
+              IconButton(
                 onPressed: () => _showConversationInfo(conversation),
                 icon: const Icon(
                   Icons.info_outline_rounded,
@@ -1484,6 +1513,32 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                onPressed: () => _showCallDialog(
+                  conversation.otherDisplayName,
+                  conversation.otherAvatarUrl,
+                  conversation.otherUserId,
+                  isVideo: false,
+                ),
+                icon: const Icon(
+                  Icons.phone_rounded,
+                  color: AppColors.accent,
+                ),
+                tooltip: 'Voice Call',
+              ),
+              IconButton(
+                onPressed: () => _showCallDialog(
+                  conversation.otherDisplayName,
+                  conversation.otherAvatarUrl,
+                  conversation.otherUserId,
+                  isVideo: true,
+                ),
+                icon: const Icon(
+                  Icons.videocam_rounded,
+                  color: AppColors.accent,
+                ),
+                tooltip: 'Video Call',
               ),
               IconButton(
                 onPressed: () => _showConversationInfo(conversation),
@@ -2341,6 +2396,51 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _showCallDialog(String name, String? avatarUrl, String userId, {bool isVideo = false}) async {
+    final conversationId = _selectedConversationId;
+    if (conversationId == null) return;
+    
+    // Show a loading indicator while creating call in database
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator(color: Colors.green)),
+    );
+
+    final callRecord = await CallService().initiateCall(
+      conversationId: conversationId,
+      receiverId: userId,
+      isVideo: isVideo,
+    );
+
+    if (!mounted) return;
+    Navigator.of(context).pop(); // Dismiss loading indicator
+
+    if (callRecord == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to initiate call. Please try again.")),
+      );
+      return;
+    }
+
+    final callId = callRecord['call_id']?.toString() ?? '';
+    final channelName = callRecord['channel_name']?.toString() ?? '';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: false,
+      builder: (dialogContext) => InAppCallScreen(
+        name: name,
+        avatarUrl: avatarUrl,
+        callId: callId,
+        channelName: channelName,
+        isVideo: isVideo,
+        isIncoming: false,
       ),
     );
   }

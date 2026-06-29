@@ -503,51 +503,82 @@ class _WebProductDetailsState extends State<WebProductDetails> {
             ],
           ),
           const SizedBox(height: 32),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _addToCart,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _primary,
-                    side: BorderSide(color: _primary.withValues(alpha: 0.35)),
+          if (_product?.farmerId != null && _product?.farmerId == SupabaseConfig.currentUser?.id)
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50.withValues(alpha: 0.8),
                       borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Colors.amber.shade200),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.info_outline_rounded, color: Colors.amber),
+                        const SizedBox(width: 8),
+                        Text(
+                          'This is your product.',
+                          style: TextStyle(
+                            color: Colors.amber.shade900,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  icon: const Icon(Icons.shopping_cart_outlined),
-                  label: const Text(
-                    'Add to Cart',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () {
-                    context.push(
-                      AppRoutes.checkout,
-                      extra: {'product': _product, 'quantity': _quantity},
-                    );
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _primary,
-                    foregroundColor: _white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _addToCart,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _primary,
+                      side: BorderSide(color: _primary.withValues(alpha: 0.35)),
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    icon: const Icon(Icons.shopping_cart_outlined),
+                    label: const Text(
+                      'Add to Cart',
+                      style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
-                  child: const Text(
-                    'Buy Now',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      context.push(
+                        AppRoutes.checkout,
+                        extra: {'product': _product, 'quantity': _quantity},
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _primary,
+                      foregroundColor: _white,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    child: const Text(
+                      'Buy Now',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );

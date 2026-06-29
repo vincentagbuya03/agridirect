@@ -9,6 +9,9 @@ import '../../../shared/styles/app_theme.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_routes.dart';
+import '../../../shared/services/farmer/farmer_service.dart';
+import '../../../shared/models/farmer/farmer_profile_model.dart';
+
 
 class FarmerOrderDetailsScreen extends StatefulWidget {
   final Order order;
@@ -30,16 +33,28 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
   final OrderService _orderService = OrderService();
   List<OrderItem> _items = [];
   Map<String, dynamic>? _address;
+  FarmerProfile? _farmerProfile;
   bool _isLoading = true;
   late String _currentStatus;
 
-  final _steps = const [
-    {'title': 'Placed', 'desc': 'Order received', 'icon': Icons.assignment_turned_in_rounded},
-    {'title': 'Confirmed', 'desc': 'Order accepted', 'icon': Icons.check_circle_rounded},
-    {'title': 'Preparing', 'desc': 'Getting ready', 'icon': Icons.inventory_2_rounded},
-    {'title': 'Shipped', 'desc': 'On the way', 'icon': Icons.local_shipping_rounded},
-    {'title': 'Delivered', 'desc': 'Completed', 'icon': Icons.home_work_rounded},
-  ];
+  List<Map<String, dynamic>> get _steps {
+    final isCop = widget.order.paymentMethod?.toUpperCase() == 'COP';
+    return [
+      {'title': 'Placed', 'desc': 'Order received', 'icon': Icons.assignment_turned_in_rounded},
+      {'title': 'Confirmed', 'desc': 'Order accepted', 'icon': Icons.check_circle_rounded},
+      {'title': 'Preparing', 'desc': 'Getting ready', 'icon': Icons.inventory_2_rounded},
+      {
+        'title': isCop ? 'Ready for Pickup' : 'Shipped',
+        'desc': isCop ? 'Ready at farm' : 'On the way',
+        'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded
+      },
+      {
+        'title': isCop ? 'Picked Up' : 'Delivered',
+        'desc': 'Completed',
+        'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded
+      },
+    ];
+  }
 
   int get _currentStepIndex {
     switch (_currentStatus) {
@@ -67,13 +82,23 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
       if (widget.order.deliveryAddressId != null && widget.order.deliveryAddressId!.isNotEmpty) {
         address = await _orderService.getDeliveryAddress(widget.order.deliveryAddressId!);
       }
+      FarmerProfile? farmerProfile;
+      if (widget.order.farmerId.isNotEmpty) {
+        farmerProfile = await FarmerService().getFarmerProfileByFarmerId(widget.order.farmerId);
+      }
       if (mounted) {
-        setState(() { _items = items; _address = address; _isLoading = false; });
+        setState(() {
+          _items = items;
+          _address = address;
+          _farmerProfile = farmerProfile;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       debugPrint('Error loading order details: $e');
       if (mounted) setState(() => _isLoading = false);
     }
+
   }
 
   @override
@@ -526,42 +551,132 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
     if (_address == null) {
       final method = widget.order.paymentMethod?.toUpperCase() ?? '';
       final isPickup = method == 'COP';
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: isPickup
-              ? AppColors.primary.withValues(alpha: 0.05)
-              : Colors.orange.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isPickup
-                ? AppColors.primary.withValues(alpha: 0.15)
-                : Colors.orange.withValues(alpha: 0.15),
+      final isReadyForPickup = widget.order.status.toUpperCase() == 'SHIPPED';
+      final hasLocation = _farmerProfile?.location != null && _farmerProfile!.location!.isNotEmpty;
+      final lat = _farmerProfile?.farmLatitude;
+      final lng = _farmerProfile?.farmLongitude;
+      final shouldShowFarmAddress = isPickup && isReadyForPickup && hasLocation;
+
+      return Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: isPickup
+                  ? AppColors.primary.withValues(alpha: 0.05)
+                  : Colors.orange.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isPickup
+                    ? AppColors.primary.withValues(alpha: 0.15)
+                    : Colors.orange.withValues(alpha: 0.15),
+              ),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  isPickup ? Icons.store_rounded : Icons.location_off_rounded,
+                  color: isPickup ? AppColors.primary : Colors.orange,
+                  size: 36,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  isPickup ? 'Cash on Pickup' : 'Address Not Found',
+                  style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isPickup
+                      ? 'Customer will pick up from your farm location'
+                      : 'No delivery address ID associated with this order (check database v_orders view).',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                ),
+              ],
+            ),
           ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              isPickup ? Icons.store_rounded : Icons.location_off_rounded,
-              color: isPickup ? AppColors.primary : Colors.orange,
-              size: 36,
+          if (shouldShowFarmAddress) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Farm Pickup Address',
+                          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(_farmerProfile!.location!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
+                ],
+              ),
             ),
-            const SizedBox(height: 10),
-            Text(
-              isPickup ? 'Cash on Pickup' : 'Address Not Found',
-              style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              isPickup
-                  ? 'Customer will pick up from your farm location'
-                  : 'No delivery address ID associated with this order (check database v_orders view).',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
-            ),
+            if (lat != null && lng != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                key: ValueKey('farm_map_${lat}_$lng'),
+                height: 220,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.08)),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Stack(
+                    children: [
+                      FlutterMap(
+                        options: MapOptions(initialCenter: LatLng(lat, lng), initialZoom: 15),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.agridirect.app',
+                          ),
+                          MarkerLayer(markers: [
+                            Marker(
+                              point: LatLng(lat, lng), width: 80, height: 80,
+                              child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+                            ),
+                          ]),
+                        ],
+                      ),
+                      Positioned(
+                        bottom: 12, right: 12,
+                        child: FloatingActionButton.small(
+                          heroTag: 'farm_nav_btn',
+                          onPressed: () => _launchNavigation(lat, lng),
+                          backgroundColor: AppColors.primary,
+                          child: const Icon(Icons.navigation_rounded, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ],
-        ),
+        ],
       );
     }
 
@@ -725,12 +840,23 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
 
   // ── Status Update Sheet ──
   void _showStatusUpdateSheet() {
+    final isCop = widget.order.paymentMethod?.toUpperCase() == 'COP';
     final allStatuses = [
-      {'label': 'CONFIRMED', 'icon': Icons.check_circle_outline, 'color': Colors.blue},
-      {'label': 'PROCESSING', 'icon': Icons.loop_rounded, 'color': Colors.indigo},
-      {'label': 'SHIPPED', 'icon': Icons.local_shipping_outlined, 'color': Colors.deepPurple},
-      {'label': 'DELIVERED', 'icon': Icons.done_all_rounded, 'color': Colors.green},
-      {'label': 'CANCELLED', 'icon': Icons.cancel_outlined, 'color': Colors.red},
+      {'label': 'CONFIRMED', 'title': 'CONFIRMED', 'icon': Icons.check_circle_outline, 'color': Colors.blue},
+      {'label': 'PROCESSING', 'title': 'PROCESSING', 'icon': Icons.loop_rounded, 'color': Colors.indigo},
+      {
+        'label': 'SHIPPED',
+        'title': isCop ? 'READY FOR PICKUP' : 'SHIPPED',
+        'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_outlined,
+        'color': Colors.deepPurple
+      },
+      {
+        'label': 'DELIVERED',
+        'title': isCop ? 'COMPLETED PICKUP' : 'DELIVERED',
+        'icon': isCop ? Icons.done_all_rounded : Icons.done_all_rounded,
+        'color': Colors.green
+      },
+      {'label': 'CANCELLED', 'title': 'CANCELLED', 'icon': Icons.cancel_outlined, 'color': Colors.red},
     ];
 
     List<Map<String, dynamic>> allowedStatuses = [];
@@ -769,7 +895,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
             else
               ...allowedStatuses.map((s) => ListTile(
                 leading: Icon(s['icon'] as IconData, color: s['color'] as Color),
-                title: Text(s['label'] as String, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                title: Text(s['title'] as String, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 onTap: () async {
                   Navigator.pop(ctx);
@@ -778,7 +904,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                     if (mounted) {
                       setState(() => _currentStatus = (s['label'] as String).toUpperCase());
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Status updated to ${s['label']}'), backgroundColor: Colors.green),
+                        SnackBar(content: Text('Status updated to ${s['title']}'), backgroundColor: Colors.green),
                       );
                     }
                   } catch (e) {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
+import '../../../shared/router/app_routes.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/integration/weather_service.dart';
 import '../../../shared/models/weather_model.dart';
@@ -695,6 +697,14 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                           ],
                         ),
                       ),
+                      GestureDetector(
+                        onTap: () => context.push(AppRoutes.farmerMessages),
+                        child: _buildHeaderAction(
+                          Icons.chat_bubble_outline_rounded,
+                          false,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       _buildHeaderAction(
                         Icons.notifications_none_rounded,
                         true,

@@ -2,6 +2,9 @@
 import 'package:flutter/material.dart';
 import '../shared/services/auth/auth_service.dart';
 import '../shared/services/core/supabase_data_service.dart';
+import '../shared/services/communication/call_service.dart';
+import '../shared/services/user/user_service.dart';
+import '../shared/screens/messages/in_app_call_screen.dart';
 import 'screens/consumer/home_screen.dart';
 import 'screens/consumer/marketplace_screen.dart';
 import 'screens/consumer/preorder_hub_screen.dart';
@@ -39,6 +42,42 @@ class _MobileNavigationState extends State<MobileNavigation> {
     SupabaseDataService.navigationTabNotifier.addListener(_onExternalTabChange);
     // Sync initial state
     _currentIndex = SupabaseDataService.navigationTabNotifier.value;
+
+    // Subscribe to real-time incoming voice/video calls
+    CallService().subscribeToIncomingCalls(
+      onIncomingCall: (callData) async {
+        if (!mounted) return;
+        final callerId = callData['caller_id']?.toString() ?? '';
+        String callerName = 'AgriDirect User';
+        String? avatarUrl;
+
+        try {
+          final profile = await UserService().getUserById(callerId);
+          if (profile != null) {
+            callerName = profile.name;
+            avatarUrl = profile.avatarUrl;
+          }
+        } catch (_) {}
+
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          useRootNavigator: false,
+          builder: (dialogContext) => InAppCallScreen(
+            name: callerName,
+            avatarUrl: avatarUrl,
+            callId: callData['call_id']?.toString() ?? '',
+            channelName: callData['channel_name']?.toString() ?? '',
+            isVideo: callData['is_video'] == true,
+            isIncoming: true,
+          ),
+        );
+      },
+      onCallUpdated: (callData) {
+        // InAppCallScreen owns call-status dismissal once the dialog is shown.
+      },
+    );
   }
 
   void _onExternalTabChange() {
@@ -55,6 +94,7 @@ class _MobileNavigationState extends State<MobileNavigation> {
     SupabaseDataService.navigationTabNotifier.removeListener(
       _onExternalTabChange,
     );
+    CallService().unsubscribeIncomingCalls();
     super.dispose();
   }
 

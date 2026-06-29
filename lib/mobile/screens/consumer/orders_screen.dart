@@ -6,6 +6,9 @@ import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/models/order/order_model.dart';
 import '../../../shared/router/app_routes.dart';
 import 'package:agridirect/shared/widgets/image_widgets.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:agridirect/shared/services/farmer/farmer_service.dart';
+import 'package:agridirect/shared/models/farmer/farmer_profile_model.dart';
 
 /// Orders Screen - Professional Order Management (Responsive Web & Mobile)
 class OrdersScreen extends StatefulWidget {
@@ -638,19 +641,28 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: AppColors.textHeadline.withValues(alpha: 0.1),
+                InkWell(
+                  onTap: () {
+                    context.push(
+                      AppRoutes.customerMessages,
+                      extra: {'farmerId': order.farmerId},
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.textHeadline.withValues(alpha: 0.1),
+                      ),
                     ),
-                  ),
-                  child: const Icon(
-                    Icons.messenger_outline_rounded,
-                    size: 20,
-                    color: AppColors.textHeadline,
+                    child: const Icon(
+                      Icons.messenger_outline_rounded,
+                      size: 20,
+                      color: AppColors.textHeadline,
+                    ),
                   ),
                 ),
               ],
@@ -757,77 +769,174 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ),
         const SizedBox(height: 24),
 
-        // Farm Info Card
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.2),
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: order.farmerAvatarUrl != null && order.farmerAvatarUrl!.isNotEmpty
-                      ? SafeNetworkImage(
-                          imageUrl: order.farmerAvatarUrl,
-                          defaultBucket: 'uploads',
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.cover,
-                          placeholder: const Icon(
-                            Icons.agriculture_rounded,
-                            color: AppColors.primary,
-                            size: 28,
-                          ),
-                          errorWidget: const Icon(
-                            Icons.agriculture_rounded,
-                            color: AppColors.primary,
-                            size: 28,
-                          ),
-                        )
-                      : const Icon(
-                          Icons.agriculture_rounded,
-                          color: AppColors.primary,
-                          size: 28,
+        // Farm Info Card & Address
+        FutureBuilder<FarmerProfile?>(
+          future: FarmerService().getFarmerProfileByFarmerId(order.farmerId),
+          builder: (context, snapshot) {
+            final profile = snapshot.data;
+            final isCop = order.paymentMethod?.toUpperCase() == 'COP';
+            final isReadyForPickup = order.status.toUpperCase() == 'SHIPPED';
+            final hasLocation = profile?.location != null && profile!.location!.isNotEmpty;
+            final hasCoords = profile?.farmLatitude != null && profile?.farmLongitude != null;
+            final shouldShowFarmAddress = isCop && isReadyForPickup && hasLocation;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      order.farmName ?? 'AgriDirect Farm',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textHeadline,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: order.farmerAvatarUrl != null && order.farmerAvatarUrl!.isNotEmpty
+                              ? SafeNetworkImage(
+                                  imageUrl: order.farmerAvatarUrl,
+                                  defaultBucket: 'uploads',
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                  placeholder: const Icon(
+                                    Icons.agriculture_rounded,
+                                    color: AppColors.primary,
+                                    size: 28,
+                                  ),
+                                  errorWidget: const Icon(
+                                    Icons.agriculture_rounded,
+                                    color: AppColors.primary,
+                                    size: 28,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.agriculture_rounded,
+                                  color: AppColors.primary,
+                                  size: 28,
+                                ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Order from farm',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textSubtle,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              order.farmName ?? 'AgriDirect Farm',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textHeadline,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Order from farm',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSubtle,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
+                if (snapshot.connectionState == ConnectionState.waiting) ...[
+                  const SizedBox(height: 12),
+                  const ClipRRect(
+                    borderRadius: BorderRadius.all(Radius.circular(2)),
+                    child: LinearProgressIndicator(
+                      color: AppColors.primary,
+                      backgroundColor: Colors.transparent,
+                      minHeight: 2,
+                    ),
+                  ),
+                ] else if (shouldShowFarmAddress) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Farm Address',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textHeadline,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          profile.location ?? '',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: AppColors.textBody,
+                            height: 1.4,
+                          ),
+                        ),
+                        if (hasCoords) ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                final lat = profile.farmLatitude;
+                                final lng = profile.farmLongitude;
+                                final url = 'google.navigation:q=$lat,$lng';
+                                if (await canLaunchUrl(Uri.parse(url))) {
+                                  await launchUrl(Uri.parse(url));
+                                } else {
+                                  await launchUrl(Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng'));
+                                }
+                              },
+                              icon: const Icon(Icons.directions_rounded, size: 18),
+                              label: Text(
+                                'Get Directions',
+                                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.primary,
+                                side: const BorderSide(color: AppColors.primary),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
         ),
         const SizedBox(height: 24),
 
@@ -1050,12 +1159,23 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _buildTimeline(Order order) {
     final status = order.status.toUpperCase();
+    final isCop = order.paymentMethod?.toUpperCase() == 'COP';
     final steps = [
       {'title': 'Placed', 'desc': 'Order received', 'code': 'PENDING', 'icon': Icons.assignment_turned_in_rounded},
       {'title': 'Confirmed', 'desc': 'Order verified', 'code': 'CONFIRMED', 'icon': Icons.check_circle_rounded},
       {'title': 'Preparing', 'desc': 'Getting ready', 'code': 'PROCESSING', 'icon': Icons.inventory_2_rounded},
-      {'title': 'Shipped', 'desc': 'On the way', 'code': 'SHIPPED', 'icon': Icons.local_shipping_rounded},
-      {'title': 'Delivered', 'desc': 'Completed', 'code': 'DELIVERED', 'icon': Icons.home_work_rounded},
+      {
+        'title': isCop ? 'Ready for Pickup' : 'Shipped',
+        'desc': isCop ? 'Ready at farm' : 'On the way',
+        'code': 'SHIPPED',
+        'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded
+      },
+      {
+        'title': isCop ? 'Picked Up' : 'Delivered',
+        'desc': 'Completed',
+        'code': 'DELIVERED',
+        'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded
+      },
     ];
 
     int currentStep = 0;

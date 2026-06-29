@@ -513,9 +513,9 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
                     : status == 'CONFIRMED'
                         ? 'Prepare Order'
                         : status == 'PROCESSING'
-                            ? 'Ship Order'
+                            ? (o['paymentMethod']?.toString().toUpperCase() == 'COP' ? 'Mark Ready for Pickup' : 'Ship Order')
                             : status == 'SHIPPED'
-                                ? 'Deliver Order'
+                                ? (o['paymentMethod']?.toString().toUpperCase() == 'COP' ? 'Complete Pickup' : 'Deliver Order')
                                 : 'Order Completed',
               ),
             ],
@@ -532,6 +532,8 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
 
     final status = o['status']?.toString().toUpperCase() ?? 'PENDING';
     
+    final isCop = o['paymentMethod']?.toString().toUpperCase() == 'COP';
+
     String nextStatus = 'CONFIRMED';
     String actionText = 'Confirm Order';
     String confirmationMsg = 'Are you sure you want to mark Order $orderIdStr as CONFIRMED?';
@@ -542,12 +544,16 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
       confirmationMsg = 'Are you sure you want to mark Order $orderIdStr as PROCESSING?';
     } else if (status == 'PROCESSING') {
       nextStatus = 'SHIPPED';
-      actionText = 'Ship Order';
-      confirmationMsg = 'Are you sure you want to mark Order $orderIdStr as SHIPPED?';
+      actionText = isCop ? 'Ready for Pickup' : 'Ship Order';
+      confirmationMsg = isCop 
+          ? 'Are you sure you want to mark Order $orderIdStr as Ready for Pickup?'
+          : 'Are you sure you want to mark Order $orderIdStr as SHIPPED?';
     } else if (status == 'SHIPPED') {
       nextStatus = 'DELIVERED';
-      actionText = 'Deliver Order';
-      confirmationMsg = 'Are you sure you want to mark Order $orderIdStr as DELIVERED?';
+      actionText = isCop ? 'Complete Pickup' : 'Deliver Order';
+      confirmationMsg = isCop
+          ? 'Are you sure you want to mark Order $orderIdStr as Picked Up?'
+          : 'Are you sure you want to mark Order $orderIdStr as DELIVERED?';
     }
 
     final confirm = await showDialog<bool>(

@@ -650,45 +650,76 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
           const SizedBox(height: 22),
           _buildOrderSummary(),
           const SizedBox(height: 22),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _addToCart,
-                  icon: const Icon(Icons.shopping_cart_outlined),
-                  label: const Text(
-                    'Add to Cart',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _primary,
-                    side: BorderSide(color: _primary.withValues(alpha: 0.28)),
+          if (_product?.farmerId != null && _product?.farmerId == SupabaseConfig.currentUser?.id)
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50.withValues(alpha: 0.8),
                       borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.amber.shade200),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.info_outline_rounded, color: Colors.amber),
+                        const SizedBox(width: 8),
+                        Text(
+                          'This is your product.',
+                          style: TextStyle(
+                            color: Colors.amber.shade900,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: _isSubmittingOrder ? null : _submitOrder,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _primary,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _addToCart,
+                    icon: const Icon(Icons.shopping_cart_outlined),
+                    label: const Text(
+                      'Add to Cart',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _primary,
+                      side: BorderSide(color: _primary.withValues(alpha: 0.28)),
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                   ),
-                  child: Text(
-                    _isSubmittingOrder ? 'Ordering...' : 'Buy Now',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _isSubmittingOrder ? null : _submitOrder,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _primary,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      _isSubmittingOrder ? 'Ordering...' : 'Buy Now',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           const SizedBox(height: 16),
           Text(
             'Total: P${(_priceValue() * _quantity).toStringAsFixed(2)}',

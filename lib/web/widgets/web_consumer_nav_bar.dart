@@ -39,7 +39,8 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
   int _hoveredNav = -1;
 
   Future<void> _downloadAndroidApk() async {
-    final uri = Uri.parse('/AgriDirect-Installer.apk');
+    final uri = Uri.parse(
+        'https://github.com/vincentagbuya03/agridirect/releases/latest/download/AgriDirect-Installer.apk');
     await launchUrl(uri, webOnlyWindowName: '_self');
   }
 

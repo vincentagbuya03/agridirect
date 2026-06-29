@@ -67,7 +67,8 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   }
 
   Future<void> _downloadAndroidApk() async {
-    final uri = Uri.parse('/AgriDirect-Installer.apk');
+    final uri = Uri.parse(
+        'https://github.com/vincentagbuya03/agridirect/releases/latest/download/AgriDirect-Installer.apk');
     await launchUrl(uri, webOnlyWindowName: '_self');
   }
 
@@ -2094,7 +2095,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 child: Builder(
                   builder: (context) {
                     final apkUrl =
-                        Uri.base.resolve('/AgriDirect-Installer.apk').toString();
+                        'https://github.com/vincentagbuya03/agridirect/releases/latest/download/AgriDirect-Installer.apk';
                     final qrUrl =
                         'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${Uri.encodeComponent(apkUrl)}';
                     return Image.network(
