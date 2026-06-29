@@ -8,6 +8,7 @@ import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/farmer/farmer_service.dart';
 import '../../../shared/models/farmer/farmer_profile_model.dart';
@@ -903,9 +904,34 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                     await OrderService().updateOrderStatus(widget.order.orderId, s['label'] as String);
                     if (mounted) {
                       setState(() => _currentStatus = (s['label'] as String).toUpperCase());
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Status updated to ${s['title']}'), backgroundColor: Colors.green),
+                      
+                      String successMsg = 'Order status updated successfully.';
+                      if (s['label'] == 'SHIPPED') {
+                        successMsg = isCop 
+                            ? 'Order is ready for pickup! Customer has been notified.' 
+                            : 'Order is shipped and on the way!';
+                      } else if (s['label'] == 'DELIVERED') {
+                        successMsg = isCop 
+                            ? 'Pickup completed successfully! Order finalized.' 
+                            : 'Order delivered successfully!';
+                      } else if (s['label'] == 'CONFIRMED') {
+                        successMsg = 'Order accepted! Preparing items.';
+                      }
+
+                      late OverlayEntry overlayEntry;
+                      overlayEntry = OverlayEntry(
+                        builder: (context) => Scaffold(
+                          backgroundColor: Colors.transparent,
+                          body: _StatusSuccessOverlay(
+                            statusTitle: s['title'] as String,
+                            message: successMsg,
+                            onFinished: () {
+                              overlayEntry.remove();
+                            },
+                          ),
+                        ),
                       );
+                      Overlay.of(context).insert(overlayEntry);
                     }
                   } catch (e) {
                     if (mounted) {
@@ -937,5 +963,116 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
     final m = dt.minute.toString().padLeft(2, '0');
     final ampm = dt.hour >= 12 ? 'PM' : 'AM';
     return '$h:$m $ampm';
+  }
+}
+
+class _StatusSuccessOverlay extends StatefulWidget {
+  final String statusTitle;
+  final String message;
+  final VoidCallback onFinished;
+
+  const _StatusSuccessOverlay({
+    required this.statusTitle,
+    required this.message,
+    required this.onFinished,
+  });
+
+  @override
+  State<_StatusSuccessOverlay> createState() => _StatusSuccessOverlayState();
+}
+
+class _StatusSuccessOverlayState extends State<_StatusSuccessOverlay> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.2).chain(CurveTween(curve: Curves.easeOutBack)), weight: 35),
+      TweenSequenceItem(tween: Tween(begin: 1.2, end: 1.0).chain(CurveTween(curve: Curves.easeIn)), weight: 15),
+      TweenSequenceItem(tween: ConstantTween<double>(1.0), weight: 35),
+    ]).animate(_controller);
+
+    _opacityAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 15),
+      TweenSequenceItem(tween: ConstantTween<double>(1.0), weight: 70),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 15),
+    ]).animate(_controller);
+
+    _controller.forward().then((_) => widget.onFinished());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacityAnimation,
+      child: Container(
+        color: Colors.black.withOpacity(0.85),
+        child: Center(
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.greenAccent,
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: Colors.white,
+                    size: 64,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  'Status Updated!',
+                  style: GoogleFonts.poppins(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Text(
+                    widget.message,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

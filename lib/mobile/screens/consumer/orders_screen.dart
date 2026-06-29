@@ -9,6 +9,7 @@ import 'package:agridirect/shared/widgets/image_widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:agridirect/shared/services/farmer/farmer_service.dart';
 import 'package:agridirect/shared/models/farmer/farmer_profile_model.dart';
+import '../../../shared/models/order/order_item_model.dart';
 
 /// Orders Screen - Professional Order Management (Responsive Web & Mobile)
 class OrdersScreen extends StatefulWidget {
@@ -683,7 +684,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
+            constraints: BoxConstraints(
+              maxWidth: 600,
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
             child: Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
@@ -726,6 +730,50 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Widget _buildOrderDetailsContent(Order order) {
+    final status = order.status.toUpperCase();
+    final isCop = order.paymentMethod?.toUpperCase() == 'COP';
+    
+    double percentage = 20.0;
+    int currentStep = 0;
+    if (status == 'CONFIRMED') {
+      percentage = 40.0;
+      currentStep = 1;
+    } else if (status == 'PROCESSING') {
+      percentage = 60.0;
+      currentStep = 2;
+    } else if (status == 'SHIPPED') {
+      percentage = 80.0;
+      currentStep = 3;
+    } else if (status == 'DELIVERED') {
+      percentage = 100.0;
+      currentStep = 4;
+    } else if (status == 'CANCELLED') {
+      percentage = 0.0;
+      currentStep = -1;
+    }
+
+    final steps = [
+      {'title': 'Placed', 'desc': 'Order received', 'icon': Icons.assignment_turned_in_rounded},
+      {'title': 'Confirmed', 'desc': 'Order verified', 'icon': Icons.check_circle_rounded},
+      {'title': 'Preparing', 'desc': 'Getting ready', 'icon': Icons.inventory_2_rounded},
+      {
+        'title': isCop ? 'Ready for Pickup' : 'Shipped',
+        'desc': isCop ? 'Ready at farm' : 'On the way',
+        'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded
+      },
+      {
+        'title': isCop ? 'Picked Up' : 'Delivered',
+        'desc': 'Completed',
+        'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded
+      },
+    ];
+
+    final activeStep = currentStep >= 0 
+        ? steps[currentStep] 
+        : {'title': 'Cancelled', 'desc': 'Order cancelled', 'icon': Icons.cancel_rounded};
+
+    final statusColor = _getStatusColor(order.status);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -743,6 +791,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             ),
           ),
 
+        // Title Header
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -774,7 +823,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
           future: FarmerService().getFarmerProfileByFarmerId(order.farmerId),
           builder: (context, snapshot) {
             final profile = snapshot.data;
-            final isCop = order.paymentMethod?.toUpperCase() == 'COP';
             final isReadyForPickup = order.status.toUpperCase() == 'SHIPPED';
             final hasLocation = profile?.location != null && profile!.location!.isNotEmpty;
             final hasCoords = profile?.farmLatitude != null && profile?.farmLongitude != null;
@@ -909,9 +957,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 final lng = profile.farmLongitude;
                                 final url = 'google.navigation:q=$lat,$lng';
                                 if (await canLaunchUrl(Uri.parse(url))) {
-                                  await launchUrl(Uri.parse(url));
+                                    await launchUrl(Uri.parse(url));
                                 } else {
-                                  await launchUrl(Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng'));
+                                    await launchUrl(Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng'));
                                 }
                               },
                               icon: const Icon(Icons.directions_rounded, size: 18),
@@ -940,55 +988,142 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ),
         const SizedBox(height: 24),
 
-        // Order Number & Status
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Order Number',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSubtle,
+        // Order Number Stats Header (TikTok Style)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.textHeadline.withOpacity(0.06)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.shopping_bag_outlined,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '#${order.orderNumber}',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textHeadline,
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Order #${order.orderNumber}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textHeadline,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${order.itemCount ?? 1} item${(order.itemCount ?? 1) > 1 ? 's' : ''} • ₱${(order.total ?? 0).toStringAsFixed(2)}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSubtle,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                ],
+              ),
+              _CircularProgressRing(
+                percentage: percentage,
+                color: status == 'CANCELLED' ? AppColors.error : AppColors.primary,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Prominent Current Status Card (TikTok Style)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: status == 'CANCELLED'
+                  ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
+                  : [const Color(0xFF3B82F6), const Color(0xFF2563EB)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: (status == 'CANCELLED' ? Colors.red : Colors.blue)
+                    .withOpacity(0.25),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
               ),
-              decoration: BoxDecoration(
-                color: _getStatusColor(order.status).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      activeStep['icon'] as IconData,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        activeStep['title'] as String,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        activeStep['desc'] as String,
+                        style: GoogleFonts.inter(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              child: Text(
-                order.status.toUpperCase(),
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: _getStatusColor(order.status),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 10,
-                ),
+              const SizedBox(height: 20),
+              // Horizontal progress steps inside the card
+              _HorizontalProgressLine(
+                currentStep: currentStep,
+                totalSteps: steps.length,
+                activeColor: Colors.white,
+                inactiveColor: Colors.white,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 32),
 
         // Timeline Section
         Text(
-          'Order Tracking',
+          'Timeline',
           style: GoogleFonts.poppins(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -1009,32 +1144,115 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${order.itemCount ?? 1} item${(order.itemCount ?? 1) > 1 ? 's' : ''}',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w600,
+        FutureBuilder<List<OrderItem>>(
+          future: OrderService().getOrderItems(order.orderId),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(color: AppColors.primary),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Order placed on ${order.createdAt.toString().split(' ')[0]}',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textSubtle,
+              );
+            }
+            final items = snapshot.data ?? [];
+            if (items.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: Text(
+                  'No item details found.',
+                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
+                ),
+              );
+            }
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.textHeadline.withOpacity(0.06)),
               ),
-            ],
-          ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: items.length,
+                separatorBuilder: (context, index) => Divider(
+                  color: AppColors.textHeadline.withOpacity(0.05),
+                  height: 24,
+                ),
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  return Row(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: item.productImage != null
+                              ? SafeNetworkImage(
+                                  imageUrl: item.productImage,
+                                  defaultBucket: 'products',
+                                  width: 56,
+                                  height: 56,
+                                  fit: BoxFit.cover,
+                                )
+                              : const Icon(
+                                  Icons.shopping_basket_rounded,
+                                  color: AppColors.primary,
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.productName ?? 'Product',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                color: AppColors.textHeadline,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Qty: ${item.quantity.toInt()} x ₱${item.unitPrice.toStringAsFixed(2)}',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSubtle,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '₱${(item.subtotal ?? (item.quantity * item.unitPrice)).toStringAsFixed(2)}',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppColors.textHeadline,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            );
+          },
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
 
         // Price Breakdown
         Text(
@@ -1049,8 +1267,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(12),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.textHeadline.withOpacity(0.06)),
           ),
           child: Column(
             children: [
@@ -1065,11 +1284,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ),
                   Text(
                     '₱${(order.subtotal ?? 0).toStringAsFixed(2)}',
-                    style: AppTextStyles.bodyMedium,
+                    style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1081,13 +1300,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ),
                   Text(
                     '₱${(order.deliveryFee ?? 0).toStringAsFixed(2)}',
-                    style: AppTextStyles.bodyMedium,
+                    style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
               Divider(
-                color: AppColors.textHeadline.withValues(alpha: 0.1),
-                height: 20,
+                color: AppColors.textHeadline.withOpacity(0.06),
+                height: 24,
               ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1127,10 +1346,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ),
           const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.textHeadline.withOpacity(0.06)),
             ),
             child: Row(
               children: [
@@ -1155,6 +1375,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         const SizedBox(height: 32),
       ],
     );
+  }
   }
 
   Widget _buildTimeline(Order order) {
@@ -1281,5 +1502,94 @@ class _OrdersScreenState extends State<OrdersScreen> {
       default:
         return AppColors.textSubtle;
     }
+  }
+}
+
+class _CircularProgressRing extends StatelessWidget {
+  final double percentage;
+  final Color color;
+
+  const _CircularProgressRing({
+    required this.percentage,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: percentage),
+      duration: const Duration(milliseconds: 800),
+      curve: Curves.easeOut,
+      builder: (context, value, child) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(
+              width: 56,
+              height: 56,
+              child: CircularProgressIndicator(
+                value: value / 100.0,
+                strokeWidth: 4,
+                backgroundColor: color.withOpacity(0.1),
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+              ),
+            ),
+            Text(
+              '${value.toInt()}%',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _HorizontalProgressLine extends StatelessWidget {
+  final int currentStep;
+  final int totalSteps;
+  final Color activeColor;
+  final Color inactiveColor;
+
+  const _HorizontalProgressLine({
+    required this.currentStep,
+    required this.totalSteps,
+    required this.activeColor,
+    required this.inactiveColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(totalSteps * 2 - 1, (index) {
+        if (index.isEven) {
+          // Circle Dot
+          final stepIndex = index ~/ 2;
+          final isActive = stepIndex <= currentStep;
+          return Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: isActive ? activeColor : inactiveColor.withOpacity(0.3),
+              shape: BoxShape.circle,
+            ),
+          );
+        } else {
+          // Connecting Line
+          final lineIndex = index ~/ 2;
+          final isActive = lineIndex < currentStep;
+          return Expanded(
+            child: Container(
+              height: 2,
+              color: isActive ? activeColor : inactiveColor.withOpacity(0.15),
+            ),
+          );
+        }
+      }),
+    );
   }
 }
