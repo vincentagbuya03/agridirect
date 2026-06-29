@@ -156,6 +156,34 @@ class CartItem {
 
   double get priceValue => double.tryParse(price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
   double get total => priceValue * quantity;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'farmerId': farmerId,
+      'productId': productId,
+      'name': name,
+      'farm': farm,
+      'price': price,
+      'unit': unit,
+      'imageUrl': imageUrl,
+      'quantity': quantity,
+      'isSelected': isSelected,
+    };
+  }
+
+  factory CartItem.fromJson(Map<String, dynamic> json) {
+    return CartItem(
+      farmerId: json['farmerId'] as String? ?? '',
+      productId: json['productId'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      farm: json['farm'] as String? ?? '',
+      price: json['price'] as String? ?? '',
+      unit: json['unit'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String? ?? '',
+      quantity: json['quantity'] as int? ?? 1,
+      isSelected: json['isSelected'] as bool? ?? true,
+    );
+  }
 }
 
 class DashboardMetric {

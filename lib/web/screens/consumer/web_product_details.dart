@@ -254,7 +254,7 @@ class _WebProductDetailsState extends State<WebProductDetails> {
         child: Row(
           children: [
             IconButton(
-              onPressed: () => context.go(AppRoutes.shop),
+              onPressed: () => context.canPop() ? context.pop() : context.go(AppRoutes.shop),
               icon: const Icon(Icons.arrow_back_rounded, color: _dark),
             ),
             const SizedBox(width: 8),

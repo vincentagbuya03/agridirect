@@ -13,7 +13,9 @@ import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/integration/weather_service.dart';
 import '../../../shared/models/weather_model.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
+import '../../widgets/web_hamburger_menu_button.dart';
 import '../../../shared/widgets/image_widgets.dart';
+
 import '../../../shared/screens/article_detail_screen.dart';
 import '../../../shared/widgets/post_detail_dialog.dart';
 import '../../../shared/widgets/forum_video_player.dart';
@@ -341,64 +343,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           ),
           if (isMobile) ...[
             const SizedBox(width: 8),
-            PopupMenuButton<int>(
-              icon: const Icon(Icons.menu, color: _primary),
-              tooltip: '',
-              onSelected: (index) {
-                widget.onNavigate(index);
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 0,
-                  child: Row(
-                    children: [
-                      Icon(Icons.dashboard_rounded, color: widget.currentIndex == 0 ? _primary : _muted, size: 20),
-                      const SizedBox(width: 8),
-                      Text('Dashboard', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 0 ? FontWeight.bold : FontWeight.normal)),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 1,
-                  child: Row(
-                    children: [
-                      Icon(Icons.agriculture_rounded, color: widget.currentIndex == 1 ? _primary : _muted, size: 20),
-                      const SizedBox(width: 8),
-                      Text('Products', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 1 ? FontWeight.bold : FontWeight.normal)),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 2,
-                  child: Row(
-                    children: [
-                      Icon(Icons.receipt_long_rounded, color: widget.currentIndex == 2 ? _primary : _muted, size: 20),
-                      const SizedBox(width: 8),
-                      Text('Orders', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 2 ? FontWeight.bold : FontWeight.normal)),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 3,
-                  child: Row(
-                    children: [
-                      Icon(Icons.people_rounded, color: widget.currentIndex == 3 ? _primary : _muted, size: 20),
-                      const SizedBox(width: 8),
-                      Text('Community', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 3 ? FontWeight.bold : FontWeight.normal)),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 4,
-                  child: Row(
-                    children: [
-                      Icon(Icons.person_rounded, color: widget.currentIndex == 4 ? _primary : _muted, size: 20),
-                      const SizedBox(width: 8),
-                      Text('Profile', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 4 ? FontWeight.bold : FontWeight.normal)),
-                    ],
-                  ),
-                ),
-              ],
+            WebHamburgerMenuButton(
+              currentIndex: widget.currentIndex,
+              onNavigate: widget.onNavigate,
             ),
           ],
         ],
@@ -921,6 +868,10 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                   label: 'Like',
                   color: post.isLiked ? const Color(0xFF3B82F6) : _muted,
                   onTap: () async {
+                    if (!AuthService().isLoggedIn) {
+                      context.go(AppRoutes.login);
+                      return;
+                    }
                     await SupabaseDataService().togglePostLike(post.id);
                     if (mounted) _refreshForumPosts();
                   },
@@ -931,7 +882,13 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                   icon: Icons.chat_bubble_outline_rounded,
                   label: 'Comment',
                   color: _muted,
-                  onTap: () => _showPostDetailFlow(post),
+                  onTap: () {
+                    if (!AuthService().isLoggedIn) {
+                      context.go(AppRoutes.login);
+                      return;
+                    }
+                    _showPostDetailFlow(post);
+                  },
                 ),
               ),
               Expanded(

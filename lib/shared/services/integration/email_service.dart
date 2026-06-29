@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
 import 'package:flutter/foundation.dart';
@@ -14,11 +16,52 @@ class EmailService {
   static String get _gmailPass =>
       dotenv.env['GMAIL_PASS'] ?? 'snoe apvj svld cank';
 
+  static String get _webEmailApiBase {
+    final configured = dotenv.env['WEB_EMAIL_API_BASE']?.trim() ?? '';
+    if (configured.isNotEmpty) return configured.replaceAll(RegExp(r'/$'), '');
+
+    final currentOrigin = Uri.base.origin;
+    final host = Uri.base.host.toLowerCase();
+    if (host != 'localhost' && host != '127.0.0.1' && host != '::1') {
+      return currentOrigin;
+    }
+
+    return 'https://agridirect-app.vercel.app';
+  }
+
+  static Future<bool> _sendEmailViaWebApi({
+    required String email,
+    required String type,
+    String? otpCode,
+  }) async {
+    final uri = Uri.parse('$_webEmailApiBase/api/auth/send-email');
+    try {
+      final response = await http.post(
+        uri,
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'type': type,
+          'otpCode': otpCode,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } catch (e) {
+      debugPrint('[EmailService] Web API email dispatch failed: $e');
+      return false;
+    }
+  }
+
   /// Send an OTP verification code email via Gmail SMTP
   static Future<bool> sendOTPEmail({
     required String email,
     required String otpCode,
   }) async {
+    if (kIsWeb) {
+      return _sendEmailViaWebApi(email: email, type: 'otp', otpCode: otpCode);
+    }
+
     try {
       final smtpServer = gmail(_gmailUser, _gmailPass);
 
@@ -41,6 +84,12 @@ class EmailService {
     required String email,
     required String code,
   }) async {
+    if (kIsWeb) {
+      // PasswordResetService already calls its own endpoint directly,
+      // but this fallback keeps Web email API dispatch robust.
+      return _sendEmailViaWebApi(email: email, type: 'otp', otpCode: code);
+    }
+
     try {
       final smtpServer = gmail(_gmailUser, _gmailPass);
 
@@ -60,6 +109,10 @@ class EmailService {
 
   /// Send password-changed security notification via Gmail SMTP
   static Future<bool> sendPasswordChangedAlert({required String email}) async {
+    if (kIsWeb) {
+      return _sendEmailViaWebApi(email: email, type: 'alert');
+    }
+
     try {
       final smtpServer = gmail(_gmailUser, _gmailPass);
 

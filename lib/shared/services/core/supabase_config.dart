@@ -247,14 +247,28 @@ class SupabaseDatabase {
     try {
       final result = await _client
           .from('users')
-          .select('user_id')
+          .select('user_id, email_verified')
           .eq('email', email)
           .maybeSingle();
-      return result != null;
+      if (result == null) return false;
+      return result['email_verified'] as bool? ?? false;
     } catch (e) {
       return false;
     }
   }
+
+  static Future<bool> deleteUnverifiedUser(String email) async {
+    try {
+      final result = await _client.rpc('delete_unverified_user', params: {
+        'p_email': email.trim().toLowerCase(),
+      });
+      return result as bool? ?? false;
+    } catch (e) {
+      debugPrint('Error invoking delete_unverified_user: $e');
+      return false;
+    }
+  }
+
 
   static Future<bool> isPhoneAlreadyRegistered(String phone) async {
     try {

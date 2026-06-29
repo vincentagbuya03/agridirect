@@ -463,11 +463,15 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
             ),
             child: Row(
               children: [
-                _buildSocialAction(
+                 _buildSocialAction(
                   post.isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
                   '${post.likes}',
                   post.isLiked ? AppColors.primary : AppColors.textSubtle,
                   onTap: () async {
+                    if (!AuthService().isLoggedIn) {
+                      context.go(AppRoutes.login);
+                      return;
+                    }
                     await SupabaseDataService().togglePostLike(post.id);
                     if (mounted) setState(() {});
                   },
@@ -478,6 +482,10 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                   '${post.comments}',
                   AppColors.textSubtle,
                   onTap: () async {
+                    if (!AuthService().isLoggedIn) {
+                      context.go(AppRoutes.login);
+                      return;
+                    }
                     final updated = await showDialog<bool>(
                       context: context,
                       builder: (context) => CommentsDialog(postId: post.id),

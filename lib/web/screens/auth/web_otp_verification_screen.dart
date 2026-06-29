@@ -44,6 +44,7 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
   bool _isVerifying = false;
   String? _errorMessage;
   bool _canResend = false;
+  int _resendCooldown = 60;
 
   static const Color _primary = Color(0xFF16A34A);
 
@@ -55,7 +56,8 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
 
   void _startCountdownTimer() {
     _secondsRemaining = widget.initialSecondsRemaining;
-    _canResend = _secondsRemaining <= 0;
+    _resendCooldown = 60;
+    _canResend = false;
 
     _timerCountdown = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
@@ -64,9 +66,14 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
       }
       setState(() {
         _secondsRemaining--;
+        if (_resendCooldown > 0) {
+          _resendCooldown--;
+          if (_resendCooldown <= 0) {
+            _canResend = true;
+          }
+        }
         if (_secondsRemaining <= 0) {
           timer.cancel();
-          _canResend = true;
         }
       });
     });
@@ -261,7 +268,24 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
                   constraints: const BoxConstraints(maxWidth: 440),
                   padding: const EdgeInsets.all(48),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back_rounded, size: 16, color: _primary),
+                          label: Text(
+                            'Back to Register',
+                            style: GoogleFonts.inter(
+                              color: _primary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                       Text(
                         'Enter Verification Code',
                         style: GoogleFonts.plusJakartaSans(
@@ -315,16 +339,22 @@ class _WebOTPVerificationScreenState extends State<WebOTPVerificationScreen> {
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        _formatTime(_secondsRemaining),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        'Code expires in: ${_formatTime(_secondsRemaining)}',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
                       ),
+                      const SizedBox(height: 12),
                       if (_canResend)
                         TextButton(
                           onPressed: _resendOTP,
                           child: const Text(
                             'Resend Code',
-                            style: TextStyle(color: _primary),
+                            style: TextStyle(color: _primary, fontWeight: FontWeight.bold),
                           ),
+                        )
+                      else
+                        Text(
+                          'Resend code in ${_resendCooldown}s',
+                          style: TextStyle(color: Colors.grey[500], fontSize: 12),
                         ),
                     ],
                   ),

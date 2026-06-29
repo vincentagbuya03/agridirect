@@ -62,10 +62,37 @@ GoRouter createAppRouter() {
     navigatorKey: appNavigatorKey,
     refreshListenable: auth,
     redirect: (BuildContext context, GoRouterState state) async {
+      // 0. Hold redirection until auth is initialized (restored from Supabase)
+      if (!auth.isInitialized) {
+        debugPrint('⏳ Router: Hold redirection until auth is initialized');
+        return null;
+      }
+
       final isLoggedIn = auth.isLoggedIn;
       final isAdmin = auth.isAdmin;
       final isFarmer = auth.isViewingAsFarmer;
       final location = state.matchedLocation;
+
+      const protectedRoutes = {
+        AppRoutes.profile,
+        AppRoutes.farmerDashboard,
+        AppRoutes.addProduct,
+        AppRoutes.myDetails,
+        AppRoutes.messages,
+        AppRoutes.customerMessages,
+        AppRoutes.farmerMessages,
+        AppRoutes.addressBook,
+        AppRoutes.favorites,
+        AppRoutes.farmerFollowers,
+        AppRoutes.helpCenter,
+        AppRoutes.appSettings,
+        AppRoutes.admin,
+        AppRoutes.completeProfile,
+        AppRoutes.checkout,
+        AppRoutes.cartCheckout,
+        AppRoutes.orderSuccess,
+        AppRoutes.customerOrders,
+      };
 
       // Use View.of for a more stable width check that doesn't trigger loops
       final view = View.of(context);
@@ -126,29 +153,6 @@ GoRouter createAppRouter() {
         }
       } else {
         // 5. Unauthenticated Users logic
-        const protectedRoutes = {
-          AppRoutes.profile,
-          AppRoutes.farmerDashboard,
-          AppRoutes.addProduct,
-          AppRoutes.myDetails,
-          AppRoutes.messages,
-          AppRoutes.customerMessages,
-          AppRoutes.farmerMessages,
-          AppRoutes.addressBook,
-          AppRoutes.favorites,
-          AppRoutes.farmerFollowers,
-          AppRoutes.helpCenter,
-          AppRoutes.appSettings,
-          AppRoutes.admin,
-          AppRoutes.completeProfile,
-          AppRoutes.marketplace,
-          AppRoutes.shop,
-          AppRoutes.community,
-          AppRoutes.cart,
-          AppRoutes.preorderDetails,
-          AppRoutes.checkout,
-        };
-
         if (protectedRoutes.contains(location)) {
           return AppRoutes.login;
         }
@@ -169,10 +173,7 @@ GoRouter createAppRouter() {
 
       // 6. Web Session Restoration Guard
       if (kIsWeb && !isLoggedIn) {
-        if (isMobile &&
-            location != AppRoutes.webWelcome &&
-            location != AppRoutes.login &&
-            location != AppRoutes.onboarding) {
+        if (protectedRoutes.contains(location)) {
           debugPrint(
             '↪️ Router: Unauthenticated web user on protected route, going to welcome',
           );

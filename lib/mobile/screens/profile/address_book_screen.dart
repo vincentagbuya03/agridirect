@@ -355,6 +355,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
           ),
           itemCount: _addresses.length,
           itemBuilder: (context, index) => _AddressCard(
+            key: ValueKey(_addresses[index].addressId),
             address: _addresses[index],
             onEdit: () => _openEditor(_addresses[index]),
             onSetDefault: () => _setDefault(_addresses[index]),
@@ -389,6 +390,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
                           separatorBuilder: (_, _) =>
                               const SizedBox(height: 14),
                           itemBuilder: (context, index) => _AddressCard(
+                            key: ValueKey(_addresses[index].addressId),
                             address: _addresses[index],
                             onEdit: () => _openEditor(_addresses[index]),
                             onSetDefault: () =>
@@ -569,6 +571,7 @@ class _AddressCard extends StatefulWidget {
   final VoidCallback onDelete;
 
   const _AddressCard({
+    super.key,
     required this.address,
     required this.onEdit,
     required this.onSetDefault,
@@ -781,7 +784,7 @@ class _AddressCardState extends State<_AddressCard>
                 ]),
               ],
 
-              const Spacer(),
+              const SizedBox(height: 16),
               const Divider(height: 1, color: Color(0xFFF1F5F9)),
               const SizedBox(height: 10),
 

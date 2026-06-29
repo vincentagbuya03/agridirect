@@ -260,9 +260,9 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
                           ? Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildOrderSummaryCard(),
-                                const SizedBox(height: 24),
                                 _buildCheckoutDetailsCard(),
+                                const SizedBox(height: 24),
+                                _buildOrderSummaryCard(),
                               ],
                             )
                           : Row(
@@ -413,13 +413,33 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          Text(
-            requiresAddress ? 'Shipping Address' : 'Pickup Location (at Farm)',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: _dark,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                requiresAddress ? 'Shipping Address' : 'Pickup Location (at Farm)',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: _dark,
+                ),
+              ),
+              if (requiresAddress)
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: _openAddressBook,
+                    child: Text(
+                      'Manage Addresses',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: _primary,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 10),
           if (_isLoadingAddresses)

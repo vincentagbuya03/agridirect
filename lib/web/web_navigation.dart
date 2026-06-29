@@ -31,6 +31,7 @@ class WebNavigation extends StatefulWidget {
 class _WebNavigationState extends State<WebNavigation> {
   late int _currentIndex;
   final _auth = AuthService();
+  String? _selectedCategoryFilter;
 
   @override
   void initState() {
@@ -49,13 +50,16 @@ class _WebNavigationState extends State<WebNavigation> {
     if (mounted) setState(() {});
   }
 
-  void _navigateTo(int index) {
+  void _navigateTo(int index, [String? category]) {
     // If trying to access Profile (index 3) and not logged in, show login instead
     if (index == 3 && !_auth.isLoggedIn) {
       _showLoginDialog();
       return;
     }
-    setState(() => _currentIndex = index);
+    setState(() {
+      _currentIndex = index;
+      _selectedCategoryFilter = category;
+    });
     if (!_auth.isViewingAsFarmer) {
       context.go(AppRoutes.webTabRoute(index));
     }
@@ -79,7 +83,10 @@ class _WebNavigationState extends State<WebNavigation> {
 
   void _handleLogout() {
     // Navigate to home first, then logout
-    setState(() => _currentIndex = 0);
+    setState(() {
+      _currentIndex = 0;
+      _selectedCategoryFilter = null;
+    });
     widget.onLogout();
   }
 
@@ -104,6 +111,7 @@ class _WebNavigationState extends State<WebNavigation> {
         onNavigate: _navigateTo,
         currentIndex: _currentIndex,
         initialShowPreOrders: widget.showPreOrdersInShop,
+        initialCategory: _selectedCategoryFilter,
       ),
       WebCommunityHub(onNavigate: _navigateTo, currentIndex: _currentIndex),
       WebProfileScreen(

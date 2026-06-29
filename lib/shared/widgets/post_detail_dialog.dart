@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import '../styles/app_theme.dart';
 import '../data/app_data.dart';
 import '../services/community/forum_service.dart';
 import '../services/core/supabase_data_service.dart';
 import '../models/forum/forum_comment_model.dart';
 import '../widgets/image_widgets.dart';
+import '../services/auth/auth_service.dart';
+import '../router/app_routes.dart';
 import 'report_content_dialog.dart';
 
 class PostDetailDialog extends StatefulWidget {
@@ -65,6 +68,11 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
   }
 
   Future<void> _togglePostLike() async {
+    if (!AuthService().isLoggedIn) {
+      Navigator.of(context).pop();
+      context.go(AppRoutes.login);
+      return;
+    }
     final wasLiked = _currentPost.isLiked;
     final newLikes = wasLiked ? _currentPost.likes - 1 : _currentPost.likes + 1;
     
@@ -98,6 +106,11 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
   }
 
   Future<void> _postComment() async {
+    if (!AuthService().isLoggedIn) {
+      Navigator.of(context).pop();
+      context.go(AppRoutes.login);
+      return;
+    }
     final commentBody = _commentController.text.trim();
     if (commentBody.isEmpty) return;
 
@@ -147,6 +160,11 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
   }
 
   Future<void> _toggleCommentLike(String commentId) async {
+    if (!AuthService().isLoggedIn) {
+      Navigator.of(context).pop();
+      context.go(AppRoutes.login);
+      return;
+    }
     final isLiked = _likedCommentIds.contains(commentId);
     setState(() {
       if (isLiked) {

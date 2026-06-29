@@ -9,7 +9,6 @@ import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/widgets/image_widgets.dart';
-import '../../../shared/widgets/brand_logo.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 
 // Web Profile screen.
@@ -38,12 +37,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   static const Color _accent = Color(0xFF22C55E);
   static const Color _dark = Color(0xFF111827);
   static const Color _muted = Color(0xFF6B7280);
-  static const Color _border = Color(0xFFE5E7EB);
 
   // Animations
   late AnimationController _fadeInController;
   final Set<int> _hoveredButtons = {};
-  int _hoveredNav = -1;
 
   String? _registrationStatus; // 'pending', 'approved', 'rejected', or null
   StreamSubscription<String?>? _registrationStatusSubscription;

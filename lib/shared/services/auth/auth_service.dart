@@ -31,6 +31,9 @@ class AuthService extends ChangeNotifier {
   String? _registrationStatus; // 'pending', 'approved', 'rejected', or null
   StreamSubscription<String?>? _regStatusSubscription;
   Timer? _lockoutTimer;
+  bool _isInitialized = false;
+
+  bool get isInitialized => _isInitialized;
 
   // Brute-force protection
   int _consecutiveFailures = 0;
@@ -454,9 +457,10 @@ class AuthService extends ChangeNotifier {
       // During some auth transitions (especially around OAuth / userUpdated / tokenRefreshed),
       // Supabase can briefly report `currentUser == null`. Treat this as transient unless
       // we are explicitly handling a sign-out event.
-      if (event != null && event != AuthChangeEvent.signedOut) {
+      if (event == AuthChangeEvent.tokenRefreshed ||
+          event == AuthChangeEvent.userUpdated) {
         debugPrint(
-          '🟡 AuthService.initialize: currentUser is null for event=$event; keeping existing session state',
+          '🟡 AuthService.initialize: currentUser is null for transient event=$event; keeping existing session state',
         );
         return;
       }
@@ -480,6 +484,7 @@ class AuthService extends ChangeNotifier {
             _userId = lastUserId;
             _isLoggedIn = true;
             await _restoreCachedUserState(lastUserId);
+            _isInitialized = true;
             notifyListeners();
             return;
           }
@@ -491,6 +496,7 @@ class AuthService extends ChangeNotifier {
       // If we reach here, it's either online and user is null (real logout)
       // or we have no cached session to recover.
       _resetSessionState();
+      _isInitialized = true;
       notifyListeners();
       return;
     }
@@ -534,6 +540,7 @@ class AuthService extends ChangeNotifier {
             : (user.userMetadata?['name'] as String?) ?? '';
         // Keep roles as they were from cache
         await _persistCachedUserState();
+        _isInitialized = true;
         notifyListeners();
         return;
       }
@@ -662,6 +669,7 @@ class AuthService extends ChangeNotifier {
 
       await _persistCachedUserState();
       await AnalyticsService().startSession(userId: user.id);
+      _isInitialized = true;
       notifyListeners();
     } else {
       // User exists but email not confirmed - sign them out
@@ -669,6 +677,7 @@ class AuthService extends ChangeNotifier {
         await _client.auth.signOut();
       } catch (_) {}
       _resetSessionState();
+      _isInitialized = true;
       notifyListeners();
     }
   }

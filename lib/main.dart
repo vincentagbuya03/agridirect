@@ -130,12 +130,14 @@ class _BootstrapAppState extends State<_BootstrapApp> {
       debugPrint('⚠️ Bootstrap cache initialization error: $e');
     }
 
-    try {
-      debugPrint('🔄 Initializing AuthService...');
-      await AuthService().initialize(event: AuthChangeEvent.initialSession);
-      debugPrint('✅ AuthService initialized');
-    } catch (e) {
-      debugPrint('⚠️ Auth initialization error: $e');
+    if (!kIsWeb) {
+      try {
+        debugPrint('🔄 Initializing AuthService...');
+        await AuthService().initialize(event: AuthChangeEvent.initialSession);
+        debugPrint('✅ AuthService initialized');
+      } catch (e) {
+        debugPrint('⚠️ Auth initialization error: $e');
+      }
     }
   }
 

@@ -16,12 +16,14 @@ class WebShopScreen extends StatefulWidget {
   final Function(int) onNavigate;
   final int currentIndex;
   final bool initialShowPreOrders;
+  final String? initialCategory;
 
   const WebShopScreen({
     super.key,
     required this.onNavigate,
     required this.currentIndex,
     this.initialShowPreOrders = false,
+    this.initialCategory,
   });
 
   @override
@@ -77,6 +79,9 @@ class _WebShopScreenState extends State<WebShopScreen>
     )..repeat();
     _productControllers = [];
     _showPreOrders = widget.initialShowPreOrders;
+    if (widget.initialCategory != null) {
+      _selectedCategory = widget.initialCategory!;
+    }
     _loadProducts();
   }
 
@@ -85,11 +90,16 @@ class _WebShopScreenState extends State<WebShopScreen>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialShowPreOrders != widget.initialShowPreOrders) {
       _showPreOrders = widget.initialShowPreOrders;
-      _selectedCategory = 'All';
+      _selectedCategory = widget.initialCategory ?? 'All';
       _searchQuery = '';
       _searchController.clear();
       _currentPage = 1;
       _loadProducts();
+    } else if (oldWidget.initialCategory != widget.initialCategory) {
+      setState(() {
+        _selectedCategory = widget.initialCategory ?? 'All';
+      });
+      _filterProducts();
     }
   }
 
@@ -115,12 +125,11 @@ class _WebShopScreenState extends State<WebShopScreen>
 
       setState(() {
         _allProducts = products;
-        _filteredProducts = products;
         _categories = categories;
         _isLoading = false;
       });
       if (!mounted) return;
-      _createProductAnimations();
+      _filterProducts();
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -1214,9 +1223,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: _isGridView
-                        ? _primaryLight
-                        : Colors.transparent,
+                    color: _isGridView ? _primaryLight : Colors.transparent,
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(
@@ -1235,9 +1242,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: !_isGridView
-                        ? _primaryLight
-                        : Colors.transparent,
+                    color: !_isGridView ? _primaryLight : Colors.transparent,
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(
@@ -1287,10 +1292,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                           'Price: High to Low',
                           'Popular',
                         ]
-                        .map(
-                          (e) =>
-                              DropdownMenuItem(value: e, child: Text(e)),
-                        )
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                         .toList(),
                 onChanged: (val) {
                   if (val != null) {
@@ -2343,21 +2345,22 @@ class _WebShopScreenState extends State<WebShopScreen>
   // FOOTER
   // ─────────────────────────────────────────────
   Widget _buildFooter() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
     return Container(
-      padding: const EdgeInsets.all(40),
+      padding: EdgeInsets.all(isMobile ? 24 : 40),
       decoration: BoxDecoration(
         color: _dark,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Company
-              Expanded(
-                flex: 3,
-                child: Column(
+          if (isMobile)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Company
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
@@ -2397,11 +2400,9 @@ class _WebShopScreenState extends State<WebShopScreen>
                     ),
                   ],
                 ),
-              ),
-              // Support
-              Expanded(
-                flex: 2,
-                child: Column(
+                const SizedBox(height: 24),
+                // Support Links
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -2432,11 +2433,9 @@ class _WebShopScreenState extends State<WebShopScreen>
                     ),
                   ],
                 ),
-              ),
-              // Newsletter
-              Expanded(
-                flex: 3,
-                child: Column(
+                const SizedBox(height: 24),
+                // Newsletter
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -2506,14 +2505,174 @@ class _WebShopScreenState extends State<WebShopScreen>
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
+              ],
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Company
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: _primary,
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                            child: const Icon(
+                              Icons.eco_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'AgriDirect',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: _white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Bringing fresh, organic produce\nfrom local farms directly to you.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF9CA3AF),
+                          height: 1.6,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Support
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Support',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _white,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ...[
+                        'Help Center',
+                        'Delivery Info',
+                        'Returns',
+                        'Contact Us',
+                      ].map(
+                        (t) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            t,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF9CA3AF),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Newsletter
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Stay Updated',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Subscribe for weekly harvest updates.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF9CA3AF),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 36,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1F2937),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xFF374151),
+                                ),
+                              ),
+                              child: TextField(
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: _white,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Email',
+                                  hintStyle: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: const Color(0xFF6B7280),
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 9,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: _primary,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.send_rounded,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           const SizedBox(height: 24),
           Container(height: 1, color: const Color(0xFF374151)),
           const SizedBox(height: 16),
           Text(
-            '© 2025 AgriDirect. All rights reserved.',
+            '© 2026 AgriDirect. All rights reserved.',
             style: GoogleFonts.inter(
               fontSize: 11,
               color: const Color(0xFF6B7280),

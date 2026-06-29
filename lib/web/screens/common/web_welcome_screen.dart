@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,8 @@ import '../../../shared/services/auth/onboarding_service.dart';
 import '../../widgets/animated_components.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/router/app_routes.dart';
+import '../../widgets/web_hamburger_menu_button.dart';
+
 
 /// Web Welcome Screen — Premium animated landing page
 /// Features: animated wave hero, floating particles, scroll-reveal sections,
@@ -29,6 +32,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   bool _heroCtaHovered = false;
   bool _heroSecondaryHovered = false;
   int _activeBannerIndex = 1; // 0, 1, or 2
+  bool _showMobileBanner = true;
 
   @override
   void initState() {
@@ -69,25 +73,142 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildNavBar(),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildNavBar(),
 
-            _buildHeroSection(),
+                _buildHeroSection(),
 
-            _buildStatsBar(),
+                _buildStatsBar(),
 
-            _buildFeaturesSection(),
-            _buildAppDownloadSection(),
-            _buildHowItWorksSection(),
-            _buildTestimonialSection(),
-            _buildCtaSection(),
+                _buildFeaturesSection(),
+                _buildAppDownloadSection(),
+                _buildHowItWorksSection(),
+                _buildTestimonialSection(),
+                _buildCtaSection(),
 
-            _buildFooter(),
-          ],
+                _buildFooter(),
+              ],
+            ),
+          ),
+          if (isMobile && _showMobileBanner)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: _buildMobileAppBanner(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileAppBanner() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AgriColors.dark.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AgriColors.emerald500.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.android_rounded,
+                  color: AgriColors.emerald400,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AgriDirect Mobile App',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Download secure APK now.',
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        color: Colors.white.withValues(alpha: 0.65),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: _downloadAndroidApk,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AgriColors.emerald500,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'Install',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: () {
+                  setState(() {
+                    _showMobileBanner = false;
+                  });
+                },
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.white60,
+                  size: 18,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                splashRadius: 16,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -211,58 +332,15 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
             ),
             if (isMobile) ...[
               const SizedBox(width: 8),
-              PopupMenuButton<int>(
-                icon: const Icon(Icons.menu, color: AgriColors.emerald600),
-                tooltip: '',
-                onSelected: (index) {
+              WebHamburgerMenuButton(
+                currentIndex: 0,
+                onNavigate: (index) {
                   if (index == 3) {
                     context.go('/login');
                   } else {
                     context.go(navRoutes[index]);
                   }
                 },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 0,
-                    child: Row(
-                      children: [
-                        const Icon(Icons.home_rounded, color: AgriColors.muted, size: 20),
-                        const SizedBox(width: 8),
-                        Text('Home', style: GoogleFonts.inter()),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 1,
-                    child: Row(
-                      children: [
-                        const Icon(Icons.shopping_bag_rounded, color: AgriColors.muted, size: 20),
-                        const SizedBox(width: 8),
-                        Text('Shop', style: GoogleFonts.inter()),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 2,
-                    child: Row(
-                      children: [
-                        const Icon(Icons.people_rounded, color: AgriColors.muted, size: 20),
-                        const SizedBox(width: 8),
-                        Text('Community', style: GoogleFonts.inter()),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 3,
-                    child: Row(
-                      children: [
-                        const Icon(Icons.login_rounded, color: AgriColors.muted, size: 20),
-                        const SizedBox(width: 8),
-                        Text('Sign In', style: GoogleFonts.inter()),
-                      ],
-                    ),
-                  ),
-                ],
               ),
             ],
           ],
@@ -1916,10 +1994,57 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   }
 
   Widget _buildQrAndButtonDark({required bool isCompact}) {
+    if (isCompact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _buildSmartphoneMockup(),
+          const SizedBox(height: 48),
+          Text(
+            'Get it for Android',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '100% Safe & Verified APK Installation',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: Colors.white.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 24),
+          _PulseDownloadButton(
+            onTap: _downloadAndroidApk,
+            fullWidth: true,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.shield_outlined, color: AgriColors.emerald400, size: 14),
+              const SizedBox(width: 6),
+              Text(
+                'Virus-free & Malware-free guaranteed',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: Colors.white.withValues(alpha: 0.4),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 40),
+          _buildInstallationStepper(),
+        ],
+      );
+    }
+
     final actionColumn = Column(
-      crossAxisAlignment: isCompact
-          ? CrossAxisAlignment.center
-          : CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
@@ -1940,86 +2065,453 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
           ),
         ),
         const SizedBox(height: 24),
-        _downloadButton(),
+        _PulseDownloadButton(onTap: _downloadAndroidApk),
       ],
     );
 
-    final content = [
-      // Glassmorphic QR Card
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 40,
-              offset: const Offset(0, 20),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Builder(
-                builder: (context) {
-                  final apkUrl =
-                      Uri.base.resolve('/AgriDirect-Installer.apk').toString();
-                  final qrUrl =
-                      'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${Uri.encodeComponent(apkUrl)}';
-                  return Image.network(
-                    qrUrl,
-                    width: 280,
-                    height: 280,
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return SizedBox(
-                        width: 280,
-                        height: 280,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.white24,
-                            value: progress.expectedTotalBytes != null
-                                ? progress.cumulativeBytesLoaded /
-                                      progress.expectedTotalBytes!
-                                : null,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Glassmorphic QR Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 40,
+                offset: const Offset(0, 20),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Builder(
+                  builder: (context) {
+                    final apkUrl =
+                        Uri.base.resolve('/AgriDirect-Installer.apk').toString();
+                    final qrUrl =
+                        'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${Uri.encodeComponent(apkUrl)}';
+                    return Image.network(
+                      qrUrl,
+                      width: 280,
+                      height: 280,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return SizedBox(
+                          width: 280,
+                          height: 280,
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.white24,
+                              value: progress.expectedTotalBytes != null
+                                  ? progress.cumulativeBytesLoaded /
+                                        progress.expectedTotalBytes!
+                                  : null,
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                    errorBuilder: (_, _, _) => const Icon(
-                      Icons.qr_code_2,
-                      size: 280,
-                      color: Colors.white24,
+                        );
+                      },
+                      errorBuilder: (_, _, _) => const Icon(
+                        Icons.qr_code_2,
+                        size: 280,
+                        color: Colors.white24,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'SCAN TO INSTALL',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white.withValues(alpha: 0.6),
+                  letterSpacing: 2,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 32),
+        Flexible(child: actionColumn),
+      ],
+    );
+  }
+
+  Widget _buildSmartphoneMockup() {
+    return Container(
+      width: 280,
+      height: 560,
+      decoration: BoxDecoration(
+        color: AgriColors.darkCard,
+        borderRadius: BorderRadius.circular(40),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 8),
+        boxShadow: [
+          BoxShadow(
+            color: AgriColors.emerald500.withValues(alpha: 0.15),
+            blurRadius: 40,
+            spreadRadius: 5,
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.6),
+            blurRadius: 30,
+            offset: const Offset(0, 20),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: const BoxDecoration(
+            gradient: AgriColors.darkGradient,
+          ),
+          child: Column(
+            children: [
+              // Status bar simulator
+              Container(
+                height: 24,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '9:41',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  );
-                },
+                    Row(
+                      children: const [
+                        Icon(Icons.signal_cellular_alt_rounded, color: Colors.white, size: 10),
+                        SizedBox(width: 4),
+                        Icon(Icons.wifi_rounded, color: Colors.white, size: 10),
+                        SizedBox(width: 4),
+                        Icon(Icons.battery_full_rounded, color: Colors.white, size: 10),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'SCAN TO INSTALL',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                color: Colors.white.withValues(alpha: 0.6),
-                letterSpacing: 2,
+              
+              // Notch
+              Align(
+                alignment: Alignment.topCenter,
+                child: Container(
+                  width: 110,
+                  height: 18,
+                  decoration: const BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(12),
+                      bottomRight: Radius.circular(12),
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ],
+              
+              const SizedBox(height: 16),
+              
+              // App mockup UI header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    const BrandLogo(size: BrandLogoSize.small, inverted: true),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AgriColors.emerald500.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'PRO VERSION',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: AgriColors.emerald400,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    )
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Mini features mockup
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // App main illustration/welcome
+                      Container(
+                        height: 140,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AgriColors.emerald800.withValues(alpha: 0.4),
+                              AgriColors.emerald900.withValues(alpha: 0.4)
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                        ),
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              right: -20,
+                              bottom: -20,
+                              child: Icon(
+                                Icons.agriculture_rounded,
+                                size: 120,
+                                color: Colors.white.withValues(alpha: 0.05),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Fresh from farm to table',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Direct connection, zero middle-men fees.',
+                                    style: GoogleFonts.inter(
+                                      color: Colors.white70,
+                                      fontSize: 9,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Mock Dashboard item 1
+                      _buildMockDashboardItem(
+                        icon: Icons.storefront_rounded,
+                        title: 'Manage Your Shop',
+                        subtitle: 'List products and adjust pricing',
+                        color: AgriColors.emerald400,
+                      ),
+                      const SizedBox(height: 10),
+                      // Mock Dashboard item 2
+                      _buildMockDashboardItem(
+                        icon: Icons.shopping_bag_outlined,
+                        title: 'Quick Purchasing',
+                        subtitle: 'Secure checkout and order tracking',
+                        color: AgriColors.lime400,
+                      ),
+                      const SizedBox(height: 10),
+                      // Mock Dashboard item 3
+                      _buildMockDashboardItem(
+                        icon: Icons.chat_bubble_outline_rounded,
+                        title: 'Community Forums',
+                        subtitle: 'Discuss farming practices',
+                        color: AgriColors.teal400,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // Bottom Indicator Bar
+              Container(
+                height: 5,
+                width: 100,
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      const SizedBox(width: 32, height: 32),
-      // Action Column (Flexible on desktop only)
-      isCompact ? actionColumn : Flexible(child: actionColumn),
+    );
+  }
+
+  Widget _buildMockDashboardItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 14),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 10,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(
+                    color: Colors.white54,
+                    fontSize: 8,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstallationStepper() {
+    final steps = [
+      {
+        'num': '1',
+        'title': 'Download',
+        'desc': 'Tap download button above to get the safe APK file.',
+        'icon': Icons.download_rounded,
+      },
+      {
+        'num': '2',
+        'title': 'Allow Settings',
+        'desc': 'Enable "Install from Unknown Sources" in your Android settings.',
+        'icon': Icons.settings_suggest_rounded,
+      },
+      {
+        'num': '3',
+        'title': 'Enjoy',
+        'desc': 'Open the app and log in to explore AgriDirect.',
+        'icon': Icons.rocket_launch_rounded,
+      },
     ];
 
-    return isCompact
-        ? Column(children: content)
-        : Row(mainAxisSize: MainAxisSize.min, children: content);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0),
+          child: Text(
+            'Simple 3-Step Installation',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        ...steps.map((s) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    color: AgriColors.emerald500,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      s['num'] as String,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s['title'] as String,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        s['desc'] as String,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  s['icon'] as IconData,
+                  color: AgriColors.emerald400.withValues(alpha: 0.6),
+                  size: 20,
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
   }
 
   Widget _buildBannerGallery({required bool isCompact}) {
@@ -2727,4 +3219,125 @@ class _Step {
   final String description;
   final IconData icon;
   const _Step(this.title, this.description, this.icon);
+}
+
+class _PulseDownloadButton extends StatefulWidget {
+  final VoidCallback onTap;
+  final bool fullWidth;
+
+  const _PulseDownloadButton({
+    required this.onTap,
+    this.fullWidth = false,
+  });
+
+  @override
+  State<_PulseDownloadButton> createState() => _PulseDownloadButtonState();
+}
+
+class _PulseDownloadButtonState extends State<_PulseDownloadButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _glowAnimation;
+  late Animation<double> _scaleAnimation;
+  bool _isHovered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _glowAnimation = Tween<double>(begin: 8.0, end: 24.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.03).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _isHovered ? 1.05 : _scaleAnimation.value,
+          duration: const Duration(milliseconds: 200),
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return Container(
+                width: widget.fullWidth ? double.infinity : null,
+                height: 58,
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AgriColors.emerald400, AgriColors.emerald600],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AgriColors.emerald500.withValues(
+                        alpha: _isHovered ? 0.6 : 0.35,
+                      ),
+                      blurRadius: _isHovered ? 28 : _glowAnimation.value,
+                      spreadRadius: _isHovered ? 2 : 0,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: child,
+              );
+            },
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: widget.fullWidth ? MainAxisSize.max : MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.android_rounded, color: Colors.white, size: 24),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Download APK',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'v1.0.0',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

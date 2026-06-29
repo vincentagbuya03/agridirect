@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 // ═══════════════════════════════════════════════════════════════════════
 // AGRIDIRECT — PREMIUM ANIMATED DESIGN COMPONENTS v2.0
@@ -1328,7 +1329,7 @@ class MiniBarChart extends StatefulWidget {
     this.barColor = const Color(0xFF10B981),
     this.bgColor = const Color(0xFFF0FDF4),
     this.height = 160,
-    this.barWidth = 28,
+    this.barWidth = 24,
   });
 
   @override
@@ -1338,15 +1339,16 @@ class MiniBarChart extends StatefulWidget {
 class _MiniBarChartState extends State<MiniBarChart>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  int _hoveredIndex = -1;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    Future.delayed(const Duration(milliseconds: 300), () {
+    Future.delayed(const Duration(milliseconds: 200), () {
       if (mounted) _controller.forward();
     });
   }
@@ -1360,51 +1362,134 @@ class _MiniBarChartState extends State<MiniBarChart>
   @override
   Widget build(BuildContext context) {
     final maxVal = widget.values.reduce(math.max);
+    final divisor = maxVal == 0.0 ? 1.0 : maxVal;
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
-        final progress = Curves.easeOutCubic.transform(_controller.value);
-        return SizedBox(
-          height: widget.height + (widget.labels != null ? 28 : 0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(widget.values.length, (i) {
-              final barHeight = (widget.values[i] / maxVal) * widget.height * progress;
-              return Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Container(
-                    width: widget.barWidth,
-                    height: barHeight.clamp(4, widget.height),
-                    decoration: BoxDecoration(
-                      color: widget.barColor.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(widget.barWidth / 3),
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [
-                          widget.barColor.withValues(alpha: 0.6),
-                          widget.barColor,
+        final progress = Curves.easeOutBack.transform(_controller.value);
+        return Stack(
+          children: [
+            // Background Grid Lines
+            Positioned.fill(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(4, (i) {
+                  return Container(
+                    height: 1,
+                    color: AgriColors.border.withValues(alpha: 0.45),
+                  );
+                }),
+              ),
+            ),
+            
+            // Bar Columns
+            SizedBox(
+              height: widget.height + (widget.labels != null ? 48 : 24),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(widget.values.length, (i) {
+                  final rawBarHeight = (widget.values[i] / divisor) * widget.height;
+                  final barHeight = rawBarHeight * progress;
+                  final isHovered = _hoveredIndex == i;
+                  final displayValue = widget.values[i] > 0
+                      ? '₱${widget.values[i].toStringAsFixed(0)}'
+                      : '';
+
+                  return MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    onEnter: (_) => setState(() => _hoveredIndex = i),
+                    onExit: (_) => setState(() => _hoveredIndex = -1),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        // Tooltip Value above bar
+                        SizedBox(
+                          height: 20,
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 150),
+                            opacity: (isHovered && widget.values[i] > 0) ? 1.0 : 0.0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AgriColors.darkAlt,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                displayValue,
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        // Bar Stack (Track + Colored Fill)
+                        Stack(
+                          alignment: Alignment.bottomCenter,
+                          children: [
+                            // Background track bar (always visible)
+                            Container(
+                              width: widget.barWidth,
+                              height: widget.height,
+                              decoration: BoxDecoration(
+                                color: widget.barColor.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(widget.barWidth / 2.5),
+                                border: Border.all(
+                                  color: widget.barColor.withValues(alpha: 0.08),
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                            // Animated colored bar fill
+                            if (widget.values[i] > 0)
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: widget.barWidth,
+                                height: barHeight.clamp(0, widget.height),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(widget.barWidth / 2.5),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                    colors: [
+                                      widget.barColor.withValues(alpha: isHovered ? 0.95 : 0.75),
+                                      widget.barColor,
+                                    ],
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: widget.barColor.withValues(alpha: isHovered ? 0.35 : 0.15),
+                                      blurRadius: isHovered ? 12 : 6,
+                                      offset: const Offset(0, -2),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (widget.labels != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            widget.labels![i],
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: isHovered ? FontWeight.w700 : FontWeight.w500,
+                              color: isHovered ? AgriColors.darkAlt : AgriColors.muted,
+                            ),
+                          ),
                         ],
-                      ),
+                      ],
                     ),
-                  ),
-                  if (widget.labels != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.labels![i],
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AgriColors.muted,
-                      ),
-                    ),
-                  ],
-                ],
-              );
-            }),
-          ),
+                  );
+                }),
+              ),
+            ),
+          ],
         );
       },
     );

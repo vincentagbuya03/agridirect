@@ -11,6 +11,8 @@ import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
+import '../../widgets/web_hamburger_menu_button.dart';
+
 
 class WebSalesDashboard extends StatefulWidget {
   final Function(int) onNavigate;
@@ -358,64 +360,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           ),
           if (isMobile) ...[
             const SizedBox(width: 8),
-            PopupMenuButton<int>(
-              icon: const Icon(Icons.menu, color: _primary),
-              tooltip: '',
-              onSelected: (index) {
-                widget.onNavigate(index);
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 0,
-                  child: Row(
-                    children: [
-                      Icon(Icons.dashboard_rounded, color: widget.currentIndex == 0 ? _primary : _muted, size: 20),
-                      const SizedBox(width: 8),
-                      Text('Dashboard', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 0 ? FontWeight.bold : FontWeight.normal)),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 1,
-                  child: Row(
-                    children: [
-                      Icon(Icons.agriculture_rounded, color: widget.currentIndex == 1 ? _primary : _muted, size: 20),
-                      const SizedBox(width: 8),
-                      Text('Products', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 1 ? FontWeight.bold : FontWeight.normal)),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 2,
-                  child: Row(
-                    children: [
-                      Icon(Icons.receipt_long_rounded, color: widget.currentIndex == 2 ? _primary : _muted, size: 20),
-                      const SizedBox(width: 8),
-                      Text('Orders', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 2 ? FontWeight.bold : FontWeight.normal)),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 3,
-                  child: Row(
-                    children: [
-                      Icon(Icons.people_rounded, color: widget.currentIndex == 3 ? _primary : _muted, size: 20),
-                      const SizedBox(width: 8),
-                      Text('Community', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 3 ? FontWeight.bold : FontWeight.normal)),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 4,
-                  child: Row(
-                    children: [
-                      Icon(Icons.person_rounded, color: widget.currentIndex == 4 ? _primary : _muted, size: 20),
-                      const SizedBox(width: 8),
-                      Text('Profile', style: GoogleFonts.inter(fontWeight: widget.currentIndex == 4 ? FontWeight.bold : FontWeight.normal)),
-                    ],
-                  ),
-                ),
-              ],
+            WebHamburgerMenuButton(
+              currentIndex: widget.currentIndex,
+              onNavigate: widget.onNavigate,
             ),
           ],
         ],
@@ -796,6 +743,10 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             height: 240,
             child: MiniBarChart(
               values: _salesData,
+              labels: List.generate(7, (i) {
+                final day = DateTime.now().subtract(Duration(days: 6 - i));
+                return DateFormat('E').format(day);
+              }),
               barColor: _primary,
             ),
           ),

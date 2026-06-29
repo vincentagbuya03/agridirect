@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/app_data.dart';
 import '../core/supabase_data_service.dart';
@@ -25,17 +27,84 @@ class CartService extends ChangeNotifier {
   bool get isAllSelected => _items.isNotEmpty && _items.every((item) => item.isSelected);
 
   Future<void> _initialize() async {
-    _supabase.auth.onAuthStateChange.listen((data) {
+    _supabase.auth.onAuthStateChange.listen((data) async {
       if (data.session == null) {
-        _items.clear();
         _customerId = null;
-        notifyListeners();
+        await loadCart();
       } else {
-        loadCart();
+        await _mergeGuestCartToDb();
+        await loadCart();
       }
     });
-    if (_supabase.auth.currentUser != null) {
-      await loadCart();
+    await loadCart();
+  }
+
+  Future<void> _mergeGuestCartToDb() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final guestCartJson = prefs.getString('guest_cart');
+      if (guestCartJson != null && guestCartJson.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(guestCartJson);
+        final guestItems = decoded.map((item) => CartItem.fromJson(item)).toList();
+        
+        final customerId = await _getCustomerId();
+        final currentUserId = _supabase.auth.currentUser?.id;
+        
+        if (customerId != null) {
+          for (var item in guestItems) {
+            if (currentUserId != null && item.farmerId == currentUserId) {
+              continue;
+            }
+            
+            final existing = await _supabase
+                .from('cart_items')
+                .select('quantity')
+                .eq('customer_id', customerId)
+                .eq('product_id', item.productId)
+                .maybeSingle();
+                
+            int newQty = item.quantity;
+            if (existing != null) {
+              newQty += (existing['quantity'] as num).toInt();
+            }
+            
+            await _supabase.from('cart_items').upsert({
+              'customer_id': customerId,
+              'product_id': item.productId,
+              'quantity': newQty,
+              'updated_at': DateTime.now().toIso8601String(),
+            }, onConflict: 'customer_id,product_id');
+          }
+        }
+        await prefs.remove('guest_cart');
+      }
+    } catch (e) {
+      debugPrint('[Cart] Error merging guest cart: $e');
+    }
+  }
+
+  Future<void> _saveGuestCart() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = jsonEncode(_items.map((item) => item.toJson()).toList());
+      await prefs.setString('guest_cart', jsonStr);
+    } catch (e) {
+      debugPrint('[Cart] Error saving guest cart: $e');
+    }
+  }
+
+  Future<void> _loadGuestCart() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('guest_cart');
+      _items.clear();
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(jsonStr);
+        _items.addAll(decoded.map((item) => CartItem.fromJson(item)));
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[Cart] Error loading guest cart: $e');
     }
   }
 
@@ -60,6 +129,12 @@ class CartService extends ChangeNotifier {
   }
 
   Future<void> loadCart() async {
+    final currentUserId = _supabase.auth.currentUser?.id;
+    if (currentUserId == null) {
+      await _loadGuestCart();
+      return;
+    }
+
     final customerId = await _getCustomerId();
     if (customerId == null) return;
 
@@ -75,7 +150,6 @@ class CartService extends ChangeNotifier {
       for (var dbItem in dbItems) {
         final productId = dbItem['product_id'] as String;
         
-        // If we already have this product in our map, just update the quantity (if larger)
         if (uniqueItems.containsKey(productId)) {
           final newQty = (dbItem['quantity'] as num).toInt();
           if (newQty > uniqueItems[productId]!.quantity) {
@@ -126,10 +200,8 @@ class CartService extends ChangeNotifier {
   Future<void> addItem(ProductItem product, [int quantity = 1]) async {
     if (product.productId == null) return;
 
-    final customerId = await _getCustomerId();
     final currentUserId = _supabase.auth.currentUser?.id;
 
-    // Safety net: Prevent adding own product to cart
     if (currentUserId != null && product.farmerId == currentUserId) {
       debugPrint('[Cart] 🛡️ Blocked attempt to add own product: ${product.productId}');
       return;
@@ -139,13 +211,18 @@ class CartService extends ChangeNotifier {
 
     if (index != -1) {
       _items[index].quantity += quantity;
-      if (customerId != null) {
-        await _supabase.from('cart_items').upsert({
-          'customer_id': customerId,
-          'product_id': product.productId!,
-          'quantity': _items[index].quantity,
-          'updated_at': DateTime.now().toIso8601String(),
-        }, onConflict: 'customer_id,product_id');
+      if (currentUserId != null) {
+        final customerId = await _getCustomerId();
+        if (customerId != null) {
+          await _supabase.from('cart_items').upsert({
+            'customer_id': customerId,
+            'product_id': product.productId!,
+            'quantity': _items[index].quantity,
+            'updated_at': DateTime.now().toIso8601String(),
+          }, onConflict: 'customer_id,product_id');
+        }
+      } else {
+        await _saveGuestCart();
       }
     } else {
       final newItem = CartItem(
@@ -160,51 +237,71 @@ class CartService extends ChangeNotifier {
       );
       _items.add(newItem);
 
-      if (customerId != null) {
-        await _supabase.from('cart_items').upsert({
-          'customer_id': customerId,
-          'product_id': product.productId!,
-          'quantity': quantity,
-          'updated_at': DateTime.now().toIso8601String(),
-        }, onConflict: 'customer_id,product_id');
+      if (currentUserId != null) {
+        final customerId = await _getCustomerId();
+        if (customerId != null) {
+          await _supabase.from('cart_items').upsert({
+            'customer_id': customerId,
+            'product_id': product.productId!,
+            'quantity': quantity,
+            'updated_at': DateTime.now().toIso8601String(),
+          }, onConflict: 'customer_id,product_id');
+        }
+      } else {
+        await _saveGuestCart();
       }
     }
     notifyListeners();
   }
 
   Future<void> removeItem(String productId) async {
-    final customerId = await _getCustomerId();
+    final currentUserId = _supabase.auth.currentUser?.id;
     _items.removeWhere((item) => item.productId == productId);
     
-    if (customerId != null) {
-      await _supabase.from('cart_items')
-          .delete()
-          .eq('customer_id', customerId)
-          .eq('product_id', productId);
+    if (currentUserId != null) {
+      final customerId = await _getCustomerId();
+      if (customerId != null) {
+        await _supabase.from('cart_items')
+            .delete()
+            .eq('customer_id', customerId)
+            .eq('product_id', productId);
+      }
+    } else {
+      await _saveGuestCart();
     }
     notifyListeners();
   }
 
   Future<void> updateQuantity(String productId, int quantity) async {
-    final customerId = await _getCustomerId();
+    final currentUserId = _supabase.auth.currentUser?.id;
     final index = _items.indexWhere((item) => item.productId == productId);
     
     if (index != -1) {
       if (quantity <= 0) {
         _items.removeAt(index);
-        if (customerId != null) {
-          await _supabase.from('cart_items')
-              .delete()
-              .eq('customer_id', customerId)
-              .eq('product_id', productId);
+        if (currentUserId != null) {
+          final customerId = await _getCustomerId();
+          if (customerId != null) {
+            await _supabase.from('cart_items')
+                .delete()
+                .eq('customer_id', customerId)
+                .eq('product_id', productId);
+          }
+        } else {
+          await _saveGuestCart();
         }
       } else {
         _items[index].quantity = quantity;
-        if (customerId != null) {
-          await _supabase.from('cart_items').update({
-            'quantity': quantity,
-            'updated_at': DateTime.now().toIso8601String(),
-          }).eq('customer_id', customerId).eq('product_id', productId);
+        if (currentUserId != null) {
+          final customerId = await _getCustomerId();
+          if (customerId != null) {
+            await _supabase.from('cart_items').update({
+              'quantity': quantity,
+              'updated_at': DateTime.now().toIso8601String(),
+            }).eq('customer_id', customerId).eq('product_id', productId);
+          }
+        } else {
+          await _saveGuestCart();
         }
       }
       notifyListeners();
@@ -212,28 +309,38 @@ class CartService extends ChangeNotifier {
   }
 
   Future<void> clear() async {
-    final customerId = await _getCustomerId();
+    final currentUserId = _supabase.auth.currentUser?.id;
     _items.clear();
     
-    if (customerId != null) {
-      await _supabase.from('cart_items')
-          .delete()
-          .eq('customer_id', customerId);
+    if (currentUserId != null) {
+      final customerId = await _getCustomerId();
+      if (customerId != null) {
+        await _supabase.from('cart_items')
+            .delete()
+            .eq('customer_id', customerId);
+      }
+    } else {
+      await _saveGuestCart();
     }
     notifyListeners();
   }
 
   Future<void> removeSelected() async {
-    final customerId = await _getCustomerId();
+    final currentUserId = _supabase.auth.currentUser?.id;
     final selectedIds = _items.where((item) => item.isSelected).map((e) => e.productId).toList();
     
     _items.removeWhere((item) => item.isSelected);
     
-    if (customerId != null && selectedIds.isNotEmpty) {
-      await _supabase.from('cart_items')
-          .delete()
-          .eq('customer_id', customerId)
-          .inFilter('product_id', selectedIds);
+    if (currentUserId != null) {
+      final customerId = await _getCustomerId();
+      if (customerId != null && selectedIds.isNotEmpty) {
+        await _supabase.from('cart_items')
+            .delete()
+            .eq('customer_id', customerId)
+            .inFilter('product_id', selectedIds);
+      }
+    } else {
+      await _saveGuestCart();
     }
     notifyListeners();
   }

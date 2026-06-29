@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../shared/styles/app_theme.dart';
 import '../../shared/data/app_data.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -6,6 +7,8 @@ import '../widgets/comments_dialog.dart';
 import '../widgets/report_content_dialog.dart';
 import '../services/core/supabase_data_service.dart';
 import '../widgets/forum_video_player.dart';
+import '../services/auth/auth_service.dart';
+import '../router/app_routes.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final ForumPostItem post;
@@ -34,6 +37,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   Future<void> _toggleLike() async {
+    if (!AuthService().isLoggedIn) {
+      context.go(AppRoutes.login);
+      return;
+    }
     if (_isUpdatingLike) return;
 
     final wasLiked = _post.isLiked;
@@ -64,6 +71,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   Future<void> _openComments() async {
+    if (!AuthService().isLoggedIn) {
+      context.go(AppRoutes.login);
+      return;
+    }
     final updated = await showDialog<bool>(
       context: context,
       builder: (context) => CommentsDialog(postId: _post.id),
