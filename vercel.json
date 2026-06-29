@@ -4,6 +4,13 @@
   "outputDirectory": "build/web",
   "cleanUrls": true,
   "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/download-apk",
+      "destination": "https://github.com/vincentagbuya03/agridirect/releases/latest/download/AgriDirect-Installer.apk",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
