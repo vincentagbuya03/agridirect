@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/services/auth/onboarding_service.dart';
 import '../../widgets/animated_components.dart';
 import '../../../shared/widgets/brand_logo.dart';

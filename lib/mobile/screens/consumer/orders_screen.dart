@@ -1481,25 +1481,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
       }),
     );
   }
-
-  Color _getStatusColor(String status) {
-    switch (status.toUpperCase()) {
-      case 'PENDING':
-        return AppColors.warning;
-      case 'CONFIRMED':
-      case 'PROCESSING':
-        return const Color(0xFF0EA5E9);
-      case 'SHIPPED':
-        return AppColors.primary;
-      case 'DELIVERED':
-        return AppColors.success;
-      case 'CANCELLED':
-      case 'REFUNDED':
-        return AppColors.error;
-      default:
-        return AppColors.textSubtle;
-    }
-  }
 }
 
 class _CircularProgressRing extends StatelessWidget {
