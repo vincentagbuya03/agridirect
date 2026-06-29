@@ -10,6 +10,7 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
+import '../../../shared/utils/apk_downloader.dart';
 
 // Web Profile screen.
 /// Shows user info, "Start Selling" button, and account settings.
@@ -150,19 +151,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   child: GestureDetector(
                     onTap: () async {
                       Navigator.of(ctx).pop();
-                      final uri = Uri.parse(
-                          'https://github.com/vincentagbuya03/agridirect/releases/latest/download/AgriDirect-Installer.apk');
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(uri, webOnlyWindowName: '_self');
-                      } else {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Could not start download.'),
-                            ),
-                          );
-                        }
-                      }
+                      await ApkDownloader.download();
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 14),

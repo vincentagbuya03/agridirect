@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../shared/services/auth/auth_service.dart';
 import '../../shared/router/app_routes.dart';
+import '../../shared/utils/apk_downloader.dart';
 
 class WebHamburgerMenuButton extends StatefulWidget {
   final int currentIndex;
@@ -49,9 +50,7 @@ class _WebHamburgerMenuButtonState extends State<WebHamburgerMenuButton> {
   }
 
   Future<void> _downloadAndroidApk() async {
-    final uri = Uri.parse(
-        'https://github.com/vincentagbuya03/agridirect/releases/latest/download/AgriDirect-Installer.apk');
-    await launchUrl(uri, webOnlyWindowName: '_self');
+    await ApkDownloader.download();
   }
 
   void _handleLogout() async {

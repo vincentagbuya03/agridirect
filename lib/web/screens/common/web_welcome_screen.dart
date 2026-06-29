@@ -8,6 +8,7 @@ import '../../widgets/animated_components.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../widgets/web_hamburger_menu_button.dart';
+import '../../../shared/utils/apk_downloader.dart';
 
 
 /// Web Welcome Screen — Premium animated landing page
@@ -67,9 +68,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   }
 
   Future<void> _downloadAndroidApk() async {
-    final uri = Uri.parse(
-        'https://github.com/vincentagbuya03/agridirect/releases/latest/download/AgriDirect-Installer.apk');
-    await launchUrl(uri, webOnlyWindowName: '_self');
+    await ApkDownloader.download();
   }
 
   @override
@@ -2094,8 +2093,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 borderRadius: BorderRadius.circular(20),
                 child: Builder(
                   builder: (context) {
-                    final apkUrl =
-                        'https://github.com/vincentagbuya03/agridirect/releases/latest/download/AgriDirect-Installer.apk';
+                    final apkUrl = ApkDownloader.apkUrl;
                     final qrUrl =
                         'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${Uri.encodeComponent(apkUrl)}';
                     return Image.network(

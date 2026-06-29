@@ -6,6 +6,7 @@ import '../../shared/services/auth/auth_service.dart';
 import '../../shared/services/commerce/cart_service.dart';
 import '../../shared/widgets/brand_logo.dart';
 import 'web_hamburger_menu_button.dart';
+import '../../shared/utils/apk_downloader.dart';
 
 
 class WebConsumerNavBar extends StatefulWidget {
@@ -39,9 +40,7 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
   int _hoveredNav = -1;
 
   Future<void> _downloadAndroidApk() async {
-    final uri = Uri.parse(
-        'https://github.com/vincentagbuya03/agridirect/releases/latest/download/AgriDirect-Installer.apk');
-    await launchUrl(uri, webOnlyWindowName: '_self');
+    await ApkDownloader.download();
   }
 
   Widget _buildGlobalMobileAppBanner() {
