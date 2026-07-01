@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/models/order/order_model.dart';
 import '../../../shared/router/app_routes.dart';
@@ -279,37 +281,48 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Widget _buildHeaderNotification() {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppColors.textHeadline.withValues(alpha: 0.1),
-        ),
-      ),
-      child: Stack(
-        children: [
-          const Icon(
-            Icons.notifications_none_rounded,
-            color: AppColors.textHeadline,
-            size: 24,
-          ),
-          Positioned(
-            top: 0,
-            right: 0,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: AppColors.error,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+    final userId = AuthService().userId;
+    return FutureBuilder<int>(
+      future: NotificationService().getUnreadNotificationCount(userId),
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        return GestureDetector(
+          onTap: () => context.push(AppRoutes.notifications),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.textHeadline.withValues(alpha: 0.1),
               ),
             ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(
+                  Icons.notifications_none_rounded,
+                  color: AppColors.textHeadline,
+                  size: 24,
+                ),
+                if (count > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: AppColors.error,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

@@ -41,60 +41,17 @@ class _WebNavigationState extends State<WebNavigation> {
     super.initState();
     _currentIndex = widget.initialIndex;
     _auth.addListener(_onAuthChanged);
-    _subscribeToIncomingCalls();
   }
 
   @override
   void dispose() {
     _auth.removeListener(_onAuthChanged);
-    CallService().unsubscribeIncomingCalls();
     super.dispose();
   }
 
   void _onAuthChanged() {
     if (!mounted) return;
     setState(() {});
-    _subscribeToIncomingCalls();
-  }
-
-  void _subscribeToIncomingCalls() {
-    if (!_auth.isLoggedIn) return;
-
-    CallService().subscribeToIncomingCalls(
-      onIncomingCall: (callData) async {
-        if (!mounted || _isShowingIncomingCall) return;
-
-        final callerId = callData['caller_id']?.toString() ?? '';
-        String callerName = 'AgriDirect User';
-        String? avatarUrl;
-
-        try {
-          final profile = await UserService().getUserById(callerId);
-          if (profile != null) {
-            callerName = profile.name;
-            avatarUrl = profile.avatarUrl;
-          }
-        } catch (_) {}
-
-        if (!mounted) return;
-        _isShowingIncomingCall = true;
-
-        final callId = callData['call_id']?.toString() ?? '';
-        // Navigate to the dedicated call page — full-screen on web.
-        await context.push('/call/$callId', extra: {
-          'name': callerName,
-          'avatarUrl': avatarUrl,
-          'channelName': callData['channel_name']?.toString() ?? '',
-          'isVideo': callData['is_video'] == true,
-          'isIncoming': true,
-        });
-
-        _isShowingIncomingCall = false;
-      },
-      onCallUpdated: (callData) {
-        // InAppCallScreen owns call-status dismissal once navigated.
-      },
-    );
   }
 
   void _navigateTo(int index, [String? category]) {

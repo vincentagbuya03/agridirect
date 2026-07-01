@@ -252,6 +252,12 @@ class MessageService {
     })();
   }
 
+  Stream<int> watchTotalUnreadCount({required bool asFarmer}) {
+    return watchInbox(asFarmer: asFarmer).map((conversations) {
+      return conversations.fold<int>(0, (sum, conv) => sum + conv.unreadCount);
+    });
+  }
+
   /// Get one-time messages for a conversation (for duplicate detection etc.)
   Future<List<ChatMessage>> getMessages({required String conversationId}) async {
     try {

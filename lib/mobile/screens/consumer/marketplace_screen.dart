@@ -57,7 +57,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       builder: (context, snapshot) {
         final count = snapshot.data ?? 0;
         return GestureDetector(
-          onTap: () => showMobileNotificationsSheet(context),
+          onTap: () => context.push(AppRoutes.notifications),
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(

@@ -287,9 +287,20 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 900;
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: isWide || _selectedConversationId != null
+    return PopScope(
+      canPop: _selectedConversationId == null || isWide,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        if (_selectedConversationId != null && !isWide) {
+          setState(() {
+            _selectedConversationId = null;
+            NotificationService().setActiveConversation(null);
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: isWide || _selectedConversationId != null
           ? null 
           : AppBar(
               backgroundColor: Colors.white,
@@ -412,8 +423,9 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildAsFarmerBadge() {
     return Container(
@@ -796,6 +808,8 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                   children: [
                     Text(
                       conversation.otherDisplayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.bodyLarge.copyWith(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
@@ -819,40 +833,46 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                           },
                         ),
                         const SizedBox(width: 6),
-                        ValueListenableBuilder<Set<String>>(
-                          valueListenable:
-                              NotificationService().onlineUsersNotifier,
-                          builder: (context, onlineUsers, _) {
-                            final isOnline = onlineUsers.contains(
-                              conversation.otherUserId,
-                            );
-                            if (isOnline) {
+                        Expanded(
+                          child: ValueListenableBuilder<Set<String>>(
+                            valueListenable:
+                                NotificationService().onlineUsersNotifier,
+                            builder: (context, onlineUsers, _) {
+                              final isOnline = onlineUsers.contains(
+                                conversation.otherUserId,
+                              );
+                              if (isOnline) {
+                                return Text(
+                                  'Active now',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    color: AppColors.success,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                );
+                              }
+
+                              final lastActiveLocal = NotificationService().getLastActive(conversation.otherUserId);
+                              DateTime? lastActive = lastActiveLocal;
+                              if (lastActive == null && conversation.otherUpdatedAt != null) {
+                                lastActive = DateTime.tryParse(conversation.otherUpdatedAt!);
+                              }
+
+                              final statusText = lastActive != null ? _formatLastActive(lastActive) : 'Offline';
+
                               return Text(
-                                'Active now',
+                                statusText,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: AppTextStyles.labelSmall.copyWith(
-                                  color: AppColors.success,
+                                  color: AppColors.textSubtle,
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w600,
                                 ),
                               );
-                            }
-
-                            final lastActiveLocal = NotificationService().getLastActive(conversation.otherUserId);
-                            DateTime? lastActive = lastActiveLocal;
-                            if (lastActive == null && conversation.otherUpdatedAt != null) {
-                              lastActive = DateTime.tryParse(conversation.otherUpdatedAt!);
-                            }
-
-                            final statusText = lastActive != null ? _formatLastActive(lastActive) : 'Offline';
-
-                            return Text(
-                              statusText,
-                              style: AppTextStyles.labelSmall.copyWith(
-                                color: AppColors.textSubtle,
-                                fontSize: 11,
-                              ),
-                            );
-                          },
+                            },
+                          ),
                         ),
                       ],
                     ),
@@ -1490,6 +1510,8 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                   children: [
                     Text(
                       conversation.otherDisplayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.bodyLarge.copyWith(
                         fontWeight: FontWeight.w800,
                         fontSize: 17,
@@ -1512,40 +1534,46 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                           },
                         ),
                         const SizedBox(width: 6),
-                        ValueListenableBuilder<Set<String>>(
-                          valueListenable:
-                              NotificationService().onlineUsersNotifier,
-                          builder: (context, onlineUsers, _) {
-                            final isOnline = onlineUsers.contains(
-                              conversation.otherUserId,
-                            );
-                            if (isOnline) {
+                        Expanded(
+                          child: ValueListenableBuilder<Set<String>>(
+                            valueListenable:
+                                NotificationService().onlineUsersNotifier,
+                            builder: (context, onlineUsers, _) {
+                              final isOnline = onlineUsers.contains(
+                                conversation.otherUserId,
+                              );
+                              if (isOnline) {
+                                return Text(
+                                  'Active now',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    color: AppColors.success,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                );
+                              }
+
+                              final lastActiveLocal = NotificationService().getLastActive(conversation.otherUserId);
+                              DateTime? lastActive = lastActiveLocal;
+                              if (lastActive == null && conversation.otherUpdatedAt != null) {
+                                lastActive = DateTime.tryParse(conversation.otherUpdatedAt!);
+                              }
+
+                              final statusText = lastActive != null ? _formatLastActive(lastActive) : 'Offline';
+
                               return Text(
-                                'Active now',
+                                statusText,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: AppTextStyles.labelSmall.copyWith(
-                                  color: AppColors.success,
+                                  color: AppColors.textSubtle,
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w600,
                                 ),
                               );
-                            }
-
-                            final lastActiveLocal = NotificationService().getLastActive(conversation.otherUserId);
-                            DateTime? lastActive = lastActiveLocal;
-                            if (lastActive == null && conversation.otherUpdatedAt != null) {
-                              lastActive = DateTime.tryParse(conversation.otherUpdatedAt!);
-                            }
-
-                            final statusText = lastActive != null ? _formatLastActive(lastActive) : 'Offline';
-
-                            return Text(
-                              statusText,
-                              style: AppTextStyles.labelSmall.copyWith(
-                                color: AppColors.textSubtle,
-                                fontSize: 11,
-                              ),
-                            );
-                          },
+                            },
+                          ),
                         ),
                       ],
                     ),

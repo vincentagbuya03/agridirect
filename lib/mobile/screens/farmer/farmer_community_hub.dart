@@ -11,6 +11,7 @@ import '../../../shared/screens/article_detail_screen.dart';
 import '../../../shared/router/app_routes.dart';
 
 import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/widgets/forum_video_player.dart';
 
 /// Farmer Community Hub - Professional Social Interface
@@ -166,31 +167,43 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
   }
 
   Widget _buildNotificationBadge() {
-    return Stack(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
+    final userId = AuthService().userId;
+    return FutureBuilder<int>(
+      future: NotificationService().getUnreadNotificationCount(userId),
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        return GestureDetector(
+          onTap: () => context.push(AppRoutes.notifications),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
+                ),
+                child: const Icon(Icons.notifications_none_rounded, size: 24, color: AppColors.textHeadline),
+              ),
+              if (count > 0)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: AppColors.error,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  ),
+                ),
+            ],
           ),
-          child: const Icon(Icons.notifications_none_rounded, size: 24, color: AppColors.textHeadline),
-        ),
-        Positioned(
-          top: 8,
-          right: 8,
-          child: Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: AppColors.error,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 

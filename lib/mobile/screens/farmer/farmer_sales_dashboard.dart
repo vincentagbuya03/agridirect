@@ -15,6 +15,8 @@ import '../../widgets/skeleton_loaders.dart';
 import '../../../shared/services/farmer/farmer_service.dart';
 import '../../../shared/services/offline/offline_product_service.dart';
 import '../../widgets/mobile_notifications_sheet.dart';
+import '../../../shared/services/community/notification_service.dart';
+import '../../../shared/services/community/message_service.dart';
 
 /// Farmer Sales Dashboard
 class FarmerSalesDashboard extends StatefulWidget {
@@ -698,20 +700,32 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                           ],
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () => context.push(AppRoutes.farmerMessages),
-                        child: _buildHeaderAction(
-                          Icons.chat_bubble_outline_rounded,
-                          false,
-                        ),
+                      StreamBuilder<int>(
+                        stream: MessageService().watchTotalUnreadCount(asFarmer: true),
+                        builder: (context, snapshot) {
+                          final count = snapshot.data ?? 0;
+                          return GestureDetector(
+                            onTap: () => context.push(AppRoutes.farmerMessages),
+                            child: _buildHeaderAction(
+                              Icons.chat_bubble_outline_rounded,
+                              count > 0,
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(width: 12),
-                      GestureDetector(
-                        onTap: () => showMobileNotificationsSheet(context),
-                        child: _buildHeaderAction(
-                          Icons.notifications_none_rounded,
-                          true,
-                        ),
+                      FutureBuilder<int>(
+                        future: NotificationService().getUnreadNotificationCount(_auth.userId),
+                        builder: (context, snapshot) {
+                          final count = snapshot.data ?? 0;
+                          return GestureDetector(
+                            onTap: () => context.push(AppRoutes.notifications),
+                            child: _buildHeaderAction(
+                              Icons.notifications_none_rounded,
+                              count > 0,
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(width: 12),
                       _buildHeaderAction(Icons.settings_outlined, false),

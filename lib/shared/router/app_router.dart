@@ -42,6 +42,7 @@ import '../../web/screens/common/web_welcome_screen.dart';
 import '../screens/messages/messages_screen.dart';
 import '../screens/messages/in_app_call_screen.dart';
 import '../../mobile/screens/common/loading_screen.dart';
+import '../../mobile/screens/common/notifications_screen.dart';
 import '../../mobile/screens/consumer/orders_screen.dart';
 import '../../mobile/screens/farmer/farmer_order_details_screen.dart';
 import '../models/order/order_model.dart';
@@ -402,6 +403,10 @@ GoRouter createAppRouter() {
       GoRoute(
         path: AppRoutes.farmersMap,
         builder: (context, state) => const FarmersMapScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.notifications,
+        builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
         path: AppRoutes.messages,

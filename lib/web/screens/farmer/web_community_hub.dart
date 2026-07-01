@@ -42,6 +42,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   late AnimationController _fadeInController;
   late List<AnimationController> _postControllers;
   late Future<List<ForumPostItem>> _forumPostsFuture;
+  List<ForumPostItem>? _postsList;
   late Future<WeatherData?> _weatherFuture;
   final Set<int> _hoveredPosts = {};
   int _hoveredNav = -1;
@@ -68,6 +69,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
   void _refreshForumPosts() {
     setState(() {
+      _postsList = null;
       _forumPostsFuture = SupabaseDataService().getForumPosts();
     });
   }
@@ -545,6 +547,10 @@ class _WebCommunityHubState extends State<WebCommunityHub>
     final sw = MediaQuery.of(context).size.width;
     final padding = sw < 600 ? const EdgeInsets.all(16) : const EdgeInsets.all(32);
 
+    if (_postsList != null) {
+      return _buildForumList(padding, _postsList!);
+    }
+
     return FutureBuilder<List<ForumPostItem>>(
       future: _forumPostsFuture,
       builder: (context, snapshot) {
@@ -557,55 +563,61 @@ class _WebCommunityHubState extends State<WebCommunityHub>
         }
 
         final posts = snapshot.data ?? [];
-        if (posts.isEmpty) {
-          return Center(
-            child: Text('No forum posts yet', style: TextStyle(color: _muted)),
+        _postsList = List.from(posts);
+
+        return _buildForumList(padding, _postsList!);
+      },
+    );
+  }
+
+  Widget _buildForumList(EdgeInsets padding, List<ForumPostItem> posts) {
+    if (posts.isEmpty) {
+      return Center(
+        child: Text('No forum posts yet', style: TextStyle(color: _muted)),
+      );
+    }
+
+    // Sync controllers once
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncPostControllers(posts.length);
+    });
+
+    final showCreateCard = AuthService().isSeller;
+    return ListView.builder(
+      padding: padding,
+      itemCount: posts.length + (showCreateCard ? 1 : 0),
+      itemBuilder: (context, i) {
+        if (showCreateCard) {
+          if (i == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: _buildFacebookCreatePostCard(),
+            );
+          }
+          final postIndex = i - 1;
+          if (postIndex < _postControllers.length) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: _buildAnimatedForumCard(postIndex, posts[postIndex]),
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: _buildForumCard(posts[postIndex]),
+          );
+        } else {
+          final postIndex = i;
+          if (postIndex < _postControllers.length) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: _buildAnimatedForumCard(postIndex, posts[postIndex]),
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: _buildForumCard(posts[postIndex]),
           );
         }
-
-        // Sync controllers once
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _syncPostControllers(posts.length);
-        });
-
-        final showCreateCard = AuthService().isSeller;
-        return ListView.builder(
-          padding: padding,
-          itemCount: posts.length + (showCreateCard ? 1 : 0),
-          itemBuilder: (context, i) {
-            if (showCreateCard) {
-              if (i == 0) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  child: _buildFacebookCreatePostCard(),
-                );
-              }
-              final postIndex = i - 1;
-              if (postIndex < _postControllers.length) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
-                  child: _buildAnimatedForumCard(postIndex, posts[postIndex]),
-                );
-              }
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 20),
-                child: _buildForumCard(posts[postIndex]),
-              );
-            } else {
-              final postIndex = i;
-              if (postIndex < _postControllers.length) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
-                  child: _buildAnimatedForumCard(postIndex, posts[postIndex]),
-                );
-              }
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 20),
-                child: _buildForumCard(posts[postIndex]),
-              );
-            }
-          },
-        );
       },
     );
   }
@@ -872,8 +884,35 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                       context.go(AppRoutes.login);
                       return;
                     }
-                    await SupabaseDataService().togglePostLike(post.id);
-                    if (mounted) _refreshForumPosts();
+
+                    // Optimistic update
+                    final index = _postsList?.indexWhere((p) => p.id == post.id) ?? -1;
+                    if (index != -1 && _postsList != null) {
+                      final targetPost = _postsList![index];
+                      final wasLiked = targetPost.isLiked;
+                      setState(() {
+                        _postsList![index] = ForumPostItem(
+                          id: targetPost.id,
+                          userId: targetPost.userId,
+                          userName: targetPost.userName,
+                          time: targetPost.time,
+                          title: targetPost.title,
+                          body: targetPost.body,
+                          imageUrl: targetPost.imageUrl,
+                          likes: wasLiked ? targetPost.likes - 1 : targetPost.likes + 1,
+                          comments: targetPost.comments,
+                          isLiked: !wasLiked,
+                          isPinned: targetPost.isPinned,
+                          authorAvatarUrl: targetPost.authorAvatarUrl,
+                        );
+                      });
+                    }
+
+                    try {
+                      await SupabaseDataService().togglePostLike(post.id);
+                    } catch (e) {
+                      if (mounted) _refreshForumPosts();
+                    }
                   },
                 ),
               ),

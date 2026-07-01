@@ -74,6 +74,9 @@ class NotificationService {
     // Always listen to auth changes and track presence (Web + Mobile support)
     _listenToAuthChanges();
     _startPresenceTracking();
+    if (supabase.auth.currentUser != null) {
+      _startGlobalIncomingCallListener();
+    }
 
     if (_isWeb) {
       _initialized = true;
@@ -323,6 +326,7 @@ class NotificationService {
           _getFCMToken();
           _startMobileRealtimeNotifications();
         }
+        _startGlobalIncomingCallListener();
         _startPresenceTracking();
       } else if (event == AuthChangeEvent.signedOut) {
         if (_isWeb) {
@@ -335,9 +339,74 @@ class NotificationService {
             await deleteToken(token);
           }
         }
+        _stopGlobalIncomingCallListener();
         _stopPresenceTracking();
       }
     });
+  }
+
+  void _startGlobalIncomingCallListener() {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    CallService().subscribeToIncomingCalls(
+      onIncomingCall: (callData) async {
+        final callerId = callData['caller_id']?.toString() ?? '';
+        String callerName = 'AgriDirect User';
+        String? avatarUrl;
+
+        try {
+          final profile = await supabase
+              .from('users')
+              .select('name, avatar_url')
+              .eq('user_id', callerId)
+              .maybeSingle();
+
+          if (profile != null) {
+            callerName = profile['name']?.toString() ?? 'AgriDirect User';
+            avatarUrl = profile['avatar_url']?.toString();
+          }
+        } catch (_) {}
+
+        final callId = callData['call_id']?.toString() ?? '';
+        final channelName = callData['channel_name']?.toString() ?? '';
+        final isVideo = callData['is_video'] == true;
+
+        final ctx = appNavigatorKey.currentContext;
+        if (ctx != null && ctx.mounted) {
+          if (_isWeb) {
+            GoRouter.of(ctx).push('/call/$callId', extra: {
+              'name': callerName,
+              'avatarUrl': avatarUrl,
+              'channelName': channelName,
+              'isVideo': isVideo,
+              'isIncoming': true,
+            });
+          } else {
+            showDialog(
+              context: ctx,
+              barrierDismissible: false,
+              useRootNavigator: false,
+              builder: (dialogContext) => InAppCallScreen(
+                name: callerName,
+                avatarUrl: avatarUrl,
+                callId: callId,
+                channelName: channelName,
+                isVideo: isVideo,
+                isIncoming: true,
+              ),
+            );
+          }
+        }
+      },
+      onCallUpdated: (callData) {
+        // Handled inside InAppCallScreen
+      },
+    );
+  }
+
+  void _stopGlobalIncomingCallListener() {
+    CallService().unsubscribeIncomingCalls();
   }
 
   Future<void> _updateMyLastActive() async {
@@ -733,6 +802,30 @@ class NotificationService {
           .eq('is_read', false);
     } catch (e) {
       debugPrint('Error marking all notifications as read: $e');
+    }
+  }
+
+  // Delete notification
+  Future<void> deleteNotification(String notificationId) async {
+    try {
+      await supabase
+          .from('notifications')
+          .delete()
+          .eq('notification_id', notificationId);
+    } catch (e) {
+      debugPrint('Error deleting notification: $e');
+    }
+  }
+
+  // Delete all notifications for a user
+  Future<void> deleteAllNotifications(String userId) async {
+    try {
+      await supabase
+          .from('notifications')
+          .delete()
+          .eq('user_id', userId);
+    } catch (e) {
+      debugPrint('Error deleting all notifications: $e');
     }
   }
 

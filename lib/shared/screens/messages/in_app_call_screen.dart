@@ -51,6 +51,7 @@ class _InAppCallScreenState extends State<InAppCallScreen>
   bool _isMuted = false;
   bool _isSpeaker = !kIsWeb;
   bool _isCameraOff = false;
+  bool _isRemoteCameraOff = false;
   bool _isEndingCall = false;
 
   String _status = 'Connecting...';
@@ -183,6 +184,14 @@ class _InAppCallScreenState extends State<InAppCallScreen>
               );
               _endCall();
             },
+        onUserMuteVideo: (RtcConnection connection, int remoteUid, bool muted) {
+          debugPrint('Agora: remote user video muted=$muted');
+          if (mounted) {
+            setState(() {
+              _isRemoteCameraOff = muted;
+            });
+          }
+        },
         onLeaveChannel: (RtcConnection connection, RtcStats stats) {
           debugPrint('Agora: left channel');
         },
@@ -358,9 +367,10 @@ class _InAppCallScreenState extends State<InAppCallScreen>
   Future<void> _toggleCamera() async {
     setState(() => _isCameraOff = !_isCameraOff);
     try {
+      await _callService.engine?.muteLocalVideoStream(_isCameraOff);
       await _callService.engine?.enableLocalVideo(!_isCameraOff);
     } catch (e) {
-      debugPrint('Agora enableLocalVideo error: $e');
+      debugPrint('Agora enableLocalVideo/muteLocalVideoStream error: $e');
     }
   }
 
@@ -443,15 +453,48 @@ class _InAppCallScreenState extends State<InAppCallScreen>
         // ── Video Rendering Layer ──────────────────────────────────────────
         if (widget.isVideo && _joinedChannel) ...[
           if (_remoteUid != null) ...[
-            Positioned.fill(
-              child: AgoraVideoView(
-                controller: VideoViewController.remote(
-                  rtcEngine: _callService.engine!,
-                  canvas: VideoCanvas(uid: _remoteUid),
-                  connection: RtcConnection(channelId: widget.channelName),
+            if (!_isRemoteCameraOff)
+              Positioned.fill(
+                child: AgoraVideoView(
+                  controller: VideoViewController.remote(
+                    rtcEngine: _callService.engine!,
+                    canvas: VideoCanvas(uid: _remoteUid),
+                    connection: RtcConnection(channelId: widget.channelName),
+                  ),
+                ),
+              )
+            else
+              Positioned.fill(
+                child: Container(
+                  color: const Color(0xFF0F172A),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SafeCircleAvatar(
+                          imageUrl: widget.avatarUrl,
+                          radius: 50,
+                          defaultBucket: 'uploads',
+                          backgroundColor: Colors.white.withValues(alpha: 0.1),
+                          child: Text(
+                            widget.name.isNotEmpty ? widget.name[0].toUpperCase() : '?',
+                            style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '${widget.name} turned off camera',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
             if (!_isCameraOff)
               Positioned(
                 top: 80,
@@ -493,7 +536,7 @@ class _InAppCallScreenState extends State<InAppCallScreen>
           ],
         ],
 
-        if (!widget.isVideo || _isCameraOff)
+        if (!widget.isVideo)
           Positioned.fill(child: Container(color: const Color(0xFF0F172A))),
 
         Positioned.fill(

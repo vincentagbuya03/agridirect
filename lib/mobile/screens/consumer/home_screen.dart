@@ -17,6 +17,7 @@ import '../../../shared/screens/post_detail_screen.dart';
 import '../../../shared/services/social/follow_service.dart';
 import 'marketplace_screen.dart';
 import '../../../shared/services/community/notification_service.dart';
+import '../../../shared/services/community/message_service.dart';
 import '../../widgets/mobile_notifications_sheet.dart';
 import '../../../shared/services/auth/auth_service.dart';
 
@@ -199,11 +200,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   Row(
                     children: [
-                      _buildHeaderAction(
-                        context,
-                        Icons.chat_bubble_outline_rounded,
-                        true,
-                        () => context.push(AppRoutes.customerMessages),
+                      StreamBuilder<int>(
+                        stream: MessageService().watchTotalUnreadCount(asFarmer: false),
+                        builder: (context, snapshot) {
+                          final unreadMessages = snapshot.data ?? 0;
+                          return _buildHeaderAction(
+                            context,
+                            Icons.chat_bubble_outline_rounded,
+                            unreadMessages > 0,
+                            () => context.push(AppRoutes.customerMessages),
+                          );
+                        },
                       ),
                       const SizedBox(width: 8),
                       _buildHeaderNotification(context),
@@ -397,7 +404,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, snapshot) {
         final count = snapshot.data ?? 0;
         return GestureDetector(
-          onTap: () => showMobileNotificationsSheet(context),
+          onTap: () => context.push(AppRoutes.notifications),
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
