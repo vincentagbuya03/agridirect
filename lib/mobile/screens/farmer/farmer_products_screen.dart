@@ -31,6 +31,8 @@ class FarmerProductsScreen extends StatefulWidget {
 class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _isOnline = true;
+  String _selectedTypeFilter = 'All'; // 'All', 'Standard', 'Pre-order'
+  String _selectedStockFilter = 'All'; // 'All', 'In Stock', 'Out of Stock'
 
   bool get _effectiveOnline => _isOnline;
   late OfflineCacheService _cacheService;
@@ -439,6 +441,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
   }
 
   Widget _buildSearchAndFilter() {
+    final activeFilters = (_selectedTypeFilter != 'All' ? 1 : 0) + (_selectedStockFilter != 'All' ? 1 : 0);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
       child: Row(
@@ -478,20 +481,168 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Container(
-            height: 52,
-            width: 52,
-            decoration: AppDecorations.cardDecoration.copyWith(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.tune_rounded,
-              color: AppColors.textHeadline,
-              size: 22,
+          GestureDetector(
+            onTap: _showFilterBottomSheet,
+            child: Badge(
+              isLabelVisible: activeFilters > 0,
+              label: Text('$activeFilters'),
+              backgroundColor: AppColors.primary,
+              child: Container(
+                height: 52,
+                width: 52,
+                decoration: AppDecorations.cardDecoration.copyWith(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  Icons.tune_rounded,
+                  color: activeFilters > 0 ? AppColors.primary : AppColors.textHeadline,
+                  size: 22,
+                ),
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  void _showFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Filter Inventory',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textHeadline,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setModalState(() {
+                            _selectedTypeFilter = 'All';
+                            _selectedStockFilter = 'All';
+                          });
+                          setState(() {});
+                        },
+                        child: Text(
+                          'Reset',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Product Type',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textHeadline,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: ['All', 'Standard', 'Pre-order'].map((type) {
+                      final isSelected = _selectedTypeFilter == type;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(type),
+                          selected: isSelected,
+                          selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                          labelStyle: GoogleFonts.plusJakartaSans(
+                            color: isSelected ? AppColors.primary : AppColors.textSubtle,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onSelected: (val) {
+                            if (val) {
+                              setModalState(() => _selectedTypeFilter = type);
+                              setState(() {});
+                            }
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Stock Status',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textHeadline,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: ['All', 'In Stock', 'Out of Stock'].map((stock) {
+                      final isSelected = _selectedStockFilter == stock;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(stock),
+                          selected: isSelected,
+                          selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                          labelStyle: GoogleFonts.plusJakartaSans(
+                            color: isSelected ? AppColors.primary : AppColors.textSubtle,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onSelected: (val) {
+                            if (val) {
+                              setModalState(() => _selectedStockFilter = stock);
+                              setState(() {});
+                            }
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Apply Filters',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -580,6 +731,20 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
             .toList();
       }
 
+      // Apply Type Filter
+      if (_selectedTypeFilter == 'Standard') {
+        offlineProducts = offlineProducts.where((p) => !p.isPreorder).toList();
+      } else if (_selectedTypeFilter == 'Pre-order') {
+        offlineProducts = offlineProducts.where((p) => p.isPreorder).toList();
+      }
+
+      // Apply Stock Filter
+      if (_selectedStockFilter == 'In Stock') {
+        offlineProducts = offlineProducts.where((p) => (p.availableQuantity ?? 0) > 0).toList();
+      } else if (_selectedStockFilter == 'Out of Stock') {
+        offlineProducts = offlineProducts.where((p) => (p.availableQuantity ?? 0) <= 0).toList();
+      }
+
       return ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
         physics: const BouncingScrollPhysics(),
@@ -636,17 +801,46 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
       }).toList();
     }
 
+    // Apply Type Filter
+    if (_selectedTypeFilter == 'Standard') {
+      filteredOnline = filteredOnline.where((p) => p['is_preorder'] != true).toList();
+    } else if (_selectedTypeFilter == 'Pre-order') {
+      filteredOnline = filteredOnline.where((p) => p['is_preorder'] == true).toList();
+    }
+
+    // Apply Stock Filter
+    if (_selectedStockFilter == 'In Stock') {
+      filteredOnline = filteredOnline.where((p) => (p['available'] as num? ?? 0) > 0).toList();
+    } else if (_selectedStockFilter == 'Out of Stock') {
+      filteredOnline = filteredOnline.where((p) => (p['available'] as num? ?? 0) <= 0).toList();
+    }
+
     if (pendingProducts.isNotEmpty) {
       var filteredPending = pendingProducts;
       if (query.isNotEmpty) {
-        filteredPending = pendingProducts
+        filteredPending = filteredPending
             .where(
               (p) =>
                   p.name.toLowerCase().contains(query) ||
-                  (p.description ?? '').toLowerCase().contains(query),
+                  p.description.toLowerCase().contains(query),
             )
             .toList();
       }
+
+      // Apply Type Filter to pending
+      if (_selectedTypeFilter == 'Standard') {
+        filteredPending = filteredPending.where((p) => !p.isPreorder).toList();
+      } else if (_selectedTypeFilter == 'Pre-order') {
+        filteredPending = filteredPending.where((p) => p.isPreorder).toList();
+      }
+
+      // Apply Stock Filter to pending
+      if (_selectedStockFilter == 'In Stock') {
+        filteredPending = filteredPending.where((p) => p.availableQuantity > 0).toList();
+      } else if (_selectedStockFilter == 'Out of Stock') {
+        filteredPending = filteredPending.where((p) => p.availableQuantity <= 0).toList();
+      }
+
       for (final pending in filteredPending) {
         listItems.add(
           _buildOfflineProductCard(
@@ -768,12 +962,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
           color: Colors.transparent,
           child: InkWell(
             onTap: () {
-              // TODO: Implement edit functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Edit functionality coming soon!'),
-                ),
-              );
+              context.push(AppRoutes.editProduct, extra: product);
             },
             child: Column(
               children: [
@@ -919,7 +1108,9 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                           ),
                           const Spacer(),
                           TextButton(
-                            onPressed: () {},
+                            onPressed: () {
+                              context.push(AppRoutes.editProduct, extra: product);
+                            },
                             child: Text(
                               'Manage',
                               style: AppTextStyles.labelSmall.copyWith(

@@ -728,7 +728,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                         },
                       ),
                       const SizedBox(width: 12),
-                      _buildHeaderAction(Icons.settings_outlined, false),
+                      GestureDetector(
+                        onTap: () => context.push(AppRoutes.appSettings),
+                        child: _buildHeaderAction(Icons.settings_outlined, false),
+                      ),
                     ],
                   ),
                   if (_currentPosition != null && _weatherData != null) ...[

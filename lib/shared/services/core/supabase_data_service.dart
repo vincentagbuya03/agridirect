@@ -313,6 +313,8 @@ class SupabaseDataService {
             harvest_days,
             is_preorder,
             farmer_id,
+            category_id,
+            unit_id,
             units(abbreviation, name)
           ''')
           .eq('farmer_id', farmerId)
@@ -361,9 +363,12 @@ class SupabaseDataService {
                   (item['harvest_days'] as num) > 0)
               ? 'In ${item['harvest_days']} days'
               : (item['is_preorder'] == true ? 'Pre-order' : 'Ready Now'),
+          'harvest_days': item['harvest_days'] ?? 0,
           'is_preorder': item['is_preorder'] ?? false,
           'status': status,
           'image': imageResponse?['image_url'] ?? '',
+          'category_id': item['category_id'],
+          'unit_id': item['unit_id'],
         });
       }
 

@@ -397,6 +397,13 @@ GoRouter createAppRouter() {
         builder: (context, state) => const AddProductScreen(),
       ),
       GoRoute(
+        path: AppRoutes.editProduct,
+        builder: (context, state) {
+          final productMap = state.extra as Map<String, dynamic>?;
+          return AddProductScreen(editProduct: productMap);
+        },
+      ),
+      GoRoute(
         path: AppRoutes.myDetails,
         builder: (context, state) => const MyDetailsScreen(),
       ),

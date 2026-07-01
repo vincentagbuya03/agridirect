@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,7 +19,8 @@ import '../../../shared/models/product/unit_model.dart';
 
 /// Add Product Screen for Farmers with Offline Support
 class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({super.key});
+  final Map<String, dynamic>? editProduct;
+  const AddProductScreen({super.key, this.editProduct});
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
@@ -60,6 +62,38 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _checkConnectivity();
     _listenToConnectivity();
     _loadCategoriesAndUnits();
+    if (widget.editProduct != null) {
+      _prefillFields();
+    }
+  }
+
+  void _prefillFields() {
+    final prod = widget.editProduct;
+    if (prod == null) return;
+
+    _nameController.text = prod['name']?.toString() ?? '';
+    _priceController.text = prod['price']?.toString() ?? '';
+    _descriptionController.text = prod['description']?.toString() ?? '';
+
+    final avail = prod['available'] ?? prod['available_quantity'] ?? 0;
+    _quantityController.text = (avail is num) ? avail.toInt().toString() : avail.toString();
+
+    final hd = prod['harvest_days'] ?? 0;
+    _harvestDaysController.text = (hd is num && hd > 0) ? hd.toString() : '';
+
+    _isPreorder = prod['is_preorder'] == true;
+    _selectedCategory = prod['category_id']?.toString();
+    _selectedUnit = prod['unit_id']?.toString();
+
+    final imagePath = prod['image']?.toString() ?? '';
+    if (imagePath.isNotEmpty) {
+      _selectedImageFiles.add(_PickedProductImage(
+        name: 'existing_image.jpg',
+        bytes: Uint8List(0),
+        path: imagePath,
+        isExisting: true,
+      ));
+    }
   }
 
   Future<void> _initializeOfflineService() async {
@@ -145,11 +179,74 @@ class _AddProductScreenState extends State<AddProductScreen> {
       );
       return;
     }
-
     setState(() => _isLoading = true);
 
     try {
       final userId = SupabaseConfig.currentUser?.id ?? '';
+
+      if (widget.editProduct != null) {
+        if (!_isOnline) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Editing products requires an active internet connection.')),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+
+        final client = SupabaseConfig.client;
+        final productId = widget.editProduct!['id'];
+
+        // 1. Update product table
+        await client.from('products').update({
+          'name': _nameController.text.trim(),
+          'price': double.parse(_priceController.text.trim()),
+          'description': _descriptionController.text.trim(),
+          'category_id': _selectedCategory,
+          'unit_id': _selectedUnit,
+          'harvest_days': _harvestDaysController.text.isNotEmpty
+              ? int.parse(_harvestDaysController.text.trim())
+              : 0,
+          'is_preorder': _isPreorder,
+        }).eq('product_id', productId);
+
+        // 2. Update inventory table
+        final qty = int.parse(
+          _quantityController.text.trim().isEmpty
+              ? '0'
+              : _quantityController.text.trim(),
+        );
+        await client.from('product_inventory').upsert({
+          'product_id': productId,
+          'available_quantity': qty,
+        }, onConflict: 'product_id');
+
+        // 3. Upload new images and save to product_images table if selected
+        final newImages = _selectedImageFiles.where((img) => !img.isExisting).toList();
+        if (newImages.isNotEmpty) {
+          for (final img in newImages) {
+            final fileName = 'product_${DateTime.now().millisecondsSinceEpoch}_${img.name}';
+            final path = 'products/$fileName';
+            await client.storage.from('uploads').uploadBinary(path, img.bytes);
+            final publicUrl = client.storage.from('uploads').getPublicUrl(path);
+            await client.from('product_images').insert({
+              'product_id': productId,
+              'image_url': publicUrl,
+              'sort_order': 0,
+            });
+          }
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Product updated successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          context.pop();
+        }
+        return;
+      }
 
       // Get local image paths
       final localImagePaths = _selectedImageFiles
@@ -376,7 +473,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ),
         ),
         title: Text(
-          'Add New Product',
+          widget.editProduct != null ? 'Edit Product' : 'Add New Product',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -729,9 +826,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               ),
                             )
                           : Text(
-                              _isOnline
-                                  ? 'Publish Product'
-                                  : 'Save Offline & Publish Later',
+                              widget.editProduct != null
+                                  ? 'Save Changes'
+                                  : (_isOnline
+                                      ? 'Publish Product'
+                                      : 'Save Offline & Publish Later'),
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
@@ -869,12 +968,23 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       margin: const EdgeInsets.only(right: 12),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.memory(
-                          _selectedImageFiles[index].bytes,
-                          height: 120,
-                          width: 120,
-                          fit: BoxFit.cover,
-                        ),
+                        child: _selectedImageFiles[index].isExisting
+                            ? CachedNetworkImage(
+                                imageUrl: _selectedImageFiles[index].path,
+                                height: 120,
+                                width: 120,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                                errorWidget: (_, __, ___) => const Icon(Icons.error),
+                              )
+                            : Image.memory(
+                                _selectedImageFiles[index].bytes,
+                                height: 120,
+                                width: 120,
+                                fit: BoxFit.cover,
+                              ),
                       ),
                     ),
                     Positioned(
@@ -1217,10 +1327,12 @@ class _PickedProductImage {
   final String name;
   final Uint8List bytes;
   final String path;
+  final bool isExisting;
 
   const _PickedProductImage({
     required this.name,
     required this.bytes,
     required this.path,
+    this.isExisting = false,
   });
 }

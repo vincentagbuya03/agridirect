@@ -562,7 +562,8 @@ class AuthService extends ChangeNotifier {
             phoneNumber: metaPhone,
             emailVerified: user.appMetadata['provider'] == 'google',
           );
-          profile = await SupabaseDatabase.getUserProfile(user.id);
+          profile = await SupabaseDatabase.getUserProfile(user.id)
+              .timeout(const Duration(seconds: 4), onTimeout: () => null);
         } catch (e) {
           debugPrint('Error creating user profile on initialize: $e');
         }

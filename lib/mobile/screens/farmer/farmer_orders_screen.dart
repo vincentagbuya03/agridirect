@@ -18,20 +18,14 @@ class FarmerOrdersScreen extends StatefulWidget {
 class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   int _selectedTab = 0;
   final _tabs = ['Active', 'Completed', 'Refunds'];
-  bool _isSearching = false;
-  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(() {
-      if (mounted) setState(() {});
-    });
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -70,110 +64,35 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: _isSearching
-              ? Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: AppColors.textHeadline.withValues(alpha: 0.1),
-                          ),
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          autofocus: true,
-                          decoration: InputDecoration(
-                            hintText: 'Search orders...',
-                            hintStyle: AppTextStyles.bodyMedium.copyWith(
-                              color: AppColors.textSubtle,
-                            ),
-                            prefixIcon: const Icon(
-                              Icons.search_rounded,
-                              color: AppColors.textSubtle,
-                              size: 20,
-                            ),
-                            suffixIcon: _searchController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear_rounded, color: AppColors.textSubtle, size: 18),
-                                    onPressed: () => _searchController.clear(),
-                                  )
-                                : null,
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ORDER MANAGEMENT',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
                     ),
-                    const SizedBox(width: 12),
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _isSearching = false;
-                          _searchController.clear();
-                        });
-                      },
-                      child: Text(
-                        'Cancel',
-                        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'ORDER MANAGEMENT',
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Recent Orders',
-                          style: AppTextStyles.headline2.copyWith(fontSize: 24),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => setState(() => _isSearching = true),
-                          child: _buildHeaderAction(Icons.search_rounded),
-                        ),
-                        const SizedBox(width: 12),
-                        _buildHeaderAction(Icons.filter_list_rounded),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Recent Orders',
+                    style: AppTextStyles.headline2.copyWith(fontSize: 24),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeaderAction(IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppColors.textHeadline.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Icon(icon, color: AppColors.textHeadline, size: 20),
-    );
-  }
+
 
   Widget _buildSleekTabBar() {
     return Container(
@@ -235,20 +154,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
         }
 
         final orders = snapshot.data ?? [];
-        final query = _searchController.text.trim().toLowerCase();
         var filteredOrders = orders;
-        if (query.isNotEmpty) {
-          filteredOrders = orders.where((o) {
-            final customerName = (o['customerName'] ?? '').toString().toLowerCase();
-            final orderId = (o['orderId'] ?? '').toString().toLowerCase();
-            final rawOrderId = (o['rawOrderId'] ?? '').toString().toLowerCase();
-            final status = (o['status'] ?? '').toString().toLowerCase();
-            return customerName.contains(query) ||
-                orderId.contains(query) ||
-                rawOrderId.contains(query) ||
-                status.contains(query);
-          }).toList();
-        }
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),

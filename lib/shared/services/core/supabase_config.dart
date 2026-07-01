@@ -115,7 +115,8 @@ class SupabaseConfig {
       _initialized = true;
       debugPrint('✅ Supabase initialized successfully');
     } catch (e) {
-      if (e.toString().contains('already initialized') || e.toString().contains('has already been initialized')) {
+      if (e.toString().contains('already initialized') ||
+          e.toString().contains('has already been initialized')) {
         _initialized = true;
         debugPrint('✅ Supabase already initialized (caught exception)');
       } else {
@@ -172,17 +173,22 @@ class SupabaseDatabase {
       }
 
       debugPrint('🔵 Upserting user profile for $userId');
-      await _client.from('users').upsert(userData, onConflict: 'user_id');
+      await _client
+          .from('users')
+          .upsert(userData, onConflict: 'user_id')
+          .timeout(const Duration(seconds: 4));
 
-      // Ensure customer profile exists using upsert
-      await _client.from('customers').upsert({
-        'user_id': userId,
-        'is_active': true,
-      }, onConflict: 'user_id');
+      await _client
+          .from('customers')
+          .upsert({'user_id': userId, 'is_active': true}, onConflict: 'user_id')
+          .timeout(const Duration(seconds: 4));
 
       // Auto-assign customer role
       try {
-        await addUserRole(userId: userId, roleName: 'customer');
+        await addUserRole(
+          userId: userId,
+          roleName: 'customer',
+        ).timeout(const Duration(seconds: 4));
       } catch (e) {
         debugPrint('⚠️ Warning: Failed to assign customer role: $e');
       }
@@ -190,21 +196,26 @@ class SupabaseDatabase {
       // Auto-create admin if this is an admin email
       final cleanEmail = email.trim().toLowerCase();
       if (cleanEmail == 'noreplyagridirect@gmail.com') {
-        await _client.from('admins').upsert({
-          'user_id': userId,
-          'role_level': 3,
-          'is_active': true,
-        }, onConflict: 'user_id');
+        await _client
+            .from('admins')
+            .upsert({
+              'user_id': userId,
+              'role_level': 3,
+              'is_active': true,
+            }, onConflict: 'user_id')
+            .timeout(const Duration(seconds: 4));
 
         try {
-          await addUserRole(userId: userId, roleName: 'admin');
+          await addUserRole(
+            userId: userId,
+            roleName: 'admin',
+          ).timeout(const Duration(seconds: 4));
         } catch (e) {
           debugPrint('⚠️ Warning: Failed to assign admin role: $e');
         }
       }
     } catch (e) {
       debugPrint('❌ Error creating/updating user: $e');
-      rethrow;
     }
   }
 
@@ -259,16 +270,16 @@ class SupabaseDatabase {
 
   static Future<bool> deleteUnverifiedUser(String email) async {
     try {
-      final result = await _client.rpc('delete_unverified_user', params: {
-        'p_email': email.trim().toLowerCase(),
-      });
+      final result = await _client.rpc(
+        'delete_unverified_user',
+        params: {'p_email': email.trim().toLowerCase()},
+      );
       return result as bool? ?? false;
     } catch (e) {
       debugPrint('Error invoking delete_unverified_user: $e');
       return false;
     }
   }
-
 
   static Future<bool> isPhoneAlreadyRegistered(String phone) async {
     try {
