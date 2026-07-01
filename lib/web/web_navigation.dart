@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../shared/services/auth/auth_service.dart';
 import '../shared/services/communication/call_service.dart';
 import '../shared/router/app_routes.dart';
-import '../shared/screens/messages/in_app_call_screen.dart';
 import '../shared/services/user/user_service.dart';
 import 'screens/consumer/web_marketplace_home.dart';
 import 'screens/consumer/web_shop_screen.dart';
@@ -79,23 +78,21 @@ class _WebNavigationState extends State<WebNavigation> {
 
         if (!mounted) return;
         _isShowingIncomingCall = true;
-        await showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          useRootNavigator: false,
-          builder: (dialogContext) => InAppCallScreen(
-            name: callerName,
-            avatarUrl: avatarUrl,
-            callId: callData['call_id']?.toString() ?? '',
-            channelName: callData['channel_name']?.toString() ?? '',
-            isVideo: callData['is_video'] == true,
-            isIncoming: true,
-          ),
-        );
+
+        final callId = callData['call_id']?.toString() ?? '';
+        // Navigate to the dedicated call page — full-screen on web.
+        await context.push('/call/$callId', extra: {
+          'name': callerName,
+          'avatarUrl': avatarUrl,
+          'channelName': callData['channel_name']?.toString() ?? '',
+          'isVideo': callData['is_video'] == true,
+          'isIncoming': true,
+        });
+
         _isShowingIncomingCall = false;
       },
       onCallUpdated: (callData) {
-        // InAppCallScreen owns call-status dismissal once the dialog is shown.
+        // InAppCallScreen owns call-status dismissal once navigated.
       },
     );
   }

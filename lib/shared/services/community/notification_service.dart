@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -6,7 +7,15 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../router/app_router.dart';
+import 'package:flutter/material.dart';
+import '../../screens/messages/in_app_call_screen.dart';
 import '../auth/auth_service.dart';
+import '../../utils/js_helper.dart';
+import '../core/supabase_data_service.dart';
+import '../communication/call_service.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart';
+import '../../screens/post_detail_screen.dart';
 
 class NotificationService {
   static const String channelId = 'agridirect_channel';
@@ -35,6 +44,8 @@ class NotificationService {
   StreamSubscription<AuthState>? _authStateSubscription;
   RealtimeChannel? _messageSubscription;
   RealtimeChannel? _presenceChannel;
+  RealtimeChannel? _webNotificationsSubscription;
+  RealtimeChannel? _mobileNotificationsSubscription;
   String? _activeConversationId;
   final ValueNotifier<Set<String>> onlineUsersNotifier = ValueNotifier({});
   final Map<String, DateTime> _lastActiveCache = {};
@@ -66,9 +77,21 @@ class NotificationService {
 
     if (_isWeb) {
       _initialized = true;
-      debugPrint(
-        'Skipping Firebase Messaging initialization on web until a web service worker is configured.',
-      );
+      registerNotificationCallback((linkType, linkId) {
+        navigateFromLink(linkType: linkType, linkId: linkId);
+      });
+      try {
+        evalJs(
+          """
+          if (typeof Notification !== 'undefined' && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+            Notification.requestPermission();
+          }
+          """
+        );
+      } catch (e) {
+        debugPrint('Error requesting web notification permission: $e');
+      }
+      _startWebRealtimeNotifications();
       return;
     }
 
@@ -82,6 +105,54 @@ class NotificationService {
 
     // Get and save FCM token
     await _getFCMToken();
+
+    // Setup Native CallKit Listener
+    FlutterCallkitIncoming.onEvent.listen((CallEvent? event) async {
+      if (event is CallEventActionCallAccept) {
+        final params = event.callKitParams;
+        final extra = params.extra ?? {};
+        final callId = extra['callId']?.toString() ?? '';
+        final channelName = extra['channelName']?.toString() ?? '';
+        final isVideo = extra['isVideo'] == true || extra['isVideo'] == 'true';
+        final callerName = params.nameCaller ?? 'AgriDirect User';
+        final avatarUrl = params.avatar;
+
+        if (callId.isNotEmpty) {
+          await CallService().updateCallStatus(callId, 'connected');
+        }
+
+        if (appNavigatorKey.currentContext != null) {
+          Navigator.push(
+            appNavigatorKey.currentContext!,
+            MaterialPageRoute(
+              builder: (_) => InAppCallScreen(
+                name: callerName,
+                avatarUrl: avatarUrl,
+                callId: callId,
+                channelName: channelName,
+                isVideo: isVideo,
+                isIncoming: true,
+                isAlreadyAccepted: true,
+              ),
+            ),
+          );
+        }
+      } else if (event is CallEventActionCallDecline) {
+        final params = event.callKitParams;
+        final extra = params.extra ?? {};
+        final callId = extra['callId']?.toString() ?? '';
+        if (callId.isNotEmpty) {
+          await CallService().updateCallStatus(callId, 'declined');
+        }
+      } else if (event is CallEventActionCallEnded) {
+        final params = event.callKitParams;
+        final extra = params.extra ?? {};
+        final callId = extra['callId']?.toString() ?? '';
+        if (callId.isNotEmpty) {
+          await CallService().updateCallStatus(callId, 'declined');
+        }
+      }
+    });
 
     // Listen to token refresh
     messaging.onTokenRefresh.listen((newToken) {
@@ -99,6 +170,8 @@ class NotificationService {
     if (initialMessage != null) {
       await _handleNotificationTap(initialMessage);
     }
+
+    _startMobileRealtimeNotifications();
 
     _initialized = true;
   }
@@ -244,16 +317,25 @@ class NotificationService {
     ) async {
       final event = authState.event;
       if (event == AuthChangeEvent.signedIn || event == AuthChangeEvent.tokenRefreshed || event == AuthChangeEvent.initialSession) {
-        _getFCMToken();
-        // _startMessageListener(); // Disabled to avoid double notifications with FCM
+        if (_isWeb) {
+          _startWebRealtimeNotifications();
+        } else {
+          _getFCMToken();
+          _startMobileRealtimeNotifications();
+        }
         _startPresenceTracking();
       } else if (event == AuthChangeEvent.signedOut) {
-        _stopMessageListener();
-        _stopPresenceTracking();
-        final token = await messaging.getToken();
-        if (token != null) {
-          await deleteToken(token);
+        if (_isWeb) {
+          _stopWebRealtimeNotifications();
+        } else {
+          _stopMessageListener();
+          _stopMobileRealtimeNotifications();
+          final token = await messaging.getToken();
+          if (token != null) {
+            await deleteToken(token);
+          }
         }
+        _stopPresenceTracking();
       }
     });
   }
@@ -305,9 +387,9 @@ class NotificationService {
       if (status == RealtimeSubscribeStatus.subscribed) {
         await _presenceChannel!.track({'user_id': user.id});
         await _updateMyLastActive();
-        // Periodically update last active timestamp in DB every 4 minutes
+        // Periodically update last active timestamp in DB every 15 minutes
         _activeStatusTimer?.cancel();
-        _activeStatusTimer = Timer.periodic(const Duration(minutes: 4), (timer) async {
+        _activeStatusTimer = Timer.periodic(const Duration(minutes: 15), (timer) async {
           await _updateMyLastActive();
         });
       }
@@ -398,7 +480,7 @@ class NotificationService {
 
     debugPrint('Link type: $linkType, Link ID: $linkId');
 
-    await _navigateFromLink(
+    await navigateFromLink(
       linkType: linkType.toString(),
       linkId: linkId.toString(),
     );
@@ -423,7 +505,7 @@ class NotificationService {
     debugPrint('Notification tapped with payload: $payload');
 
     final parsed = _parsePayload(payload);
-    await _navigateFromLink(linkType: parsed.$1, linkId: parsed.$2);
+    await navigateFromLink(linkType: parsed.$1, linkId: parsed.$2);
   }
 
   // Helper to get payload from message
@@ -461,16 +543,16 @@ class NotificationService {
     return (normalizedType, rawId);
   }
 
-  Future<void> _navigateFromLink({
+  Future<void> navigateFromLink({
     required String linkType,
     required String linkId,
     int retryCount = 0,
   }) async {
-    final context = appNavigatorKey.currentContext;
-    if (context == null) {
+    final initialContext = appNavigatorKey.currentContext;
+    if (initialContext == null) {
       if (retryCount < 6) {
         await Future<void>.delayed(const Duration(milliseconds: 250));
-        await _navigateFromLink(
+        await navigateFromLink(
           linkType: linkType,
           linkId: linkId,
           retryCount: retryCount + 1,
@@ -481,30 +563,128 @@ class NotificationService {
 
     if (linkType == 'conversation' && linkId.isNotEmpty) {
       final isFarmer = AuthService().isViewingAsFarmer;
-      GoRouter.of(context).go(
-        AppRoutes.messages,
-        extra: {'conversationId': linkId, 'asFarmer': isFarmer},
-      );
+      final ctx = appNavigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        GoRouter.of(ctx).go(
+          AppRoutes.messages,
+          extra: {'conversationId': linkId, 'asFarmer': isFarmer},
+        );
+      }
       setActiveConversation(linkId);
       return;
     }
 
-    if (linkType == 'weather') {
-      GoRouter.of(context).go(AppRoutes.home);
+    if (linkType == 'call' && linkId.isNotEmpty) {
+      try {
+        final callRecord = await supabase
+            .from('calls')
+            .select()
+            .eq('call_id', linkId)
+            .maybeSingle();
+
+        if (callRecord != null && callRecord['status'] == 'ringing') {
+          final callerId = callRecord['caller_id']?.toString() ?? '';
+          String callerName = 'AgriDirect User';
+          String? avatarUrl;
+
+          final profile = await supabase
+              .from('users')
+              .select('name, avatar_url')
+              .eq('user_id', callerId)
+              .maybeSingle();
+
+          if (profile != null) {
+            callerName = profile['name']?.toString() ?? 'AgriDirect User';
+            avatarUrl = profile['avatar_url']?.toString();
+          }
+
+          final ctx = appNavigatorKey.currentContext;
+          if (ctx != null && ctx.mounted) {
+            showDialog(
+              context: ctx,
+              barrierDismissible: false,
+              useRootNavigator: false,
+              builder: (dialogContext) => InAppCallScreen(
+                name: callerName,
+                avatarUrl: avatarUrl,
+                callId: callRecord['call_id']?.toString() ?? '',
+                channelName: callRecord['channel_name']?.toString() ?? '',
+                isVideo: callRecord['is_video'] == true,
+                isIncoming: true,
+              ),
+            );
+          }
+          return;
+        }
+      } catch (e) {
+        debugPrint('Error navigating to call: $e');
+      }
+      final ctx = appNavigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        GoRouter.of(ctx).go(AppRoutes.home);
+      }
       return;
     }
 
-    if (linkType == 'product') {
-      GoRouter.of(context).go(AppRoutes.marketplace);
+    if (linkType == 'order') {
+      final isFarmer = AuthService().isViewingAsFarmer;
+      final ctx = appNavigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        if (kIsWeb) {
+          if (isFarmer) {
+            GoRouter.of(ctx).go('${AppRoutes.farmerDashboard}?tab=2');
+          } else {
+            GoRouter.of(ctx).go(AppRoutes.profile);
+          }
+        } else {
+          if (isFarmer) {
+            GoRouter.of(ctx).go(AppRoutes.home);
+          } else {
+            GoRouter.of(ctx).go(AppRoutes.customerOrders);
+          }
+        }
+      }
       return;
     }
 
-    if (linkType == 'post') {
-      GoRouter.of(context).go(AppRoutes.home);
-      return;
-    }
+    final ctx = appNavigatorKey.currentContext;
+    if (ctx != null && ctx.mounted) {
+      if (linkType == 'weather') {
+        GoRouter.of(ctx).go(AppRoutes.home);
+        return;
+      }
 
-    GoRouter.of(context).go(AppRoutes.home);
+      if (linkType == 'product') {
+        GoRouter.of(ctx).go(AppRoutes.marketplace);
+        return;
+      }
+
+      if (linkType == 'post' && linkId.isNotEmpty) {
+        try {
+          final post = await SupabaseDataService().getForumPostById(linkId);
+          if (post != null) {
+            final targetContext = appNavigatorKey.currentContext;
+            if (targetContext != null && targetContext.mounted) {
+              Navigator.of(targetContext).push(
+                MaterialPageRoute(
+                  builder: (_) => PostDetailScreen(post: post),
+                ),
+              );
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error navigating to post details: $e');
+        }
+        final finalCtx = appNavigatorKey.currentContext;
+        if (finalCtx != null && finalCtx.mounted) {
+          GoRouter.of(finalCtx).go(AppRoutes.home);
+        }
+        return;
+      }
+
+      GoRouter.of(ctx).go(AppRoutes.home);
+    }
   }
 
 
@@ -515,7 +695,8 @@ class NotificationService {
           .from('notifications')
           .count(CountOption.exact)
           .eq('user_id', userId)
-          .eq('is_read', false);
+          .eq('is_read', false)
+          .neq('link_type', 'conversation');
 
       return count;
     } catch (e) {
@@ -622,6 +803,7 @@ class NotificationService {
           .from('notifications')
           .select()
           .eq('user_id', userId)
+          .neq('link_type', 'conversation')
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
@@ -630,5 +812,153 @@ class NotificationService {
       debugPrint('Error getting notifications: $e');
       return [];
     }
+  }
+
+  void _startWebRealtimeNotifications() {
+    if (!_isWeb) return;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    _stopWebRealtimeNotifications();
+
+    _webNotificationsSubscription = supabase
+        .channel('web-notifications')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
+          ),
+          callback: (payload) {
+            final linkType = payload.newRecord['link_type']?.toString();
+            if (linkType == 'conversation') {
+              return; // Skip showing HTML5 notifications for chat messages
+            }
+            final title = payload.newRecord['title']?.toString() ?? 'AgriDirect';
+            final body = payload.newRecord['body']?.toString() ?? '';
+            final linkId = payload.newRecord['link_id']?.toString() ?? '';
+            _showWebNotification(title, body, linkType ?? '', linkId);
+          },
+        )
+        .subscribe();
+  }
+
+  void _stopWebRealtimeNotifications() {
+    _webNotificationsSubscription?.unsubscribe();
+    _webNotificationsSubscription = null;
+  }
+
+  void _showWebNotification(String title, String body, String linkType, String linkId) {
+    if (!_isWeb) return;
+    try {
+      final escapedTitle = jsonEncode(title);
+      final escapedBody = jsonEncode(body);
+      final escapedLinkType = jsonEncode(linkType);
+      final escapedLinkId = jsonEncode(linkId);
+      evalJs(
+        """
+        if (typeof Notification !== 'undefined') {
+          if (Notification.permission === 'granted') {
+            var notification = new Notification($escapedTitle, {
+              body: $escapedBody,
+              icon: '/icons/Icon-192.png'
+            });
+            notification.onclick = function() {
+              window.focus();
+              if (typeof onWebNotificationClick === 'function') {
+                onWebNotificationClick($escapedLinkType, $escapedLinkId);
+              }
+            };
+          } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then(permission => {
+              if (permission === 'granted') {
+                var notification = new Notification($escapedTitle, {
+                  body: $escapedBody,
+                  icon: '/icons/Icon-192.png'
+                });
+                notification.onclick = function() {
+                  window.focus();
+                  if (typeof onWebNotificationClick === 'function') {
+                    onWebNotificationClick($escapedLinkType, $escapedLinkId);
+                  }
+                };
+              }
+            });
+          }
+        }
+        """
+      );
+    } catch (e) {
+      debugPrint('Error showing HTML5 Web Notification: $e');
+    }
+  }
+
+  void _startMobileRealtimeNotifications() {
+    if (_isWeb) return;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    _stopMobileRealtimeNotifications();
+
+    _mobileNotificationsSubscription = supabase
+        .channel('mobile-notifications')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
+          ),
+          callback: (payload) async {
+            final linkType = payload.newRecord['link_type']?.toString();
+            // Suppress foreground notification if we are already in the conversation
+            if (linkType == 'conversation') {
+              final linkId = payload.newRecord['link_id']?.toString() ?? '';
+              if (linkId == _activeConversationId) {
+                return;
+              }
+            }
+
+            final title = payload.newRecord['title']?.toString() ?? 'AgriDirect';
+            final body = payload.newRecord['body']?.toString() ?? '';
+            final linkId = payload.newRecord['link_id']?.toString() ?? '';
+
+            // Show local notification
+            await flutterLocalNotificationsPlugin.show(
+              payload.newRecord['notification_id'].hashCode,
+              title,
+              body,
+              NotificationDetails(
+                android: AndroidNotificationDetails(
+                  channelId,
+                  channelName,
+                  channelDescription: channelDescription,
+                  importance: Importance.max,
+                  priority: Priority.high,
+                  playSound: true,
+                  enableVibration: true,
+                  icon: '@mipmap/ic_launcher',
+                ),
+                iOS: const DarwinNotificationDetails(
+                  presentAlert: true,
+                  presentBadge: true,
+                  presentSound: true,
+                ),
+              ),
+              payload: '$linkType:$linkId',
+            );
+          },
+        )
+        .subscribe();
+  }
+
+  void _stopMobileRealtimeNotifications() {
+    _mobileNotificationsSubscription?.unsubscribe();
+    _mobileNotificationsSubscription = null;
   }
 }

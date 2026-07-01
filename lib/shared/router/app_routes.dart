@@ -14,6 +14,7 @@ class AppRoutes {
   static const String messages = '/messages';
   static const String customerMessages = '/customer-messages';
   static const String farmerMessages = '/farmer-messages';
+  static const String call = '/call';
   static const String loading = '/loading';
   static const String productDetails = '/product-details';
 
@@ -30,7 +31,6 @@ class AppRoutes {
   static const String farmerFollowers = '/farmer-followers';
   static const String helpCenter = '/help-center';
   static const String appSettings = '/app-settings';
-
   // Web-specific
   static const String webWelcome = '/web-welcome';
   static const String marketplace = '/marketplace';

@@ -1,6 +1,6 @@
-import 'dart:js' as js;
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'js_helper.dart';
 
 /// Helper class to handle downloading the APK file on both Web and Mobile.
 /// Uses a hidden iframe on Web to bypass Android's default-browser redirect
@@ -12,7 +12,7 @@ class ApkDownloader {
   static Future<void> download() async {
     if (kIsWeb) {
       try {
-        js.context.callMethod('eval', [
+        evalJs(
           """
           var iframe = document.createElement('iframe');
           iframe.style.display = 'none';
@@ -24,7 +24,7 @@ class ApkDownloader {
             }
           }, 5000);
           """
-        ]);
+        );
       } catch (e) {
         // Fallback to url_launcher if JS evaluation fails
         final uri = Uri.parse(apkUrl);

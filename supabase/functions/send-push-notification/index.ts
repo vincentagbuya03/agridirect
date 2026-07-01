@@ -61,7 +61,7 @@ async function assertIsAdmin(
   adminClient: ReturnType<typeof createClient>,
   request: Request,
   supabaseServiceRoleKey: string,
-): Promise<{ userId: string } | Response> {
+): Promise<{ userId: string; isAdmin: boolean } | Response> {
   const jwt = bearerFromRequest(request);
   if (!jwt) {
     return new Response(JSON.stringify({ error: "Missing authorization header." }), {
@@ -74,7 +74,7 @@ async function assertIsAdmin(
   // This is used by scheduled jobs (e.g. daily weather checks) and should never be
   // sent from client apps.
   if (jwt === supabaseServiceRoleKey) {
-    return { userId: "service_role" };
+    return { userId: "service_role", isAdmin: true };
   }
 
   const userResponse = await adminClient.auth.getUser(jwt);
@@ -102,14 +102,8 @@ async function assertIsAdmin(
     );
   }
 
-  if (!adminRecord.data) {
-    return new Response(JSON.stringify({ error: "Forbidden." }), {
-      status: 403,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  return { userId };
+  const isAdmin = adminRecord.data !== null;
+  return { userId, isAdmin };
 }
 
 async function resolveAudienceUserIds(
@@ -361,14 +355,15 @@ Deno.serve(async (request: Request) => {
 
     const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const adminCheck = await assertIsAdmin(
+    const authResult = await assertIsAdmin(
       adminClient,
       request,
       supabaseServiceRoleKey,
     );
-    if (adminCheck instanceof Response) {
-      return adminCheck;
+    if (authResult instanceof Response) {
+      return authResult;
     }
+    const { userId, isAdmin } = authResult;
 
     const payload = await request.json() as SendPushPayload;
     const targetUserId = payload.targetUserId?.trim();
@@ -379,6 +374,21 @@ Deno.serve(async (request: Request) => {
     const title = payload.title?.trim();
     const body = payload.body?.trim();
     const notificationCode = payload.notificationCode?.trim() || "general";
+
+    // Enforce authorization: Non-admins cannot broadcast notifications
+    if (!isAdmin) {
+      if (audience || targetUserIds.length > 0) {
+        return new Response(
+          JSON.stringify({
+            error: "Forbidden: Only admins can broadcast notifications.",
+          }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
 
     console.log(`--- NEW NOTIFICATION REQUEST ---`);
     console.log(`Target User: ${targetUserId}`);
@@ -553,22 +563,43 @@ Deno.serve(async (request: Request) => {
             body: JSON.stringify({
               message: {
                 token: tokenRow.fcm_token,
-                notification: {
-                  title,
-                  body,
-                },
-                data: messageData,
-                android: {
-                  priority: "high",
+                ...(payload.linkType !== "call" && {
                   notification: {
-                    channel_id: "agridirect_channel",
-                    sound: "default",
+                    title,
+                    body,
                   },
+                }),
+                data: {
+                  ...messageData,
+                  // For calls, also include these top-level data fields so the
+                  // background handler can read them from RemoteMessage.data
+                  ...(payload.linkType === "call" && {
+                    call_id: payload.linkId ?? "",
+                    caller_name: payload.data?.caller_name ?? title ?? "",
+                    channel_name: payload.data?.channel_name ?? "",
+                    is_video: payload.data?.is_video ?? "false",
+                    notification_type: "incoming_call",
+                  }),
+                },
+                android: {
+                  // HIGH priority is required at both levels for data-only messages
+                  // to wake a completely killed Android app
+                  priority: "high",
+                  ...(payload.linkType !== "call" && {
+                    notification: {
+                      channel_id: "agridirect_channel",
+                      sound: "default",
+                    },
+                  }),
                 },
                 apns: {
+                  headers: {
+                    "apns-priority": "10",
+                  },
                   payload: {
                     aps: {
                       sound: "default",
+                      "content-available": 1,
                     },
                   },
                 },

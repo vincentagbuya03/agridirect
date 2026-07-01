@@ -8,7 +8,6 @@ import '../../widgets/animated_components.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/widgets/image_widgets.dart';
-import '../../../shared/data/app_data.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 import '../../widgets/web_hamburger_menu_button.dart';
@@ -56,21 +55,6 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
     super.dispose();
   }
 
-  ProductItem _mapToProductItem(Map<String, dynamic> p) {
-    return ProductItem(
-      productId: p['productId']?.toString() ?? p['product_id']?.toString() ?? p['id']?.toString() ?? '',
-      farmerId: p['farmerId']?.toString() ?? p['farmer_id']?.toString() ?? '',
-      name: p['name']?.toString() ?? 'Product',
-      farm: p['farmName']?.toString() ?? p['farm_name']?.toString() ?? 'AgriDirect Farm',
-      price: p['price']?.toString() ?? '0',
-      unit: p['unit']?.toString() ?? 'kg',
-      imageUrl: p['image_url']?.toString() ?? p['imageUrl']?.toString() ?? p['image']?.toString() ?? '',
-      description: p['description']?.toString(),
-      rating: p['rating']?.toString() ?? '4.5',
-      reviews: p['reviews']?.toString() ?? '0',
-      categoryName: p['category_name']?.toString() ?? p['categoryName']?.toString(),
-    );
-  }
 
   void _openProduct(Map<String, dynamic> productMap) {
     _showEditProductDialog(productMap);
@@ -816,8 +800,6 @@ class _EditProductDialogState extends State<_EditProductDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 600;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -909,7 +891,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                                     children: [
                                       _buildFieldLabel('Category'),
                                       DropdownButtonFormField<String>(
-                                        value: _selectedCategory,
+                                        initialValue: _selectedCategory,
                                         items: _categories.map((c) => DropdownMenuItem<String>(
                                           value: c['id'],
                                           child: Text(c['name'], style: GoogleFonts.inter(fontSize: 14)),
@@ -928,7 +910,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                                     children: [
                                       _buildFieldLabel('Unit'),
                                       DropdownButtonFormField<String>(
-                                        value: _selectedUnit,
+                                        initialValue: _selectedUnit,
                                         items: _units.map((u) => DropdownMenuItem<String>(
                                           value: u['id'],
                                           child: Text(u['name'], style: GoogleFonts.inter(fontSize: 14)),

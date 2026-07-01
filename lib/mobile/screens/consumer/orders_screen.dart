@@ -24,14 +24,24 @@ class _OrdersScreenState extends State<OrdersScreen> {
   int _selectedTab = 0;
   final _tabs = ['Active', 'Completed', 'Cancelled'];
   late Stream<List<Order>> _ordersStream;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _ordersStream = OrderService().watchMyOrders();
+    _searchController.addListener(() {
+      if (mounted) setState(() {});
+    });
     if (widget.initialOrderId != null) {
       _loadAndShowOrderDetails(widget.initialOrderId!);
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadAndShowOrderDetails(String orderId) async {
@@ -239,6 +249,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ),
                 ),
                 child: TextField(
+                  controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'Search your orders...',
                     hintStyle: AppTextStyles.bodyMedium.copyWith(
@@ -249,6 +260,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       color: AppColors.textSubtle,
                       size: 22,
                     ),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, color: AppColors.textSubtle, size: 20),
+                            onPressed: () => _searchController.clear(),
+                          )
+                        : null,
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(vertical: 14),
                   ),
@@ -400,8 +417,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
           filteredOrders = orders.where((o) => o.isCancelled).toList();
         }
 
+        final query = _searchController.text.trim().toLowerCase();
+        if (query.isNotEmpty) {
+          filteredOrders = filteredOrders.where((o) =>
+            o.orderNumber.toLowerCase().contains(query) ||
+            o.status.toLowerCase().contains(query) ||
+            (o.farmName ?? '').toLowerCase().contains(query) ||
+            o.orderId.toLowerCase().contains(query)
+          ).toList();
+        }
+
         if (filteredOrders.isEmpty) {
-          return _buildEmptyState('No ${_tabs[_selectedTab].toLowerCase()} orders');
+          return _buildEmptyState(query.isNotEmpty ? 'No orders match "$query"' : 'No ${_tabs[_selectedTab].toLowerCase()} orders');
         }
 
         return ListView.builder(

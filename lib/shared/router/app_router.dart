@@ -40,6 +40,7 @@ import '../../web/screens/consumer/web_order_success_screen.dart';
 import '../../web/screens/admin/admin_dashboard_redesigned.dart';
 import '../../web/screens/common/web_welcome_screen.dart';
 import '../screens/messages/messages_screen.dart';
+import '../screens/messages/in_app_call_screen.dart';
 import '../../mobile/screens/common/loading_screen.dart';
 import '../../mobile/screens/consumer/orders_screen.dart';
 import '../../mobile/screens/farmer/farmer_order_details_screen.dart';
@@ -213,8 +214,10 @@ GoRouter createAppRouter() {
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
             if (kIsWeb || constraints.maxWidth > 800) {
+              final tabParam = state.uri.queryParameters['tab'];
+              final tabIndex = tabParam != null ? int.tryParse(tabParam) ?? 0 : 0;
               return WebNavigation(
-                initialIndex: 0,
+                initialIndex: tabIndex,
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
@@ -359,8 +362,10 @@ GoRouter createAppRouter() {
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
             if (kIsWeb || constraints.maxWidth > 800) {
+              final tabParam = state.uri.queryParameters['tab'];
+              final tabIndex = tabParam != null ? int.tryParse(tabParam) ?? 0 : 0;
               return WebNavigation(
-                initialIndex: 0,
+                initialIndex: tabIndex,
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
@@ -717,6 +722,25 @@ GoRouter createAppRouter() {
           );
         },
       ),
+      // ── Web Call Page (full-screen, used when calling from web) ─────────
+      GoRoute(
+        path: '/call/:callId',
+        builder: (context, state) {
+          final callId = state.pathParameters['callId'] ?? '';
+          final extra = state.extra as Map<String, dynamic>?;
+          return InAppCallScreen(
+            name: extra?['name'] as String? ?? 'Unknown',
+            avatarUrl: extra?['avatarUrl'] as String?,
+            callId: callId,
+            channelName: extra?['channelName'] as String? ?? '',
+            isVideo: extra?['isVideo'] as bool? ?? false,
+            isIncoming: extra?['isIncoming'] as bool? ?? false,
+            isAlreadyAccepted: extra?['isAlreadyAccepted'] as bool? ?? false,
+            isRoute: true,
+          );
+        },
+      ),
+
       GoRoute(
         path: AppRoutes.addressBook,
         builder: (context, state) => const AddressBookScreen(),

@@ -16,6 +16,9 @@ import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/screens/post_detail_screen.dart';
 import '../../../shared/services/social/follow_service.dart';
 import 'marketplace_screen.dart';
+import '../../../shared/services/community/notification_service.dart';
+import '../../widgets/mobile_notifications_sheet.dart';
+import '../../../shared/services/auth/auth_service.dart';
 
 /// Home Screen - Premium Customer Interface
 class HomeScreen extends StatefulWidget {
@@ -203,6 +206,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         () => context.push(AppRoutes.customerMessages),
                       ),
                       const SizedBox(width: 8),
+                      _buildHeaderNotification(context),
+                      const SizedBox(width: 8),
                       _buildCartAction(context),
                     ],
                   ),
@@ -374,6 +379,52 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHeaderNotification(BuildContext context) {
+    final userId = AuthService().userId;
+    return FutureBuilder<int>(
+      future: NotificationService().getUnreadNotificationCount(userId),
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        return GestureDetector(
+          onTap: () => showMobileNotificationsSheet(context),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.textHeadline.withValues(alpha: 0.1),
+              ),
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(
+                  Icons.notifications_none_rounded,
+                  color: AppColors.textHeadline,
+                  size: 24,
+                ),
+                if (count > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: AppColors.error,
+                        shape: BoxShape.circle,
                       ),
                     ),
                   ),

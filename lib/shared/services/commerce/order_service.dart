@@ -228,6 +228,32 @@ class OrderService {
         },
       );
 
+      // Notify the farmer about the new order
+      try {
+        final farmerRecord = await _supabase
+            .from('farmers')
+            .select('user_id')
+            .eq('farmer_id', farmerId)
+            .maybeSingle();
+        final farmerUserId = farmerRecord?['user_id']?.toString();
+        if (farmerUserId != null && farmerUserId.isNotEmpty) {
+          final customerName = await _getUserDisplayName(customerId);
+          await _supabase.functions.invoke(
+            'send-push-notification',
+            body: {
+              'targetUserId': farmerUserId,
+              'title': 'New Order Received',
+              'body': '$customerName has placed order ${createdOrder.orderNumber}',
+              'notificationCode': 'new_order',
+              'linkType': 'order',
+              'linkId': createdOrder.orderId,
+            },
+          );
+        }
+      } catch (fcmError) {
+        debugPrint('Failed to send new order push notification: $fcmError');
+      }
+
       return createdOrder;
     } catch (e) {
       throw Exception('Failed to create order: $e');
@@ -266,6 +292,31 @@ class OrderService {
           'new_status': normalizedStatus,
         },
       );
+
+      // Notify the customer about the order status update
+      try {
+        final customerRecord = await _supabase
+            .from('customers')
+            .select('user_id')
+            .eq('customer_id', updatedOrder.customerId)
+            .maybeSingle();
+        final customerUserId = customerRecord?['user_id']?.toString();
+        if (customerUserId != null && customerUserId.isNotEmpty) {
+          await _supabase.functions.invoke(
+            'send-push-notification',
+            body: {
+              'targetUserId': customerUserId,
+              'title': 'Order Status Updated',
+              'body': 'Your order ${updatedOrder.orderNumber} status is now ${newStatus.toUpperCase()}',
+              'notificationCode': 'order_status_update',
+              'linkType': 'order',
+              'linkId': updatedOrder.orderId,
+            },
+          );
+        }
+      } catch (fcmError) {
+        debugPrint('Failed to send order status update push notification: $fcmError');
+      }
 
       return updatedOrder;
     } catch (e) {

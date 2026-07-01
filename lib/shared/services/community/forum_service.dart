@@ -1,12 +1,9 @@
-// ============================================================================
-// lib/shared/services/community/forum_service.dart
-// Community forum operations
-// ============================================================================
-
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/forum/forum_post_model.dart';
 import '../../models/forum/forum_comment_model.dart';
 import '../social/follow_service.dart';
+import 'notification_service.dart';
 
 class ForumService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -231,7 +228,7 @@ class ForumService {
 
       return rows.map((row) => _mapComment(row, usersById)).toList();
     } catch (e) {
-      throw Exception('Failed to fetch comments: \$e');
+      throw Exception('Failed to fetch comments: $e');
     }
   }
 
@@ -254,9 +251,38 @@ class ForumService {
           .single();
 
       final usersById = await _getUsersById([userId]);
-      return _mapComment(Map<String, dynamic>.from(response), usersById);
+      final comment = _mapComment(Map<String, dynamic>.from(response), usersById);
+
+      // Trigger notification for the post author
+      try {
+        final post = await _supabase
+            .from('forum_posts')
+            .select('user_id, title')
+            .eq('post_id', postId)
+            .maybeSingle();
+        final postAuthorId = post?['user_id']?.toString();
+        if (postAuthorId != null && postAuthorId.isNotEmpty && postAuthorId != userId) {
+          final commenterName = usersById[userId]?['name'] ?? 'Someone';
+          final postTitle = post?['title']?.toString() ?? 'your post';
+          final previewText = body.length > 60 ? '${body.substring(0, 57)}...' : body;
+
+          await NotificationService().insertNotification(
+            userId: postAuthorId,
+            title: 'New comment on your post',
+            content: '$commenterName commented on "$postTitle": "$previewText"',
+            type: 'post',
+            linkType: 'post',
+            linkId: postId,
+          );
+        }
+      } catch (notifyError) {
+        // Do not crash the comment creation if notification fails
+        debugPrint('Error sending comment notification: $notifyError');
+      }
+
+      return comment;
     } catch (e) {
-      throw Exception('Failed to create comment: \$e');
+      throw Exception('Failed to create comment: $e');
     }
   }
 
@@ -272,7 +298,7 @@ class ForumService {
 
       return ForumComment.fromJson(response);
     } catch (e) {
-      throw Exception('Failed to update comment: \$e');
+      throw Exception('Failed to update comment: $e');
     }
   }
 
@@ -284,7 +310,7 @@ class ForumService {
           .delete()
           .eq('comment_id', commentId);
     } catch (e) {
-      throw Exception('Failed to delete comment: \$e');
+      throw Exception('Failed to delete comment: $e');
     }
   }
 
@@ -305,8 +331,39 @@ class ForumService {
         'post_id': postId,
         'user_id': userId,
       });
+
+      // Trigger notification for the post author
+      try {
+        final post = await _supabase
+            .from('forum_posts')
+            .select('user_id, title')
+            .eq('post_id', postId)
+            .maybeSingle();
+        final postAuthorId = post?['user_id']?.toString();
+        if (postAuthorId != null && postAuthorId.isNotEmpty && postAuthorId != userId) {
+          final likerUser = await _supabase
+              .from('users')
+              .select('name')
+              .eq('user_id', userId)
+              .maybeSingle();
+          final likerName = likerUser?['name']?.toString() ?? 'Someone';
+          final postTitle = post?['title']?.toString() ?? 'your post';
+
+          await NotificationService().insertNotification(
+            userId: postAuthorId,
+            title: 'New like on your post',
+            content: '$likerName liked your post: "$postTitle"',
+            type: 'post',
+            linkType: 'post',
+            linkId: postId,
+          );
+        }
+      } catch (notifyError) {
+        // Do not crash the like action if notification fails
+        debugPrint('Error sending like notification: $notifyError');
+      }
     } catch (e) {
-      throw Exception('Failed to like post: \$e');
+      throw Exception('Failed to like post: $e');
     }
   }
 
@@ -322,7 +379,7 @@ class ForumService {
           .eq('post_id', postId)
           .eq('user_id', userId);
     } catch (e) {
-      throw Exception('Failed to unlike post: \$e');
+      throw Exception('Failed to unlike post: $e');
     }
   }
 

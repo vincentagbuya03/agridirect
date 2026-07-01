@@ -7,10 +7,7 @@ npx.cmd vercel@latest deploy --prod --yes
 Copy-Item .\build\app\outputs\apk\release\app-armeabi-v7a-release.apk .\web\AgriDirect-Installer-armeabi-v7a.apk
 
 
-PS C:\Users\Nick Vincent Agbuya\Documents\Flutter Project\agridirect> Copy-Item "build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" "web\agridirect-android-arm64-v8a-release.apk"
-PS C:\Users\Nick Vincent Agbuya\Documents\Flutter Project\agridirect> Copy-Item "build\app\outputs\flutter-apk\app-armeabi-v7a-release.apk" "web\agridirect-android-armeabi-v7a-release.apk"
-PS C:\Users\Nick Vincent Agbuya\Documents\Flutter Project\agridirect> Copy-Item "build\app\outputs\flutter-apk\app-x86_64-release.apk" "web\agridirect-android-x86_64-release.apk"
-PS C:\Users\Nick Vincent Agbuya\Documents\Flutter Project\agridirect> Get-ChildItem web\*.apk
+
 
 // arm64-v8a, : version that i can push
 AgriDirect-Installer.apk : Name of the Installer
@@ -29,3 +26,39 @@ SELECT cron.schedule(
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsIn
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+To upload your built app APKs as a new release on GitHub, follow these steps:
+
+### 1. Wait for the build to finish
+Wait for your active terminal command `flutter build apk --release --split-per-abi` to complete.
+
+### 2. Locate the generated APK files
+Once the build is complete, you can find the generated APK files in this directory:
+`build\app\outputs\flutter-apk\`
+
+You will see files named similarly to:
+* `app-armeabi-v7a-release.apk`
+* `app-arm64-v8a-release.apk`
+* `app-x86_64-release.apk`
+
+### 3. Create the Release on GitHub
+1. Open the link in your browser: [GitHub New Release](https://github.com/vincentagbuya03/agridirect/releases/new)
+2. Click **Choose a tag**, type a version number (e.g., `v1.0.0`), and click **Create new tag**.
+3. Set a **Release title** (e.g., `Release v1.0.0`) and optionally add a description of the changes.
+4. Scroll down to the box labeled **"Attach binaries by dropping them here or selecting them"**.
+5. Drag and drop the APK files from your `build\app\outputs\flutter-apk\` folder into that box.
+6. Once the upload completes, click **Publish release**.

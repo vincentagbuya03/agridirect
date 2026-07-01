@@ -30,6 +30,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../shared/services/auth/auth_service.dart';
 
+import '../../../shared/services/community/notification_service.dart';
+import '../../widgets/mobile_notifications_sheet.dart';
+
 /// Marketplace Screen - Professional Digital Marketplace
 class MarketplaceScreen extends StatefulWidget {
   const MarketplaceScreen({super.key});
@@ -45,6 +48,60 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   late OfflineCacheService _cacheService;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   final GlobalKey _cartKey = GlobalKey();
+  final TextEditingController _searchController = TextEditingController();
+
+  Widget _buildHeaderNotification(BuildContext context) {
+    final userId = AuthService().userId;
+    return FutureBuilder<int>(
+      future: NotificationService().getUnreadNotificationCount(userId),
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        return GestureDetector(
+          onTap: () => showMobileNotificationsSheet(context),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.textHeadline.withValues(alpha: 0.1),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.textHeadline.withValues(alpha: 0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(
+                  Icons.notifications_none_rounded,
+                  color: AppColors.textHeadline,
+                  size: 24,
+                ),
+                if (count > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: AppColors.error,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _ensureCacheServiceReady() async {
     if (!_cacheService.isInitialized) {
@@ -59,6 +116,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     _setupConnectivityListener();
     _loadMarketplaceCategories();
     SupabaseDataService.marketplaceCategoryNotifier.addListener(_onExternalCategoryFilter);
+    _searchController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   void _onExternalCategoryFilter() {
@@ -215,6 +275,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   void dispose() {
     _connectivitySubscription?.cancel();
     SupabaseDataService.marketplaceCategoryNotifier.removeListener(_onExternalCategoryFilter);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -285,7 +346,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [const BrandLogo(), _buildHeaderCart(context)],
+                children: [
+                  const BrandLogo(),
+                  Row(
+                    children: [
+                      _buildHeaderNotification(context),
+                      const SizedBox(width: 12),
+                      _buildHeaderCart(context),
+                    ],
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
               Row(
@@ -301,6 +371,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                         ),
                       ),
                       child: TextField(
+                        controller: _searchController,
                         decoration: InputDecoration(
                           hintText: 'Search fresh harvest...',
                           hintStyle: AppTextStyles.bodyMedium.copyWith(
@@ -311,6 +382,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                             color: AppColors.textSubtle,
                             size: 22,
                           ),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear_rounded, color: AppColors.textSubtle, size: 20),
+                                  onPressed: () => _searchController.clear(),
+                                )
+                              : null,
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
                             vertical: 14,
@@ -475,6 +552,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   Widget _buildProductContent() {
+    final query = _searchController.text.trim().toLowerCase();
+
     if (!_isOnline) {
       final currentUserId = AuthService().userId;
       final cachedProducts = _cacheService
@@ -483,7 +562,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           .map(_cachedToProductItem)
           .where((p) {
             final isNotMine = currentUserId.isEmpty || p.farmerId != currentUserId;
-            return _matchesSelectedCategory(p) && isNotMine;
+            final matchesCategory = _matchesSelectedCategory(p);
+            final matchesQuery = query.isEmpty ||
+                p.name.toLowerCase().contains(query) ||
+                (p.description ?? '').toLowerCase().contains(query) ||
+                p.farm.toLowerCase().contains(query);
+            return matchesCategory && isNotMine && matchesQuery;
           })
           .toList();
 
@@ -536,7 +620,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         final currentUserId = AuthService().userId;
         final filteredProducts = products.where((p) {
           final isNotMine = currentUserId.isEmpty || p.farmerId != currentUserId;
-          return _matchesSelectedCategory(p) && isNotMine;
+          final matchesCategory = _matchesSelectedCategory(p);
+          final matchesQuery = query.isEmpty ||
+              p.name.toLowerCase().contains(query) ||
+              (p.description ?? '').toLowerCase().contains(query) ||
+              p.farm.toLowerCase().contains(query);
+          return matchesCategory && isNotMine && matchesQuery;
         }).toList();
 
         if (filteredProducts.isEmpty) {

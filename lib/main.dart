@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -24,12 +26,85 @@ import 'shared/router/app_router.dart';
 import 'shared/services/offline/offline_cache_service.dart';
 import 'shared/utils/url_strategy.dart';
 import 'mobile/screens/common/loading_screen.dart';
+import 'shared/screens/messages/in_app_call_screen.dart';
 
 // Handle background notifications
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   debugPrint('Handling background message: ${message.messageId}');
+
+  final data = message.data;
+  final linkType = data['link_type']?.toString() ?? '';
+
+  if (linkType == 'call') {
+    try {
+      final isVideo = data['is_video'] == 'true';
+      final callerName = data['caller_name']?.toString() ?? 'AgriDirect User';
+      final channelName = data['channel_name']?.toString() ?? '';
+      // call_id is sent in both link_id and call_id fields - try both
+      final callId = (data['call_id']?.toString() ?? data['link_id']?.toString() ?? '').trim();
+
+      if (callId.isEmpty || channelName.isEmpty) {
+        debugPrint('⚠️ Background call: missing callId or channelName, skipping CallKit.');
+        return;
+      }
+
+      final callKitParams = CallKitParams(
+        id: callId,
+        nameCaller: callerName,
+        appName: 'AgriDirect',
+        isAccepted: false,
+        handle: 'Incoming Call',
+        type: isVideo ? 1 : 0,
+        missedCallNotification: const NotificationParams(
+          showNotification: true,
+          isShowCallback: true,
+          subtitle: 'Missed call',
+          callbackText: 'Call back',
+        ),
+        extra: <String, dynamic>{
+          'callId': callId,
+          'channelName': channelName,
+          'isVideo': isVideo,
+        },
+        android: const AndroidParams(
+          isCustomNotification: true,
+          isShowLogo: false,
+          ringtonePath: 'system_ringtone_default',
+          backgroundColor: '#0955fa',
+          actionColor: '#4CAF50',
+          textColor: '#ffffff',
+          incomingCallNotificationChannelName: "Incoming Call",
+          missedCallNotificationChannelName: "Missed Call",
+          isShowCallID: false,
+          textAccept: 'Accept',
+          textDecline: 'Decline',
+        ),
+        ios: const IOSParams(
+          iconName: 'CallKitLogo',
+          handleType: '',
+          supportsVideo: true,
+          maximumCallGroups: 2,
+          maximumCallsPerCallGroup: 1,
+          audioSessionMode: 'default',
+          audioSessionActive: true,
+          audioSessionPreferredSampleRate: 44100.0,
+          audioSessionPreferredIOBufferDuration: 0.005,
+          supportsDTMF: true,
+          supportsHolding: true,
+          supportsGrouping: false,
+          supportsUngrouping: false,
+          ringtonePath: 'system_ringtone_default',
+        ),
+      );
+
+      debugPrint('📞 Background: Showing CallKit for call $callId, channel=$channelName');
+      await FlutterCallkitIncoming.showCallkitIncoming(callKitParams);
+    } catch (e) {
+      debugPrint('Error showing background CallKit: $e');
+    }
+  }
 }
 
 void main() async {
@@ -37,6 +112,32 @@ void main() async {
 
   // Applies web URL strategy only on web, no-op on mobile/desktop.
   configureUrlStrategy();
+
+  // Initialize environment, Hive, Firebase, and Supabase immediately
+  try {
+    final envFile = kIsWeb ? '.env.web' : '.env';
+    await dotenv.load(fileName: envFile);
+  } catch (e) {
+    try {
+      await dotenv.load(fileName: '.env');
+    } catch (_) {}
+  }
+
+  try {
+    await Hive.initFlutter();
+  } catch (_) {}
+
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+  } catch (_) {}
+
+  try {
+    await SupabaseConfig.initialize();
+  } catch (_) {}
 
   runApp(const _BootstrapApp());
 }
@@ -48,9 +149,69 @@ class _BootstrapApp extends StatefulWidget {
   State<_BootstrapApp> createState() => _BootstrapAppState();
 }
 
+typedef PendingCall = ({
+  String callId,
+  String channelName,
+  bool isVideo,
+  String callerName,
+  String? avatarUrl,
+});
+
+PendingCall? _globalPendingAcceptedCall;
+
 class _BootstrapAppState extends State<_BootstrapApp> {
   late final Future<void> _initializationFuture = _initializeAppWithMinDelay();
   bool _isAnimationDone = false;
+  bool _isFullyInitialized = false;
+  PendingCall? _pendingCall;
+  bool _callScreenLaunched = false;
+  StreamSubscription<CallEvent?>? _callkitSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb) {
+      // Listen in state so setState() can be called regardless of timing
+      _callkitSubscription =
+          FlutterCallkitIncoming.onEvent.listen((CallEvent? event) {
+        if (event is CallEventActionCallAccept && mounted) {
+          // If the app is already fully initialized and running, let the active
+          // NotificationService push the call screen natively instead of resetting the app.
+          if (_isFullyInitialized) {
+            debugPrint('📞 Bootstrap: App already running, delegating to NotificationService');
+            return;
+          }
+
+          final params = event.callKitParams;
+          final extra = params.extra ?? {};
+          final callId = extra['callId']?.toString() ?? '';
+          final channelName = extra['channelName']?.toString() ?? '';
+          final isVideo =
+              extra['isVideo'] == true || extra['isVideo'] == 'true';
+          final callerName = params.nameCaller ?? 'AgriDirect User';
+          final avatarUrl = params.avatar;
+          if (callId.isNotEmpty && channelName.isNotEmpty) {
+            debugPrint('📞 Bootstrap: CallKit accept received during cold start, forcing rebuild');
+            setState(() {
+              _pendingCall = (
+                callId: callId,
+                channelName: channelName,
+                isVideo: isVideo,
+                callerName: callerName,
+                avatarUrl: avatarUrl,
+              );
+            });
+          }
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _callkitSubscription?.cancel();
+    super.dispose();
+  }
 
   Route<dynamic> _startupRoute(Widget child) {
     return MaterialPageRoute<void>(builder: (_) => child);
@@ -60,89 +221,180 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     final startTime = DateTime.now();
     await _initializeApp();
     final elapsed = DateTime.now().difference(startTime);
-    // Ensure we wait at least 3.2 seconds for the fancy loading animation
-    final remaining = const Duration(milliseconds: 3200) - elapsed;
+    // Remove the artificial waiting delay on web, and reduce it to 1.5s on mobile
+    final minDelay = kIsWeb ? Duration.zero : const Duration(milliseconds: 1500);
+    final remaining = minDelay - elapsed;
     if (remaining > Duration.zero) {
       await Future.delayed(remaining);
     }
   }
 
   Future<void> _initializeApp() async {
-    // Keep each step non-fatal where possible so web never stays blank.
-    try {
-      await Hive.initFlutter();
-      debugPrint('✅ Hive initialized');
-    } catch (e) {
-      debugPrint('⚠️ Hive initialization error: $e');
-    }
-
-    try {
-      final cacheService = OfflineCacheService();
-      await cacheService.init();
-      debugPrint('✅ Offline cache service initialized');
-    } catch (e) {
-      debugPrint('⚠️ Offline cache initialization error: $e');
-    }
-
-    try {
-      final envFile = kIsWeb ? '.env.web' : '.env';
-      debugPrint('🚀 Loading environment: $envFile');
-      await dotenv.load(fileName: envFile);
-    } catch (e) {
+    // Stage 1: Load environment, initialize Hive, and initialize Firebase concurrently
+    final Future<void> envLoadFuture = () async {
       try {
-        await dotenv.load(fileName: '.env');
-      } catch (fallbackError) {
-        debugPrint('⚠️ Could not load env file: $e / $fallbackError');
+        final envFile = kIsWeb ? '.env.web' : '.env';
+        debugPrint('🚀 Loading environment: $envFile');
+        await dotenv.load(fileName: envFile);
+      } catch (e) {
+        try {
+          await dotenv.load(fileName: '.env');
+        } catch (fallbackError) {
+          debugPrint('⚠️ Could not load env file: $e / $fallbackError');
+        }
       }
-    }
+    }();
 
-    try {
-      if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
-        debugPrint('✅ Firebase initialized');
-      } else {
-        debugPrint('✅ Firebase already initialized');
+    final Future<void> hiveInitFuture = () async {
+      try {
+        await Hive.initFlutter();
+        debugPrint('✅ Hive initialized');
+      } catch (e) {
+        debugPrint('⚠️ Hive initialization error: $e');
       }
-    } catch (e) {
-      debugPrint('⚠️ Firebase initialization error: $e');
-    }
+    }();
+
+    final Future<void> firebaseInitFuture = () async {
+      try {
+        if (Firebase.apps.isEmpty) {
+          await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform,
+          );
+          debugPrint('✅ Firebase initialized');
+        } else {
+          debugPrint('✅ Firebase already initialized');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Firebase initialization error: $e');
+      }
+    }();
+
+    // Wait for Stage 1 concurrent tasks to complete
+    await Future.wait([envLoadFuture, hiveInitFuture, firebaseInitFuture]);
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    try {
-      await SupabaseConfig.initialize();
-      debugPrint('✅ SupabaseConfig initialized');
-    } catch (e) {
-      debugPrint('⚠️ SupabaseConfig initialization error: $e');
-    }
-
-    // Note: On web, Supabase SDK auto-handles PKCE code exchange during
-    // initialize() when it detects ?code= in the URL (see 'handle deeplink uri' log).
-    // No manual exchangeCodeForSession() call is needed here.
-
-    try {
-      debugPrint('🔄 Priming product metadata cache...');
-      await BootstrapCacheService().primeProductMetadataCache();
-      debugPrint('✅ Product metadata cache primed');
-    } catch (e) {
-      debugPrint('⚠️ Bootstrap cache initialization error: $e');
-    }
-
-    if (!kIsWeb) {
+    // Stage 2: Initialize offline cache (needs Hive) and Supabase (needs dotenv) concurrently
+    final Future<void> cacheInitFuture = () async {
       try {
-        debugPrint('🔄 Initializing AuthService...');
-        await AuthService().initialize(event: AuthChangeEvent.initialSession);
-        debugPrint('✅ AuthService initialized');
+        final cacheService = OfflineCacheService();
+        await cacheService.init();
+        debugPrint('✅ Offline cache service initialized');
       } catch (e) {
-        debugPrint('⚠️ Auth initialization error: $e');
+        debugPrint('⚠️ Offline cache initialization error: $e');
+      }
+    }();
+
+    final Future<void> supabaseInitFuture = () async {
+      try {
+        await SupabaseConfig.initialize();
+        debugPrint('✅ SupabaseConfig initialized');
+      } catch (e) {
+        debugPrint('⚠️ SupabaseConfig initialization error: $e');
+      }
+    }();
+
+    await Future.wait([cacheInitFuture, supabaseInitFuture]);
+
+    // Stage 3: Prime cache (needs Supabase) and initialize AuthService on mobile concurrently
+    final Future<void> primeCacheFuture = () async {
+      try {
+        debugPrint('🔄 Priming product metadata cache...');
+        await BootstrapCacheService().primeProductMetadataCache();
+        debugPrint('✅ Product metadata cache primed');
+      } catch (e) {
+        debugPrint('⚠️ Bootstrap cache initialization error: $e');
+      }
+    }();
+
+    final Future<void> authInitFuture = () async {
+      if (!kIsWeb) {
+        try {
+          debugPrint('🔄 Initializing AuthService...');
+          await AuthService().initialize(event: AuthChangeEvent.initialSession);
+          debugPrint('✅ AuthService initialized');
+        } catch (e) {
+          debugPrint('⚠️ Auth initialization error: $e');
+        }
+      }
+    }();
+
+    await Future.wait([primeCacheFuture, authInitFuture]);
+
+    // Check if app was launched by tapping an incoming CallKit notification
+    if (!kIsWeb) {
+      if (_globalPendingAcceptedCall != null) {
+        _pendingCall = _globalPendingAcceptedCall;
+        _globalPendingAcceptedCall = null;
+      } else {
+        try {
+          final activeCalls = await FlutterCallkitIncoming.activeCalls();
+          if (activeCalls.isNotEmpty) {
+            final call = activeCalls.first;
+            final extra = call.extra ?? {};
+            final callId = extra['callId']?.toString() ?? call.id;
+            final channelName = extra['channelName']?.toString() ?? '';
+            final isVideo = extra['isVideo'] == true || extra['isVideo'] == 'true';
+            final callerName = call.nameCaller ?? 'AgriDirect User';
+            final avatarUrl = call.avatar;
+
+            if (callId.isNotEmpty && channelName.isNotEmpty) {
+              _pendingCall = (
+                callId: callId,
+                channelName: channelName,
+                isVideo: isVideo,
+                callerName: callerName,
+                avatarUrl: avatarUrl,
+              );
+              debugPrint('📞 Pending CallKit call detected: $callId');
+            }
+          }
+        } catch (e) {
+          debugPrint('⚠️ Could not check active CallKit calls: $e');
+        }
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ── If launched via CallKit accept, show ONLY the call screen immediately. ──
+    // This runs before FutureBuilder is even evaluated, so no loading or splash screen shows!
+    if (_pendingCall != null && !kIsWeb && !_callScreenLaunched) {
+      _callScreenLaunched = true;
+      final call = _pendingCall!;
+      debugPrint('📞 Early Launch: standalone call screen for ${call.callId}');
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        navigatorKey: appNavigatorKey,
+        theme: ThemeData.dark(),
+        home: InAppCallScreen(
+          name: call.callerName,
+          avatarUrl: call.avatarUrl,
+          callId: call.callId,
+          channelName: call.channelName,
+          isVideo: call.isVideo,
+          isIncoming: true,
+          isAlreadyAccepted: true,
+          onCallEnded: () {
+            if (mounted) {
+              setState(() {
+                _pendingCall = null;
+                _callScreenLaunched = true;
+              });
+            }
+          },
+        ),
+        // After call ends and screen pops, launch the real app
+        onGenerateRoute: (_) => _startupRoute(const AgriDirectApp()),
+      );
+    }
+
+    if (_callScreenLaunched) {
+      // Call screen was shown; after popping it falls to AgriDirectApp
+      return const AgriDirectApp();
+    }
+
     return FutureBuilder<void>(
       future: _initializationFuture,
       builder: (context, snapshot) {
@@ -152,6 +404,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
         }
 
         if (snapshot.connectionState == ConnectionState.done) {
+          _isFullyInitialized = true;
           final auth = AuthService();
           debugPrint('   auth.isLoggedIn=${auth.isLoggedIn}, _isAnimationDone=$_isAnimationDone');
 
@@ -161,6 +414,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
           // - Animation already done
           // - Coming from OAuth callback (the callback screen handles its own transition)
           final isOAuthCallback = kIsWeb && Uri.base.path.contains('/auth/callback');
+
           if (kIsWeb || !auth.isLoggedIn || _isAnimationDone || isOAuthCallback) {
             debugPrint('   → Launching AgriDirectApp()');
             return const AgriDirectApp();

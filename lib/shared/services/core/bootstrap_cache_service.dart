@@ -180,7 +180,11 @@ class BootstrapCacheService {
     final prefs = await SharedPreferences.getInstance();
 
     await _seedDefaultsIfMissing(prefs: prefs);
-    await _refreshFromServerIfAvailable(prefs: prefs);
+    
+    // Refresh from server in the background so it doesn't block app startup
+    _refreshFromServerIfAvailable(prefs: prefs).catchError((e) {
+      debugPrint('⚠️ Background metadata cache refresh failed: $e');
+    });
   }
 
   Future<void> _seedDefaultsIfMissing({

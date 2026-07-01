@@ -84,6 +84,8 @@ class _WebHamburgerMenuButtonState extends State<WebHamburgerMenuButton> {
             _handleLogout();
           } else if (index == 101) {
             context.go(AppRoutes.login);
+          } else if (index == 5) {
+            context.go(AppRoutes.messages, extra: {'asFarmer': isFarmerMode});
           } else if (!isFarmerMode && index == 4) {
             if (widget.onCartTap != null) widget.onCartTap!();
           } else {
@@ -140,6 +142,7 @@ class _WebHamburgerMenuButtonState extends State<WebHamburgerMenuButton> {
               (2, Icons.receipt_long_rounded, 'Orders'),
               (3, Icons.groups_rounded, 'Community'),
               (4, Icons.person_rounded, 'Profile'),
+              (5, Icons.chat_bubble_rounded, 'Messages'),
             ];
 
             items.addAll(farmerMenuItems.map((item) {
@@ -181,6 +184,7 @@ class _WebHamburgerMenuButtonState extends State<WebHamburgerMenuButton> {
               (2, Icons.people_rounded, 'Community'),
               (3, Icons.person_rounded, 'Profile'),
               (4, Icons.shopping_cart_rounded, 'Cart'),
+              (5, Icons.chat_bubble_rounded, 'Messages'),
             ];
 
             items.addAll(customerMenuItems.map((item) {

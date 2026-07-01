@@ -14,6 +14,7 @@ import 'dart:async';
 import '../../widgets/skeleton_loaders.dart';
 import '../../../shared/services/farmer/farmer_service.dart';
 import '../../../shared/services/offline/offline_product_service.dart';
+import '../../widgets/mobile_notifications_sheet.dart';
 
 /// Farmer Sales Dashboard
 class FarmerSalesDashboard extends StatefulWidget {
@@ -705,9 +706,12 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      _buildHeaderAction(
-                        Icons.notifications_none_rounded,
-                        true,
+                      GestureDetector(
+                        onTap: () => showMobileNotificationsSheet(context),
+                        child: _buildHeaderAction(
+                          Icons.notifications_none_rounded,
+                          true,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       _buildHeaderAction(Icons.settings_outlined, false),

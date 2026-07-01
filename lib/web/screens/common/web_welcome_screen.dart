@@ -2652,52 +2652,6 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     );
   }
 
-  Widget _downloadButton({bool fullWidth = false}) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: _downloadAndroidApk,
-        child: Container(
-          width: fullWidth ? double.infinity : null,
-          height: 58,
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [AgriColors.emerald400, AgriColors.emerald600],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: AgriColors.emerald500.withValues(alpha: 0.3),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.android_rounded, color: Colors.white, size: 24),
-                const SizedBox(width: 12),
-                Text(
-                  'Download APK',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildFooter() {
     final sw = MediaQuery.of(context).size.width;
     return Container(

@@ -2468,19 +2468,32 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
     final callId = callRecord['call_id']?.toString() ?? '';
     final channelName = callRecord['channel_name']?.toString() ?? '';
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      useRootNavigator: false,
-      builder: (dialogContext) => InAppCallScreen(
-        name: name,
-        avatarUrl: avatarUrl,
-        callId: callId,
-        channelName: channelName,
-        isVideo: isVideo,
-        isIncoming: false,
-      ),
-    );
+    // On web: navigate to a dedicated full-screen call route instead of dialog.
+    // On mobile: use the dialog overlay as before.
+    if (kIsWeb) {
+      if (!mounted) return;
+      context.push('/call/$callId', extra: {
+        'name': name,
+        'avatarUrl': avatarUrl,
+        'channelName': channelName,
+        'isVideo': isVideo,
+        'isIncoming': false,
+      });
+    } else {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        useRootNavigator: false,
+        builder: (dialogContext) => InAppCallScreen(
+          name: name,
+          avatarUrl: avatarUrl,
+          callId: callId,
+          channelName: channelName,
+          isVideo: isVideo,
+          isIncoming: false,
+        ),
+      );
+    }
   }
 
   String _formatLastActive(DateTime dateTime) {
@@ -2489,13 +2502,13 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
       return 'Active just now';
     } else if (difference.inMinutes < 60) {
       final mins = difference.inMinutes;
-      return 'Active $mins min${mins > 1 ? \'s\' : \'\'} ago';
+      return "Active $mins min${mins > 1 ? 's' : ''} ago";
     } else if (difference.inHours < 24) {
       final hours = difference.inHours;
-      return 'Active $hours hr${hours > 1 ? \'s\' : \'\'} ago';
+      return "Active $hours hr${hours > 1 ? 's' : ''} ago";
     } else {
       final days = difference.inDays;
-      return 'Active $days day${days > 1 ? \'s\' : \'\'} ago';
+      return "Active $days day${days > 1 ? 's' : ''} ago";
     }
   }
 }

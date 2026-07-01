@@ -823,3 +823,57 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.delete_unverified_user(text) TO anon, authenticated;
 
+-- Conversations, Messages, and Calls Signaling tables and indexes
+CREATE TABLE IF NOT EXISTS public.conversations (
+    conversation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID NOT NULL REFERENCES public.customers(customer_id) ON DELETE CASCADE,
+    farmer_id UUID NOT NULL REFERENCES public.farmers(farmer_id) ON DELETE CASCADE,
+    last_message_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(customer_id, farmer_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.messages (
+    message_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID NOT NULL REFERENCES public.conversations(conversation_id) ON DELETE CASCADE,
+    sender_id UUID NOT NULL REFERENCES public.users(user_id) ON DELETE CASCADE,
+    message_text TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT false,
+    read_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Try to create enum but catch if already exists in target DB
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'call_status') THEN
+        CREATE TYPE public.call_status AS ENUM ('ringing', 'connected', 'declined', 'ended', 'missed');
+    END IF;
+END$$;
+
+CREATE TABLE IF NOT EXISTS public.calls (
+    call_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID REFERENCES public.conversations(conversation_id) ON DELETE CASCADE,
+    caller_id UUID NOT NULL REFERENCES public.users(user_id) ON DELETE CASCADE,
+    receiver_id UUID NOT NULL REFERENCES public.users(user_id) ON DELETE CASCADE,
+    channel_name TEXT NOT NULL,
+    is_video BOOLEAN NOT NULL DEFAULT false,
+    status public.call_status NOT NULL DEFAULT 'ringing',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Indexes for performance & Disk IO Budget protection
+CREATE INDEX IF NOT EXISTS idx_conversations_customer_id ON public.conversations(customer_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_farmer_id ON public.conversations(farmer_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_last_message_at ON public.conversations(last_message_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON public.messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON public.messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON public.messages(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_calls_conversation_id ON public.calls(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_calls_caller_id ON public.calls(caller_id);
+CREATE INDEX IF NOT EXISTS idx_calls_receiver_id ON public.calls(receiver_id);
+
+

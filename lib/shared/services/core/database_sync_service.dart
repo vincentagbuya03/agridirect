@@ -28,9 +28,9 @@ class DatabaseSyncService extends ChangeNotifier {
   String? _activeFarmerId;
 
   // Sync configuration
-  final Duration _profileSyncInterval = const Duration(minutes: 5);
-  final Duration _imageSyncInterval = const Duration(minutes: 10);
-  final Duration _registrationSyncInterval = const Duration(minutes: 3);
+  final Duration _profileSyncInterval = const Duration(minutes: 30);
+  final Duration _imageSyncInterval = const Duration(minutes: 60);
+  final Duration _registrationSyncInterval = const Duration(minutes: 30);
 
   // Sync state
   bool _isProfileSyncing = false;
