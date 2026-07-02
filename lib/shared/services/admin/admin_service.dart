@@ -2799,6 +2799,25 @@ class AdminService extends ChangeNotifier {
     }
   }
 
+  /// Get sales trends data from the database
+  Future<List<Map<String, dynamic>>> getSalesTrends(String range) async {
+    try {
+      final int days = range == '1Y' ? 365 : (range == '90D' ? 90 : 30);
+      final cutoffDate = DateTime.now().subtract(Duration(days: days));
+      
+      final response = await _client
+          .from('orders')
+          .select('total_amount, created_at')
+          .gte('created_at', cutoffDate.toIso8601String())
+          .order('created_at', ascending: true);
+          
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error getting sales trends: $e');
+      return [];
+    }
+  }
+
   /// Get specialized metrics for farmers
   Future<Map<String, dynamic>> getFarmerMetrics() async {
     try {

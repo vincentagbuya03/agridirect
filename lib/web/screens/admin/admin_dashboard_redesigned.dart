@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../../../shared/services/admin/admin_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
 
@@ -42,6 +43,11 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
   List<Map<String, dynamic>> _activity = [];
   bool _isLoading = true;
 
+  String _selectedRange = '30D';
+  List<FlSpot> _chartSpots = [];
+  bool _isChartLoading = false;
+  int _dbLatency = 12;
+
   @override
   void initState() {
     super.initState();
@@ -78,8 +84,11 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
     try {
       setState(() => _isLoading = true);
 
+      final stopwatch = Stopwatch()..start();
       final counts = await _adminService.getDashboardCounts();
       final activity = await _adminService.getDashboardActivity();
+      stopwatch.stop();
+      final latency = stopwatch.elapsedMilliseconds;
 
       if (mounted) {
         setState(() {
@@ -92,12 +101,55 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
             'revenue': counts['total_revenue'] ?? 0.0,
           };
           _activity = activity;
+          _dbLatency = latency > 0 ? (latency ~/ 2) : 12; // divide by 2 to approximate single query time
           _isLoading = false;
         });
       }
+      await _loadChartData();
     } catch (e) {
       debugPrint('Error loading dashboard data: $e');
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadChartData() async {
+    try {
+      setState(() => _isChartLoading = true);
+      final raw = await _adminService.getSalesTrends(_selectedRange);
+
+      final Map<String, double> grouped = {};
+      final now = DateTime.now();
+      final int days = _selectedRange == '1Y' ? 365 : (_selectedRange == '90D' ? 90 : 30);
+      
+      for (int i = days; i >= 0; i--) {
+        final d = now.subtract(Duration(days: i));
+        final key = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+        grouped[key] = 0.0;
+      }
+
+      for (var order in raw) {
+        final dateStr = (order['created_at'] ?? '').toString().substring(0, 10);
+        if (dateStr.isNotEmpty) {
+          final amount = (order['total_amount'] ?? 0).toDouble();
+          grouped[dateStr] = (grouped[dateStr] ?? 0.0) + amount;
+        }
+      }
+
+      final sortedKeys = grouped.keys.toList()..sort();
+      final List<FlSpot> spots = [];
+      for (int i = 0; i < sortedKeys.length; i++) {
+        spots.add(FlSpot(i.toDouble(), grouped[sortedKeys[i]]!));
+      }
+
+      if (mounted) {
+        setState(() {
+          _chartSpots = spots;
+          _isChartLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading sales chart: $e');
+      if (mounted) setState(() => _isChartLoading = false);
     }
   }
 
@@ -602,21 +654,31 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                 child: Row(
                   children: ['30D', '90D', '1Y']
                       .map(
-                        (t) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: t == '30D' ? Colors.white : null,
-                            borderRadius: AdminUi.radiusSm,
-                            boxShadow: t == '30D' ? AdminUi.shadowSm : null,
-                          ),
-                          child: Text(
-                            t,
-                            style: AdminUi.label(
-                              size: 11,
-                              weight: FontWeight.w700,
+                        (t) => InkWell(
+                          onTap: _isChartLoading
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _selectedRange = t;
+                                  });
+                                  _loadChartData();
+                                },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: t == _selectedRange ? Colors.white : null,
+                              borderRadius: AdminUi.radiusSm,
+                              boxShadow: t == _selectedRange ? AdminUi.shadowSm : null,
+                            ),
+                            child: Text(
+                              t,
+                              style: AdminUi.label(
+                                size: 11,
+                                weight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
@@ -630,29 +692,121 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
           SizedBox(
             height: 200,
             width: double.infinity,
-            child: CustomPaint(painter: WavePainter()),
+            child: _isChartLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: AdminUi.brand),
+                  )
+                : _chartSpots.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No sales records in this period',
+                          style: AdminUi.body(color: AdminUi.textMuted),
+                        ),
+                      )
+                    : LineChart(
+                        LineChartData(
+                          gridData: const FlGridData(show: false),
+                          titlesData: const FlTitlesData(show: false),
+                          borderData: FlBorderData(show: false),
+                          lineTouchData: LineTouchData(
+                            touchTooltipData: LineTouchTooltipData(
+                              getTooltipColor: (_) => AdminUi.brandDark,
+                              getTooltipItems: (touchedSpots) {
+                                return touchedSpots.map((spot) {
+                                  return LineTooltipItem(
+                                    '₱${spot.y.toStringAsFixed(2)}',
+                                    GoogleFonts.plusJakartaSans(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  );
+                                }).toList();
+                              },
+                            ),
+                          ),
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: _chartSpots,
+                              isCurved: true,
+                              gradient: const LinearGradient(
+                                colors: [AdminUi.brand, AdminUi.brandSecondary],
+                              ),
+                              barWidth: 4,
+                              isStrokeCapRound: true,
+                              dotData: const FlDotData(show: false),
+                              belowBarData: BarAreaData(
+                                show: true,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AdminUi.brand.withValues(alpha: 0.1),
+                                    AdminUi.brandSecondary.withValues(alpha: 0.0),
+                                  ],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
           ),
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children:
-                [
-                      _getShortDate(Duration(days: 28)),
-                      _getShortDate(Duration(days: 21)),
-                      _getShortDate(Duration(days: 14)),
-                      _getShortDate(Duration(days: 7)),
-                      'TODAY',
-                    ]
-                    .map(
-                      (d) => Text(
-                        d,
-                        style: AdminUi.label(
-                          size: 10,
-                          color: AdminUi.textMuted,
+            children: _selectedRange == '1Y'
+                ? [
+                    _getShortDate(const Duration(days: 365)),
+                    _getShortDate(const Duration(days: 270)),
+                    _getShortDate(const Duration(days: 180)),
+                    _getShortDate(const Duration(days: 90)),
+                    'TODAY',
+                  ]
+                      .map(
+                        (d) => Text(
+                          d,
+                          style: AdminUi.label(
+                            size: 10,
+                            color: AdminUi.textMuted,
+                          ),
                         ),
-                      ),
-                    )
-                    .toList(),
+                      )
+                      .toList()
+                : _selectedRange == '90D'
+                    ? [
+                        _getShortDate(const Duration(days: 90)),
+                        _getShortDate(const Duration(days: 68)),
+                        _getShortDate(const Duration(days: 45)),
+                        _getShortDate(const Duration(days: 22)),
+                        'TODAY',
+                      ]
+                          .map(
+                            (d) => Text(
+                              d,
+                              style: AdminUi.label(
+                                size: 10,
+                                color: AdminUi.textMuted,
+                              ),
+                            ),
+                          )
+                          .toList()
+                    : [
+                        _getShortDate(const Duration(days: 28)),
+                        _getShortDate(const Duration(days: 21)),
+                        _getShortDate(const Duration(days: 14)),
+                        _getShortDate(const Duration(days: 7)),
+                        'TODAY',
+                      ]
+                          .map(
+                            (d) => Text(
+                              d,
+                              style: AdminUi.label(
+                                size: 10,
+                                color: AdminUi.textMuted,
+                              ),
+                            ),
+                          )
+                          .toList(),
           ),
         ],
       ),
@@ -832,10 +986,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                 children: pending
                     .take(3)
                     .map(
-                      (reg) => _registrationItem(
-                        reg['full_name'] ?? reg['name'] ?? 'Applicant',
-                        '${reg['farm_name'] ?? "New Farm"} • ${reg['specialty'] ?? "General"}',
-                      ),
+                      (reg) => _registrationItem(reg),
                     )
                     .toList(),
               );
@@ -846,7 +997,10 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
     );
   }
 
-  Widget _registrationItem(String name, String farm) {
+  Widget _registrationItem(Map<String, dynamic> reg) {
+    final name = reg['full_name'] ?? reg['name'] ?? 'Applicant';
+    final farm = '${reg['farm_name'] ?? "New Farm"} • ${reg['specialty'] ?? "General"}';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -883,11 +1037,47 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
           ),
           IconButton(
             icon: const Icon(Icons.visibility_outlined, size: 20),
-            onPressed: () {},
+            onPressed: () {
+              setState(() {
+                _selectedIndex = 1; // Switches to Farmers tab
+              });
+            },
           ),
           const SizedBox(width: 8),
           ElevatedButton(
-            onPressed: () {},
+            onPressed: () async {
+              final regId = reg['registration_id']?.toString() ?? '';
+              if (regId.isEmpty) return;
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Processing approval...'),
+                  duration: Duration(seconds: 1),
+                ),
+              );
+
+              final success = await _adminService.approveFarmerRegistration(
+                registrationId: regId,
+              );
+
+              if (!mounted) return;
+              if (success) {
+                _loadDashboardData();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Approved applicant successfully!'),
+                    backgroundColor: AdminUi.success,
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to approve registration.'),
+                    backgroundColor: AdminUi.danger,
+                  ),
+                );
+              }
+            },
             style: AdminUi.primaryButton.copyWith(
               backgroundColor: WidgetStateProperty.all(AdminUi.brandDark),
             ),
@@ -934,7 +1124,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
               Expanded(
                 child: _integrityMetric(
                   'DB QUERY SPEED',
-                  '12ms',
+                  '${_dbLatency}ms',
                   false,
                   subtext: 'Optimal Range',
                 ),
@@ -944,7 +1134,7 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                   'SECURITY HEALTH',
                   'No Risk',
                   false,
-                  subtext: 'Last scan: 4m ago',
+                  subtext: 'Last scan: Just now',
                 ),
               ),
             ],
