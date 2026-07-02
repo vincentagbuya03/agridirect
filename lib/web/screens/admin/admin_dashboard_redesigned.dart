@@ -12,6 +12,7 @@ import 'admin_content_tab.dart';
 import 'admin_logs_tab.dart';
 import 'admin_announcements_tab.dart';
 import 'admin_settings_tab.dart';
+import 'admin_support_tab.dart';
 import '../../../shared/widgets/brand_logo.dart';
 
 class AdminDashboardRedesigned extends StatefulWidget {
@@ -152,6 +153,8 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
       case 7:
         return 'Announcements';
       case 8:
+        return 'Support Tickets';
+      case 9:
         return 'System Settings';
       default:
         return 'The AgriDirect Curator';
@@ -172,6 +175,8 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
         return 'Search activity logs...';
       case 7:
         return 'Search announcements...';
+      case 8:
+        return 'Search support tickets...';
       default:
         return 'Search arboretum data...';
     }
@@ -306,7 +311,8 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
           _buildNavItem(5, 'Moderation', Icons.gavel_rounded),
           _buildNavItem(6, 'System Logs', Icons.history_rounded),
           _buildNavItem(7, 'Announcements', Icons.campaign_rounded),
-          _buildNavItem(8, 'Settings', Icons.settings_rounded),
+          _buildNavItem(8, 'Support Tickets', Icons.support_agent_rounded),
+          _buildNavItem(9, 'Settings', Icons.settings_rounded),
           const Spacer(),
           Padding(
             padding: const EdgeInsets.all(24),
@@ -430,6 +436,8 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
       case 7:
         return AdminAnnouncementsTab(adminService: _adminService);
       case 8:
+        return AdminSupportTab(adminService: _adminService);
+      case 9:
         return const AdminSettingsTab();
       default:
         return _buildDashboardView();

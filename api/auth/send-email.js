@@ -119,12 +119,11 @@ function buildHtmlTemplate(code, action) {
   `;
 }
 
-function buildPasswordChangedTemplate() {
+function buildSupportResolutionTemplate(name, subject, text) {
   return `
 <!doctype html>
 <html>
   <body style="margin:0; padding:0; background:#edf3ee; font-family:Arial, Helvetica, sans-serif;">
-    <div style="display:none; max-height:0; overflow:hidden; opacity:0; mso-hide:all;">Your AgriDirect password was changed.</div>
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f3f7f4; padding:24px 12px;">
       <tr>
         <td align="center">
@@ -134,26 +133,28 @@ function buildPasswordChangedTemplate() {
             </tr>
             <tr>
               <td style="padding:26px 28px 12px 28px; text-align:center;">
-                <div style="font-size:34px; line-height:34px;">🔒</div>
-                <h1 style="margin:10px 0 0 0; color:#0f6c34; font-size:28px; font-weight:800; line-height:1.2;">Password Updated</h1>
-                <p style="margin:8px 0 0 0; color:#5f6f62; font-size:14px; line-height:1.5;">Your AgriDirect password was successfully changed.</p>
+                <div style="font-size:34px; line-height:34px;">✅</div>
+                <h1 style="margin:10px 0 0 0; color:#0f6c34; font-size:28px; font-weight:800; line-height:1.2;">Support Ticket Resolved</h1>
+                <p style="margin:8px 0 0 0; color:#5f6f62; font-size:14px; line-height:1.5;">Hi ${name}, our support team has responded to your ticket.</p>
               </td>
             </tr>
             <tr>
               <td style="padding:8px 28px 0 28px;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#eef9f1; border:1px solid #cfe7d5; border-radius:12px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#eef9f1; border:1px solid #cfe7d5; border-radius:12px; font-size:14px; color:#1f3c29; line-height:1.6;">
                   <tr>
-                    <td style="padding:18px 20px; text-align:left;">
-                      <p style="margin:0; color:#1f3c29; font-size:14px; line-height:1.6;">If this was you, no action is needed.</p>
-                      <p style="margin:8px 0 0 0; color:#1f3c29; font-size:14px; line-height:1.6;">If this was not you, reset your password immediately and contact support.</p>
+                    <td style="padding:18px 20px;">
+                      <p style="margin:0 0 8px 0;"><strong>Ticket Subject:</strong> ${subject}</p>
+                      <hr style="border:0; border-top:1px solid #cfe7d5; margin:14px 0;" />
+                      <p style="margin:0;"><strong>Support Team Response:</strong></p>
+                      <p style="margin:6px 0 0 0; white-space:pre-wrap; background:#ffffff; padding:12px; border:1px solid #cfe7d5; border-radius:8px;">${text}</p>
                     </td>
                   </tr>
                 </table>
               </td>
             </tr>
             <tr>
-              <td style="padding:16px 28px 10px 28px;">
-                <p style="margin:0; color:#6b7c70; font-size:12px; line-height:1.6;">This is an automated security alert from AgriDirect.</p>
+              <td style="padding:16px 28px 10px 28px; text-align:center;">
+                <p style="margin:0; color:#5f6f62; font-size:12px; line-height:1.6;">If you have any further questions, please feel free to submit another request in the app.</p>
               </td>
             </tr>
             <tr>
@@ -186,19 +187,26 @@ module.exports = async function handler(req, res) {
 
   try {
     const email = normalizeEmail(req.body && req.body.email);
-    const type = req.body && req.body.type; // 'otp' or 'alert'
+    const type = req.body && req.body.type; // 'otp', 'alert' or 'resolution'
     const otpCode = req.body && req.body.otpCode;
+    const userName = req.body && req.body.userName;
+    const subjectLine = req.body && req.body.subject;
+    const messageText = req.body && req.body.messageText;
 
     if (!email || !email.includes('@')) {
       return res.status(400).json({ error: 'A valid email address is required.' });
     }
 
-    if (type !== 'otp' && type !== 'alert') {
+    if (type !== 'otp' && type !== 'alert' && type !== 'resolution') {
       return res.status(400).json({ error: 'Invalid email type requested.' });
     }
 
     if (type === 'otp' && (!otpCode || otpCode.length < 4)) {
       return res.status(400).json({ error: 'A valid OTP code is required.' });
+    }
+
+    if (type === 'resolution' && (!userName || !subjectLine || !messageText)) {
+      return res.status(400).json({ error: 'Resolution email requires userName, subject, and messageText.' });
     }
 
     const transporter = nodemailer.createTransport({
@@ -211,18 +219,25 @@ module.exports = async function handler(req, res) {
 
     let subject = '';
     let html = '';
+    let toEmail = email;
+    let replyTo = undefined;
 
     if (type === 'otp') {
       subject = 'AgriDirect: Account Verification Code';
       html = buildHtmlTemplate(otpCode, 'verify your account');
-    } else {
+    } else if (type === 'alert') {
       subject = 'AgriDirect: Your Password Was Changed';
       html = buildPasswordChangedTemplate();
+    } else if (type === 'resolution') {
+      subject = `AgriDirect Support: Update on "${subjectLine}"`;
+      html = buildSupportResolutionTemplate(userName, subjectLine, messageText);
+      toEmail = email; // Send directly to user
     }
 
     await transporter.sendMail({
       from: `"AgriDirect Support" <${gmailUser}>`,
-      to: email,
+      to: toEmail,
+      replyTo: replyTo,
       subject: subject,
       html: html,
     });

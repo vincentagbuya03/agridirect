@@ -156,18 +156,40 @@ class AuthService extends ChangeNotifier {
     return null;
   }
 
-  Future<bool> changePassword({required String newPassword}) async {
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
     _isLoading = true;
     _errorMessage = '';
     notifyListeners();
 
     try {
+      final email = _userEmail.isNotEmpty ? _userEmail : _client.auth.currentUser?.email;
+      if (email == null || email.isEmpty) {
+        _errorMessage = 'No user email found. Please log in again.';
+        return false;
+      }
+
+      // 1. Verify current password by attempting to sign in
+      try {
+        await _client.auth.signInWithPassword(
+          email: email,
+          password: currentPassword,
+        );
+      } catch (authError) {
+        _errorMessage = 'Incorrect current password.';
+        return false;
+      }
+
+      // 2. Validate new password
       final validationError = validatePassword(newPassword);
       if (validationError != null) {
         _errorMessage = validationError;
         return false;
       }
 
+      // 3. Update password
       await _client.auth.updateUser(UserAttributes(password: newPassword));
       return true;
     } catch (e) {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
@@ -1269,144 +1270,226 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   }
 
   void _showNotificationsDialog() {
-    bool emailAlerts = true;
-    bool pushAlerts = true;
-    bool promoAlerts = false;
-    bool isSaving = false;
-
     showDialog(
       context: context,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (ctx, setModalState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: Text(
-            'Notification Settings',
-            style: GoogleFonts.plusJakartaSans(
-              fontWeight: FontWeight.w800,
-              fontSize: 22,
-              color: _dark,
-            ),
-          ),
-          content: SizedBox(
-            width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SwitchListTile(
-                  activeThumbColor: primary,
-                  activeTrackColor: primary.withValues(alpha: 0.5),
-                  title: Text(
-                    'Email Notifications',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                  subtitle: const Text('Receive order status updates via email'),
-                  value: emailAlerts,
-                  onChanged: isSaving
-                      ? null
-                      : (val) => setModalState(() => emailAlerts = val),
+      builder: (dialogCtx) {
+        bool emailAlerts = true;
+        bool pushAlerts = true;
+        bool promoAlerts = false;
+        bool isSaving = false;
+        bool isLoaded = false;
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            if (!isLoaded) {
+              SharedPreferences.getInstance().then((prefs) {
+                setModalState(() {
+                  emailAlerts = prefs.getBool('notifications.email_alerts') ?? true;
+                  pushAlerts = prefs.getBool('notifications.push_alerts') ?? true;
+                  promoAlerts = prefs.getBool('notifications.promo_alerts') ?? false;
+                  isLoaded = true;
+                });
+              });
+            }
+
+            Future<void> savePreferences() async {
+              setModalState(() => isSaving = true);
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('notifications.email_alerts', emailAlerts);
+              await prefs.setBool('notifications.push_alerts', pushAlerts);
+              await prefs.setBool('notifications.promo_alerts', promoAlerts);
+              
+              if (!dialogCtx.mounted) return;
+              setModalState(() => isSaving = false);
+              Navigator.of(dialogCtx).pop();
+
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Notification preferences saved successfully!'),
+                  backgroundColor: primary,
+                  behavior: SnackBarBehavior.floating,
                 ),
-                const Divider(),
-                SwitchListTile(
-                  activeThumbColor: primary,
-                  activeTrackColor: primary.withValues(alpha: 0.5),
-                  title: Text(
-                    'Push Notifications',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
+              );
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.notifications_active_outlined,
+                      color: primary,
+                      size: 20,
                     ),
                   ),
-                  subtitle: const Text('Receive message alerts and activity updates'),
-                  value: pushAlerts,
-                  onChanged: isSaving
-                      ? null
-                      : (val) => setModalState(() => pushAlerts = val),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Notification Settings',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 20,
+                      color: _dark,
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 420,
+                child: !isLoaded
+                    ? const SizedBox(
+                        height: 150,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: primary,
+                            strokeWidth: 3,
+                          ),
+                        ),
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Customize how and when you want to receive alerts from AgriDirect.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          SwitchListTile.adaptive(
+                            activeTrackColor: primary.withValues(alpha: 0.5),
+                            activeThumbColor: primary,
+                            secondary: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.mail_outline_rounded, color: Colors.blue),
+                            ),
+                            title: Text(
+                              'Email Notifications',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                            subtitle: const Text('Receive order status updates via email'),
+                            value: emailAlerts,
+                            onChanged: isSaving
+                                ? null
+                                : (val) => setModalState(() => emailAlerts = val),
+                          ),
+                          const Divider(height: 16),
+                          SwitchListTile.adaptive(
+                            activeTrackColor: primary.withValues(alpha: 0.5),
+                            activeThumbColor: primary,
+                            secondary: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.phonelink_ring_rounded, color: Colors.green),
+                            ),
+                            title: Text(
+                              'Push Notifications',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                            subtitle: const Text('Receive message alerts and activity updates'),
+                            value: pushAlerts,
+                            onChanged: isSaving
+                                ? null
+                                : (val) => setModalState(() => pushAlerts = val),
+                          ),
+                          const Divider(height: 16),
+                          SwitchListTile.adaptive(
+                            activeTrackColor: primary.withValues(alpha: 0.5),
+                            activeThumbColor: primary,
+                            secondary: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.local_offer_outlined, color: Colors.orange),
+                            ),
+                            title: Text(
+                              'Promotions & Offers',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                            subtitle: const Text('Get notified of discount codes and local deals'),
+                            value: promoAlerts,
+                            onChanged: isSaving
+                                ? null
+                                : (val) => setModalState(() => promoAlerts = val),
+                          ),
+                        ],
+                      ),
+              ),
+              actionsPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 16,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.of(dialogCtx).pop(),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-                const Divider(),
-                SwitchListTile(
-                  activeThumbColor: primary,
-                  activeTrackColor: primary.withValues(alpha: 0.5),
-                  title: Text(
-                    'Promotions & Offers',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
+                ElevatedButton(
+                  onPressed: (!isLoaded || isSaving) ? null : savePreferences,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
                     ),
                   ),
-                  subtitle: const Text('Get notified of discount codes and local deals'),
-                  value: promoAlerts,
-                  onChanged: isSaving
-                      ? null
-                      : (val) => setModalState(() => promoAlerts = val),
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          'Save Preferences',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                 ),
               ],
-            ),
-          ),
-          actionsPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 16,
-          ),
-          actions: [
-            TextButton(
-              onPressed: isSaving ? null : () => Navigator.of(dialogCtx).pop(),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: isSaving
-                  ? null
-                  : () async {
-                      setModalState(() => isSaving = true);
-                      // Simulate api call
-                      await Future.delayed(const Duration(milliseconds: 600));
-                      if (mounted && dialogCtx.mounted) {
-                        Navigator.of(dialogCtx).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Notification preferences saved!'),
-                            backgroundColor: primary,
-                          ),
-                        );
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-              ),
-              child: isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.5,
-                      ),
-                    )
-                  : const Text(
-                      'Save Preferences',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-            ),
-          ],
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 }

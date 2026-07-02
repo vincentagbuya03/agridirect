@@ -3307,4 +3307,33 @@ class AdminService extends ChangeNotifier {
       return {'total': 0, 'pinned': 0, 'recent': 0};
     }
   }
+
+  /// Get support tickets from Supabase with mock fallback
+  Future<List<Map<String, dynamic>>> getSupportTickets() async {
+    try {
+      final response = await _client
+          .from('support_tickets')
+          .select('*')
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (e) {
+      debugPrint('Failed to fetch support tickets from Supabase: $e');
+      return [];
+    }
+  }
+
+  /// Update support ticket status in Supabase
+  Future<bool> updateSupportTicketStatus(String ticketId, String status) async {
+    try {
+      await _client
+          .from('support_tickets')
+          .update({'status': status})
+          .eq('ticket_id', ticketId);
+      _notifyDataChanged();
+      return true;
+    } catch (e) {
+      debugPrint('Failed to update support ticket status: $e');
+      return false;
+    }
+  }
 }

@@ -876,4 +876,15 @@ CREATE INDEX IF NOT EXISTS idx_calls_conversation_id ON public.calls(conversatio
 CREATE INDEX IF NOT EXISTS idx_calls_caller_id ON public.calls(caller_id);
 CREATE INDEX IF NOT EXISTS idx_calls_receiver_id ON public.calls(receiver_id);
 
+-- Support Tickets Table
+CREATE TABLE IF NOT EXISTS public.support_tickets (
+    ticket_id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_email text NOT NULL,
+    user_name text NOT NULL,
+    subject text NOT NULL,
+    message_text text NOT NULL,
+    status text DEFAULT 'open'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
 

@@ -33,6 +33,9 @@ class EmailService {
     required String email,
     required String type,
     String? otpCode,
+    String? userName,
+    String? subject,
+    String? messageText,
   }) async {
     final uri = Uri.parse('$_webEmailApiBase/api/auth/send-email');
     try {
@@ -43,12 +46,19 @@ class EmailService {
           'email': email,
           'type': type,
           'otpCode': otpCode,
+          'userName': userName,
+          'subject': subject,
+          'messageText': messageText,
         }),
       ).timeout(const Duration(seconds: 15));
 
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint('[EmailService] Web API email dispatch failed. Status: ${response.statusCode}, Body: ${response.body}');
+      }
+
       return response.statusCode >= 200 && response.statusCode < 300;
     } catch (e) {
-      debugPrint('[EmailService] Web API email dispatch failed: $e');
+      debugPrint('[EmailService] Web API email dispatch exception: $e');
       return false;
     }
   }
@@ -128,6 +138,96 @@ class EmailService {
       debugPrint('[EmailService] Error sending password changed alert: $e');
       return false;
     }
+  }
+
+  /// Send support ticket resolution email to user via Gmail SMTP or Web API
+  static Future<bool> sendSupportResolutionEmail({
+    required String userEmail,
+    required String userName,
+    required String subject,
+    required String replyText,
+  }) async {
+    if (kIsWeb) {
+      return _sendEmailViaWebApi(
+        email: userEmail,
+        type: 'resolution',
+        userName: userName,
+        subject: subject,
+        messageText: replyText,
+      );
+    }
+
+    try {
+      final smtpServer = gmail(_gmailUser, _gmailPass);
+
+      final message = Message()
+        ..from = Address(_gmailUser, 'AgriDirect Support')
+        ..recipients.add(userEmail) // Send directly to the user
+        ..subject = 'AgriDirect Support: Update on "$subject"'
+        ..html = _buildSupportResolutionTemplate(userName, subject, replyText);
+
+      await send(message, smtpServer);
+      return true;
+    } catch (e) {
+      debugPrint('[EmailService] Error sending support resolution email: $e');
+      return false;
+    }
+  }
+
+  static String _buildSupportResolutionTemplate(
+    String name,
+    String subject,
+    String text,
+  ) {
+    return """
+<!doctype html>
+<html>
+  <body style="margin:0; padding:0; background:#edf3ee; font-family:Arial, Helvetica, sans-serif;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f3f7f4; padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%; max-width:600px; background:#ffffff; border:1px solid #d6e2d9; border-radius:16px; overflow:hidden;">
+            <tr>
+              <td style="height:6px; background:linear-gradient(90deg,#0f6c34,#2aa85a);"></td>
+            </tr>
+            <tr>
+              <td style="padding:26px 28px 12px 28px; text-align:center;">
+                <div style="font-size:34px; line-height:34px;">✅</div>
+                <h1 style="margin:10px 0 0 0; color:#0f6c34; font-size:28px; font-weight:800; line-height:1.2;">Support Ticket Resolved</h1>
+                <p style="margin:8px 0 0 0; color:#5f6f62; font-size:14px; line-height:1.5;">Hi $name, our support team has responded to your ticket.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 28px 0 28px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#eef9f1; border:1px solid #cfe7d5; border-radius:12px; font-size:14px; color:#1f3c29; line-height:1.6;">
+                  <tr>
+                    <td style="padding:18px 20px;">
+                      <p style="margin:0 0 8px 0;"><strong>Ticket Subject:</strong> $subject</p>
+                      <hr style="border:0; border-top:1px solid #cfe7d5; margin:14px 0;" />
+                      <p style="margin:0;"><strong>Support Team Response:</strong></p>
+                      <p style="margin:6px 0 0 0; white-space:pre-wrap; background:#ffffff; padding:12px; border:1px solid #cfe7d5; border-radius:8px;">$text</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 28px 10px 28px; text-align:center;">
+                <p style="margin:0; color:#5f6f62; font-size:12px; line-height:1.6;">If you have any further questions, please feel free to submit another request in the app.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 28px 24px 28px; border-top:1px solid #edf2ee; text-align:center;">
+                <p style="margin:0; color:#8a978d; font-size:11px; line-height:1.6;">© 2026 AgriDirect. All rights reserved.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+""";
   }
 
   /// Modern, Enterprise-grade HTML Template Generator
