@@ -17,6 +17,7 @@ import '../../mobile/screens/consumer/marketplace_screen.dart';
 import '../../mobile/screens/consumer/preorder_details_screen.dart';
 import '../../mobile/screens/consumer/preorder_hub_screen.dart';
 import '../../mobile/screens/consumer/farmers_map_screen.dart';
+import '../../mobile/screens/consumer/farmer_public_profile_screen.dart';
 import '../../mobile/screens/consumer/my_details_screen.dart';
 import '../../mobile/screens/profile/address_book_screen.dart';
 import '../../mobile/screens/profile/favorites_screen.dart';
@@ -47,6 +48,7 @@ import '../../mobile/screens/consumer/orders_screen.dart';
 import '../../mobile/screens/farmer/farmer_order_details_screen.dart';
 import '../models/order/order_model.dart';
 import '../services/commerce/order_service.dart';
+import '../services/core/supabase_data_service.dart';
 import '../styles/app_theme.dart';
 
 import '../data/app_data.dart';
@@ -387,6 +389,50 @@ GoRouter createAppRouter() {
         path: '${AppRoutes.farmerProfileBase}/:farmerId',
         builder: (context, state) {
           final farmerId = state.pathParameters['farmerId'] ?? '';
+          
+          final view = View.of(context);
+          final width = view.physicalSize.width / view.devicePixelRatio;
+          final isMobile = !kIsWeb && (width <= 800);
+
+          if (isMobile) {
+            return FutureBuilder<Map<String, dynamic>?>(
+              future: SupabaseDataService().getFarmerProfileByFarmerId(farmerId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (snapshot.hasError || snapshot.data == null) {
+                  return Scaffold(
+                    appBar: AppBar(title: const Text('Farmer Profile')),
+                    body: const Center(child: Text('Farmer not found or offline.')),
+                  );
+                }
+                
+                final dbProfile = snapshot.data!;
+                final mappedProfile = <String, dynamic>{
+                  ...dbProfile,
+                  'farmerId': dbProfile['farmer_id'],
+                  'farmerUserId': dbProfile['user_id'],
+                  'name': dbProfile['farm_name'] ?? dbProfile['full_name'] ?? 'Farm',
+                  'specialty': dbProfile['specialty'],
+                  'location': dbProfile['location'],
+                  'imageUrl': dbProfile['image_url'],
+                  'avatarUrl': dbProfile['avatar_url'],
+                  'badge': dbProfile['badge'] ?? (dbProfile['is_verified'] == true ? 'VERIFIED' : null),
+                  'farmingHistory': dbProfile['farming_history'],
+                  'isVerified': dbProfile['is_verified'],
+                  'yearsOfExperience': dbProfile['years_of_experience'],
+                  'latitude': dbProfile['farm_latitude'],
+                  'longitude': dbProfile['farm_longitude'],
+                };
+
+                return FarmerPublicProfileScreen(farmer: mappedProfile);
+              },
+            );
+          }
+
           return WebFarmerPublicProfileScreen(farmerId: farmerId);
         },
       ),

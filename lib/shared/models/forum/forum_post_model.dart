@@ -47,9 +47,9 @@ class ForumPost {
       'body': json['body'],
       'imageUrl': json['imageUrl'] ?? json['image_url'],
       'videoUrl': json['videoUrl'] ?? json['video_url'],
-      'createdAt': json['createdAt'] ?? json['created_at'],
+      'createdAt': json['createdAt'] ?? json['created_at'] ?? DateTime.now().toIso8601String(),
       'updatedAt':
-          json['updatedAt'] ?? json['updated_at'] ?? json['created_at'],
+          json['updatedAt'] ?? json['updated_at'] ?? json['created_at'] ?? DateTime.now().toIso8601String(),
       'authorName': json['authorName'] ?? json['author_name'],
       'authorAvatar': json['authorAvatar'] ?? json['author_avatar'],
       'likesCount': json['likesCount'] ?? json['likes_count'],

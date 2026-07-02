@@ -17,13 +17,14 @@ class ProductItem {
   final String? categoryName;
   final String? rating;
   final String? reviews;
-  final String? harvestDays;
+   final String? harvestDays;
   final String? description;
   final double? reservedQuantity;
   final double? targetQuantity;
   final double? latitude;
   final double? longitude;
   final bool isFeatured;
+  final DateTime? createdAt;
 
   const ProductItem({
     this.productId,
@@ -47,6 +48,7 @@ class ProductItem {
     this.latitude,
     this.longitude,
     this.isFeatured = false,
+    this.createdAt,
   });
 }
 

@@ -61,7 +61,7 @@ class _WebShopScreenState extends State<WebShopScreen>
   String _sortBy = 'Newest';
   String _searchQuery = '';
   final _searchController = TextEditingController();
-  double _priceRange = 100.0;
+  double _priceRange = 500.0;
   int _currentPage = 1;
   final int _itemsPerPage = 12;
 

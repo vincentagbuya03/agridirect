@@ -769,6 +769,79 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
+  Future<void> _confirmCancelOrder(BuildContext context, Order order) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Cancel Order',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to cancel order #${order.orderNumber}? This action cannot be undone.',
+          style: GoogleFonts.inter(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'No, Keep It',
+              style: GoogleFonts.inter(color: AppColors.textSubtle, fontWeight: FontWeight.w600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text(
+              'Yes, Cancel',
+              style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      if (!context.mounted) return;
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+
+      try {
+        await OrderService().cancelOrder(order.orderId);
+        navigator.pop(); // Pop loading
+        navigator.pop(); // Pop details sheet
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Order #${order.orderNumber} has been cancelled successfully.'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      } catch (e) {
+        navigator.pop(); // Pop loading
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Failed to cancel order: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildOrderDetailsContent(Order order) {
     final status = order.status.toUpperCase();
     final isCop = order.paymentMethod?.toUpperCase() == 'COP';
@@ -1407,6 +1480,33 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+        if (!order.isShipped && !order.isDelivered && !order.isCancelled) ...[
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _confirmCancelOrder(context, order),
+              icon: const Icon(Icons.cancel_outlined, color: Colors.white),
+              label: Text(
+                'Cancel Order',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                elevation: 2,
+                shadowColor: AppColors.error.withValues(alpha: 0.3),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
             ),
           ),
         ],

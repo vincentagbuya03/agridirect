@@ -1464,7 +1464,6 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -1475,147 +1474,153 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
               ),
             ],
           ),
-          child: Row(
-            children: [
-              if (MediaQuery.of(context).size.width < 900)
-                IconButton(
-                  onPressed: () => setState(() {
-                    _selectedConversationId = null;
-                    NotificationService().setActiveConversation(null);
-                  }),
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                  color: AppColors.textHeadline,
-                ),
-              const SizedBox(width: 4),
-              Hero(
-                tag: 'avatar_${conversation.conversationId}',
-                child: SafeCircleAvatar(
-                  imageUrl: conversation.otherAvatarUrl,
-                  radius: 22,
-                  defaultBucket: 'uploads',
-                  backgroundColor: AppColors.accent.withValues(alpha: 0.1),
-                  child: Text(
-                    conversation.otherDisplayName.isNotEmpty
-                        ? conversation.otherDisplayName[0].toUpperCase()
-                        : '?',
-                    style: AppTextStyles.headline3.copyWith(
-                      color: AppColors.accent,
-                      fontSize: 18,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              child: Row(
+                children: [
+                  if (MediaQuery.of(context).size.width < 900)
+                    IconButton(
+                      onPressed: () => setState(() {
+                        _selectedConversationId = null;
+                        NotificationService().setActiveConversation(null);
+                      }),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                      color: AppColors.textHeadline,
                     ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      conversation.otherDisplayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.bodyLarge.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 17,
-                        color: AppColors.textHeadline,
+                  const SizedBox(width: 4),
+                  Hero(
+                    tag: 'avatar_${conversation.conversationId}',
+                    child: SafeCircleAvatar(
+                      imageUrl: conversation.otherAvatarUrl,
+                      radius: 22,
+                      defaultBucket: 'uploads',
+                      backgroundColor: AppColors.accent.withValues(alpha: 0.1),
+                      child: Text(
+                        conversation.otherDisplayName.isNotEmpty
+                            ? conversation.otherDisplayName[0].toUpperCase()
+                            : '?',
+                        style: AppTextStyles.headline3.copyWith(
+                          color: AppColors.accent,
+                          fontSize: 18,
+                        ),
                       ),
                     ),
-                    Row(
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ValueListenableBuilder<Set<String>>(
-                          valueListenable:
-                              NotificationService().onlineUsersNotifier,
-                          builder: (context, onlineUsers, _) {
-                            final isOnline = onlineUsers.contains(
-                              conversation.otherUserId,
-                            );
-                            return PulsingStatusIndicator(
-                              isOnline: isOnline,
-                              size: 8,
-                            );
-                          },
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: ValueListenableBuilder<Set<String>>(
-                            valueListenable:
-                                NotificationService().onlineUsersNotifier,
-                            builder: (context, onlineUsers, _) {
-                              final isOnline = onlineUsers.contains(
-                                conversation.otherUserId,
-                              );
-                              if (isOnline) {
-                                return Text(
-                                  'Active now',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTextStyles.labelSmall.copyWith(
-                                    color: AppColors.success,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                );
-                              }
-
-                              final lastActiveLocal = NotificationService().getLastActive(conversation.otherUserId);
-                              DateTime? lastActive = lastActiveLocal;
-                              if (lastActive == null && conversation.otherUpdatedAt != null) {
-                                lastActive = DateTime.tryParse(conversation.otherUpdatedAt!);
-                              }
-
-                              final statusText = lastActive != null ? _formatLastActive(lastActive) : 'Offline';
-
-                              return Text(
-                                statusText,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTextStyles.labelSmall.copyWith(
-                                  color: AppColors.textSubtle,
-                                  fontSize: 11,
-                                ),
-                              );
-                            },
+                        Text(
+                          conversation.otherDisplayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.bodyLarge.copyWith(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 17,
+                            color: AppColors.textHeadline,
                           ),
+                        ),
+                        Row(
+                          children: [
+                            ValueListenableBuilder<Set<String>>(
+                              valueListenable:
+                                  NotificationService().onlineUsersNotifier,
+                              builder: (context, onlineUsers, _) {
+                                final isOnline = onlineUsers.contains(
+                                  conversation.otherUserId,
+                                );
+                                return PulsingStatusIndicator(
+                                  isOnline: isOnline,
+                                  size: 8,
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: ValueListenableBuilder<Set<String>>(
+                                valueListenable:
+                                    NotificationService().onlineUsersNotifier,
+                                builder: (context, onlineUsers, _) {
+                                  final isOnline = onlineUsers.contains(
+                                    conversation.otherUserId,
+                                  );
+                                  if (isOnline) {
+                                    return Text(
+                                      'Active now',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTextStyles.labelSmall.copyWith(
+                                        color: AppColors.success,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    );
+                                  }
+
+                                  final lastActiveLocal = NotificationService().getLastActive(conversation.otherUserId);
+                                  DateTime? lastActive = lastActiveLocal;
+                                  if (lastActive == null && conversation.otherUpdatedAt != null) {
+                                    lastActive = DateTime.tryParse(conversation.otherUpdatedAt!);
+                                  }
+
+                                  final statusText = lastActive != null ? _formatLastActive(lastActive) : 'Offline';
+
+                                  return Text(
+                                    statusText,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTextStyles.labelSmall.copyWith(
+                                      color: AppColors.textSubtle,
+                                      fontSize: 11,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  IconButton(
+                    onPressed: () => _showCallDialog(
+                      conversation.otherDisplayName,
+                      conversation.otherAvatarUrl,
+                      conversation.otherUserId,
+                      isVideo: false,
+                    ),
+                    icon: const Icon(
+                      Icons.phone_rounded,
+                      color: AppColors.accent,
+                    ),
+                    tooltip: 'Voice Call',
+                  ),
+                  IconButton(
+                    onPressed: () => _showCallDialog(
+                      conversation.otherDisplayName,
+                      conversation.otherAvatarUrl,
+                      conversation.otherUserId,
+                      isVideo: true,
+                    ),
+                    icon: const Icon(
+                      Icons.videocam_rounded,
+                      color: AppColors.accent,
+                    ),
+                    tooltip: 'Video Call',
+                  ),
+                  IconButton(
+                    onPressed: () => _showConversationInfo(conversation),
+                    icon: const Icon(
+                      Icons.info_outline_rounded,
+                      color: AppColors.textSubtle,
+                    ),
+                  ),
+                ],
               ),
-              IconButton(
-                onPressed: () => _showCallDialog(
-                  conversation.otherDisplayName,
-                  conversation.otherAvatarUrl,
-                  conversation.otherUserId,
-                  isVideo: false,
-                ),
-                icon: const Icon(
-                  Icons.phone_rounded,
-                  color: AppColors.accent,
-                ),
-                tooltip: 'Voice Call',
-              ),
-              IconButton(
-                onPressed: () => _showCallDialog(
-                  conversation.otherDisplayName,
-                  conversation.otherAvatarUrl,
-                  conversation.otherUserId,
-                  isVideo: true,
-                ),
-                icon: const Icon(
-                  Icons.videocam_rounded,
-                  color: AppColors.accent,
-                ),
-                tooltip: 'Video Call',
-              ),
-              IconButton(
-                onPressed: () => _showConversationInfo(conversation),
-                icon: const Icon(
-                  Icons.info_outline_rounded,
-                  color: AppColors.textSubtle,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
 

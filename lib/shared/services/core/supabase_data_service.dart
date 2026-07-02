@@ -34,9 +34,21 @@ class SupabaseDataService {
   // PRODUCTS
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Get all pre-order products
   Future<List<ProductItem>> getPreOrderProducts() async {
     try {
+      final currentUserId = _client.auth.currentUser?.id;
+      String? currentFarmerId;
+      if (currentUserId != null) {
+        final farmerRes = await _client
+            .from('farmers')
+            .select('farmer_id')
+            .eq('user_id', currentUserId)
+            .maybeSingle();
+        if (farmerRes != null) {
+          currentFarmerId = farmerRes['farmer_id']?.toString();
+        }
+      }
+
       final response = await _client
           .from('v_products')
           .select()
@@ -83,6 +95,10 @@ class SupabaseDataService {
         }
 
         enrichedItems.add(item);
+      }
+
+      if (currentFarmerId != null) {
+        enrichedItems.removeWhere((item) => item['farmer_id']?.toString() == currentFarmerId);
       }
 
       await _enrichProductItemsWithFarmerProfiles(enrichedItems);
@@ -161,9 +177,21 @@ class SupabaseDataService {
     }
   }
 
-  /// Get all nearby/available products (not pre-order)
   Future<List<ProductItem>> getNearbyProducts() async {
     try {
+      final currentUserId = _client.auth.currentUser?.id;
+      String? currentFarmerId;
+      if (currentUserId != null) {
+        final farmerRes = await _client
+            .from('farmers')
+            .select('farmer_id')
+            .eq('user_id', currentUserId)
+            .maybeSingle();
+        if (farmerRes != null) {
+          currentFarmerId = farmerRes['farmer_id']?.toString();
+        }
+      }
+
       final response = await _client
           .from('v_products')
           .select()
@@ -193,6 +221,10 @@ class SupabaseDataService {
               : (item['image_url'] ?? '');
         }
         enrichedItems.add(item);
+      }
+
+      if (currentFarmerId != null) {
+        enrichedItems.removeWhere((item) => item['farmer_id']?.toString() == currentFarmerId);
       }
 
       await _enrichProductItemsWithFarmerProfiles(enrichedItems);
@@ -687,6 +719,7 @@ class SupabaseDataService {
   }
 
   ProductItem _mapToProductItem(Map<String, dynamic> item) {
+    final rawCreated = item['created_at']?.toString() ?? '';
     return ProductItem(
       productId: item['product_id']?.toString(),
       farmerId: item['farmer_id']?.toString(),
@@ -711,6 +744,7 @@ class SupabaseDataService {
       latitude: (item['latitude'] as num?)?.toDouble(),
       longitude: (item['longitude'] as num?)?.toDouble(),
       isFeatured: item['is_featured'] == true,
+      createdAt: rawCreated.isNotEmpty ? DateTime.tryParse(rawCreated) : null,
     );
   }
 

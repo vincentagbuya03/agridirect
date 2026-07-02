@@ -9,6 +9,8 @@ import '../services/core/supabase_data_service.dart';
 import '../widgets/forum_video_player.dart';
 import '../services/auth/auth_service.dart';
 import '../router/app_routes.dart';
+import '../services/community/forum_service.dart';
+import '../models/forum/forum_comment_model.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final ForumPostItem post;
@@ -23,10 +25,154 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   late ForumPostItem _post;
   bool _isUpdatingLike = false;
 
+  final _forumService = ForumService();
+  final _commentController = TextEditingController();
+  List<ForumComment> _comments = [];
+  bool _isLoadingComments = true;
+  bool _isPosting = false;
+  final Set<String> _likedCommentIds = {};
+
   @override
   void initState() {
     super.initState();
     _post = widget.post;
+    _loadComments();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadComments() async {
+    if (!mounted) return;
+    setState(() => _isLoadingComments = true);
+    try {
+      final comments = await _forumService.getPostComments(_post.id);
+      final likedIds = <String>{};
+      for (final comment in comments) {
+        final isLiked = await _forumService.hasUserLikedComment(comment.commentId);
+        if (isLiked) {
+          likedIds.add(comment.commentId);
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _comments = comments;
+          _likedCommentIds.clear();
+          _likedCommentIds.addAll(likedIds);
+          _isLoadingComments = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingComments = false);
+      }
+    }
+  }
+
+  Future<void> _postComment() async {
+    if (!AuthService().isLoggedIn) {
+      context.go(AppRoutes.login);
+      return;
+    }
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isPosting = true);
+    try {
+      final newComment = await _forumService.createComment(
+        postId: _post.id,
+        body: text,
+      );
+      if (mounted) {
+        setState(() {
+          _comments.insert(0, newComment);
+          _commentController.clear();
+          _isPosting = false;
+          _post = ForumPostItem(
+            id: _post.id,
+            userId: _post.userId,
+            userName: _post.userName,
+            time: _post.time,
+            title: _post.title,
+            body: _post.body,
+            imageUrl: _post.imageUrl,
+            likes: _post.likes,
+            comments: _post.comments + 1,
+            isLiked: _post.isLiked,
+            isPinned: _post.isPinned,
+            authorAvatarUrl: _post.authorAvatarUrl,
+          );
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isPosting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to post comment: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleCommentLike(String commentId) async {
+    if (!AuthService().isLoggedIn) {
+      context.go(AppRoutes.login);
+      return;
+    }
+    final isLiked = _likedCommentIds.contains(commentId);
+    setState(() {
+      if (isLiked) {
+        _likedCommentIds.remove(commentId);
+      } else {
+        _likedCommentIds.add(commentId);
+      }
+    });
+
+    try {
+      if (isLiked) {
+        await _forumService.unlikeComment(commentId);
+      } else {
+        await _forumService.likeComment(commentId);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          if (isLiked) {
+            _likedCommentIds.add(commentId);
+          } else {
+            _likedCommentIds.remove(commentId);
+          }
+        });
+      }
+    }
+  }
+
+  Future<void> _reportComment(ForumComment comment) async {
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (context) => ReportContentDialog(
+        contentLabel: 'comment',
+        contentTitle: comment.body,
+        onSubmit: (reason, details) {
+          return SupabaseDataService().reportForumComment(
+            commentId: comment.commentId,
+            reason: reason,
+            description: details,
+          );
+        },
+      ),
+    );
+
+    if (submitted == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Comment reported. Our team will review it soon.'),
+        ),
+      );
+    }
   }
 
   Future<void> _refreshPost() async {
@@ -34,6 +180,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (latest != null && mounted) {
       setState(() => _post = latest);
     }
+    await _loadComments();
   }
 
   Future<void> _toggleLike() async {
@@ -230,24 +377,40 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 40),
-            // Placeholder for comments section
+            const SizedBox(height: 24),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text('Comments (${_post.comments})', style: AppTextStyles.headline3),
             ),
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(40),
-                child: Column(
-                  children: [
-                    Icon(Icons.chat_outlined, size: 48, color: AppColors.textSubtle.withValues(alpha: 0.3)),
-                    const SizedBox(height: 12),
-                    Text('No comments yet', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
-                  ],
+            const SizedBox(height: 10),
+            if (_isLoadingComments)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 30),
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
                 ),
+              )
+            else if (_comments.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Column(
+                    children: [
+                      Icon(Icons.chat_outlined, size: 48, color: AppColors.textSubtle.withValues(alpha: 0.3)),
+                      const SizedBox(height: 12),
+                      Text('No comments yet', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _comments.length,
+                itemBuilder: (context, index) => _buildCommentItemWidget(_comments[index]),
               ),
-            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -271,32 +434,36 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         child: Row(
           children: [
             Expanded(
-              child: InkWell(
-                onTap: _openComments,
-                borderRadius: BorderRadius.circular(24),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.background,
-                    borderRadius: BorderRadius.circular(24),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: TextField(
+                  controller: _commentController,
+                  decoration: InputDecoration(
+                    hintText: 'Add a comment...',
+                    hintStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   ),
-                  child: Row(
-                    children: [
-                      Text('Add a comment...', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
-                    ],
-                  ),
+                  onSubmitted: (_) => _postComment(),
                 ),
               ),
             ),
             const SizedBox(width: 12),
-            InkWell(
-              onTap: _openComments,
-              borderRadius: BorderRadius.circular(24),
-              child: const CircleAvatar(
+            GestureDetector(
+              onTap: _isPosting ? null : _postComment,
+              child: CircleAvatar(
                 radius: 24,
                 backgroundColor: AppColors.primary,
-                child: Icon(Icons.send, color: Colors.white, size: 20),
+                child: _isPosting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.send, color: Colors.white, size: 20),
               ),
             ),
           ],
@@ -312,6 +479,107 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         const SizedBox(width: 6),
         Text(value, style: AppTextStyles.labelSmall.copyWith(color: color, fontWeight: FontWeight.bold)),
       ],
+    );
+  }
+
+  Widget _buildCommentItemWidget(ForumComment comment) {
+    final isLiked = _likedCommentIds.contains(comment.commentId);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+            child: Text(
+              (comment.userName ?? 'U')[0].toUpperCase(),
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.textSubtle.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          comment.userName ?? 'Anonymous',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textHeadline,
+                          ),
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        padding: EdgeInsets.zero,
+                        onSelected: (value) {
+                          if (value == 'report') {
+                            _reportComment(comment);
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem<String>(
+                            value: 'report',
+                            child: Text('Report comment'),
+                          ),
+                        ],
+                        child: const Icon(
+                          Icons.more_horiz_rounded,
+                          size: 18,
+                          color: AppColors.textSubtle,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    comment.body,
+                    style: const TextStyle(color: AppColors.textSubtle),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => _toggleCommentLike(comment.commentId),
+                        child: Icon(
+                          isLiked
+                              ? Icons.thumb_up_rounded
+                              : Icons.thumb_up_outlined,
+                          size: 16,
+                          color: isLiked ? AppColors.primary : AppColors.textSubtle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isLiked ? 'Liked' : 'Like',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isLiked ? AppColors.primary : AppColors.textSubtle,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -50,6 +50,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   final TextEditingController _searchController = TextEditingController();
   late Stream<List<ProductItem>> _productsStream;
 
+  double _minPrice = 0.0;
+  double _maxPrice = 500.0;
+  double _maxDistance = 5.0; // default 5 km
+  Position? _userPosition;
+
   Widget _buildHeaderNotification(BuildContext context) {
     final userId = AuthService().userId;
     return FutureBuilder<int>(
@@ -116,10 +121,30 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     _initializeCacheService();
     _setupConnectivityListener();
     _loadMarketplaceCategories();
+    _fetchUserPosition();
     SupabaseDataService.marketplaceCategoryNotifier.addListener(_onExternalCategoryFilter);
     _searchController.addListener(() {
       if (mounted) setState(() {});
     });
+  }
+
+  Future<void> _fetchUserPosition() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+        final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+        if (mounted) {
+          setState(() {
+            _userPosition = pos;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to get user position: $e');
+    }
   }
 
   void _onExternalCategoryFilter() {
@@ -398,24 +423,27 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Container(
-                    height: 52,
-                    width: 52,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.tune_rounded,
-                      color: Colors.white,
-                      size: 22,
+                  GestureDetector(
+                    onTap: _showFilterDialog,
+                    child: Container(
+                      height: 52,
+                      width: 52,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.tune_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
                   ),
                 ],
@@ -568,7 +596,23 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 p.name.toLowerCase().contains(query) ||
                 (p.description ?? '').toLowerCase().contains(query) ||
                 p.farm.toLowerCase().contains(query);
-            return matchesCategory && isNotMine && matchesQuery;
+
+            final productPrice = _parsePrice(p.price);
+            final matchesPrice = productPrice >= _minPrice && productPrice <= _maxPrice;
+
+            bool matchesDistance = true;
+            if (_userPosition != null && p.latitude != null && p.longitude != null) {
+              final distInMeters = Geolocator.distanceBetween(
+                _userPosition!.latitude,
+                _userPosition!.longitude,
+                p.latitude!,
+                p.longitude!,
+              );
+              final distInKm = distInMeters / 1000.0;
+              matchesDistance = distInKm <= _maxDistance;
+            }
+
+            return matchesCategory && isNotMine && matchesQuery && matchesPrice && matchesDistance;
           })
           .toList();
 
@@ -626,7 +670,23 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               p.name.toLowerCase().contains(query) ||
               (p.description ?? '').toLowerCase().contains(query) ||
               p.farm.toLowerCase().contains(query);
-          return matchesCategory && isNotMine && matchesQuery;
+
+          final productPrice = _parsePrice(p.price);
+          final matchesPrice = productPrice >= _minPrice && productPrice <= _maxPrice;
+
+          bool matchesDistance = true;
+          if (_userPosition != null && p.latitude != null && p.longitude != null) {
+            final distInMeters = Geolocator.distanceBetween(
+              _userPosition!.latitude,
+              _userPosition!.longitude,
+              p.latitude!,
+              p.longitude!,
+            );
+            final distInKm = distInMeters / 1000.0;
+            matchesDistance = distInKm <= _maxDistance;
+          }
+
+          return matchesCategory && isNotMine && matchesQuery && matchesPrice && matchesDistance;
         }).toList();
 
         if (filteredProducts.isEmpty) {
@@ -760,14 +820,162 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildFilterPill(Icons.sell_rounded, '₱2 - ₱500', AppColors.primary),
+          GestureDetector(
+            onTap: _showFilterDialog,
+            child: _buildFilterPill(
+              Icons.sell_rounded,
+              '₱${_minPrice.toInt()} - ₱${_maxPrice.toInt()}',
+              AppColors.primary,
+            ),
+          ),
           const SizedBox(width: 12),
-          _buildFilterPill(
-            Icons.near_me_rounded,
-            '< 5 km',
-            const Color(0xFF1E293B),
+          GestureDetector(
+            onTap: _showFilterDialog,
+            child: _buildFilterPill(
+              Icons.near_me_rounded,
+              '< ${_maxDistance.toInt()} km',
+              const Color(0xFF1E293B),
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showFilterDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.textSubtle.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Filter Marketplace',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textHeadline,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Price Range',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textHeadline,
+                    ),
+                  ),
+                  Text(
+                    '₱${_minPrice.toInt()} - ₱${_maxPrice.toInt()}',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              RangeSlider(
+                values: RangeValues(_minPrice, _maxPrice),
+                min: 0.0,
+                max: 1000.0,
+                divisions: 50,
+                activeColor: AppColors.primary,
+                inactiveColor: AppColors.textSubtle.withValues(alpha: 0.1),
+                labels: RangeLabels('₱${_minPrice.toInt()}', '₱${_maxPrice.toInt()}'),
+                onChanged: (values) {
+                  setSheetState(() {
+                    _minPrice = values.start;
+                    _maxPrice = values.end;
+                  });
+                  setState(() {});
+                },
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Maximum Distance',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textHeadline,
+                    ),
+                  ),
+                  Text(
+                    '${_maxDistance.toInt()} km',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Slider(
+                value: _maxDistance,
+                min: 1.0,
+                max: 50.0,
+                divisions: 49,
+                activeColor: AppColors.primary,
+                inactiveColor: AppColors.textSubtle.withValues(alpha: 0.1),
+                label: '${_maxDistance.toInt()} km',
+                onChanged: (val) {
+                  setSheetState(() {
+                    _maxDistance = val;
+                  });
+                  setState(() {});
+                },
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    'Apply Filters',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

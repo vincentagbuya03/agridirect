@@ -776,6 +776,27 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
     final days = int.tryParse(product.harvestDays ?? '');
     if (days == null) return 'TBD';
     if (days <= 0) return 'Date TBD';
+    if (product.createdAt != null) {
+      final harvestDate = product.createdAt!.add(Duration(days: days));
+      final now = DateTime.now();
+      final diff = harvestDate.difference(now);
+      if (diff.isNegative) {
+        return 'Harvested';
+      }
+      final remainingDays = diff.inDays;
+      if (remainingDays >= 1) {
+        return '$remainingDays days';
+      }
+      final remainingHours = diff.inHours;
+      if (remainingHours >= 1) {
+        return '$remainingHours hrs left';
+      }
+      final remainingMinutes = diff.inMinutes;
+      if (remainingMinutes >= 1) {
+        return '$remainingMinutes mins left';
+      }
+      return 'Harvesting now';
+    }
     return '$days days';
   }
 

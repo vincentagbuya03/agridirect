@@ -1,13 +1,13 @@
 {
-  "name": "AgriDirect",
-  "short_name": "AgriDirect",
+  "name": "AgriDirect Philippines",
+  "short_name": "AgriDirect PH",
   "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#F8FAFC",
   "theme_color": "#10B981",
-  "description": "AgriDirect - Farm direct marketplace for fresh products.",
+  "description": "AgriDirect Philippines - Farm direct marketplace for fresh products.",
   "orientation": "portrait-primary",
   "prefer_related_applications": false,
   "icons": [

@@ -514,7 +514,38 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
   }
 
   Widget _buildPremiumPreOrderCard(ProductItem product) {
-    final daysLeft = int.tryParse(product.harvestDays ?? '7') ?? 7;
+    int daysLeft = 7;
+    String timeUnitLabel = 'DAYS LEFT';
+    if (product.harvestDays != null) {
+      final days = int.tryParse(product.harvestDays!) ?? 7;
+      if (product.createdAt != null) {
+        final harvestDate = product.createdAt!.add(Duration(days: days));
+        final diff = harvestDate.difference(DateTime.now());
+        if (diff.isNegative) {
+          daysLeft = 0;
+          timeUnitLabel = 'HARVESTED';
+        } else {
+          final remainingDays = diff.inDays;
+          if (remainingDays >= 1) {
+            daysLeft = remainingDays;
+            timeUnitLabel = remainingDays == 1 ? 'DAY LEFT' : 'DAYS LEFT';
+          } else {
+            final remainingHours = diff.inHours;
+            if (remainingHours >= 1) {
+              daysLeft = remainingHours;
+              timeUnitLabel = remainingHours == 1 ? 'HOUR LEFT' : 'HOURS LEFT';
+            } else {
+              final remainingMinutes = diff.inMinutes;
+              daysLeft = remainingMinutes > 0 ? remainingMinutes : 0;
+              timeUnitLabel = remainingMinutes == 1 ? 'MIN LEFT' : 'MINS LEFT';
+            }
+          }
+        }
+      } else {
+        daysLeft = days;
+      }
+    }
+
     final reservedQty = product.reservedQuantity ?? 0;
     final targetQty = product.targetQuantity ?? 0;
     final reservedCount = targetQty > 0
@@ -594,7 +625,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
                         ),
                       ),
                       Text(
-                        'DAYS LEFT',
+                        timeUnitLabel,
                         style: AppTextStyles.labelSmall.copyWith(
                           fontSize: 8,
                           fontWeight: FontWeight.w800,

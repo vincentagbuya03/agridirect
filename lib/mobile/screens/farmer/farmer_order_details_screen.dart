@@ -868,7 +868,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
     } else if (_currentStatus == 'PROCESSING') {
       allowedStatuses = allStatuses.where((s) => s['label'] == 'SHIPPED' || s['label'] == 'CANCELLED').toList();
     } else if (_currentStatus == 'SHIPPED') {
-      allowedStatuses = allStatuses.where((s) => s['label'] == 'DELIVERED' || s['label'] == 'CANCELLED').toList();
+      allowedStatuses = allStatuses.where((s) => s['label'] == 'DELIVERED').toList();
     }
 
     showModalBottomSheet(

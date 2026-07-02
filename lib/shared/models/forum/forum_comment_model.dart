@@ -37,9 +37,9 @@ class ForumComment {
       'postId': json['postId'] ?? json['post_id'],
       'userId': json['userId'] ?? json['user_id'],
       'body': json['body'],
-      'createdAt': json['createdAt'] ?? json['created_at'],
+      'createdAt': json['createdAt'] ?? json['created_at'] ?? DateTime.now().toIso8601String(),
       'updatedAt':
-          json['updatedAt'] ?? json['updated_at'] ?? json['created_at'],
+          json['updatedAt'] ?? json['updated_at'] ?? json['created_at'] ?? DateTime.now().toIso8601String(),
       'userName': json['userName'] ?? json['user_name'],
       'userAvatar': json['userAvatar'] ?? json['user_avatar'],
     };

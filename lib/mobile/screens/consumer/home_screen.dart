@@ -35,12 +35,83 @@ class _HomeScreenState extends State<HomeScreen> {
   late Stream<List<ForumPostItem>> _forumStream;
   late Stream<int> _unreadCountStream;
 
+  String _aiInsightTitle = 'Scanning market prices...';
+  String _aiInsightDesc = 'Our AI is analyzing local supply and pricing trends to find the best deals.';
+  bool _isLoadingInsight = true;
+
   @override
   void initState() {
     super.initState();
     _forumStream = SupabaseDataService().watchForumPosts();
     _unreadCountStream = MessageService().watchTotalUnreadCount(asFarmer: false);
     _loadDefaultAddress();
+    _loadAIMarketInsight();
+  }
+
+  Future<void> _loadAIMarketInsight() async {
+    try {
+      final products = await SupabaseDataService().getNearbyProducts();
+      if (products.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _aiInsightTitle = 'Market is fresh today';
+            _aiInsightDesc = 'Browse the marketplace to discover fresh harvests from local farmers.';
+            _isLoadingInsight = false;
+          });
+        }
+        return;
+      }
+
+      final Map<String, List<ProductItem>> categories = {};
+      for (final p in products) {
+        final cat = p.categoryName ?? 'Produce';
+        categories.putIfAbsent(cat, () => []).add(p);
+      }
+
+      if (categories.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _aiInsightTitle = 'Fresh harvests available';
+            _aiInsightDesc = 'Explore the marketplace to see fresh items listed today.';
+            _isLoadingInsight = false;
+          });
+        }
+        return;
+      }
+
+      String peakCategory = categories.keys.first;
+      int maxCount = 0;
+      categories.forEach((cat, list) {
+        if (list.length > maxCount) {
+          maxCount = list.length;
+          peakCategory = cat;
+        }
+      });
+
+      final list = categories[peakCategory]!;
+      list.sort((a, b) {
+        final priceA = double.tryParse(a.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+        final priceB = double.tryParse(b.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+        return priceA.compareTo(priceB);
+      });
+      final cheapest = list.first;
+
+      if (mounted) {
+        setState(() {
+          _aiInsightTitle = '${cheapest.name} starting at ${cheapest.price}';
+          _aiInsightDesc = 'Peak supply detected in $peakCategory from ${cheapest.farm}. Grab fresh harvests at wholesale prices today.';
+          _isLoadingInsight = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _aiInsightTitle = 'Discover local produce';
+          _aiInsightDesc = 'Local farmers are offering fresh harvests at great prices. Tap below to browse.';
+          _isLoadingInsight = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadDefaultAddress() async {
@@ -496,22 +567,32 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            Text(
-              'Tomatoes are currently 12% cheaper',
-              style: AppTextStyles.headline2.copyWith(
-                color: Colors.white,
-                fontSize: 24,
-                height: 1.2,
+            if (_isLoadingInsight) ...[
+              const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Market supply peaked this morning. Local farmers are offering fresh harvests at wholesale prices.',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: Colors.white.withValues(alpha: 0.8),
-                height: 1.5,
+            ] else ...[
+              Text(
+                _aiInsightTitle,
+                style: AppTextStyles.headline2.copyWith(
+                  color: Colors.white,
+                  fontSize: 22,
+                  height: 1.2,
+                ),
               ),
-            ),
+              const SizedBox(height: 12),
+              Text(
+                _aiInsightDesc,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  height: 1.5,
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {

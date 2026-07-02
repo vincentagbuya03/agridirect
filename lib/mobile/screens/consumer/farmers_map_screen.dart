@@ -8,9 +8,13 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../shared/router/app_routes.dart';
+import 'package:agridirect/shared/widgets/image_widgets.dart';
 
 class FarmersMapScreen extends StatefulWidget {
   const FarmersMapScreen({super.key});
@@ -55,9 +59,9 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
       }
 
       final rows = await SupabaseConfig.client
-          .from('farmers')
+          .from('v_farmer_profiles')
           .select(
-            'farm_name, specialty, location, farm_latitude, farm_longitude',
+            'farmer_id, user_id, farm_name, full_name, specialty, location, farm_latitude, farm_longitude, image_url, avatar_url, badge, years_of_experience, farmer_phone, farming_history, is_verified, free_delivery_min_amount',
           )
           .not('farm_latitude', 'is', null)
           .not('farm_longitude', 'is', null)
@@ -278,8 +282,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
             final latitude = (farmer['farm_latitude'] as num).toDouble();
             final longitude = (farmer['farm_longitude'] as num).toDouble();
             final farmName = (farmer['farm_name'] ?? 'Farm').toString();
-            final specialty = (farmer['specialty'] ?? 'No specialty')
-                .toString();
+            final avatarUrl = farmer['avatar_url'] ?? farmer['image_url'];
             final isSelected = index == _selectedIndex;
 
             return Marker(
@@ -292,12 +295,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
                   setState(() => _selectedIndex = index);
                   _mapController.move(LatLng(latitude, longitude), 15.0);
                 },
-                onLongPress: () => _openFarmerInfo(
-                  farmName: farmName,
-                  specialty: specialty,
-                  latitude: latitude,
-                  longitude: longitude,
-                ),
+                onLongPress: () => _openFarmerInfo(farmer),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -313,7 +311,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
+                              color: Colors.black.withValues(alpha: 0.15),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -325,7 +323,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 10,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w800,
                             color: Colors.white,
                           ),
                         ),
@@ -333,32 +331,44 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
                     Stack(
                       alignment: Alignment.center,
                       children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.elasticOut,
-                          width: isSelected ? 48 : 36,
-                          height: isSelected ? 48 : 36,
+                        Container(
+                          width: 44,
+                          height: 44,
                           decoration: BoxDecoration(
-                            color: isSelected ? AppColors.accent : Colors.white,
+                            color: isSelected ? AppColors.accent : AppColors.primary,
                             shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
                             boxShadow: [
                               BoxShadow(
-                                  color: (isSelected ? AppColors.accent : AppColors.primary)
-                                      .withValues(alpha: 0.2),
-                                  blurRadius: isSelected ? 12 : 6,
-                                  spreadRadius: isSelected ? 2 : 0,
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
                               ),
                             ],
-                            border: Border.all(
-                              color: isSelected ? Colors.white : AppColors.primary,
-                              width: 2,
+                          ),
+                          child: ClipOval(
+                            child: SafeNetworkImage(
+                              imageUrl: avatarUrl,
+                              defaultBucket: 'uploads',
+                              fit: BoxFit.cover,
+                              placeholder: Container(
+                                color: Colors.white,
+                                child: Icon(
+                                  Icons.agriculture_rounded,
+                                  size: 20,
+                                  color: isSelected ? AppColors.accent : AppColors.primary,
+                                ),
+                              ),
+                              errorWidget: Container(
+                                color: Colors.white,
+                                child: Icon(
+                                  Icons.agriculture_rounded,
+                                  size: 20,
+                                  color: isSelected ? AppColors.accent : AppColors.primary,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                        Icon(
-                          Icons.agriculture_rounded,
-                          size: isSelected ? 24 : 18,
-                          color: isSelected ? Colors.white : AppColors.primary,
                         ),
                       ],
                     ),
@@ -466,13 +476,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
                           right: 12,
                           bottom: 12,
                           child: _selectedFarmCard(
-                            farmName: (selected['farm_name'] ?? 'Farm')
-                                .toString(),
-                            specialty: (selected['specialty'] ?? 'No specialty')
-                                .toString(),
-                            location:
-                                (selected['location'] ?? 'Location unavailable')
-                                    .toString(),
+                            farmer: selected,
                             latitude: selectedLat,
                             longitude: selectedLng,
                             resolvedAddressFuture: _resolveAddress(
@@ -481,15 +485,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
                             ),
                             onOpenMap: () =>
                                 _openExternalMap(selectedLat, selectedLng),
-                            onViewDetails: () => _openFarmerInfo(
-                              farmName: (selected['farm_name'] ?? 'Farm')
-                                  .toString(),
-                              specialty:
-                                  (selected['specialty'] ?? 'No specialty')
-                                      .toString(),
-                              latitude: selectedLat,
-                              longitude: selectedLng,
-                            ),
+                            onViewDetails: () => _openFarmerInfo(selected),
                           ),
                         ),
                       ],
@@ -532,25 +528,30 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
   }
 
   Widget _selectedFarmCard({
-    required String farmName,
-    required String specialty,
-    required String location,
+    required Map<String, dynamic> farmer,
     required double latitude,
     required double longitude,
     required Future<Map<String, String>> resolvedAddressFuture,
     required VoidCallback onOpenMap,
     required VoidCallback onViewDetails,
   }) {
+    final farmName = (farmer['farm_name'] ?? 'Farm').toString();
+    final specialty = (farmer['specialty'] ?? 'General Farming').toString();
+    final location = (farmer['location'] ?? 'Location unavailable').toString();
+    final avatarUrl = farmer['avatar_url'] ?? farmer['image_url'];
+    final isVerified = farmer['is_verified'] == true;
+    final exp = farmer['years_of_experience']?.toString() ?? '0';
+
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(18),
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -561,44 +562,87 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
           Row(
             children: [
               Container(
-                width: 34,
-                height: 34,
+                width: 50,
+                height: 50,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2), width: 1.5),
                 ),
-                child: const Icon(
-                  Icons.agriculture_rounded,
-                  size: 18,
-                  color: AppColors.primary,
+                child: ClipOval(
+                  child: SafeNetworkImage(
+                    imageUrl: avatarUrl,
+                    defaultBucket: 'uploads',
+                    fit: BoxFit.cover,
+                    placeholder: Container(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      child: const Icon(Icons.person, color: AppColors.primary),
+                    ),
+                    errorWidget: Container(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      child: const Icon(Icons.person, color: AppColors.primary),
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 14),
               Expanded(
-                child: Text(
-                  farmName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.headline3.copyWith(fontSize: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            farmName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textHeadline,
+                            ),
+                          ),
+                        ),
+                        if (isVerified) ...[
+                          const SizedBox(width: 4),
+                          const Icon(Icons.verified_rounded, size: 16, color: Colors.blueAccent),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      specialty,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSubtle,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              TextButton(
+              ElevatedButton(
                 onPressed: onViewDetails,
-                child: const Text('Details'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                  foregroundColor: AppColors.primary,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Details',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            specialty,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.bodySmall.copyWith(
-              color: AppColors.textSubtle,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
           FutureBuilder<Map<String, String>>(
             future: resolvedAddressFuture,
             builder: (context, snapshot) {
@@ -610,11 +654,11 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
               return Row(
                 children: [
                   const Icon(
-                    Icons.pin_drop_outlined,
-                    size: 14,
+                    Icons.pin_drop_rounded,
+                    size: 16,
                     color: AppColors.primary,
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       resolved,
@@ -622,7 +666,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.bodySmall.copyWith(
                         color: AppColors.textHeadline,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
@@ -630,15 +674,41 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
               );
             },
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           Row(
             children: [
+              if (exp != '0')
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$exp+ Years Exp',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF475569),
+                    ),
+                  ),
+                ),
               const Spacer(),
-              const SizedBox(width: 8),
               ElevatedButton.icon(
                 onPressed: onOpenMap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 icon: const Icon(Icons.route_rounded, size: 16),
-                label: const Text('Navigate'),
+                label: Text(
+                  'Navigate',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
@@ -647,85 +717,301 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
     );
   }
 
-  void _openFarmerInfo({
-    required String farmName,
-    required String specialty,
-    required double latitude,
-    required double longitude,
-  }) {
+  void _openFarmerInfo(Map<String, dynamic> farmer) {
+    final farmName = (farmer['farm_name'] ?? 'Farm').toString();
+    final specialty = (farmer['specialty'] ?? 'General Farming').toString();
+    final history = (farmer['farming_history'] ?? '').toString().trim();
+    final phone = (farmer['farmer_phone'] ?? '').toString().trim();
+    final experience = farmer['years_of_experience']?.toString() ?? '0';
+    final avatarUrl = farmer['avatar_url'] ?? farmer['image_url'];
+    final isVerified = farmer['is_verified'] == true;
+    final farmerId = (farmer['farmer_id'] ?? '').toString();
+    final freeDeliveryMin = double.tryParse(farmer['free_delivery_min_amount']?.toString() ?? '0') ?? 0.0;
+    final latitude = (farmer['farm_latitude'] as num).toDouble();
+    final longitude = (farmer['farm_longitude'] as num).toDouble();
+
     showModalBottomSheet<void>(
       context: context,
-      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: FutureBuilder<Map<String, String>>(
-              future: _resolveAddress(latitude, longitude),
-              builder: (context, snapshot) {
-                final address = snapshot.data;
-                final street = (address?['street'] ?? '').trim();
-                final sitio = (address?['sitio'] ?? '').trim();
-                final barangay = (address?['barangay'] ?? '').trim();
-                final city = (address?['city'] ?? '').trim();
-                final province = (address?['province'] ?? '').trim();
-
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            top: 16,
+            left: 24,
+            right: 24,
+          ),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 48,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.textHeadline.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
                   children: [
-                    Text(farmName, style: AppTextStyles.headline3),
-                    const SizedBox(height: 8),
-                    Text(specialty, style: AppTextStyles.bodyMedium),
-                    const SizedBox(height: 10),
-                    if (street.isNotEmpty)
-                      Text('Street: $street', style: AppTextStyles.bodySmall),
-                    if (sitio.isNotEmpty)
-                      Text(
-                        'Sitio/Purok: $sitio',
-                        style: AppTextStyles.bodySmall,
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2), width: 2),
                       ),
-                    if (barangay.isNotEmpty)
-                      Text(
-                        'Barangay: $barangay',
-                        style: AppTextStyles.bodySmall,
-                      ),
-                    if (city.isNotEmpty)
-                      Text(
-                        'City/Municipality: $city',
-                        style: AppTextStyles.bodySmall,
-                      ),
-                    if (province.isNotEmpty)
-                      Text(
-                        'Province: $province',
-                        style: AppTextStyles.bodySmall,
-                      ),
-                    if (snapshot.connectionState == ConnectionState.waiting)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          'Resolving address from pin...',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSubtle,
+                      child: ClipOval(
+                        child: SafeNetworkImage(
+                          imageUrl: avatarUrl,
+                          defaultBucket: 'uploads',
+                          fit: BoxFit.cover,
+                          placeholder: Container(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            child: const Icon(Icons.person, size: 28, color: AppColors.primary),
+                          ),
+                          errorWidget: Container(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            child: const Icon(Icons.person, size: 28, color: AppColors.primary),
                           ),
                         ),
                       ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => _openExternalMap(latitude, longitude),
-                        icon: const Icon(Icons.map_outlined),
-                        label: const Text('Open in Maps'),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  farmName,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textHeadline,
+                                  ),
+                                ),
+                              ),
+                              if (isVerified) ...[
+                                const SizedBox(width: 6),
+                                const Icon(Icons.verified_rounded, size: 20, color: Colors.blueAccent),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            specialty,
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.textSubtle,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                );
-              },
+                ),
+                const SizedBox(height: 20),
+                const Divider(),
+                const SizedBox(height: 20),
+                
+                // Details Grid
+                Row(
+                  children: [
+                    if (experience != '0') ...[
+                      Expanded(
+                        child: _detailTile(
+                          icon: Icons.history_edu_rounded,
+                          title: 'Experience',
+                          value: '$experience+ Years',
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                    ],
+                    if (freeDeliveryMin > 0)
+                      Expanded(
+                        child: _detailTile(
+                          icon: Icons.local_shipping_rounded,
+                          title: 'Free Delivery',
+                          value: '₱${freeDeliveryMin.toInt()}+',
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                FutureBuilder<Map<String, String>>(
+                  future: _resolveAddress(latitude, longitude),
+                  builder: (context, snapshot) {
+                    final address = snapshot.data;
+                    final fullAddress = address?['full'] ?? (farmer['location'] ?? 'Location unavailable').toString();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Farm Location',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textHeadline,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.pin_drop_rounded, size: 18, color: AppColors.primary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                fullAddress,
+                                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textBody),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                if (history.isNotEmpty) ...[
+                  Text(
+                    'About the Farm',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textHeadline,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Text(
+                      history,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: const Color(0xFF475569),
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                Row(
+                  children: [
+                    if (phone.isNotEmpty) ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => launchUrl(Uri.parse('tel:$phone')),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            side: const BorderSide(color: AppColors.primary),
+                          ),
+                          icon: const Icon(Icons.phone_rounded, color: AppColors.primary),
+                          label: Text(
+                            'Call Farmer',
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    if (farmerId.isNotEmpty)
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            context.push(AppRoutes.farmerProfile(farmerId));
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          icon: const Icon(Icons.storefront_rounded),
+                          label: Text(
+                            'Visit Shop',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _detailTile({required IconData icon, required String title, required String value}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 24, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSubtle,
+                ),
+              ),
+              Text(
+                value,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textHeadline,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
