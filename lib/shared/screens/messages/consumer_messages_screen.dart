@@ -47,10 +47,12 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
   bool _startingInitialConversation = false;
   final List<ChatMessage> _optimisticMessages = [];
   String _conversationSearchQuery = '';
+  late Stream<List<MessageConversation>> _inboxStream;
 
   @override
   void initState() {
     super.initState();
+    _inboxStream = _messageService.watchInbox(asFarmer: false);
     _selectedConversationId = widget.initialConversationId;
     if (_selectedConversationId != null) {
       NotificationService().setActiveConversation(_selectedConversationId);
@@ -337,7 +339,7 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
             _buildErrorBanner(),
           Expanded(
             child: StreamBuilder<List<MessageConversation>>(
-              stream: _messageService.watchInbox(asFarmer: false),
+              stream: _inboxStream,
               builder: (context, snapshot) {
                 if (_startingInitialConversation) {
                   return const Center(child: AppShimmerLoader());

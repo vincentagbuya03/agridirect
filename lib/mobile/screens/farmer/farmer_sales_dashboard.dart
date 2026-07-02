@@ -14,7 +14,6 @@ import 'dart:async';
 import '../../widgets/skeleton_loaders.dart';
 import '../../../shared/services/farmer/farmer_service.dart';
 import '../../../shared/services/offline/offline_product_service.dart';
-import '../../widgets/mobile_notifications_sheet.dart';
 import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/services/community/message_service.dart';
 
@@ -50,6 +49,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     'listingsTrend': '0%',
   };
   bool _isLoadingStats = true;
+  late Stream<int> _unreadMessagesStream;
 
   void _retryProfileLoadAfterStartup() {
     Future<void>.delayed(const Duration(milliseconds: 700), () async {
@@ -252,6 +252,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   @override
   void initState() {
     super.initState();
+    _unreadMessagesStream = MessageService().watchTotalUnreadCount(asFarmer: true);
     _loadCachedDbAvatar();
     _loadFarmerProfile();
     _loadDashboardStats();
@@ -701,7 +702,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                         ),
                       ),
                       StreamBuilder<int>(
-                        stream: MessageService().watchTotalUnreadCount(asFarmer: true),
+                        stream: _unreadMessagesStream,
                         builder: (context, snapshot) {
                           final count = snapshot.data ?? 0;
                           return GestureDetector(

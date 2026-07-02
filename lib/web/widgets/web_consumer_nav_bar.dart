@@ -748,13 +748,19 @@ class WebMessageIcon extends StatefulWidget {
 
 class _WebMessageIconState extends State<WebMessageIcon> {
   final _messageService = MessageService();
+  late Stream<List<MessageConversation>> _inboxStream;
+  bool? _lastIsFarmerMode;
 
   @override
   Widget build(BuildContext context) {
     final isFarmerMode = AuthService().isViewingAsFarmer;
+    if (_lastIsFarmerMode != isFarmerMode) {
+      _lastIsFarmerMode = isFarmerMode;
+      _inboxStream = _messageService.watchInbox(asFarmer: isFarmerMode);
+    }
 
     return StreamBuilder<List<MessageConversation>>(
-      stream: _messageService.watchInbox(asFarmer: isFarmerMode),
+      stream: _inboxStream,
       builder: (context, snapshot) {
         int unreadCount = 0;
         if (snapshot.hasData) {

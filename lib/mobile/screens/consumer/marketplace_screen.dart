@@ -31,7 +31,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../shared/services/auth/auth_service.dart';
 
 import '../../../shared/services/community/notification_service.dart';
-import '../../widgets/mobile_notifications_sheet.dart';
 
 /// Marketplace Screen - Professional Digital Marketplace
 class MarketplaceScreen extends StatefulWidget {
@@ -49,6 +48,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   final GlobalKey _cartKey = GlobalKey();
   final TextEditingController _searchController = TextEditingController();
+  late Stream<List<ProductItem>> _productsStream;
 
   Widget _buildHeaderNotification(BuildContext context) {
     final userId = AuthService().userId;
@@ -112,6 +112,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   @override
   void initState() {
     super.initState();
+    _productsStream = SupabaseDataService().watchNearbyProducts();
     _initializeCacheService();
     _setupConnectivityListener();
     _loadMarketplaceCategories();
@@ -606,7 +607,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     }
 
     return StreamBuilder<List<ProductItem>>(
-      stream: SupabaseDataService().watchNearbyProducts(),
+      stream: _productsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {

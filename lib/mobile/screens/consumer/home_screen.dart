@@ -18,7 +18,6 @@ import '../../../shared/services/social/follow_service.dart';
 import 'marketplace_screen.dart';
 import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/services/community/message_service.dart';
-import '../../widgets/mobile_notifications_sheet.dart';
 import '../../../shared/services/auth/auth_service.dart';
 
 /// Home Screen - Premium Customer Interface
@@ -33,10 +32,14 @@ class _HomeScreenState extends State<HomeScreen> {
   UserAddress? _defaultAddress;
   bool _addressLoaded = false;
   final FollowService _followService = FollowService();
+  late Stream<List<ForumPostItem>> _forumStream;
+  late Stream<int> _unreadCountStream;
 
   @override
   void initState() {
     super.initState();
+    _forumStream = SupabaseDataService().watchForumPosts();
+    _unreadCountStream = MessageService().watchTotalUnreadCount(asFarmer: false);
     _loadDefaultAddress();
   }
 
@@ -201,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Row(
                     children: [
                       StreamBuilder<int>(
-                        stream: MessageService().watchTotalUnreadCount(asFarmer: false),
+                        stream: _unreadCountStream,
                         builder: (context, snapshot) {
                           final unreadMessages = snapshot.data ?? 0;
                           return _buildHeaderAction(
@@ -1169,7 +1172,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildCommunityFeed(BuildContext context) {
     return StreamBuilder<List<ForumPostItem>>(
-      stream: SupabaseDataService().watchForumPosts(),
+      stream: _forumStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
