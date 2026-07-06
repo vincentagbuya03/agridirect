@@ -24,6 +24,7 @@ Order _$OrderFromJson(Map<String, dynamic> json) => Order(
       cancelledBy: json['cancelled_by'] as String?,
       farmName: json['farm_name'] as String?,
       farmerAvatarUrl: json['farmer_avatar_url'] as String?,
+      isPreorder: json['is_preorder'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$OrderToJson(Order instance) => <String, dynamic>{
@@ -44,4 +45,5 @@ Map<String, dynamic> _$OrderToJson(Order instance) => <String, dynamic>{
       'cancelled_by': instance.cancelledBy,
       'farm_name': instance.farmName,
       'farmer_avatar_url': instance.farmerAvatarUrl,
+      'is_preorder': instance.isPreorder,
     };

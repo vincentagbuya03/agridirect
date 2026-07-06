@@ -725,6 +725,7 @@ GoRouter createAppRouter() {
           return WebCheckoutScreen(
             product: product,
             initialQuantity: quantity,
+            isPreOrder: extra?['isPreOrder'] as bool? ?? false,
           );
         },
       ),

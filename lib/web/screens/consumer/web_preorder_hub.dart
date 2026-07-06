@@ -124,8 +124,13 @@ class _WebPreOrderHubState extends State<WebPreOrderHub> {
   }
 
   Widget _buildCard(ProductItem product) {
-    final days = int.tryParse(product.harvestDays ?? '') ?? 0;
-    final harvestLabel = days > 0 ? 'Harvest in $days days' : 'Reserve now';
+    final totalDays = int.tryParse(product.harvestDays ?? '') ?? 0;
+    final remainingDays = product.createdAt == null
+        ? totalDays
+        : product.createdAt!.add(Duration(days: totalDays)).difference(DateTime.now()).inDays + 1;
+    final harvestLabel = remainingDays > 0
+        ? 'Harvest in $remainingDays days'
+        : (remainingDays == 0 ? 'Harvesting today' : 'Harvested');
 
     return SizedBox(
       width: 280,

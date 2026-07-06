@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../shared/data/app_data.dart';
 import '../../../shared/models/auth/user_address_model.dart';
@@ -31,59 +32,23 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
   static const Color _white = Colors.white;
 
   final ProductService _productService = ProductService();
-  final OrderService _orderService = OrderService();
-  final UserService _userService = UserService();
-  final TextEditingController _instructionsController = TextEditingController();
 
   ProductItem? _product;
   Map<String, dynamic>? _farmerProfile;
   List<ProductReview> _reviews = const [];
   List<ProductItem> _moreFromFarmer = const [];
-  List<UserAddress> _addresses = const [];
-  UserAddress? _selectedAddress;
   bool _isLoading = true;
-  bool _isLoadingAddresses = true;
-  bool _isSubmittingOrder = false;
   int _quantity = 1;
-  String _selectedPaymentMethod = 'COD';
-
-  static const List<String> _paymentOptions = ['COD', 'COP'];
 
   @override
   void initState() {
     super.initState();
     _loadPage();
-    _loadAddresses();
   }
 
   @override
   void dispose() {
-    _instructionsController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadAddresses() async {
-    try {
-      final addresses = await _userService.getAllUserAddresses();
-      if (!mounted) return;
-      setState(() {
-        _addresses = addresses;
-        _selectedAddress = addresses.cast<UserAddress?>().firstWhere(
-          (address) => address?.isDefault == true,
-          orElse: () => addresses.isNotEmpty ? addresses.first : null,
-        );
-        _isLoadingAddresses = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isLoadingAddresses = false);
-    }
-  }
-
-  Future<void> _openAddressBook() async {
-    await context.push(AppRoutes.addressBook);
-    if (!mounted) return;
-    await _loadAddresses();
   }
 
   Future<void> _loadPage([ProductItem? target]) async {
@@ -187,20 +152,9 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
     return 'Fresh produce';
   }
 
-  double _priceValue() {
-    final raw = _product?.price ?? '0';
-    return double.tryParse(raw.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
-  }
-
   String _unitLabel() {
     final unit = _product?.unit.trim();
     return unit == null || unit.isEmpty ? 'unit' : unit;
-  }
-
-  String _harvestLabel() {
-    final days = int.tryParse(_product?.harvestDays ?? '');
-    if (days == null || days <= 0) return 'Available now';
-    return 'Harvest in $days days';
   }
 
   double _averageReviewRating() {
@@ -216,57 +170,6 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('${_product!.name} added to cart')));
-  }
-
-  Future<void> _submitOrder() async {
-    final productId = _product?.productId;
-    if (productId == null || productId.isEmpty) return;
-
-    if (_selectedPaymentMethod == 'COD' && _selectedAddress == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a delivery address.')),
-      );
-      return;
-    }
-
-    setState(() => _isSubmittingOrder = true);
-    try {
-      final instructions = _instructionsController.text.trim();
-      final result = await _orderService.createOfflinePreOrderByProductId(
-        productId: productId,
-        quantity: _quantity.toDouble(),
-        paymentMethod: _selectedPaymentMethod,
-        deliveryAddressId:
-            _selectedPaymentMethod == 'COP' ? null : _selectedAddress?.addressId,
-        notes: instructions.isNotEmpty
-            ? instructions
-            : _selectedPaymentMethod == 'COD'
-            ? 'Customer selected Cash on Delivery for this pre-order.'
-            : 'Customer selected Cash on Pickup for this pre-order.',
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pre-order placed successfully.')),
-      );
-      final conversationId = result['conversation_id']?.toString();
-      if (conversationId != null && conversationId.isNotEmpty) {
-        context.go(
-          AppRoutes.messages,
-          extra: {'conversationId': conversationId, 'asFarmer': false},
-        );
-      } else {
-        context.go(AppRoutes.customerOrders);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmittingOrder = false);
-      }
-    }
   }
 
   @override
@@ -456,7 +359,31 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
     final reviewCount = _reviews.isNotEmpty
         ? _reviews.length
         : int.tryParse(_product!.reviews ?? '0') ?? 0;
-    final requiresAddress = _selectedPaymentMethod == 'COD';
+
+    final totalDays = int.tryParse(_product?.harvestDays ?? '') ?? 0;
+    final remainingDays = _product?.createdAt == null
+        ? totalDays
+        : _product!.createdAt!
+                  .add(Duration(days: totalDays))
+                  .difference(DateTime.now())
+                  .inDays +
+              1;
+    final isHarvested = remainingDays <= 0;
+
+    String availabilityValue;
+    if (isHarvested) {
+      final diff = remainingDays.abs();
+      availabilityValue = diff == 0
+          ? 'Harvested today'
+          : 'Harvested $diff days ago';
+    } else {
+      availabilityValue = 'Harvest in $remainingDays days';
+    }
+
+    final target = _product!.targetQuantity ?? 100.0;
+    final reserved = _product!.reservedQuantity ?? 0.0;
+    final percent = (reserved / (target > 0 ? target : 1)).clamp(0.0, 1.0);
+    final displayUnit = _product!.unit.split('/').last.trim();
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -468,20 +395,52 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              _product!.categoryName ?? 'Product',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: _primary,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: _primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  _product!.categoryName ?? 'Product',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _primary,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: isHarvested
+                      ? const Color(0xFF16A34A).withValues(alpha: 0.15)
+                      : const Color(0xFFEA580C).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  isHarvested
+                      ? 'READY FOR ORDER (HARVESTED)'
+                      : 'UPCOMING HARVEST (PRE-ORDER)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: isHarvested
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFFEA580C),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Text(
@@ -547,110 +506,150 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                 child: _infoTile(
                   Icons.schedule_rounded,
                   'Availability',
-                  _harvestLabel(),
+                  availabilityValue,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _infoTile(
                   Icons.inventory_2_rounded,
-                  'Stock',
+                  'Stock Goal',
                   _product!.targetQuantity != null
-                      ? _product!.targetQuantity!.toStringAsFixed(0)
+                      ? '${_product!.targetQuantity!.toStringAsFixed(0)} $displayUnit'
                       : 'Available',
                 ),
               ),
             ],
           ),
           const SizedBox(height: 22),
-          _buildQuantityRow(),
-          const SizedBox(height: 18),
-          DropdownButtonFormField<String>(
-            initialValue: _selectedPaymentMethod,
-            items: _paymentOptions
-                .map(
-                  (option) => DropdownMenuItem<String>(
-                    value: option,
-                    child: Text(option),
-                  ),
-                )
-                .toList(),
-            onChanged: (value) {
-              if (value == null) return;
-              setState(() => _selectedPaymentMethod = value);
-            },
-            decoration: const InputDecoration(
-              labelText: 'Payment method',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            requiresAddress ? 'Shipping Address' : 'Pickup Location (at Farm)',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: _dark,
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (_isLoadingAddresses)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: CircularProgressIndicator(color: _primary),
-              ),
-            )
-          else if (requiresAddress)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildAddressPanel(),
-                const SizedBox(height: 16),
-              ],
-            )
-          else
+          if (!isHarvested) ...[
             Container(
-              width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _surface,
+                color: const Color(0xFFEFF6FF),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _border),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Pickup will be arranged directly with the farmer.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: _dark,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.stars_rounded,
+                            size: 16,
+                            color: Color(0xFF1D4ED8),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Pre-Order Reservation Status',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1E3A8A),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '${(percent * 100).toStringAsFixed(0)}% Reserved',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF1D4ED8),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: percent,
+                      backgroundColor: const Color(0xFFDBEAFE),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFF1D4ED8),
+                      ),
+                      minHeight: 8,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _farmName(),
-                    style: const TextStyle(fontSize: 13, color: _muted),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Reserved: ${reserved.toStringAsFixed(0)} $displayUnit',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E3A8A),
+                        ),
+                      ),
+                      Text(
+                        'Goal: ${target.toStringAsFixed(0)} $displayUnit',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E3A8A),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-          TextField(
-            controller: _instructionsController,
-            maxLines: 2,
-            decoration: InputDecoration(
-              hintText: 'Special instructions (optional)',
-              border: OutlineInputBorder(
+            const SizedBox(height: 22),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    size: 20,
+                    color: Color(0xFF15803D),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Harvest Complete',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF166534),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'This batch has been harvested! You can still order it now as standard fresh stock.',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFF166534),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(height: 22),
-          _buildOrderSummary(),
-          const SizedBox(height: 22),
-          if (_product?.farmerId != null && _product?.farmerId == SupabaseConfig.currentUser?.id)
+            const SizedBox(height: 22),
+          ],
+          _buildQuantityRow(),
+          const SizedBox(height: 32),
+          if (_product?.farmerId != null &&
+              _product?.farmerId == SupabaseConfig.currentUser?.id)
             Row(
               children: [
                 Expanded(
@@ -658,13 +657,16 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     decoration: BoxDecoration(
                       color: Colors.amber.shade50.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(18),
                       border: Border.all(color: Colors.amber.shade200),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.info_outline_rounded, color: Colors.amber),
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          color: Colors.amber,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'This is your product.',
@@ -686,49 +688,54 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: _addToCart,
-                    icon: const Icon(Icons.shopping_cart_outlined),
-                    label: const Text(
-                      'Add to Cart',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                    icon: Icon(
+                      isHarvested
+                          ? Icons.shopping_cart_outlined
+                          : Icons.calendar_today_rounded,
+                    ),
+                    label: Text(
+                      isHarvested ? 'Add to Cart' : 'Add Pre-order to Cart',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _primary,
                       side: BorderSide(color: _primary.withValues(alpha: 0.28)),
                       padding: const EdgeInsets.symmetric(vertical: 18),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(18),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
                   child: FilledButton(
-                    onPressed: _isSubmittingOrder ? null : _submitOrder,
+                    onPressed: () {
+                      context.push(
+                        AppRoutes.checkout,
+                        extra: {
+                          'product': _product,
+                          'quantity': _quantity,
+                          'isPreOrder': !isHarvested,
+                        },
+                      );
+                    },
                     style: FilledButton.styleFrom(
                       backgroundColor: _primary,
+                      foregroundColor: _white,
                       padding: const EdgeInsets.symmetric(vertical: 18),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(18),
                       ),
                     ),
                     child: Text(
-                      _isSubmittingOrder ? 'Ordering...' : 'Buy Now',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      isHarvested ? 'Buy Now' : 'Reserve Pre-order',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),
               ],
             ),
-          const SizedBox(height: 16),
-          Text(
-            'Total: P${(_priceValue() * _quantity).toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: _dark,
-            ),
-          ),
         ],
       ),
     );
@@ -846,161 +853,6 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         const SizedBox(width: 10),
         Text(_unitLabel(), style: const TextStyle(fontSize: 13, color: _muted)),
       ],
-    );
-  }
-
-  Widget _buildAddressPanel() {
-    if (_addresses.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _border),
-        ),
-        child: Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'No saved address found. Add one first to use Cash on Delivery.',
-                style: TextStyle(fontSize: 13, color: _muted),
-              ),
-            ),
-            TextButton(
-              onPressed: _openAddressBook,
-              child: const Text('Manage'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DropdownButtonFormField<String>(
-          initialValue: _selectedAddress?.addressId,
-          items: _addresses
-              .map(
-                (address) => DropdownMenuItem<String>(
-                  value: address.addressId,
-                  child: Text(
-                    '${address.label} - ${address.city}',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedAddress = _addresses.cast<UserAddress?>().firstWhere(
-                (address) => address?.addressId == value,
-                orElse: () => null,
-              );
-            });
-          },
-          decoration: InputDecoration(
-            labelText: 'Delivery address',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        if (_selectedAddress != null)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _border),
-            ),
-            child: Text(
-              '${_selectedAddress!.recipientName}\n${_selectedAddress!.fullAddress}\n${_selectedAddress!.recipientPhone}',
-              style: const TextStyle(fontSize: 13, color: _muted, height: 1.5),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildOrderSummary() {
-    final subtotal = _priceValue() * _quantity;
-    final requiresAddress = _selectedPaymentMethod == 'COD';
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Order Summary',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: _dark,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _summaryRow('Unit price', _currencyLabel(_product!.price)),
-          _summaryRow('Quantity', '$_quantity ${_unitLabel()}'),
-          _summaryRow(
-            'Fulfillment',
-            requiresAddress ? 'Delivery' : 'Pickup at farm',
-          ),
-          _summaryRow(
-            'Payment',
-            _selectedPaymentMethod == 'COD'
-                ? 'Cash on Delivery'
-                : 'Cash on Pickup',
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Divider(height: 1),
-          ),
-          _summaryRow(
-            'Total',
-            _currencyLabel(subtotal.toStringAsFixed(2)),
-            isEmphasized: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryRow(String label, String value, {bool isEmphasized = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: isEmphasized ? _dark : _muted,
-                fontWeight: isEmphasized ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: isEmphasized ? 15 : 13,
-              color: _dark,
-              fontWeight: isEmphasized ? FontWeight.w800 : FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
     );
   }
 

@@ -1413,7 +1413,7 @@ class _WebShopScreenState extends State<WebShopScreen>
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: 20,
             mainAxisSpacing: 20,
-            mainAxisExtent: 392,
+            mainAxisExtent: _showPreOrders ? 440 : 392,
           ),
           itemCount: products.length,
           itemBuilder: (context, index) {
@@ -1637,6 +1637,88 @@ class _WebShopScreenState extends State<WebShopScreen>
                         ],
                       ),
                     ],
+                    if (_showPreOrders && product.harvestDays != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            size: 13,
+                            color: const Color(0xFFEA580C),
+                          ),
+                          const SizedBox(width: 5),
+                          Builder(
+                            builder: (context) {
+                              final totalDays = int.tryParse(product.harvestDays ?? '') ?? 0;
+                              final remainingDays = product.createdAt == null
+                                  ? totalDays
+                                  : product.createdAt!.add(Duration(days: totalDays)).difference(DateTime.now()).inDays + 1; // +1 to account for current partial day
+                              final harvestLabel = remainingDays > 0
+                                  ? 'Harvest in $remainingDays days'
+                                  : (remainingDays == 0 ? 'Harvesting today' : 'Harvested');
+                              return Text(
+                                harvestLabel,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFFEA580C),
+                                ),
+                              );
+                            }
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (_showPreOrders) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: 240,
+                        child: LayoutBuilder(
+                          builder: (context, boxConstraints) {
+                            final target = product.targetQuantity ?? 100.0;
+                            final reserved = product.reservedQuantity ?? 0.0;
+                            final percent = (reserved / (target > 0 ? target : 1)).clamp(0.0, 1.0);
+                            final displayUnit = product.unit.split('/').last.trim();
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Reserved: ${reserved.toStringAsFixed(0)}/${target.toStringAsFixed(0)} $displayUnit',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: _muted,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${(percent * 100).toStringAsFixed(0)}%',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: _primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: percent,
+                                    backgroundColor: _primaryLight,
+                                    valueColor: AlwaysStoppedAnimation<Color>(_primary),
+                                    minHeight: 6,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1699,13 +1781,13 @@ class _WebShopScreenState extends State<WebShopScreen>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.shopping_bag,
+                              _showPreOrders ? Icons.calendar_today_rounded : Icons.shopping_bag,
                               size: 15,
                               color: isHovered ? _white : _primary,
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'Add to Cart',
+                              _showPreOrders ? 'Reserve Now' : 'Add to Cart',
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,
@@ -1775,7 +1857,7 @@ class _WebShopScreenState extends State<WebShopScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                flex: 3,
+                flex: _showPreOrders ? 2 : 3,
                 child: Stack(
                   children: [
                     Container(
@@ -1974,6 +2056,85 @@ class _WebShopScreenState extends State<WebShopScreen>
                               ],
                             ),
                           ],
+                          if (_showPreOrders && product.harvestDays != null) ...[
+                            const SizedBox(height: 7),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.calendar_today_rounded,
+                                  size: 13,
+                                  color: const Color(0xFFEA580C),
+                                ),
+                                const SizedBox(width: 5),
+                                Builder(
+                                  builder: (context) {
+                                    final totalDays = int.tryParse(product.harvestDays ?? '') ?? 0;
+                                    final remainingDays = product.createdAt == null
+                                        ? totalDays
+                                        : product.createdAt!.add(Duration(days: totalDays)).difference(DateTime.now()).inDays + 1; // +1 to account for current partial day
+                                    final harvestLabel = remainingDays > 0
+                                        ? 'Harvest in $remainingDays days'
+                                        : (remainingDays == 0 ? 'Harvesting today' : 'Harvested');
+                                    return Text(
+                                      harvestLabel,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFFEA580C),
+                                      ),
+                                    );
+                                  }
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (_showPreOrders) ...[
+                            const SizedBox(height: 10),
+                            LayoutBuilder(
+                              builder: (context, boxConstraints) {
+                                final target = product.targetQuantity ?? 100.0;
+                                final reserved = product.reservedQuantity ?? 0.0;
+                                final percent = (reserved / (target > 0 ? target : 1)).clamp(0.0, 1.0);
+                                final displayUnit = product.unit.split('/').last.trim();
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Reserved: ${reserved.toStringAsFixed(0)}/${target.toStringAsFixed(0)} $displayUnit',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: _muted,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${(percent * 100).toStringAsFixed(0)}%',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            color: _primary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        value: percent,
+                                        backgroundColor: _primaryLight,
+                                        valueColor: AlwaysStoppedAnimation<Color>(_primary),
+                                        minHeight: 6,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
                         ],
                       ),
                       Column(
@@ -2047,13 +2208,13 @@ class _WebShopScreenState extends State<WebShopScreen>
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Icon(
-                                        Icons.shopping_bag,
+                                        _showPreOrders ? Icons.calendar_today_rounded : Icons.shopping_bag,
                                         size: 16,
                                         color: isHovered ? _white : _primary,
                                       ),
                                       const SizedBox(width: 7),
                                       Text(
-                                        'Add to Cart',
+                                        _showPreOrders ? 'Reserve Now' : 'Add to Cart',
                                         style: GoogleFonts.inter(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w800,
@@ -2187,86 +2348,26 @@ class _WebShopScreenState extends State<WebShopScreen>
   // LOADING & EMPTY STATES
   // ─────────────────────────────────────────────
   Widget _buildLoadingGrid() {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        childAspectRatio: 0.68,
-        crossAxisSpacing: 20,
-        mainAxisSpacing: 20,
-      ),
-      itemCount: 8,
-      itemBuilder: (context, index) {
-        return Container(
-          decoration: BoxDecoration(
-            color: _white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _border),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth > 1200
+            ? 4
+            : constraints.maxWidth > 900
+            ? 3
+            : constraints.maxWidth > 600
+            ? 2
+            : 1;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 20,
+            mainAxisSpacing: 20,
+            mainAxisExtent: _showPreOrders ? 440 : 392,
           ),
-          child: Column(
-            children: [
-              Expanded(
-                flex: 3,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(14),
-                    ),
-                    color: Colors.grey[100],
-                  ),
-                  child: Center(
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: AppShimmerLoader(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          _primary.withValues(alpha: 0.3),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                flex: 3,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        height: 14,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        height: 10,
-                        width: 80,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+          itemCount: 8,
+          itemBuilder: (context, index) => const AppShimmerCard(),
         );
       },
     );

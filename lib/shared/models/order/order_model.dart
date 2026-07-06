@@ -49,6 +49,8 @@ class Order {
   final String? farmName;
   @JsonKey(name: 'farmer_avatar_url')
   final String? farmerAvatarUrl;
+  @JsonKey(name: 'is_preorder')
+  final bool? isPreorder;
 
   Order({
     required this.orderId,
@@ -68,6 +70,7 @@ class Order {
     this.cancelledBy,
     this.farmName,
     this.farmerAvatarUrl,
+    this.isPreorder = false,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) => _$OrderFromJson(json);
@@ -91,6 +94,7 @@ class Order {
     String? cancelledBy,
     String? farmName,
     String? farmerAvatarUrl,
+    bool? isPreorder,
   }) {
     return Order(
       orderId: orderId ?? this.orderId,
@@ -110,6 +114,7 @@ class Order {
       cancelledBy: cancelledBy ?? this.cancelledBy,
       farmName: farmName ?? this.farmName,
       farmerAvatarUrl: farmerAvatarUrl ?? this.farmerAvatarUrl,
+      isPreorder: isPreorder ?? this.isPreorder,
     );
   }
 

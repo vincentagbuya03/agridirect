@@ -865,21 +865,37 @@ class _OrdersScreenState extends State<OrdersScreen> {
       currentStep = -1;
     }
 
-    final steps = [
-      {'title': 'Placed', 'desc': 'Order received', 'icon': Icons.assignment_turned_in_rounded},
-      {'title': 'Confirmed', 'desc': 'Order verified', 'icon': Icons.check_circle_rounded},
-      {'title': 'Preparing', 'desc': 'Getting ready', 'icon': Icons.inventory_2_rounded},
-      {
-        'title': isCop ? 'Ready for Pickup' : 'Shipped',
-        'desc': isCop ? 'Ready at farm' : 'On the way',
-        'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded
-      },
-      {
-        'title': isCop ? 'Picked Up' : 'Delivered',
-        'desc': 'Completed',
-        'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded
-      },
-    ];
+    final steps = order.isPreorder == true
+        ? [
+            {'title': 'Pre-ordered', 'desc': 'Reservation received', 'icon': Icons.bookmark_added_rounded},
+            {'title': 'Confirmed', 'desc': 'Pre-order verified', 'icon': Icons.check_circle_rounded},
+            {'title': 'Growing', 'desc': 'Awaiting harvest', 'icon': Icons.agriculture_rounded},
+            {
+              'title': isCop ? 'Ready for Pickup' : 'Shipped',
+              'desc': isCop ? 'Ready at farm' : 'On the way',
+              'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded
+            },
+            {
+              'title': isCop ? 'Picked Up' : 'Delivered',
+              'desc': 'Completed',
+              'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded
+            },
+          ]
+        : [
+            {'title': 'Placed', 'desc': 'Order received', 'icon': Icons.assignment_turned_in_rounded},
+            {'title': 'Confirmed', 'desc': 'Order verified', 'icon': Icons.check_circle_rounded},
+            {'title': 'Preparing', 'desc': 'Getting ready', 'icon': Icons.inventory_2_rounded},
+            {
+              'title': isCop ? 'Ready for Pickup' : 'Shipped',
+              'desc': isCop ? 'Ready at farm' : 'On the way',
+              'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded
+            },
+            {
+              'title': isCop ? 'Picked Up' : 'Delivered',
+              'desc': 'Completed',
+              'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded
+            },
+          ];
 
     final activeStep = currentStep >= 0 
         ? steps[currentStep] 
@@ -1518,23 +1534,41 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Widget _buildTimeline(Order order) {
     final status = order.status.toUpperCase();
     final isCop = order.paymentMethod?.toUpperCase() == 'COP';
-    final steps = [
-      {'title': 'Placed', 'desc': 'Order received', 'code': 'PENDING', 'icon': Icons.assignment_turned_in_rounded},
-      {'title': 'Confirmed', 'desc': 'Order verified', 'code': 'CONFIRMED', 'icon': Icons.check_circle_rounded},
-      {'title': 'Preparing', 'desc': 'Getting ready', 'code': 'PROCESSING', 'icon': Icons.inventory_2_rounded},
-      {
-        'title': isCop ? 'Ready for Pickup' : 'Shipped',
-        'desc': isCop ? 'Ready at farm' : 'On the way',
-        'code': 'SHIPPED',
-        'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded
-      },
-      {
-        'title': isCop ? 'Picked Up' : 'Delivered',
-        'desc': 'Completed',
-        'code': 'DELIVERED',
-        'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded
-      },
-    ];
+    final steps = order.isPreorder == true
+        ? [
+            {'title': 'Pre-ordered', 'desc': 'Reservation received', 'code': 'PENDING', 'icon': Icons.bookmark_added_rounded},
+            {'title': 'Confirmed', 'desc': 'Pre-order verified', 'code': 'CONFIRMED', 'icon': Icons.check_circle_rounded},
+            {'title': 'Growing', 'desc': 'Awaiting harvest', 'code': 'PROCESSING', 'icon': Icons.agriculture_rounded},
+            {
+              'title': isCop ? 'Ready for Pickup' : 'Shipped',
+              'desc': isCop ? 'Ready at farm' : 'On the way',
+              'code': 'SHIPPED',
+              'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded
+            },
+            {
+              'title': isCop ? 'Picked Up' : 'Delivered',
+              'desc': 'Completed',
+              'code': 'DELIVERED',
+              'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded
+            },
+          ]
+        : [
+            {'title': 'Placed', 'desc': 'Order received', 'code': 'PENDING', 'icon': Icons.assignment_turned_in_rounded},
+            {'title': 'Confirmed', 'desc': 'Order verified', 'code': 'CONFIRMED', 'icon': Icons.check_circle_rounded},
+            {'title': 'Preparing', 'desc': 'Getting ready', 'code': 'PROCESSING', 'icon': Icons.inventory_2_rounded},
+            {
+              'title': isCop ? 'Ready for Pickup' : 'Shipped',
+              'desc': isCop ? 'Ready at farm' : 'On the way',
+              'code': 'SHIPPED',
+              'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded
+            },
+            {
+              'title': isCop ? 'Picked Up' : 'Delivered',
+              'code': 'DELIVERED',
+              'desc': 'Completed',
+              'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded
+            },
+          ];
 
     int currentStep = 0;
     if (status == 'CONFIRMED') {

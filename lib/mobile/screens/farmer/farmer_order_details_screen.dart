@@ -40,21 +40,38 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
 
   List<Map<String, dynamic>> get _steps {
     final isCop = widget.order.paymentMethod?.toUpperCase() == 'COP';
-    return [
-      {'title': 'Placed', 'desc': 'Order received', 'icon': Icons.assignment_turned_in_rounded},
-      {'title': 'Confirmed', 'desc': 'Order accepted', 'icon': Icons.check_circle_rounded},
-      {'title': 'Preparing', 'desc': 'Getting ready', 'icon': Icons.inventory_2_rounded},
-      {
-        'title': isCop ? 'Ready for Pickup' : 'Shipped',
-        'desc': isCop ? 'Ready at farm' : 'On the way',
-        'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded
-      },
-      {
-        'title': isCop ? 'Picked Up' : 'Delivered',
-        'desc': 'Completed',
-        'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded
-      },
-    ];
+    final isPreorder = widget.order.isPreorder == true;
+    return isPreorder
+        ? [
+            {'title': 'Pre-ordered', 'desc': 'Reservation received', 'icon': Icons.bookmark_added_rounded},
+            {'title': 'Confirmed', 'desc': 'Pre-order accepted', 'icon': Icons.check_circle_rounded},
+            {'title': 'Growing', 'desc': 'Awaiting harvest', 'icon': Icons.agriculture_rounded},
+            {
+              'title': isCop ? 'Ready for Pickup' : 'Shipped',
+              'desc': isCop ? 'Ready at farm' : 'On the way',
+              'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded
+            },
+            {
+              'title': isCop ? 'Picked Up' : 'Delivered',
+              'desc': 'Completed',
+              'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded
+            },
+          ]
+        : [
+            {'title': 'Placed', 'desc': 'Order received', 'icon': Icons.assignment_turned_in_rounded},
+            {'title': 'Confirmed', 'desc': 'Order accepted', 'icon': Icons.check_circle_rounded},
+            {'title': 'Preparing', 'desc': 'Getting ready', 'icon': Icons.inventory_2_rounded},
+            {
+              'title': isCop ? 'Ready for Pickup' : 'Shipped',
+              'desc': isCop ? 'Ready at farm' : 'On the way',
+              'icon': isCop ? Icons.storefront_rounded : Icons.local_shipping_rounded
+            },
+            {
+              'title': isCop ? 'Picked Up' : 'Delivered',
+              'desc': 'Completed',
+              'icon': isCop ? Icons.done_all_rounded : Icons.home_work_rounded
+            },
+          ];
   }
 
   int get _currentStepIndex {

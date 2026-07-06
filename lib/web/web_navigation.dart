@@ -76,8 +76,6 @@ class _WebNavigationState extends State<WebNavigation> {
         child: WebLoginScreen(
           onLoginSuccess: () {
             Navigator.of(dialogContext).pop();
-            // Re-render to let WebNavigation.build() check admin status
-            // This will show AdminDashboard if _auth.isAdmin is true
             if (mounted) setState(() {});
           },
         ),

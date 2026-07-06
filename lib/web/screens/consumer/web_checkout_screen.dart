@@ -16,10 +16,12 @@ class WebCheckoutScreen extends StatefulWidget {
     super.key,
     required this.product,
     required this.initialQuantity,
+    this.isPreOrder = false,
   });
 
   final ProductItem product;
   final int initialQuantity;
+  final bool isPreOrder;
 
   @override
   State<WebCheckoutScreen> createState() => _WebCheckoutScreenState();
@@ -147,26 +149,54 @@ class _WebCheckoutScreenState extends State<WebCheckoutScreen> {
 
     setState(() => _isSubmittingOrder = true);
     try {
-      await _orderService.createOfflineOrder(
-        farmerId: farmerId,
-        items: [
-          OrderItemInput(
-            productId: productId,
-            quantity: _quantity.toDouble(),
-            unitPrice: _priceValue(),
-          ),
-        ],
-        paymentMethod: _selectedPaymentMethod,
-        deliveryAddressId:
-            _selectedPaymentMethod == 'COP' ? null : _selectedAddress?.addressId,
-        notes: _instructionsController.text.trim(),
-        deliveryFee: _calculateDeliveryFee(),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order placed successfully!')),
-      );
-      context.go(AppRoutes.orderSuccess, extra: widget.product.categoryName);
+      if (widget.isPreOrder) {
+        final result = await _orderService.createOfflinePreOrderByProductId(
+          productId: productId,
+          quantity: _quantity.toDouble(),
+          paymentMethod: _selectedPaymentMethod,
+          deliveryAddressId:
+              _selectedPaymentMethod == 'COP' ? null : _selectedAddress?.addressId,
+          notes: _instructionsController.text.trim().isNotEmpty
+              ? _instructionsController.text.trim()
+              : _selectedPaymentMethod == 'COD'
+              ? 'Customer selected Cash on Delivery for this pre-order.'
+              : 'Customer selected Cash on Pickup for this pre-order.',
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pre-order placed successfully.')),
+        );
+        final conversationId = result['conversation_id']?.toString();
+        if (conversationId != null && conversationId.isNotEmpty) {
+          context.go(
+            AppRoutes.messages,
+            extra: {'conversationId': conversationId, 'asFarmer': false},
+          );
+        } else {
+          context.go(AppRoutes.customerOrders);
+        }
+      } else {
+        await _orderService.createOfflineOrder(
+          farmerId: farmerId,
+          items: [
+            OrderItemInput(
+              productId: productId,
+              quantity: _quantity.toDouble(),
+              unitPrice: _priceValue(),
+            ),
+          ],
+          paymentMethod: _selectedPaymentMethod,
+          deliveryAddressId:
+              _selectedPaymentMethod == 'COP' ? null : _selectedAddress?.addressId,
+          notes: _instructionsController.text.trim(),
+          deliveryFee: _calculateDeliveryFee(),
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Order placed successfully!')),
+        );
+        context.go(AppRoutes.orderSuccess, extra: widget.product.categoryName);
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
