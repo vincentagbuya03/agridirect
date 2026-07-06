@@ -10,6 +10,7 @@ import 'screens/farmer/web_sales_dashboard.dart';
 import 'screens/farmer/web_farmer_products.dart';
 import 'screens/farmer/web_farmer_orders.dart';
 import 'screens/farmer/web_community_hub.dart';
+import 'screens/farmer/web_farmer_preorders_tab.dart';
 import 'screens/consumer/web_profile_screen.dart';
 import 'screens/auth/web_login_screen.dart';
 import 'screens/admin/admin_dashboard_redesigned.dart';
@@ -99,6 +100,7 @@ class _WebNavigationState extends State<WebNavigation> {
         WebFarmerProducts(onNavigate: _navigateTo, currentIndex: _currentIndex),
         WebFarmerOrders(onNavigate: _navigateTo, currentIndex: _currentIndex),
         WebCommunityHub(onNavigate: _navigateTo, currentIndex: _currentIndex),
+        WebFarmerPreordersTab(onNavigate: _navigateTo, currentIndex: _currentIndex),
         WebProfileScreen(
           onModeChanged: () => setState(() => _currentIndex = 0),
           onLogout: _handleLogout,

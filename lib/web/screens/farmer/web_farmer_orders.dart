@@ -111,7 +111,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
       );
     }
 
-    final navItems = ['Dashboard', 'Products', 'Orders', 'Community'];
+    final navItems = ['Dashboard', 'Products', 'Orders', 'Community', 'Pre-Orders'];
     return Container(
       margin: isMobile
           ? const EdgeInsets.fromLTRB(16, 16, 16, 8)

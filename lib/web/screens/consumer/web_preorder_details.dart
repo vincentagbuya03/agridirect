@@ -5,14 +5,14 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/models/auth/user_address_model.dart';
 import '../../../shared/models/product/product_review_model.dart';
+import '../../../shared/models/product/crop_milestone_model.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/commerce/cart_service.dart';
-import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/services/commerce/product_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
-import '../../../shared/services/user/user_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
+import '../../widgets/crop_milestones_timeline.dart';
 
 class WebPreorderDetails extends StatefulWidget {
   const WebPreorderDetails({super.key, this.initialProduct});
@@ -37,6 +37,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
   Map<String, dynamic>? _farmerProfile;
   List<ProductReview> _reviews = const [];
   List<ProductItem> _moreFromFarmer = const [];
+  List<CropMilestone> _milestones = const [];
   bool _isLoading = true;
   int _quantity = 1;
 
@@ -84,11 +85,16 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
           product.farmerId != null && product.farmerId!.isNotEmpty
           ? SupabaseDataService().getProductsByFarmerId(product.farmerId!)
           : Future.value(<ProductItem>[]);
+      final milestonesFuture =
+          product.productId != null && product.productId!.isNotEmpty
+          ? _productService.getCropMilestones(product.productId!)
+          : Future.value(<CropMilestone>[]);
 
       final results = await Future.wait<dynamic>([
         farmerFuture,
         reviewsFuture,
         relatedFuture,
+        milestonesFuture,
       ]);
 
       if (!mounted) return;
@@ -100,6 +106,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
             .where((item) => item.productId != product!.productId)
             .take(6)
             .toList();
+        _milestones = results[3] as List<CropMilestone>;
         _isLoading = false;
       });
     } catch (_) {
@@ -223,6 +230,8 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                         ),
                   const SizedBox(height: 28),
                   _buildSellerSection(),
+                  const SizedBox(height: 28),
+                  CropMilestonesTimeline(milestones: _milestones),
                   const SizedBox(height: 28),
                   _buildReviewsSection(),
                   const SizedBox(height: 28),

@@ -9,6 +9,7 @@ import '../../models/product/product_model.dart';
 import '../../models/product/category_model.dart';
 import '../../models/product/unit_model.dart';
 import '../../models/product/product_review_model.dart';
+import '../../models/product/crop_milestone_model.dart';
 import '../logging/system_activity_logger.dart';
 import '../social/follow_service.dart';
 
@@ -645,5 +646,62 @@ class ProductService {
       userName: user?['name']?.toString(),
       userAvatar: user?['avatar_url']?.toString(),
     );
+  }
+
+  /// Fetch milestones for a specific pre-order crop product
+  Future<List<CropMilestone>> getCropMilestones(String productId) async {
+    try {
+      final response = await _supabase
+          .from('crop_milestones')
+          .select()
+          .eq('product_id', productId)
+          .order('created_at', ascending: true);
+
+      return (response as List<dynamic>)
+          .map((json) => CropMilestone.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching crop milestones: $e');
+      return [];
+    }
+  }
+
+  /// Add a growth update/milestone for a crop
+  Future<CropMilestone> addCropMilestone({
+    required String productId,
+    required String title,
+    required String description,
+    String? imageUrl,
+  }) async {
+    try {
+      final response = await _supabase
+          .from('crop_milestones')
+          .insert({
+            'product_id': productId,
+            'title': title,
+            'description': description,
+            'image_url': imageUrl,
+          })
+          .select()
+          .single();
+
+      final milestone = CropMilestone.fromJson(response);
+
+      await _activityLogger.log(
+        action: 'crop_milestone_added',
+        details: 'Added milestone "${milestone.title}" for product $productId',
+        entityType: 'product',
+        entityId: productId,
+        metadata: {
+          'milestone_id': milestone.milestoneId,
+          'product_id': productId,
+          'title': title,
+        },
+      );
+
+      return milestone;
+    } catch (e) {
+      throw Exception('Failed to add crop milestone: $e');
+    }
   }
 }

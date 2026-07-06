@@ -249,7 +249,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
       );
     }
 
-    final navItems = ['Dashboard', 'Products', 'Orders', 'Community'];
+    final navItems = ['Dashboard', 'Products', 'Orders', 'Community', 'Pre-Orders'];
     return Container(
       margin: isMobile
           ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
