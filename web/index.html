@@ -15,7 +15,20 @@
   <meta property="og:description"
     content="Modern e-commerce platform connecting Filipino farmers directly with customers for fresh agricultural products." />
   <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="AgriDirect" />
+  <meta property="og:url" content="https://agridirect-app.vercel.app" />
   <meta name="theme-color" content="#10B981" />
+
+  <!-- Google Site Name Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "AgriDirect",
+    "alternateName": ["AgriDirect Philippines", "AgriDirect PH"],
+    "url": "https://agridirect-app.vercel.app"
+  }
+  </script>
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes" />
@@ -122,12 +135,19 @@
     }
   </style>
 
-  <title>AgriDirect Philippines - Farm Direct E-commerce</title>
+  <title>AgriDirect - Modern Farm Direct E-commerce Platform</title>
   <link rel="manifest" href="manifest.json?v=7" />
 </head>
 
 <body>
-  <div id="app"></div>
+  <div id="app">
+    <!-- Static SEO content for search engine crawlers -->
+    <div style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;">
+      <h1>AgriDirect</h1>
+      <p>AgriDirect is a modern e-commerce platform connecting local farmers directly with consumers for fresh agricultural products and fresh produce.</p>
+      <a href="https://agridirect-app.vercel.app">AgriDirect Web App</a>
+    </div>
+  </div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 
