@@ -935,6 +935,12 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         'Data & security',
         onTap: () => context.push(AppRoutes.appSettings),
       ),
+      _SettingsItem(
+        Icons.help_outline_rounded,
+        'Help Center',
+        'FAQs & customer support',
+        onTap: () => context.push(AppRoutes.helpCenter),
+      ),
     ];
 
     final sw = MediaQuery.of(context).size.width;

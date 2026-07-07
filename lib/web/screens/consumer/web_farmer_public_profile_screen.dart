@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/data/app_data.dart';
@@ -9,6 +9,7 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/social/follow_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
+import '../../../shared/services/commerce/voucher_service.dart';
 
 class WebFarmerPublicProfileScreen extends StatefulWidget {
   final String farmerId;
@@ -168,6 +169,7 @@ class _WebFarmerPublicProfileScreenState
                       const SizedBox(height: 24),
                       _buildStatsRow(farmer),
                       const SizedBox(height: 24),
+                      _buildVouchersSection(farmer),
                       _buildContent(farmer),
                     ],
                   ),
@@ -437,6 +439,198 @@ class _WebFarmerPublicProfileScreenState
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildVouchersSection(Map<String, dynamic> farmer) {
+    final currentUserId = AuthService().userId;
+    if (currentUserId.isEmpty) return const SizedBox.shrink();
+    final farmerId = farmer['user_id'] as String? ?? widget.farmerId;
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: VoucherService().getFarmerVouchersForUser(
+        farmerId: farmerId,
+        userId: currentUserId,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData) {
+          return const SizedBox.shrink();
+        }
+        final vouchers = snapshot.data!;
+        if (vouchers.isEmpty) return const SizedBox.shrink();
+
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 24),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.confirmation_number_outlined, color: _primary, size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Store Vouchers',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Claim & apply at checkout',
+                    style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: vouchers.map((v) {
+                    final code = v['code'] ?? '';
+                    final val = (v['discount_value'] as num).toDouble();
+                    final type = v['discount_type'] ?? '';
+                    final minSpend = (v['min_spend'] as num).toDouble();
+                    bool isClaimed = v['is_claimed'] as bool? ?? false;
+
+                    return StatefulBuilder(
+                      builder: (ctx, setVoucherState) {
+                        return Container(
+                          margin: const EdgeInsets.only(right: 16),
+                          width: 280,
+                          height: 86,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: _primary.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 86,
+                                decoration: BoxDecoration(
+                                  color: _primary.withValues(alpha: 0.08),
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(11),
+                                    bottomLeft: Radius.circular(11),
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      type == 'flat' ? 'â‚±${val.toStringAsFixed(0)}' : '${val.toStringAsFixed(0)}%',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 18,
+                                        color: _primary,
+                                      ),
+                                    ),
+                                    Text(
+                                      'OFF',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 11,
+                                        color: _primary,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              CustomPaint(
+                                size: const Size(6, 86),
+                                painter: TicketDottedLinePainter(color: _primary.withValues(alpha: 0.3)),
+                              ),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        code,
+                                        style: GoogleFonts.inter(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                          color: _dark,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Min. Spend â‚±${minSpend.toStringAsFixed(0)}',
+                                        style: GoogleFonts.inter(fontSize: 11, color: _muted),
+                                      ),
+                                      const Spacer(),
+                                      Align(
+                                        alignment: Alignment.bottomRight,
+                                        child: isClaimed
+                                            ? Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFF1F5F9),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  'Claimed',
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: _muted,
+                                                  ),
+                                                ),
+                                              )
+                                            : ElevatedButton(
+                                                onPressed: () async {
+                                                  final ok = await VoucherService().claimVoucher(currentUserId, v['voucher_id']);
+                                                  if (ok) setVoucherState(() { isClaimed = true; });
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: _primary,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                                  minimumSize: const Size(60, 26),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  elevation: 0,
+                                                ),
+                                                child: Text(
+                                                  'Claim',
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -719,7 +913,6 @@ class _WebFarmerProductsTab extends StatelessWidget {
     );
   }
 }
-
 class _WebFarmerPostsTab extends StatelessWidget {
   final String farmerUserId;
 
@@ -868,6 +1061,7 @@ class _WebFarmerPostsTab extends StatelessWidget {
     );
   }
 
+
   Widget _buildEmptyState(String title, String subtitle) {
     return Center(
       child: Column(
@@ -890,3 +1084,26 @@ class _WebFarmerPostsTab extends StatelessWidget {
     );
   }
 }
+
+class TicketDottedLinePainter extends CustomPainter {
+  final Color color;
+  TicketDottedLinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+    
+    double startY = 6;
+    while (startY < size.height - 6) {
+      canvas.drawLine(Offset(size.width / 2, startY), Offset(size.width / 2, startY + 4), paint);
+      startY += 8;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+

@@ -9,6 +9,9 @@ import '../../../shared/services/commerce/product_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
+import '../../../shared/services/commerce/voucher_service.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class WebProductDetails extends StatefulWidget {
   const WebProductDetails({super.key, this.initialProduct});
@@ -454,6 +457,8 @@ class _WebProductDetailsState extends State<WebProductDetails> {
               ),
             ],
           ),
+          const SizedBox(height: 22),
+          _buildProductVouchersSection(),
           const SizedBox(height: 22),
           Row(
             children: [
@@ -1100,6 +1105,146 @@ class _WebProductDetailsState extends State<WebProductDetails> {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildProductVouchersSection() {
+    final farmerId = _product?.farmerId;
+    final currentUserId = AuthService().userId;
+    if (farmerId == null || farmerId.isEmpty || currentUserId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: VoucherService().getFarmerVouchersForUser(
+        farmerId: farmerId,
+        userId: currentUserId,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData) {
+          return const SizedBox.shrink();
+        }
+
+        final vouchers = snapshot.data!;
+        if (vouchers.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.confirmation_number_outlined, color: _primary, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  'Vouchers available for this shop:',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: _dark,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 56,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: vouchers.length,
+                itemBuilder: (context, idx) {
+                  final v = vouchers[idx];
+                  final code = v['code'] ?? '';
+                  final val = (v['discount_value'] as num).toDouble();
+                  final type = v['discount_type'] ?? '';
+                  final isClaimed = v['is_claimed'] as bool? ?? false;
+
+                  return Container(
+                    margin: const EdgeInsets.only(right: 12),
+                    width: 170,
+                    decoration: BoxDecoration(
+                      color: _primary.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _primary.withValues(alpha: 0.2)),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                type == 'flat' ? '₱${val.toStringAsFixed(0)} OFF' : '${val.toStringAsFixed(0)}% OFF',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                  color: _primary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                code,
+                                style: GoogleFonts.inter(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: _muted,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        isClaimed
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE2E8F0),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'Claimed',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w800,
+                                    color: _muted,
+                                  ),
+                                ),
+                              )
+                            : GestureDetector(
+                                onTap: () async {
+                                  final ok = await VoucherService().claimVoucher(currentUserId, v['voucher_id']);
+                                  if (ok) {
+                                    setState(() {});
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: _primary,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Claim',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

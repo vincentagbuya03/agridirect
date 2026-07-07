@@ -10,6 +10,8 @@ import '../../../shared/services/user/user_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../../shared/models/farmer/farmer_profile_model.dart';
 import '../../../shared/services/farmer/farmer_service.dart';
+import '../../../shared/services/commerce/voucher_service.dart';
+import '../../../shared/services/auth/auth_service.dart';
 
 class WebCheckoutScreen extends StatefulWidget {
   const WebCheckoutScreen({
@@ -46,6 +48,7 @@ class _WebCheckoutScreenState extends State<WebCheckoutScreen> {
   late int _quantity;
   String _selectedPaymentMethod = 'COD';
   FarmerProfile? _farmerProfile;
+  Map<String, dynamic>? _selectedVoucher;
 
   static const List<String> _paymentOptions = ['COD', 'COP'];
 
@@ -126,8 +129,29 @@ class _WebCheckoutScreenState extends State<WebCheckoutScreen> {
     return 50.0;
   }
 
+  double _calculateVoucherDiscount() {
+    if (_selectedVoucher == null) return 0.0;
+    final type = _selectedVoucher!['discount_type'] ?? '';
+    final val = (_selectedVoucher!['discount_value'] as num).toDouble();
+    final subtotal = _calculateSubtotal();
+    
+    if (type == 'flat') {
+      return val;
+    } else {
+      final disc = subtotal * (val / 100);
+      final maxDisc = _selectedVoucher!['max_discount'] != null 
+          ? (_selectedVoucher!['max_discount'] as num).toDouble()
+          : null;
+      if (maxDisc != null && disc > maxDisc) {
+        return maxDisc;
+      }
+      return disc;
+    }
+  }
+
   double _calculateTotal() {
-    return _calculateSubtotal() + _calculateDeliveryFee();
+    final total = _calculateSubtotal() + _calculateDeliveryFee() - _calculateVoucherDiscount();
+    return total < 0 ? 0.0 : total;
   }
 
   Future<void> _submitOrder() async {
@@ -190,7 +214,16 @@ class _WebCheckoutScreenState extends State<WebCheckoutScreen> {
               _selectedPaymentMethod == 'COP' ? null : _selectedAddress?.addressId,
           notes: _instructionsController.text.trim(),
           deliveryFee: _calculateDeliveryFee(),
+          discount: _calculateVoucherDiscount(),
         );
+
+        if (_selectedVoucher != null) {
+          await VoucherService().markVoucherAsUsed(
+            _selectedVoucher!['claim_id'],
+            _selectedVoucher!['voucher_id'],
+          );
+        }
+
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Order placed successfully!')),
@@ -760,10 +793,20 @@ class _WebCheckoutScreenState extends State<WebCheckoutScreen> {
             ],
           ),
           const Divider(height: 36),
+          // Voucher Selection Row
+          _buildVoucherSelectionRow(),
+          const Divider(height: 36),
           // Cost Details
           _costRow('Subtotal', _currencyLabel(subtotal)),
           const SizedBox(height: 12),
           _costRow('Delivery Fee', deliveryFee > 0 ? _currencyLabel(deliveryFee) : 'Free'),
+          if (_selectedVoucher != null) ...[
+            const SizedBox(height: 12),
+            _costRow(
+              'Voucher Discount (${_selectedVoucher!['code']})',
+              '-${_currencyLabel(_calculateVoucherDiscount())}',
+            ),
+          ],
           const Divider(height: 36),
           Row(
             children: [
@@ -832,6 +875,198 @@ class _WebCheckoutScreenState extends State<WebCheckoutScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildVoucherSelectionRow() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.confirmation_number_outlined, color: _primary, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Shop Voucher',
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                color: _dark,
+              ),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: _openVoucherSelectionDialog,
+              child: Text(
+                _selectedVoucher == null ? 'Select Voucher' : 'Change',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: _primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_selectedVoucher != null) ...[
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _primary.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _primary.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_outline_rounded, color: _primary, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'Applied: ${_selectedVoucher!['code']}',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    color: _primary,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 16, color: Colors.grey),
+                  onPressed: () {
+                    setState(() {
+                      _selectedVoucher = null;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _openVoucherSelectionDialog() async {
+    final currentUserId = AuthService().userId;
+    final farmerId = widget.product.farmerId;
+    if (currentUserId.isEmpty || farmerId == null || farmerId.isEmpty) return;
+
+    final voucherService = VoucherService();
+    bool isLoading = true;
+    List<Map<String, dynamic>> validVouchers = [];
+
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> load() async {
+              try {
+                final list = await voucherService.getValidCheckoutVouchers(
+                  userId: currentUserId,
+                  farmerId: farmerId,
+                  cartAmount: _calculateSubtotal(),
+                );
+                setModalState(() {
+                  validVouchers = list;
+                  isLoading = false;
+                });
+              } catch (_) {
+                setModalState(() => isLoading = false);
+              }
+            }
+
+            if (isLoading) {
+              WidgetsBinding.instance.addPostFrameCallback((_) => load());
+            }
+
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Text(
+                'Select Store Voucher',
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  color: _dark,
+                ),
+              ),
+              content: SizedBox(
+                width: 400,
+                height: 300,
+                child: isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : (validVouchers.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.confirmation_number_outlined, size: 40, color: Colors.grey),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No valid vouchers found for this order.',
+                                  style: GoogleFonts.inter(color: Colors.grey, fontSize: 13),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: validVouchers.length,
+                            itemBuilder: (context, index) {
+                              final v = validVouchers[index];
+                              final code = v['code'] ?? '';
+                              final val = (v['discount_value'] as num).toDouble();
+                              final type = v['discount_type'] ?? '';
+                              final minSpend = (v['min_spend'] as num).toDouble();
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: ListTile(
+                                  title: Text(
+                                    code,
+                                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
+                                  ),
+                                  subtitle: Text(
+                                    type == 'flat'
+                                        ? '₱${val.toStringAsFixed(0)} OFF (Min. spend ₱${minSpend.toStringAsFixed(0)})'
+                                        : '${val.toStringAsFixed(0)}% OFF (Min. spend ₱${minSpend.toStringAsFixed(0)})',
+                                    style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                                  ),
+                                  trailing: const Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 14,
+                                    color: _muted,
+                                  ),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedVoucher = v;
+                                    });
+                                    Navigator.of(dialogCtx).pop();
+                                  },
+                                ),
+                              );
+                            },
+                          )),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

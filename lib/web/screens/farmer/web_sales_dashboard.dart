@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 import '../../widgets/web_hamburger_menu_button.dart';
+import '../../../shared/services/commerce/voucher_service.dart';
 
 
 class WebSalesDashboard extends StatefulWidget {
@@ -333,7 +334,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
-              onTap: () => widget.onNavigate(4),
+              onTap: () => widget.onNavigate(5),
               child: Container(
                 width: isMobile ? 38 : 46,
                 height: isMobile ? 38 : 46,
@@ -472,6 +473,26 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         children: [
           headerText,
           const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _openVoucherManager,
+                  icon: const Icon(Icons.confirmation_number_outlined),
+                  label: const Text('Manage Vouchers'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           weatherWidget,
         ],
       );
@@ -482,9 +503,650 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
       children: [
         Expanded(child: headerText),
         const SizedBox(width: 16),
+        ElevatedButton.icon(
+          onPressed: _openVoucherManager,
+          icon: const Icon(Icons.confirmation_number_outlined),
+          label: const Text('Manage Vouchers'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
         weatherWidget,
       ],
     );
+  }
+
+  Future<void> _openVoucherManager() async {
+    final voucherService = VoucherService();
+    final currentUserId = AuthService().userId;
+    bool isSaving = false;
+    bool isLoadingList = true;
+    List<Map<String, dynamic>> vouchers = [];
+    int activeTab = 0;
+
+    final formKey = GlobalKey<FormState>();
+    final codeController = TextEditingController();
+    final valueController = TextEditingController();
+    final minSpendController = TextEditingController();
+    final maxDiscountController = TextEditingController();
+    final limitController = TextEditingController(text: '100');
+    String discountType = 'flat';
+    DateTime startDate = DateTime.now();
+    DateTime endDate = DateTime.now().add(const Duration(days: 30));
+
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> loadList() async {
+              setModalState(() => isLoadingList = true);
+              try {
+                final list = await voucherService.getFarmerVouchers(currentUserId);
+                setModalState(() {
+                  vouchers = list;
+                  isLoadingList = false;
+                });
+              } catch (_) {
+                setModalState(() => isLoadingList = false);
+              }
+            }
+
+            if (isLoadingList && activeTab == 0) {
+              WidgetsBinding.instance.addPostFrameCallback((_) => loadList());
+            }
+
+            Future<void> submit() async {
+              if (!formKey.currentState!.validate()) return;
+              setModalState(() => isSaving = true);
+              try {
+                await voucherService.createVoucher(
+                  farmerId: currentUserId,
+                  code: codeController.text,
+                  discountType: discountType,
+                  discountValue: double.parse(valueController.text),
+                  minSpend: double.parse(minSpendController.text),
+                  maxDiscount: maxDiscountController.text.isNotEmpty 
+                      ? double.parse(maxDiscountController.text)
+                      : null,
+                  usageLimit: int.parse(limitController.text),
+                  startDate: startDate,
+                  endDate: endDate,
+                );
+                
+                codeController.clear();
+                valueController.clear();
+                minSpendController.clear();
+                maxDiscountController.clear();
+                limitController.text = '100';
+                
+                setModalState(() {
+                  activeTab = 0;
+                  isLoadingList = true;
+                  isSaving = false;
+                });
+              } catch (e) {
+                setModalState(() => isSaving = false);
+                ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                  SnackBar(content: Text('Failed to create voucher: $e')),
+                );
+              }
+            }
+
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              titlePadding: const EdgeInsets.fromLTRB(32, 32, 32, 0),
+              contentPadding: const EdgeInsets.fromLTRB(32, 24, 32, 0),
+              actionsPadding: const EdgeInsets.fromLTRB(32, 24, 32, 32),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.confirmation_number_rounded,
+                      color: _primary,
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Voucher Manager',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: _dark,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Manage store vouchers & discount codes',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: _muted,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.all(4),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => setModalState(() => activeTab = 0),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: activeTab == 0 ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: activeTab == 0
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.05),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : [],
+                            ),
+                            child: Text(
+                              'Vouchers List',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: activeTab == 0 ? FontWeight.w700 : FontWeight.w600,
+                                color: activeTab == 0 ? _dark : _muted,
+                              ),
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => setModalState(() => activeTab = 1),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: activeTab == 1 ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: activeTab == 1
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.05),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : [],
+                            ),
+                            child: Text(
+                              'Create New',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: activeTab == 1 ? FontWeight.w700 : FontWeight.w600,
+                                color: activeTab == 1 ? _dark : _muted,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 600,
+                height: 440,
+                child: activeTab == 0
+                    ? (isLoadingList
+                        ? const Center(child: CircularProgressIndicator(color: _primary))
+                        : (vouchers.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(24),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF8FAFC),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: const Color(0xFFF1F5F9)),
+                                      ),
+                                      child: const Icon(
+                                        Icons.confirmation_number_outlined,
+                                        size: 48,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 18),
+                                    Text(
+                                      'No vouchers created yet',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 16,
+                                        color: _dark,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Click "Create New" to add discount vouchers for your shop.',
+                                      style: GoogleFonts.inter(
+                                        color: _muted,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                physics: const BouncingScrollPhysics(),
+                                itemCount: vouchers.length,
+                                itemBuilder: (context, index) {
+                                  final voucher = vouchers[index];
+                                  final code = voucher['code'] ?? '';
+                                  final discVal = (voucher['discount_value'] as num).toDouble();
+                                  final type = voucher['discount_type'] ?? '';
+                                  final minSpend = (voucher['min_spend'] as num).toDouble();
+                                  final limit = voucher['usage_limit'] ?? 0;
+                                  final used = voucher['used_count'] ?? 0;
+                                  final endStr = DateFormat('yMMMd').format(DateTime.parse(voucher['end_date']));
+
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.02),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        // Left discount ticket block
+                                        Container(
+                                          width: 120,
+                                          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+                                          decoration: BoxDecoration(
+                                            color: _primary.withValues(alpha: 0.06),
+                                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(15)),
+                                            border: const Border(
+                                              right: BorderSide(color: Color(0xFFE2E8F0), style: BorderStyle.solid),
+                                            ),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                type == 'flat' ? '₱${discVal.toStringAsFixed(0)}' : '${discVal.toStringAsFixed(0)}%',
+                                                style: GoogleFonts.plusJakartaSans(
+                                                  fontWeight: FontWeight.w900,
+                                                  fontSize: 22,
+                                                  color: _primary,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'OFF',
+                                                style: GoogleFonts.plusJakartaSans(
+                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 10,
+                                                  color: _primary,
+                                                  letterSpacing: 1.5,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        // Right details block
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(16),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      code,
+                                                      style: GoogleFonts.plusJakartaSans(
+                                                        fontWeight: FontWeight.w800,
+                                                        fontSize: 15,
+                                                        color: _dark,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFFF1F5F9),
+                                                        borderRadius: BorderRadius.circular(20),
+                                                      ),
+                                                      child: Text(
+                                                        'Min. Spend ₱${minSpend.toStringAsFixed(0)}',
+                                                        style: GoogleFonts.inter(
+                                                          fontSize: 10,
+                                                          fontWeight: FontWeight.w700,
+                                                          color: _muted,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.history_toggle_off_rounded, size: 13, color: Colors.grey),
+                                                    const SizedBox(width: 6),
+                                                    Text(
+                                                      'Expires $endStr',
+                                                      style: GoogleFonts.inter(fontSize: 11, color: _muted),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.people_outline_rounded, size: 13, color: Colors.grey),
+                                                    const SizedBox(width: 6),
+                                                    Text(
+                                                      'Claimed $used / $limit times',
+                                                      style: GoogleFonts.inter(fontSize: 11, color: _muted),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.only(right: 12),
+                                          child: IconButton(
+                                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                                            tooltip: 'Delete Voucher',
+                                            style: IconButton.styleFrom(
+                                              backgroundColor: Colors.red.withValues(alpha: 0.05),
+                                              padding: const EdgeInsets.all(10),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                            ),
+                                            onPressed: () async {
+                                              await voucherService.deleteVoucher(voucher['voucher_id']);
+                                              loadList();
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              )))
+                    : SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Form(
+                          key: formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFFF1F5F9)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.lightbulb_outline_rounded, color: _primary, size: 20),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        'Configure discount value and rules. Vouchers are displayed on your store profile page and product details pages.',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: _muted,
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: codeController,
+                                      textCapitalization: TextCapitalization.characters,
+                                      decoration: InputDecoration(
+                                        labelText: 'Voucher Code',
+                                        hintText: 'e.g. FARM50',
+                                        prefixIcon: const Icon(Icons.label_outline_rounded, size: 20),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                      ),
+                                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      value: discountType,
+                                      decoration: InputDecoration(
+                                        labelText: 'Discount Type',
+                                        prefixIcon: const Icon(Icons.style_outlined, size: 20),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(value: 'flat', child: Text('Flat Discount (₱)')),
+                                        DropdownMenuItem(value: 'percentage', child: Text('Percentage (%)')),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setModalState(() => discountType = val);
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: valueController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: discountType == 'flat' ? 'Discount Value (₱)' : 'Discount Value (%)',
+                                        hintText: discountType == 'flat' ? '50' : '10',
+                                        prefixIcon: Icon(
+                                          discountType == 'flat' ? Icons.payments_outlined : Icons.percent_rounded,
+                                          size: 20,
+                                        ),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                      ),
+                                      validator: (v) => (v == null || double.tryParse(v) == null) ? 'Required number' : null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: minSpendController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: 'Min. Spend (₱)',
+                                        hintText: '100',
+                                        prefixIcon: const Icon(Icons.shopping_bag_outlined, size: 20),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                      ),
+                                      validator: (v) => (v == null || double.tryParse(v) == null) ? 'Required number' : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: maxDiscountController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: 'Max Discount Limit (₱)',
+                                        hintText: 'Leave empty for no limit',
+                                        prefixIcon: const Icon(Icons.money_off_rounded, size: 20),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: limitController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: 'Total Quantity Limit',
+                                        hintText: '100',
+                                        prefixIcon: const Icon(Icons.onetwothree_rounded, size: 20),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                      ),
+                                      validator: (v) => (v == null || int.tryParse(v) == null) ? 'Required integer' : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap: () async {
+                                        final picked = await showDatePicker(
+                                          context: context,
+                                          initialDate: endDate,
+                                          firstDate: DateTime.now(),
+                                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                                          builder: (context, child) {
+                                            return Theme(
+                                              data: Theme.of(context).copyWith(
+                                                colorScheme: const ColorScheme.light(
+                                                  primary: _primary,
+                                                  onPrimary: Colors.white,
+                                                  onSurface: _dark,
+                                                ),
+                                              ),
+                                              child: child!,
+                                            );
+                                          },
+                                        );
+                                        if (picked != null) {
+                                          setModalState(() => endDate = picked);
+                                        }
+                                      },
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                        decoration: BoxDecoration(
+                                          border: Border.all(color: Colors.grey.shade400),
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.date_range_rounded, color: _primary, size: 20),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'Expiration Date',
+                                                    style: GoogleFonts.inter(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w500,
+                                                      color: _muted,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    DateFormat('yMMMd').format(endDate),
+                                                    style: GoogleFonts.inter(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: _dark,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Close'),
+                ),
+                if (activeTab == 1)
+                  FilledButton(
+                    onPressed: isSaving ? null : submit,
+                    child: Text(isSaving ? 'Saving...' : 'Create Voucher'),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    codeController.dispose();
+    valueController.dispose();
+    minSpendController.dispose();
+    maxDiscountController.dispose();
+    limitController.dispose();
   }
 
   Widget _buildMetricsRow() {

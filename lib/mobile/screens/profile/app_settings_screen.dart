@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/offline/offline_cache_service.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../web/widgets/web_consumer_nav_bar.dart';
+import '../../../shared/router/app_routes.dart';
 
 class AppSettingsScreen extends StatefulWidget {
   const AppSettingsScreen({super.key});
@@ -19,6 +24,9 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   bool _publicProfile = true;
   bool _locationPermission = true;
   bool _diagnosticsEnabled = true;
+
+  int _activeTabIndex = 0;
+  int _hoveredTab = -1;
 
   @override
   void initState() {
@@ -442,8 +450,278 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     confirmationController.dispose();
   }
 
+  Widget _buildWebLayout() {
+    final isFarmer = _auth.isViewingAsFarmer;
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: Column(
+        children: [
+          WebConsumerNavBar(
+            currentIndex: -1,
+            onNavigate: (index) {
+              if (isFarmer) {
+                context.go(AppRoutes.farmerDashboard);
+              } else {
+                context.go(AppRoutes.webTabRoute(index));
+              }
+            },
+            onCartTap: () => context.go(AppRoutes.cart),
+          ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildWebSidebar(),
+                Container(
+                  width: 1,
+                  color: const Color(0xFFE2E8F0),
+                ),
+                Expanded(
+                  child: _buildWebSettingsContent(),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWebSidebar() {
+    final categories = [
+      {'title': 'Security', 'icon': Icons.lock_outline_rounded},
+      {'title': 'Privacy', 'icon': Icons.visibility_outlined},
+      {'title': 'Storage', 'icon': Icons.cleaning_services_outlined},
+      {'title': 'Account Actions', 'icon': Icons.delete_forever_rounded},
+    ];
+
+    return Container(
+      width: 280,
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => context.pop(),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_rounded,
+                      size: 20,
+                      color: Color(0xFF475569),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Settings',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          ...List.generate(categories.length, (index) {
+            final cat = categories[index];
+            final isActive = _activeTabIndex == index;
+            final isHovered = _hoveredTab == index;
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                onEnter: (_) => setState(() => _hoveredTab = index),
+                onExit: (_) => setState(() => _hoveredTab = -1),
+                child: GestureDetector(
+                  onTap: () => setState(() => _activeTabIndex = index),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                          : isHovered
+                              ? const Color(0xFFF1F5F9)
+                              : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          cat['icon'] as IconData,
+                          size: 20,
+                          color: isActive
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 14),
+                        Text(
+                          cat['title'] as String,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                            color: isActive
+                                ? const Color(0xFF047857)
+                                : const Color(0xFF334155),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWebSettingsContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_activeTabIndex == 0) ...[
+            _buildWebHeader('Security', 'Manage the security of your account.'),
+            const SizedBox(height: 24),
+            _buildWebTileCard([
+              _SettingsTile(
+                icon: Icons.lock_outline_rounded,
+                title: 'Change Password',
+                subtitle: 'Update the password used for your account.',
+                onTap: _openChangePasswordDialog,
+              ),
+            ]),
+          ] else if (_activeTabIndex == 1) ...[
+            _buildWebHeader('Privacy', 'Configure your data and visibility preferences.'),
+            const SizedBox(height: 24),
+            _buildWebTileCard([
+              _SwitchSettingsTile(
+                icon: Icons.visibility_outlined,
+                title: 'Public Profile',
+                subtitle: 'Allow other users to search or view your profile details.',
+                value: _publicProfile,
+                onChanged: (val) => _updatePrivacySetting('privacy.public_profile', val),
+              ),
+              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              _SwitchSettingsTile(
+                icon: Icons.location_on_outlined,
+                title: 'Location Services',
+                subtitle: 'Use device location to match and find nearby farms.',
+                value: _locationPermission,
+                onChanged: (val) => _updatePrivacySetting('privacy.location_permission', val),
+              ),
+              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              _SwitchSettingsTile(
+                icon: Icons.analytics_outlined,
+                title: 'Usage Diagnostics',
+                subtitle: 'Share anonymous usage reports to help improve AgriDirect.',
+                value: _diagnosticsEnabled,
+                onChanged: (val) => _updatePrivacySetting('privacy.diagnostics_enabled', val),
+              ),
+            ]),
+          ] else if (_activeTabIndex == 2) ...[
+            _buildWebHeader('Storage', 'Manage local cache settings and offline data.'),
+            const SizedBox(height: 24),
+            _buildWebTileCard([
+              _SettingsTile(
+                icon: Icons.cleaning_services_outlined,
+                title: 'Clear Auto Cache',
+                subtitle: 'Remove temporary offline product cache.',
+                trailing: _clearingCache
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : null,
+                onTap: _clearingCache ? null : _clearAutoCache,
+              ),
+            ]),
+          ] else if (_activeTabIndex == 3) ...[
+            _buildWebHeader('Account Actions', 'Crucial account state operations.'),
+            const SizedBox(height: 24),
+            _buildWebTileCard([
+              _SettingsTile(
+                icon: Icons.delete_forever_rounded,
+                title: 'Delete Account',
+                subtitle: 'Permanently delete your profile and account data.',
+                onTap: _openDeleteAccountDialog,
+                iconColor: AppColors.error,
+                iconBgColor: AppColors.error.withValues(alpha: 0.1),
+                titleColor: AppColors.error,
+              ),
+            ]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWebHeader(String title, String subtitle) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: const Color(0xFF64748B),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWebTileCard(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.02),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: children,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb && MediaQuery.of(context).size.width >= 650) {
+      return _buildWebLayout();
+    }
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -598,6 +876,9 @@ class _SettingsTile extends StatelessWidget {
   final String subtitle;
   final Widget? trailing;
   final VoidCallback? onTap;
+  final Color? iconColor;
+  final Color? iconBgColor;
+  final Color? titleColor;
 
   const _SettingsTile({
     required this.icon,
@@ -605,34 +886,45 @@ class _SettingsTile extends StatelessWidget {
     required this.subtitle,
     this.trailing,
     this.onTap,
+    this.iconColor,
+    this.iconBgColor,
+    this.titleColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isWeb = kIsWeb && MediaQuery.of(context).size.width >= 650;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(isWeb ? 16 : 22),
       child: Container(
         padding: const EdgeInsets.all(18),
-        decoration: AppDecorations.cardDecoration.copyWith(
-          borderRadius: BorderRadius.circular(22),
-        ),
+        decoration: isWeb
+            ? null
+            : AppDecorations.cardDecoration.copyWith(
+                borderRadius: BorderRadius.circular(22),
+              ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
+                color: iconBgColor ?? AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: AppColors.primary),
+              child: Icon(icon, color: iconColor ?? AppColors.primary),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: AppTextStyles.headline3),
+                  Text(
+                    title,
+                    style: AppTextStyles.headline3.copyWith(
+                      color: titleColor,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
@@ -673,11 +965,14 @@ class _SwitchSettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isWeb = kIsWeb && MediaQuery.of(context).size.width >= 650;
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: AppDecorations.cardDecoration.copyWith(
-        borderRadius: BorderRadius.circular(22),
-      ),
+      decoration: isWeb
+          ? null
+          : AppDecorations.cardDecoration.copyWith(
+              borderRadius: BorderRadius.circular(22),
+            ),
       child: Row(
         children: [
           Container(

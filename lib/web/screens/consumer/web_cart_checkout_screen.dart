@@ -12,6 +12,8 @@ import '../../../shared/models/farmer/farmer_profile_model.dart';
 import '../../../shared/services/farmer/farmer_service.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
+import '../../../shared/services/commerce/voucher_service.dart';
+import '../../../shared/services/auth/auth_service.dart';
 
 
 /// Dedicated full-page checkout for cart items (web).
@@ -41,6 +43,7 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
 
   List<FarmerProfile> _farmerProfiles = [];
   late List<CartItem> _cartItems;
+  final Map<String, Map<String, dynamic>> _selectedVouchersByFarmer = {};
 
   @override
   void initState() {
@@ -118,6 +121,33 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
     return fee;
   }
 
+  double _calculateVoucherDiscountForFarmer(String farmerId, double farmerSubtotal) {
+    final v = _selectedVouchersByFarmer[farmerId];
+    if (v == null) return 0.0;
+    final type = v['discount_type'] ?? '';
+    final val = (v['discount_value'] as num).toDouble();
+    if (type == 'flat') {
+      return val;
+    } else {
+      final disc = farmerSubtotal * (val / 100);
+      final maxDisc = v['max_discount'] != null ? (v['max_discount'] as num).toDouble() : null;
+      if (maxDisc != null && disc > maxDisc) return maxDisc;
+      return disc;
+    }
+  }
+
+  double _totalVoucherDiscount() {
+    double totalDiscount = 0.0;
+    final Map<String, double> subtotalByFarmer = {};
+    for (final item in _cartItems) {
+      subtotalByFarmer[item.farmerId] = (subtotalByFarmer[item.farmerId] ?? 0.0) + item.total;
+    }
+    for (final entry in subtotalByFarmer.entries) {
+      totalDiscount += _calculateVoucherDiscountForFarmer(entry.key, entry.value);
+    }
+    return totalDiscount;
+  }
+
   double _subtotal() {
     double total = 0;
     for (final item in _cartItems) {
@@ -126,7 +156,10 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
     return total;
   }
 
-  double _grandTotal() => _subtotal() + _totalDeliveryFee();
+  double _grandTotal() {
+    final total = _subtotal() + _totalDeliveryFee() - _totalVoucherDiscount();
+    return total < 0 ? 0.0 : total;
+  }
 
   String _currency(double value) => '₱${value.toStringAsFixed(2)}';
 
@@ -174,6 +207,8 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
           farmerDeliveryFee = 0.0;
         }
 
+        final farmerDiscount = _calculateVoucherDiscountForFarmer(entry.key, farmerSubtotal);
+
         await orderService.createOfflineOrder(
           farmerId: entry.key,
           items: entry.value,
@@ -182,7 +217,16 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
               _paymentMethod == 'COP' ? null : _selectedAddress?.addressId,
           notes: _instructionsController.text.trim(),
           deliveryFee: farmerDeliveryFee,
+          discount: farmerDiscount,
         );
+
+        final farmerVoucher = _selectedVouchersByFarmer[entry.key];
+        if (farmerVoucher != null) {
+          await VoucherService().markVoucherAsUsed(
+            farmerVoucher['claim_id'],
+            farmerVoucher['voucher_id'],
+          );
+        }
       }
 
       String? firstCategory;
@@ -706,6 +750,12 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
     final deliveryFee = _totalDeliveryFee();
     final total = _grandTotal();
 
+    final Map<String, List<CartItem>> itemsByFarmer = {};
+    for (final item in _cartItems) {
+      itemsByFarmer.putIfAbsent(item.farmerId, () => []);
+      itemsByFarmer[item.farmerId]!.add(item);
+    }
+
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
@@ -724,13 +774,47 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
               color: _dark,
             ),
           ),
-          const SizedBox(height: 20),
-          // Item list
-          ..._cartItems.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: _buildItemRow(item),
-              )),
-          const Divider(height: 28),
+          const SizedBox(height: 12),
+          // Item list grouped by farmer
+          ...itemsByFarmer.entries.map((entry) {
+            final farmerId = entry.key;
+            final farmerItems = entry.value;
+            final profile = _farmerProfiles.cast<FarmerProfile?>().firstWhere(
+              (p) => p?.profileId == farmerId,
+              orElse: () => null,
+            );
+            final farmName = profile?.farmName ?? 'Farmer Store';
+            final farmerSubtotal = farmerItems.fold<double>(0.0, (sum, i) => sum + i.total);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 14, bottom: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.storefront_rounded, size: 16, color: _primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        farmName,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          color: _dark,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ...farmerItems.map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildItemRow(item),
+                    )),
+                _buildFarmerVoucherRow(farmerId, farmName, farmerSubtotal),
+                const Divider(height: 24),
+              ],
+            );
+          }),
           // Cost breakdown
           _costRow('Subtotal', _currency(subtotal)),
           const SizedBox(height: 12),
@@ -738,6 +822,13 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
             'Delivery Fee',
             deliveryFee > 0 ? _currency(deliveryFee) : 'Free',
           ),
+          if (_totalVoucherDiscount() > 0) ...[
+            const SizedBox(height: 12),
+            _costRow(
+              'Voucher Discount',
+              '-${_currency(_totalVoucherDiscount())}',
+            ),
+          ],
           const Divider(height: 36),
           Row(
             children: [
@@ -865,6 +956,203 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildFarmerVoucherRow(String farmerId, String farmName, double farmerSubtotal) {
+    final selectedVoucher = _selectedVouchersByFarmer[farmerId];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.confirmation_number_outlined, color: _primary, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              'Shop Voucher',
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                color: _dark,
+              ),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: () => _openVoucherSelectionDialogForFarmer(farmerId, farmName, farmerSubtotal),
+              style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(40, 20)),
+              child: Text(
+                selectedVoucher == null ? 'Select Voucher' : 'Change',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  color: _primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (selectedVoucher != null) ...[
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: _primary.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: _primary.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_outline_rounded, color: _primary, size: 14),
+                const SizedBox(width: 6),
+                Text(
+                  'Applied: ${selectedVoucher['code']}',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    color: _primary,
+                  ),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedVouchersByFarmer.remove(farmerId);
+                    });
+                  },
+                  child: const Icon(Icons.clear_rounded, size: 14, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _openVoucherSelectionDialogForFarmer(
+    String farmerId,
+    String farmName,
+    double farmerSubtotal,
+  ) async {
+    final currentUserId = AuthService().userId;
+    if (currentUserId.isEmpty) return;
+
+    final voucherService = VoucherService();
+    bool isLoading = true;
+    List<Map<String, dynamic>> validVouchers = [];
+
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> load() async {
+              try {
+                final list = await voucherService.getValidCheckoutVouchers(
+                  userId: currentUserId,
+                  farmerId: farmerId,
+                  cartAmount: farmerSubtotal,
+                );
+                setModalState(() {
+                  validVouchers = list;
+                  isLoading = false;
+                });
+              } catch (_) {
+                setModalState(() => isLoading = false);
+              }
+            }
+
+            if (isLoading) {
+              WidgetsBinding.instance.addPostFrameCallback((_) => load());
+            }
+
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Text(
+                'Vouchers for $farmName',
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  color: _dark,
+                ),
+              ),
+              content: SizedBox(
+                width: 400,
+                height: 300,
+                child: isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : (validVouchers.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.confirmation_number_outlined, size: 40, color: Colors.grey),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No valid vouchers found for this shop.',
+                                  style: GoogleFonts.inter(color: Colors.grey, fontSize: 13),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: validVouchers.length,
+                            itemBuilder: (context, index) {
+                              final v = validVouchers[index];
+                              final code = v['code'] ?? '';
+                              final val = (v['discount_value'] as num).toDouble();
+                              final type = v['discount_type'] ?? '';
+                              final minSpend = (v['min_spend'] as num).toDouble();
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: ListTile(
+                                  title: Text(
+                                    code,
+                                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
+                                  ),
+                                  subtitle: Text(
+                                    type == 'flat'
+                                        ? '₱${val.toStringAsFixed(0)} OFF (Min. spend ₱${minSpend.toStringAsFixed(0)})'
+                                        : '${val.toStringAsFixed(0)}% OFF (Min. spend ₱${minSpend.toStringAsFixed(0)})',
+                                    style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                                  ),
+                                  trailing: const Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 14,
+                                    color: _muted,
+                                  ),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedVouchersByFarmer[farmerId] = v;
+                                    });
+                                    Navigator.of(dialogCtx).pop();
+                                  },
+                                ),
+                              );
+                            },
+                          )),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

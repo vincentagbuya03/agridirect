@@ -12,6 +12,7 @@ import 'marketplace_screen.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/social/follow_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
+import '../../../shared/services/commerce/voucher_service.dart';
 
 /// Full-screen public profile for a farmer, with Products & Posts tabs.
 class FarmerPublicProfileScreen extends StatefulWidget {
@@ -570,6 +571,7 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
                 ],
               ),
             ),
+            _buildVouchersSection(),
           ],
         ),
       ),
@@ -613,6 +615,231 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
       ),
     );
   }
+  Widget _buildVouchersSection() {
+    final currentUserId = AuthService().userId;
+    final farmerId = f['farmerId']?.toString();
+    if (currentUserId.isEmpty || farmerId == null || farmerId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: VoucherService().getFarmerVouchersForUser(
+        farmerId: farmerId,
+        userId: currentUserId,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData) {
+          return const SizedBox.shrink();
+        }
+
+        final vouchers = snapshot.data!;
+        if (vouchers.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                const Icon(Icons.confirmation_number_outlined, color: AppColors.primary, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'Shop Vouchers',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textHeadline,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 76,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: vouchers.length,
+                itemBuilder: (context, index) {
+                  final v = vouchers[index];
+                  final code = v['code'] ?? '';
+                  final val = (v['discount_value'] as num).toDouble();
+                  final type = v['discount_type'] ?? '';
+                  final minSpend = (v['min_spend'] as num).toDouble();
+                  bool isClaimed = v['is_claimed'] as bool? ?? false;
+
+                  return StatefulBuilder(
+                    builder: (context, setVoucherState) {
+                      return Container(
+                        margin: const EdgeInsets.only(right: 12),
+                        width: 220,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                          color: isClaimed ? const Color(0xFFF8FAFC) : Colors.white,
+                        ),
+                        child: Row(
+                          children: [
+                            // Left discount display
+                            Container(
+                              width: 66,
+                              decoration: BoxDecoration(
+                                color: isClaimed 
+                                    ? const Color(0xFFE2E8F0)
+                                    : AppColors.primary.withValues(alpha: 0.08),
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(11),
+                                  bottomLeft: Radius.circular(11),
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    type == 'flat' ? '₱${val.toStringAsFixed(0)}' : '${val.toStringAsFixed(0)}%',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 14,
+                                      color: isClaimed ? const Color(0xFF64748B) : AppColors.primary,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  Text(
+                                    'OFF',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 9,
+                                      color: isClaimed ? const Color(0xFF64748B) : AppColors.primary,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Dotted line
+                            CustomPaint(
+                              size: const Size(4, 76),
+                              painter: MobileTicketDottedLinePainter(
+                                color: isClaimed
+                                    ? const Color(0xFFE2E8F0)
+                                    : AppColors.primary.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            // Details
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      code,
+                                      style: GoogleFonts.inter(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12,
+                                        color: AppColors.textHeadline,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Min Spend ₱${minSpend.toStringAsFixed(0)}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textSubtle,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const Spacer(),
+                                    Align(
+                                      alignment: Alignment.bottomRight,
+                                      child: isClaimed
+                                          ? Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFE2E8F0),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                'Claimed',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 8,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: const Color(0xFF64748B),
+                                                ),
+                                              ),
+                                            )
+                                          : InkWell(
+                                              onTap: () async {
+                                                final ok = await VoucherService().claimVoucher(currentUserId, v['voucher_id']);
+                                                if (ok) {
+                                                  setVoucherState(() {
+                                                    isClaimed = true;
+                                                  });
+                                                }
+                                              },
+                                              borderRadius: BorderRadius.circular(4),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.primary,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  'Claim',
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 8,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class MobileTicketDottedLinePainter extends CustomPainter {
+  final Color color;
+  MobileTicketDottedLinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+
+    double startY = 4;
+    while (startY < size.height - 4) {
+      canvas.drawLine(Offset(size.width / 2, startY), Offset(size.width / 2, startY + 3), paint);
+      startY += 6;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {

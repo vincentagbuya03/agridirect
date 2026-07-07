@@ -318,7 +318,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
-              onTap: () => widget.onNavigate(4), // Profile is index 4
+              onTap: () => widget.onNavigate(5), // Profile is index 5
               child: Container(
                 width: isMobile ? 38 : 46,
                 height: isMobile ? 38 : 46,

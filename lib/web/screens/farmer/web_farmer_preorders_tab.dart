@@ -11,6 +11,8 @@ import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import '../../web_navigation.dart';
+import '../../widgets/web_hamburger_menu_button.dart';
+import '../../widgets/web_consumer_nav_bar.dart';
 
 class WebFarmerPreordersTab extends StatefulWidget {
   final Function(int) onNavigate;
@@ -27,6 +29,17 @@ class WebFarmerPreordersTab extends StatefulWidget {
 }
 
 class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
+  // Premium Design Tokens
+  static const Color _primary = Color(0xFF10B981); // Emerald
+  static const Color _secondary = Color(0xFF3B82F6); // Blue
+  static const Color _accent = Color(0xFFF59E0B); // Amber
+  
+  static const Color _dark = Color(0xFF0F172A);
+  static const Color _muted = Color(0xFF64748B);
+  static const Color _border = Color(0xFFE2E8F0);
+  static const Color _surface = Color(0xFFF8FAFC);
+  static const Color _white = Color(0xFFFFFFFF);
+
   final _supabase = Supabase.instance.client;
   final _productService = ProductService();
 
@@ -298,6 +311,17 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 650;
 
+    if (!AuthService().isViewingAsFarmer) {
+      return WebConsumerNavBar(
+        currentIndex: widget.currentIndex,
+        onNavigate: widget.onNavigate,
+        onCartTap: () => context.go(AppRoutes.cart),
+        margin: isMobile
+            ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
+            : const EdgeInsets.fromLTRB(32, 24, 32, 12),
+      );
+    }
+
     final navItems = ['Dashboard', 'Products', 'Orders', 'Community', 'Pre-Orders'];
     return Container(
       margin: isMobile
@@ -310,10 +334,10 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0).withValues(alpha: 0.5)),
+        border: Border.all(color: _border.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1E293B).withValues(alpha: 0.03),
+            color: _dark.withValues(alpha: 0.03),
             blurRadius: 30,
             offset: const Offset(0, 10),
           ),
@@ -325,7 +349,9 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               onTap: () => widget.onNavigate(0),
-              child: const BrandLogo(size: BrandLogoSize.medium),
+              child: BrandLogo(
+                size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium,
+              ),
             ),
           ),
           if (!isMobile) ...[
@@ -336,32 +362,38 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
                   onEnter: (_) => setState(() => _hoveredNav = i),
                   onExit: (_) => setState(() => _hoveredNav = -1),
-                  cursor: SystemMouseCursors.click,
                   child: GestureDetector(
                     onTap: () => widget.onNavigate(i),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      duration: const Duration(milliseconds: 300),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
                         color: isActive
-                            ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                            ? _primary.withValues(alpha: 0.1)
                             : isHovered
-                                ? const Color(0xFF10B981).withValues(alpha: 0.04)
-                                : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
+                            ? _border.withValues(alpha: 0.35)
+                            : Colors.transparent,
                       ),
                       child: Text(
                         navItems[i],
                         style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                          fontSize: 15,
+                          fontWeight: isActive
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                           color: isActive
-                              ? const Color(0xFF047857)
+                              ? _primary
                               : isHovered
-                                  ? const Color(0xFF047857)
-                                  : const Color(0xFF64748B),
+                              ? _dark
+                              : _muted,
+                          letterSpacing: 0.2,
                         ),
                       ),
                     ),
@@ -371,13 +403,41 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
             }),
           ],
           const Spacer(),
-          IconButton(
-            onPressed: () {
-              AuthService().logout();
-              context.go(AppRoutes.login);
-            },
-            icon: const Icon(Icons.logout_rounded, color: Color(0xFF64748B)),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => widget.onNavigate(5),
+              child: Container(
+                width: isMobile ? 38 : 46,
+                height: isMobile ? 38 : 46,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_primary, Color(0xFF059669)],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _primary.withValues(alpha: 0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.person_outline_rounded,
+                  color: Colors.white,
+                  size: isMobile ? 20 : 24,
+                ),
+              ),
+            ),
           ),
+          if (isMobile) ...[
+            const SizedBox(width: 8),
+            WebHamburgerMenuButton(
+              currentIndex: widget.currentIndex,
+              onNavigate: widget.onNavigate,
+            ),
+          ],
         ],
       ),
     );

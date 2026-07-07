@@ -145,6 +145,7 @@ class OrderService {
     String? deliveryAddressId,
     String? specialInstructions,
     double deliveryFee = 0.0,
+    double discount = 0.0,
   }) async {
     try {
       if (items.isEmpty) {
@@ -176,7 +177,7 @@ class OrderService {
             'order_status_id': pendingStatusId,
             'delivery_address_id': deliveryAddressId,
             'subtotal': subtotal,
-            'total_amount': subtotal + deliveryFee,
+            'total_amount': subtotal + deliveryFee - discount,
             'payment_method': normalizedMethod,
             'delivery_method': normalizedMethod == 'COP'
                 ? 'pickup'
@@ -338,6 +339,7 @@ class OrderService {
     String? deliveryAddressId,
     String? notes,
     double deliveryFee = 0.0,
+    double discount = 0.0,
   }) async {
     if (items.isEmpty) {
       throw Exception('Order must contain at least one item');
@@ -355,6 +357,7 @@ class OrderService {
       deliveryAddressId: deliveryAddressId,
       specialInstructions: notes,
       deliveryFee: deliveryFee,
+      discount: discount,
     );
 
     final customerId = await _getCurrentCustomerId();
