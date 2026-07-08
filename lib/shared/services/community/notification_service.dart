@@ -47,6 +47,7 @@ class NotificationService {
   RealtimeChannel? _webNotificationsSubscription;
   RealtimeChannel? _mobileNotificationsSubscription;
   String? _activeConversationId;
+  String? _activeCallId; // Guard against double incoming-call dialog
   final ValueNotifier<Set<String>> onlineUsersNotifier = ValueNotifier({});
   final Map<String, DateTime> _lastActiveCache = {};
   Timer? _activeStatusTimer;
@@ -351,6 +352,15 @@ class NotificationService {
 
     CallService().subscribeToIncomingCalls(
       onIncomingCall: (callData) async {
+        final callId = callData['call_id']?.toString() ?? '';
+
+        // Prevent duplicate dialogs for the same call (Realtime + FCM race)
+        if (callId.isNotEmpty && callId == _activeCallId) {
+          debugPrint('📞 Duplicate incoming call ignored for $callId');
+          return;
+        }
+        _activeCallId = callId;
+
         final callerId = callData['caller_id']?.toString() ?? '';
         String callerName = 'AgriDirect User';
         String? avatarUrl;
@@ -368,7 +378,6 @@ class NotificationService {
           }
         } catch (_) {}
 
-        final callId = callData['call_id']?.toString() ?? '';
         final channelName = callData['channel_name']?.toString() ?? '';
         final isVideo = callData['is_video'] == true;
 
@@ -395,7 +404,7 @@ class NotificationService {
                 isVideo: isVideo,
                 isIncoming: true,
               ),
-            );
+            ).whenComplete(() => _activeCallId = null); // Reset guard when dialog closes
           }
         }
       },
@@ -494,6 +503,16 @@ class NotificationService {
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     debugPrint('Got a message whilst in the foreground!');
     debugPrint('Message data: ${message.data}');
+
+    // Skip call notifications in foreground — the Realtime path already
+    // opened the InAppCallScreen dialog with a ringtone.
+    final linkType =
+        (message.data['link_type'] ?? _inferLinkTypeFromData(message.data))
+            .toString();
+    if (linkType == 'call') {
+      debugPrint('Suppressed FCM call notification (handled by Realtime dialog)');
+      return;
+    }
 
     if (message.notification != null) {
       debugPrint('Message notification: ${message.notification}');

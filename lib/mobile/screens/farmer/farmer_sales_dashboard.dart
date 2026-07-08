@@ -16,6 +16,7 @@ import '../../../shared/services/farmer/farmer_service.dart';
 import '../../../shared/services/offline/offline_product_service.dart';
 import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/services/community/message_service.dart';
+import '../../../shared/services/core/supabase_data_service.dart';
 
 /// Farmer Sales Dashboard
 class FarmerSalesDashboard extends StatefulWidget {
@@ -49,6 +50,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     'listingsTrend': '0%',
   };
   bool _isLoadingStats = true;
+  bool _isSpeedDialOpen = false;
   late Stream<int> _unreadMessagesStream;
 
   void _retryProfileLoadAfterStartup() {
@@ -86,7 +88,6 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     if (metaName.isNotEmpty) {
       return metaName.split(' ').first;
     }
-
     return 'Farmer';
   }
 
@@ -252,7 +253,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   @override
   void initState() {
     super.initState();
-    _unreadMessagesStream = MessageService().watchTotalUnreadCount(asFarmer: true);
+    _unreadMessagesStream = MessageService().watchTotalUnreadCount(
+      asFarmer: true,
+    );
     _loadCachedDbAvatar();
     _loadFarmerProfile();
     _loadDashboardStats();
@@ -531,48 +534,152 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     return ListenableBuilder(
       listenable: _auth,
       builder: (context, _) {
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          body: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              children: [
-                if (_isLoadingStats)
-                  const LinearProgressIndicator(
-                    backgroundColor: Colors.transparent,
-                    minHeight: 2,
-                  ),
-                _buildPremiumHeader(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 24,
-                  ),
+        return Stack(
+          children: [
+            Scaffold(
+              backgroundColor: AppColors.background,
+              body: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  children: [
+                    if (_isLoadingStats)
+                      const LinearProgressIndicator(
+                        backgroundColor: Colors.transparent,
+                        minHeight: 2,
+                      ),
+                    _buildPremiumHeader(),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 24,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSectionHeader('Performance Overview'),
+                          const SizedBox(height: 16),
+                          _buildMetricsGrid(),
+                          const SizedBox(height: 24),
+                          _buildSectionHeader('Sales Analytics'),
+                          const SizedBox(height: 16),
+                          _buildSalesAnalytics(),
+                          const SizedBox(height: 24),
+                          _buildWeatherIntelligence(),
+                          const SizedBox(height: 24),
+                          _buildHourlyForecast(),
+                          const SizedBox(height: 24),
+                          _buildForecast(),
+                          const SizedBox(height: 24),
+                          _buildAICropInsights(),
+                          const SizedBox(height: 48),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Speed dial backdrop and actions overlay
+            AnimatedOpacity(
+              opacity: _isSpeedDialOpen ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 250),
+              child: IgnorePointer(
+                ignoring: !_isSpeedDialOpen,
+                child: GestureDetector(
+                  onTap: () => setState(() => _isSpeedDialOpen = false),
+                  child: Container(color: Colors.black.withValues(alpha: 0.5)),
+                ),
+              ),
+            ),
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutBack,
+              right: 20,
+              bottom: _isSpeedDialOpen ? 90 : 30,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 200),
+                opacity: _isSpeedDialOpen ? 1.0 : 0.0,
+                child: IgnorePointer(
+                  ignoring: !_isSpeedDialOpen,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      _buildSectionHeader('Performance Overview'),
+                      _buildSpeedDialItem(
+                        label: 'Add Product',
+                        icon: Icons.inventory_2_outlined,
+                        color: AppColors.primary,
+                        onTap: () {
+                          setState(() => _isSpeedDialOpen = false);
+                          context.push(AppRoutes.addProduct);
+                        },
+                      ),
                       const SizedBox(height: 16),
-                      _buildMetricsGrid(),
-                      const SizedBox(height: 24),
-                      _buildSectionHeader('Sales Analytics'),
+                      _buildSpeedDialItem(
+                        label: 'New Voucher',
+                        icon: Icons.confirmation_number_outlined,
+                        color: Colors.purple,
+                        onTap: () {
+                          setState(() => _isSpeedDialOpen = false);
+                          context.push(AppRoutes.farmerVouchers);
+                        },
+                      ),
                       const SizedBox(height: 16),
-                      _buildSalesAnalytics(),
-                      const SizedBox(height: 24),
-                      _buildWeatherIntelligence(),
-                      const SizedBox(height: 24),
-                      _buildHourlyForecast(),
-                      const SizedBox(height: 24),
-                      _buildForecast(),
-                      const SizedBox(height: 24),
-                      _buildAICropInsights(),
-                      const SizedBox(height: 48),
+                      _buildSpeedDialItem(
+                        label: 'New Order',
+                        icon: Icons.assignment_outlined,
+                        color: Colors.blue,
+                        onTap: () {
+                          setState(() => _isSpeedDialOpen = false);
+                          // Redirect to Orders tab (index 2)
+                          SupabaseDataService.navigationTabNotifier.value = 2;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      _buildSpeedDialItem(
+                        label: 'New Post',
+                        icon: Icons.chat_bubble_outline_rounded,
+                        color: AppColors.accent,
+                        onTap: () {
+                          setState(() => _isSpeedDialOpen = false);
+                          // Redirect to Community tab (index 3)
+                          SupabaseDataService.navigationTabNotifier.value = 3;
+                        },
+                      ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+
+            // FAB positioned at bottom right on top of overlay
+            Positioned(
+              right: 20,
+              bottom: 20,
+              child: SizedBox(
+                width: 56,
+                height: 56,
+                child: FloatingActionButton(
+                  heroTag: 'farmer_dashboard_fab',
+                  backgroundColor: AppColors.primary,
+                  elevation: 6,
+                  shape: const CircleBorder(),
+                  onPressed: () =>
+                      setState(() => _isSpeedDialOpen = !_isSpeedDialOpen),
+                  child: AnimatedRotation(
+                    turns: _isSpeedDialOpen ? 0.125 : 0.0,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutCubic,
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -716,7 +823,8 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                       ),
                       const SizedBox(width: 12),
                       FutureBuilder<int>(
-                        future: NotificationService().getUnreadNotificationCount(_auth.userId),
+                        future: NotificationService()
+                            .getUnreadNotificationCount(_auth.userId),
                         builder: (context, snapshot) {
                           final count = snapshot.data ?? 0;
                           return GestureDetector(
@@ -731,7 +839,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                       const SizedBox(width: 12),
                       GestureDetector(
                         onTap: () => context.push(AppRoutes.appSettings),
-                        child: _buildHeaderAction(Icons.settings_outlined, false),
+                        child: _buildHeaderAction(
+                          Icons.settings_outlined,
+                          false,
+                        ),
                       ),
                     ],
                   ),
@@ -1748,7 +1859,6 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                     final forecast = hourlyData[index];
                     final pop = ((forecast.rainProbability ?? 0.0) * 100)
                         .round();
-
                     return Container(
                       margin: const EdgeInsets.only(bottom: 16),
                       padding: const EdgeInsets.all(16),
@@ -1830,6 +1940,61 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       },
     );
   }
+
+  Widget _buildSpeedDialItem({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                color: AppColors.textHeadline,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _AnalyticsChartPainter extends CustomPainter {
@@ -1863,8 +2028,6 @@ class _AnalyticsChartPainter extends CustomPainter {
 
     final points = List.generate(data.length, (i) {
       final x = (size.width / (data.length - 1)) * i;
-      // Invert Y: 0 is top, size.height is bottom.
-      // We want high values at the top (near 0) and low values at bottom (near size.height).
       final y =
           size.height -
           (size.height * (data[i] / displayMax) * 0.8) -

@@ -57,6 +57,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         isAccepted: false,
         handle: 'Incoming Call',
         type: isVideo ? 1 : 0,
+        duration: 30000, // Ring for 30 seconds before auto-missing
         missedCallNotification: const NotificationParams(
           showNotification: true,
           isShowCallback: true,

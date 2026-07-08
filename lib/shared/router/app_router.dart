@@ -12,6 +12,7 @@ import '../../mobile/screens/common/onboarding_screen.dart';
 import '../../mobile/screens/common/face_capture_screen.dart';
 import '../../mobile/screens/farmer/add_product_screen.dart';
 import '../../mobile/screens/farmer/farmer_followers_screen.dart';
+import '../../mobile/screens/farmer/farmer_vouchers_screen.dart';
 import '../../mobile/screens/consumer/cart_screen.dart';
 import '../../mobile/screens/consumer/marketplace_screen.dart';
 import '../../mobile/screens/consumer/preorder_details_screen.dart';
@@ -448,6 +449,10 @@ GoRouter createAppRouter() {
           final productMap = state.extra as Map<String, dynamic>?;
           return AddProductScreen(editProduct: productMap);
         },
+      ),
+      GoRoute(
+        path: AppRoutes.farmerVouchers,
+        builder: (context, state) => const FarmerVouchersScreen(),
       ),
       GoRoute(
         path: AppRoutes.myDetails,

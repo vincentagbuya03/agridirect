@@ -92,18 +92,28 @@ class VoucherService {
     }
   }
 
-  /// Get all vouchers for a farmer and flag if the user has already claimed them
   Future<List<Map<String, dynamic>>> getFarmerVouchersForUser({
     required String farmerId,
     required String userId,
   }) async {
     try {
+      // Resolve farmer profile ID to user ID if needed
+      String targetUserId = farmerId;
+      final farmerData = await _supabase
+          .from('farmers')
+          .select('user_id')
+          .eq('farmer_id', farmerId)
+          .maybeSingle();
+      if (farmerData != null && farmerData['user_id'] != null) {
+        targetUserId = farmerData['user_id'].toString();
+      }
+
       // 1. Fetch all active vouchers for this farmer
       final now = DateTime.now().toIso8601String();
       final activeVouchers = await _supabase
           .from('vouchers')
           .select()
-          .eq('farmer_id', farmerId)
+          .eq('farmer_id', targetUserId)
           .gte('end_date', now)
           .lte('start_date', now);
 

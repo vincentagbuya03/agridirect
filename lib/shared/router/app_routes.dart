@@ -32,6 +32,7 @@ class AppRoutes {
   static const String farmerFollowers = '/farmer-followers';
   static const String helpCenter = '/help-center';
   static const String appSettings = '/app-settings';
+  static const String farmerVouchers = '/farmer-vouchers';
   // Web-specific
   static const String webWelcome = '/web-welcome';
   static const String marketplace = '/marketplace';

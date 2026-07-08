@@ -518,7 +518,14 @@ class _CartScreenState extends State<CartScreen> {
     try {
       farmerProfiles = await FarmerService().getFarmerProfilesByIds(farmerIds);
       if (currentUserId.isNotEmpty) {
-        claimedVouchers = await VoucherService().getUserClaimedVouchers(currentUserId);
+        final raw = await VoucherService().getUserClaimedVouchers(currentUserId);
+        claimedVouchers = raw.map((item) {
+          final voucher = item['vouchers'] as Map<String, dynamic>? ?? {};
+          final enriched = Map<String, dynamic>.from(voucher);
+          enriched['claim_id'] = item['claim_id'];
+          enriched['is_used'] = item['is_used'];
+          return enriched;
+        }).toList();
       }
     } catch (e) {
       debugPrint('Error pre-fetching checkout data: $e');
@@ -1233,8 +1240,8 @@ class _CartScreenState extends State<CartScreen> {
 
         if (selectedVoucher != null) {
           await VoucherService().markVoucherAsUsed(
-            selectedVoucher['voucher_id'],
-            AuthService().userId,
+            selectedVoucher['claim_id']?.toString() ?? '',
+            selectedVoucher['voucher_id']?.toString() ?? '',
           );
         }
       }
@@ -1303,7 +1310,7 @@ class _CartScreenState extends State<CartScreen> {
           final applicableVouchers = claimedVouchers.where((v) {
             final fId = v['farmer_id']?.toString() ?? '';
             final minSpend = (v['min_spend'] as num?)?.toDouble() ?? 0.0;
-            return fId == farmerId && subtotal >= minSpend;
+            return fId == profile?.userId && subtotal >= minSpend;
           }).toList();
 
           final selected = _selectedVouchersByFarmer[farmerId];

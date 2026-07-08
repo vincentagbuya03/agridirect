@@ -997,7 +997,10 @@ class _HomeScreenState extends State<HomeScreen> {
       future: SupabaseDataService().getFeaturedFarmers(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: AppShimmerLoader());
+          return const SizedBox(
+            height: 344,
+            child: Center(child: AppShimmerLoader()),
+          );
         }
 
         final currentUserId = SupabaseConfig.currentUser?.id;

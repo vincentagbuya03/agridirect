@@ -63,9 +63,13 @@ class _InAppCallScreenState extends State<InAppCallScreen>
   int _durationSeconds = 0;
   String _durationString = '00:00';
 
-  // Polling fallback — runs every 3 s while caller is waiting for connection.
-  // Ensures status updates even if Supabase Realtime or Agora events miss a beat.
+  // Polling fallback — runs every 2s while caller is waiting for connection,
+  // and every 5s after connected to catch remote 'ended' events.
   Timer? _pollTimer;
+  Timer? _connectedPollTimer;
+
+  // True once the remote Agora peer has joined — prevents premature 'Connected' on caller.
+  bool _remotePeerJoined = false;
 
   // Pulse animation for avatar ring while connecting/calling
   late AnimationController _pulseController;
@@ -146,10 +150,12 @@ class _InAppCallScreenState extends State<InAppCallScreen>
           if (mounted) {
             setState(() {
               _remoteUid = remoteUid;
+              _remotePeerJoined = true;
               _status = 'Connected';
             });
             _startDurationTimer();
-            _pollTimer?.cancel(); // Agora confirmed — no need to poll anymore
+            _pollTimer?.cancel();
+            _startConnectedHeartbeat(); // Watch for remote 'ended' even if Realtime misses
           }
         },
         onRemoteAudioStateChanged:
@@ -285,25 +291,48 @@ class _InAppCallScreenState extends State<InAppCallScreen>
         _endCall(updateDb: false);
       } else if (status == 'connected' && _status != 'Connected') {
         // IMPORTANT: Must wrap in try-catch — FlutterRingtonePlayer.stop()
-        // throws on web (caller side), silently killing this callback and
-        // leaving the caller stuck at 'Calling...' forever.
+        // throws on web (caller side), silently killing this callback.
         try {
           FlutterRingtonePlayer().stop();
         } catch (_) {}
+        // Only fully transition to 'Connected' once Agora also confirms the
+        // remote peer joined. On web the Agora onUserJoined event can be
+        // delayed; show 'Connecting...' until both signals arrive.
         if (mounted) {
-          setState(() => _status = 'Connected');
-          _startDurationTimer();
+          if (_remotePeerJoined || !widget.isIncoming) {
+            // Caller side: treat DB 'connected' as the signal since Agora web
+            // SDK may not fire onUserJoined reliably. Set a 5-s grace timer.
+            setState(() => _status = _remotePeerJoined ? 'Connected' : 'Connecting...');
+            if (!_remotePeerJoined) {
+              // Grace timer: if Agora doesn't fire within 5s, accept DB state.
+              Future.delayed(const Duration(seconds: 5), () {
+                if (mounted && _status != 'Connected') {
+                  setState(() {
+                    _remotePeerJoined = true;
+                    _status = 'Connected';
+                  });
+                  _startDurationTimer();
+                  _startConnectedHeartbeat();
+                }
+              });
+            } else {
+              _startDurationTimer();
+              _startConnectedHeartbeat();
+            }
+          } else {
+            setState(() => _status = 'Connecting...');
+          }
           _pollTimer?.cancel();
         }
       }
     });
   }
 
-  /// Polling fallback: checks DB every 3 s in case Realtime stream or Agora
-  /// onUserJoined event misses the update (common on web Agora SDK).
+  /// Pre-connect polling: checks DB every 2s while waiting for the other side
+  /// to accept/connect (covers Realtime and Agora SDK gaps).
   void _startStatusPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
       if (_status == 'Connected' || _isEndingCall || !mounted) {
         _pollTimer?.cancel();
         return;
@@ -319,11 +348,33 @@ class _InAppCallScreenState extends State<InAppCallScreen>
           if (mounted) {
             setState(() => _status = 'Connected');
             _startDurationTimer();
+            _startConnectedHeartbeat();
           }
           _pollTimer?.cancel();
         } else if (status == 'declined' ||
             status == 'ended' ||
             status == 'missed') {
+          _endCall(updateDb: false);
+        }
+      } catch (_) {}
+    });
+  }
+
+  /// Heartbeat poll after connected: every 5s watches for remote 'ended'
+  /// in case the Supabase Realtime stream on either side misses the event.
+  void _startConnectedHeartbeat() {
+    _connectedPollTimer?.cancel();
+    _connectedPollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (_isEndingCall || !mounted) {
+        _connectedPollTimer?.cancel();
+        return;
+      }
+      try {
+        final data = await _callService.getCallStatus(widget.callId);
+        if (data == null || !mounted) return;
+        final status = data['status']?.toString();
+        if (status == 'ended' || status == 'declined' || status == 'missed') {
+          _connectedPollTimer?.cancel();
           _endCall(updateDb: false);
         }
       } catch (_) {}
@@ -388,8 +439,19 @@ class _InAppCallScreenState extends State<InAppCallScreen>
     } catch (_) {}
     _durationTimer?.cancel();
     _pollTimer?.cancel();
+    _connectedPollTimer?.cancel();
     _callSubscription?.cancel();
 
+    // ── Step 1: Update DB FIRST so remote side gets the 'ended' event ──────
+    if (updateDb) {
+      try {
+        await _callService.updateCallStatus(widget.callId, 'ended');
+      } catch (e) {
+        debugPrint('Call status update error: $e');
+      }
+    }
+
+    // ── Step 2: End CallKit notification on mobile ──────────────────────────
     if (!kIsWeb) {
       try {
         await FlutterCallkitIncoming.endCall(widget.callId);
@@ -401,6 +463,7 @@ class _InAppCallScreenState extends State<InAppCallScreen>
       }
     }
 
+    // ── Step 3: Dismiss the screen ──────────────────────────────────────────
     if (mounted) {
       if (widget.onCallEnded != null) {
         widget.onCallEnded!();
@@ -414,14 +477,7 @@ class _InAppCallScreenState extends State<InAppCallScreen>
       }
     }
 
-    if (updateDb) {
-      try {
-        await _callService.updateCallStatus(widget.callId, 'ended');
-      } catch (e) {
-        debugPrint('Call status update error: $e');
-      }
-    }
-
+    // ── Step 4: Release Agora engine last ───────────────────────────────────
     try {
       await _callService.releaseAgora();
     } catch (e) {
@@ -437,6 +493,7 @@ class _InAppCallScreenState extends State<InAppCallScreen>
     } catch (_) {}
     _durationTimer?.cancel();
     _pollTimer?.cancel();
+    _connectedPollTimer?.cancel();
     _callSubscription?.cancel();
     super.dispose();
   }
@@ -738,7 +795,7 @@ class _InAppCallScreenState extends State<InAppCallScreen>
           const SizedBox(width: 6),
           Text(
             _durationString,
-            style: GoogleFonts.inter(
+            style: const TextStyle(
               color: Colors.white70,
               fontSize: 18,
               fontWeight: FontWeight.w500,
@@ -750,7 +807,7 @@ class _InAppCallScreenState extends State<InAppCallScreen>
     }
     return Text(
       _status,
-      style: GoogleFonts.inter(
+      style: const TextStyle(
         color: Colors.white54,
         fontSize: 15,
         fontWeight: FontWeight.w500,
@@ -776,7 +833,7 @@ class _InAppCallScreenState extends State<InAppCallScreen>
           const SizedBox(height: 4),
           Text(
             _durationString,
-            style: GoogleFonts.inter(color: Colors.white70, fontSize: 14),
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
           ),
         ],
       ),

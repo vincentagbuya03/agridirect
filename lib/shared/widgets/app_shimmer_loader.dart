@@ -143,45 +143,61 @@ class AppShimmerLoader extends StatelessWidget {
     final base = baseColor ?? const Color(0xFFF1F5F9);
     final highlight = highlightColor ?? const Color(0xFFE2E8F0);
 
-    Widget child;
-    switch (type) {
-      case ShimmerType.circle:
-        child = Container(
-          width: width ?? size,
-          height: height ?? size,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-          ),
-        );
-        break;
-      case ShimmerType.text:
-        child = Container(
-          width: width ?? double.infinity,
-          height: height ?? 14,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(borderRadius),
-          ),
-        );
-        break;
-      case ShimmerType.rectangle:
-      default:
-        child = Container(
-          width: width ?? double.infinity,
-          height: height ?? double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(borderRadius),
-          ),
-        );
-        break;
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        Widget child;
+        switch (type) {
+          case ShimmerType.circle:
+            child = Container(
+              width: width ?? size,
+              height: height ?? size,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+            );
+            break;
+          case ShimmerType.text:
+            final resolvedWidth = width ??
+                (constraints.maxWidth.isFinite
+                    ? double.infinity
+                    : 150.0);
+            child = Container(
+              width: resolvedWidth,
+              height: height ?? 14,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(borderRadius),
+              ),
+            );
+            break;
+          case ShimmerType.rectangle:
+          default:
+            final resolvedWidth = width ??
+                (constraints.maxWidth.isFinite
+                    ? double.infinity
+                    : 200.0);
+            final resolvedHeight = height ??
+                (constraints.maxHeight.isFinite
+                    ? double.infinity
+                    : 200.0);
+            child = Container(
+              width: resolvedWidth,
+              height: resolvedHeight,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(borderRadius),
+              ),
+            );
+            break;
+        }
 
-    return Shimmer.fromColors(
-      baseColor: base,
-      highlightColor: highlight,
-      child: child,
+        return Shimmer.fromColors(
+          baseColor: base,
+          highlightColor: highlight,
+          child: child,
+        );
+      },
     );
   }
 }

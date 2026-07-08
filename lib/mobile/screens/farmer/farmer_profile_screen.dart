@@ -484,6 +484,14 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                     widget.onModeChanged();
                   },
                 ),
+                _buildDivider(),
+                _buildMenuItem(
+                  icon: Icons.confirmation_number_outlined,
+                  title: 'Manage Vouchers',
+                  subtitle: 'Create and distribute discount coupons',
+                  color: Colors.purple,
+                  onTap: () => context.push(AppRoutes.farmerVouchers),
+                ),
               ],
             ),
           ),

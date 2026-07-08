@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -470,16 +471,21 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     final isFarmer = _auth.isViewingAsFarmer;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
+        centerTitle: true,
         title: Text(
           isFarmer ? 'Farm Details' : 'Personal Details',
-          style: AppTextStyles.headline3,
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            color: AppColors.textHeadline,
+          ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textHeadline, size: 20),
           onPressed: () => context.pop(),
         ),
       ),
@@ -504,7 +510,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Profile Image Section (both farmers and customers)
+                     // Profile Image Section (both farmers and customers)
                     _buildProfileImageSection(isFarmer),
                     const SizedBox(height: 28),
 
@@ -515,7 +521,11 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                     // Form fields
                     Text(
                       isFarmer ? 'Farm Information' : 'Personal Information',
-                      style: AppTextStyles.headline3,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                        color: AppColors.textHeadline,
+                      ),
                     ),
                     const SizedBox(height: 16),
 
@@ -571,7 +581,14 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
 
                     // Location section
                     if (isFarmer) ...[
-                      Text('Location Details', style: AppTextStyles.headline3),
+                      Text(
+                        'Location Details',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                          color: AppColors.textHeadline,
+                        ),
+                      ),
                       const SizedBox(height: 16),
 
                       Container(
@@ -579,8 +596,15 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.grey[200]!),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.02),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -607,9 +631,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                                     _locationController.text.trim().isNotEmpty
                                         ? _locationController.text.trim()
                                         : 'No location detected yet',
-                                    style: AppTextStyles.bodyMedium.copyWith(
+                                    style: GoogleFonts.inter(
                                       color: AppColors.textHeadline,
                                       fontWeight: FontWeight.w600,
+                                      fontSize: 14,
                                     ),
                                   ),
                                 ],
@@ -665,11 +690,24 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         width: double.infinity,
                         child: OutlinedButton.icon(
                           onPressed: _isEditing ? _openFarmPinPicker : null,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            side: BorderSide(
+                              color: _isEditing ? AppColors.primary : Colors.grey.shade300,
+                              width: 1.5,
+                            ),
+                          ),
                           icon: const Icon(Icons.place_rounded),
                           label: Text(
                             _hasPinnedCoordinates()
                                 ? 'Update Farm Pin on Map'
                                 : 'Pin Farm on Map',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
@@ -697,7 +735,14 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(title, style: AppTextStyles.headline3),
+        Text(
+          title,
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w800,
+            fontSize: 16,
+            color: AppColors.textHeadline,
+          ),
+        ),
         const SizedBox(height: 16),
         Center(
           child: Stack(
@@ -793,26 +838,26 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   }
 
   Widget _buildHeaderCard(bool isFarmer) {
-    final role = isFarmer ? 'Verified Farmer' : 'Premium Buyer';
+    final role = isFarmer ? 'Verified Farm Profile' : 'Buyer Profile';
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isFarmer
               ? [
-                  AppColors.primary.withValues(alpha: 0.1),
-                  AppColors.primary.withValues(alpha: 0.1),
+                  AppColors.primary.withValues(alpha: 0.12),
+                  AppColors.primary.withValues(alpha: 0.04),
                 ]
               : [
-                  Colors.blue.withValues(alpha: 0.1),
-                  Colors.blue.withValues(alpha: 0.1),
+                  Colors.blue.withValues(alpha: 0.12),
+                  Colors.blue.withValues(alpha: 0.04),
                 ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isFarmer ? AppColors.primary : Colors.blue,
+          color: isFarmer ? AppColors.primary.withValues(alpha: 0.2) : Colors.blue.withValues(alpha: 0.2),
           width: 1.5,
         ),
       ),
@@ -822,7 +867,7 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: isFarmer ? AppColors.primary : Colors.blue,
-              borderRadius: BorderRadius.circular(8),
+              shape: BoxShape.circle,
             ),
             child: Icon(
               isFarmer ? Icons.agriculture : Icons.shopping_bag,
@@ -830,23 +875,26 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               size: 24,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   role,
-                  style: AppTextStyles.labelSmall.copyWith(
-                    fontWeight: FontWeight.w600,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
                     color: isFarmer ? AppColors.primary : Colors.blue,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  isFarmer ? 'Manage your farm details' : 'Manage your account',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: Colors.grey[600],
+                  isFarmer ? 'Manage your farm settings and stall location details' : 'Manage your default personal account',
+                  style: GoogleFonts.inter(
+                    color: AppColors.textSubtle,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -872,27 +920,37 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
       enabled: enabled,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      style: GoogleFonts.inter(
+        fontWeight: FontWeight.w600,
+        color: AppColors.textHeadline,
+        fontSize: 14,
+      ),
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: AppColors.primary),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        labelStyle: GoogleFonts.inter(
+          color: Colors.grey.shade500,
+          fontWeight: FontWeight.w500,
+        ),
+        prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
+        filled: true,
+        fillColor: enabled ? Colors.grey.shade50 : Colors.grey.shade100,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.grey.shade200),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
         disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey[200]!),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.grey.shade200),
         ),
-        filled: !enabled,
-        fillColor: !enabled ? Colors.grey[100] : null,
-        labelStyle: enabled
-            ? null
-            : AppTextStyles.bodySmall.copyWith(color: Colors.grey[600]),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
       validator: (value) {
         if (!enabled) return null;
@@ -916,13 +974,20 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
         height: 56,
         child: ElevatedButton.icon(
           onPressed: () => setState(() => _isEditing = true),
-          icon: const Icon(Icons.edit),
-          label: const Text('Edit Details'),
+          icon: const Icon(Icons.edit_rounded, color: Colors.white),
+          label: Text(
+            'Edit Details',
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(18),
             ),
+            elevation: 0,
           ),
         ),
       );
@@ -939,11 +1004,17 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(18),
               ),
-              side: const BorderSide(color: Colors.grey),
+              side: BorderSide(color: Colors.grey.shade300, width: 1.5),
             ),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSubtle,
+              ),
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -956,15 +1027,22 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                     height: 20,
                     child: AppShimmerLoader(strokeWidth: 2),
                   )
-                : const Icon(Icons.check),
-            label: Text(_isSaving ? 'Saving...' : 'Save Changes'),
+                : const Icon(Icons.check_rounded, color: Colors.white),
+            label: Text(
+              _isSaving ? 'Saving...' : 'Save',
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               disabledBackgroundColor: Colors.grey[300],
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(18),
               ),
+              elevation: 0,
             ),
           ),
         ),
