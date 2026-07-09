@@ -1143,43 +1143,50 @@ class _OrdersScreenState extends State<OrdersScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.shopping_bag_outlined,
-                      color: AppColors.primary,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Order #${order.orderNumber}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textHeadline,
-                        ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${order.itemCount ?? 1} item${(order.itemCount ?? 1) > 1 ? 's' : ''} • ₱${(order.total ?? 0).toStringAsFixed(2)}',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSubtle,
-                        ),
+                      child: const Icon(
+                        Icons.shopping_bag_outlined,
+                        color: AppColors.primary,
+                        size: 24,
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Order #${order.orderNumber}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textHeadline,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${order.itemCount ?? 1} item${(order.itemCount ?? 1) > 1 ? 's' : ''} • ₱${(order.total ?? 0).toStringAsFixed(2)}',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textSubtle,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 12),
               _CircularProgressRing(
                 percentage: percentage,
                 color: status == 'CANCELLED' ? AppColors.error : AppColors.primary,

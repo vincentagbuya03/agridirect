@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/core/auto_update_service.dart';
 import '../../../shared/services/offline/offline_cache_service.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../web/widgets/web_consumer_nav_bar.dart';
@@ -838,6 +839,17 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 24),
+
+          // System Section
+          Text('System', style: AppTextStyles.headline3),
+          const SizedBox(height: 12),
+          _SettingsTile(
+            icon: Icons.system_update_rounded,
+            title: 'Check for Updates',
+            subtitle: 'Check for new application versions.',
+            onTap: () => AutoUpdateService().checkForUpdates(context, showFeedback: true),
           ),
           const SizedBox(height: 24),
 

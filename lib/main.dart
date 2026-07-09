@@ -16,6 +16,7 @@ import 'firebase_options.dart';
 import 'shared/services/auth/auth_service.dart';
 import 'shared/services/community/analytics_service.dart';
 import 'shared/services/core/supabase_config.dart';
+import 'shared/services/core/auto_update_service.dart';
 import 'shared/services/core/bootstrap_cache_service.dart';
 import 'shared/services/core/database_sync_service.dart';
 import 'shared/services/commerce/product_service.dart';
@@ -549,6 +550,9 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AutoUpdateService().checkForUpdates(context);
+    });
     _lifecycleObserver = _AppLifecycleObserver(this);
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _auth.addListener(_handleAuthSyncState);
