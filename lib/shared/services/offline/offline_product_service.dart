@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../core/supabase_config.dart';
 import '../commerce/product_service.dart';
@@ -22,7 +24,7 @@ class OfflineProductService {
   final ValueNotifier<bool> isSyncing = ValueNotifier(false);
 
   static OfflineProductService? _instance;
-  
+
   factory OfflineProductService({
     OfflineQueueService? queueService,
     ProductService? productService,
@@ -65,7 +67,9 @@ class OfflineProductService {
 
   void _startBackgroundSyncTimer() {
     _backgroundSyncTimer?.cancel();
-    _backgroundSyncTimer = Timer.periodic(const Duration(minutes: 1), (timer) async {
+    _backgroundSyncTimer = Timer.periodic(const Duration(minutes: 1), (
+      timer,
+    ) async {
       final online = await isOnline();
       if (online && pendingProductsCount.value > 0 && !isSyncing.value) {
         debugPrint('🔄 Background auto-sync triggered...');
@@ -75,7 +79,9 @@ class OfflineProductService {
   }
 
   void _listenToQueueChanges() {
-    Hive.box<OfflineProductQueue>(OfflineQueueService.boxName).watch().listen((event) async {
+    Hive.box<OfflineProductQueue>(OfflineQueueService.boxName).watch().listen((
+      event,
+    ) async {
       final online = await isOnline();
       if (online && !isSyncing.value) {
         final pending = _queueService.getPendingProducts();
@@ -166,12 +172,16 @@ class OfflineProductService {
   Future<bool> isOnline() async {
     try {
       final result = await _connectivity.checkConnectivity();
-      if (result.isEmpty || result.first == ConnectivityResult.none) return false;
-      
+      if (result.isEmpty || result.first == ConnectivityResult.none)
+        return false;
+
+      // InternetAddress.lookup is NOT supported on web and will throw UnimplementedError
+      if (kIsWeb) return true;
+
       // Actual internet check (DNS lookup)
-      final ping = await InternetAddress.lookup('google.com').timeout(
-        const Duration(seconds: 3),
-      );
+      final ping = await InternetAddress.lookup(
+        'google.com',
+      ).timeout(const Duration(seconds: 3));
       return ping.isNotEmpty && ping[0].rawAddress.isNotEmpty;
     } catch (_) {
       return false;
@@ -191,6 +201,8 @@ class OfflineProductService {
     required bool isPreorder,
     required int availableQuantity,
     required List<String> localImagePaths, // File paths
+    List<Uint8List>? webImageBytes,
+    List<String>? webImageNames,
     String? uploadedImageUrl, // URLs from online upload (optional)
   }) async {
     final online = await isOnline();
@@ -208,9 +220,10 @@ class OfflineProductService {
           isPreorder: isPreorder,
           availableQuantity: availableQuantity.toDouble(),
           localImagePaths: localImagePaths,
+          webImageBytes: webImageBytes,
+          webImageNames: webImageNames,
         );
       } catch (e) {
-        // If online fails, fall back to offline queue
         debugPrint('Failed to upload to Supabase: $e, saving offline');
         final queuedProduct = await _queueService.addProductToQueue(
           farmerId: farmerId,
@@ -282,29 +295,56 @@ class OfflineProductService {
     required bool isPreorder,
     required double availableQuantity,
     required List<String> localImagePaths,
+    List<Uint8List>? webImageBytes,
+    List<String>? webImageNames,
   }) async {
     // Upload local images to Supabase Storage
     List<String> uploadedUrls = [];
-    for (final imagePath in localImagePaths) {
-      final file = File(imagePath);
-      if (await file.exists()) {
-        final bytes = await file.readAsBytes();
-        final fileName =
-            'product_${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
-        final path = 'products/$fileName';
+    if (kIsWeb) {
+      if (webImageBytes != null && webImageNames != null) {
+        for (int i = 0; i < webImageBytes.length; i++) {
+          final bytes = webImageBytes[i];
+          final imageName = webImageNames[i];
+          final fileName =
+              'product_${DateTime.now().millisecondsSinceEpoch}_$imageName';
+          final path = 'products/$fileName';
 
-        try {
-          await SupabaseConfig.client.storage
-              .from('products')
-              .uploadBinary(path, bytes);
+          try {
+            await SupabaseConfig.client.storage
+                .from('products')
+                .uploadBinary(path, bytes);
 
-          final url = SupabaseConfig.client.storage
-              .from('products')
-              .getPublicUrl(path);
-          uploadedUrls.add(url);
-        } catch (e) {
-          debugPrint('Error uploading image $imagePath: $e');
-          // Continue with other images
+            final url = SupabaseConfig.client.storage
+                .from('products')
+                .getPublicUrl(path);
+            uploadedUrls.add(url);
+          } catch (e) {
+            debugPrint('Error uploading image $imageName: $e');
+          }
+        }
+      }
+    } else {
+      for (final imagePath in localImagePaths) {
+        final file = File(imagePath);
+        if (await file.exists()) {
+          final bytes = await file.readAsBytes();
+          final fileName =
+              'product_${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
+          final path = 'products/$fileName';
+
+          try {
+            await SupabaseConfig.client.storage
+                .from('products')
+                .uploadBinary(path, bytes);
+
+            final url = SupabaseConfig.client.storage
+                .from('products')
+                .getPublicUrl(path);
+            uploadedUrls.add(url);
+          } catch (e) {
+            debugPrint('Error uploading image $imagePath: $e');
+            // Continue with other images
+          }
         }
       }
     }
@@ -347,7 +387,7 @@ class OfflineProductService {
         final online = await isOnline();
         if (!online) {
           debugPrint('📡 Sync interrupted: Connection lost');
-          break; 
+          break;
         }
 
         debugPrint('🚀 Syncing product: ${product.name} (${product.id})');
@@ -357,7 +397,9 @@ class OfflineProductService {
 
         // Verify resolved IDs are UUIDs (required by Supabase)
         if (resolvedCategoryId.length < 30 || resolvedUnitId.length < 30) {
-          throw Exception('Could not resolve valid UUIDs for category or unit. Category: $resolvedCategoryId, Unit: $resolvedUnitId');
+          throw Exception(
+            'Could not resolve valid UUIDs for category or unit. Category: $resolvedCategoryId, Unit: $resolvedUnitId',
+          );
         }
 
         await _uploadProductToSupabase(
@@ -376,7 +418,7 @@ class OfflineProductService {
         await _queueService.markAsSynced(product.id);
         await _queueService.setSyncError(product.id, null);
         await _cacheService.removeCachedProduct(product.id);
-        
+
         debugPrint('✅ Sync successful for: ${product.name}');
       } catch (e) {
         // Record error but continue with next product

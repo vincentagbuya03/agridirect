@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
@@ -253,6 +254,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
           .map((img) => img.path)
           .toList();
 
+      final webImageBytes = kIsWeb
+          ? _selectedImageFiles.map((img) => img.bytes).toList()
+          : null;
+      final webImageNames = kIsWeb
+          ? _selectedImageFiles.map((img) => img.name).toList()
+          : null;
+
       // Use offline service to save
       await _offlineService.createProduct(
         farmerId: userId,
@@ -271,6 +279,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
               : _quantityController.text.trim(),
         ),
         localImagePaths: localImagePaths,
+        webImageBytes: webImageBytes,
+        webImageNames: webImageNames,
       );
 
       if (mounted) {

@@ -12,7 +12,6 @@ import '../../../shared/services/auth/auth_service.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 import '../../widgets/web_hamburger_menu_button.dart';
 
-
 class WebFarmerProducts extends StatefulWidget {
   final Function(int) onNavigate;
   final int currentIndex;
@@ -27,7 +26,8 @@ class WebFarmerProducts extends StatefulWidget {
   State<WebFarmerProducts> createState() => _WebFarmerProductsState();
 }
 
-class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProviderStateMixin {
+class _WebFarmerProductsState extends State<WebFarmerProducts>
+    with TickerProviderStateMixin {
   late AnimationController _fadeInController;
   int _hoveredNav = -1;
   String _searchQuery = '';
@@ -54,7 +54,6 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
     _searchController.dispose();
     super.dispose();
   }
-
 
   void _openProduct(Map<String, dynamic> productMap) {
     _showEditProductDialog(productMap);
@@ -85,7 +84,10 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
           // Background accents
           Positioned.fill(
             child: CustomPaint(
-              painter: DotPatternPainter(opacity: 0.03, color: const Color(0xFF10B981)),
+              painter: DotPatternPainter(
+                opacity: 0.03,
+                color: const Color(0xFF10B981),
+              ),
             ),
           ),
           const Positioned.fill(
@@ -100,7 +102,12 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
               _buildNavBar(),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(isMobile ? 16 : 40, 0, isMobile ? 16 : 40, 40),
+                  padding: EdgeInsets.fromLTRB(
+                    isMobile ? 16 : 40,
+                    0,
+                    isMobile ? 16 : 40,
+                    40,
+                  ),
                   child: FadeTransition(
                     opacity: _fadeInController,
                     child: Column(
@@ -136,7 +143,13 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
       );
     }
 
-    final navItems = ['Dashboard', 'Products', 'Orders', 'Community', 'Pre-Orders'];
+    final navItems = [
+      'Dashboard',
+      'Products',
+      'Orders',
+      'Community',
+      'Pre-Orders',
+    ];
     return Container(
       margin: isMobile
           ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
@@ -275,10 +288,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
         const SizedBox(height: 8),
         Text(
           'Manage your inventory, prices, and listings.',
-          style: GoogleFonts.inter(
-            fontSize: isMobile ? 14 : 16,
-            color: _muted,
-          ),
+          style: GoogleFonts.inter(fontSize: isMobile ? 14 : 16, color: _muted),
         ),
       ],
     );
@@ -305,7 +315,11 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
                     decoration: InputDecoration(
                       hintText: 'Search...',
                       hintStyle: GoogleFonts.inter(color: _muted, fontSize: 14),
-                      prefixIcon: const Icon(Icons.search_rounded, color: _muted, size: 20),
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: _muted,
+                        size: 20,
+                      ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     ),
@@ -323,8 +337,13 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _primary,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 0,
                 ),
               ),
@@ -353,7 +372,11 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
                 decoration: InputDecoration(
                   hintText: 'Search products...',
                   hintStyle: GoogleFonts.inter(color: _muted, fontSize: 14),
-                  prefixIcon: const Icon(Icons.search_rounded, color: _muted, size: 20),
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                    color: _muted,
+                    size: 20,
+                  ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -370,8 +393,13 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 elevation: 0,
               ),
             ),
@@ -414,9 +442,16 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
             child: Column(
               children: [
                 const SizedBox(height: 80),
-                Icon(Icons.inventory_2_outlined, size: 64, color: _muted.withValues(alpha: 0.3)),
+                Icon(
+                  Icons.inventory_2_outlined,
+                  size: 64,
+                  color: _muted.withValues(alpha: 0.3),
+                ),
                 const SizedBox(height: 16),
-                Text('No products found', style: GoogleFonts.inter(fontSize: 18, color: _muted)),
+                Text(
+                  'No products found',
+                  style: GoogleFonts.inter(fontSize: 18, color: _muted),
+                ),
               ],
             ),
           );
@@ -474,11 +509,14 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
                 child: Stack(
                   children: [
                     ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
                       child: SizedBox(
                         width: double.infinity,
                         height: double.infinity,
-                        child: imageUrl != null && imageUrl.toString().isNotEmpty
+                        child:
+                            imageUrl != null && imageUrl.toString().isNotEmpty
                             ? SafeNetworkImage(
                                 imageUrl: imageUrl.toString(),
                                 defaultBucket: 'uploads',
@@ -486,17 +524,29 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
                                 placeholder: Container(color: _surface),
                                 errorWidget: Container(
                                   color: _surface,
-                                  child: const Icon(Icons.broken_image_rounded, color: _muted),
+                                  child: const Icon(
+                                    Icons.broken_image_rounded,
+                                    color: _muted,
+                                  ),
                                 ),
                               )
-                            : Container(color: _surface, child: const Icon(Icons.image_outlined, color: _muted)),
+                            : Container(
+                                color: _surface,
+                                child: const Icon(
+                                  Icons.image_outlined,
+                                  color: _muted,
+                                ),
+                              ),
                       ),
                     ),
                     Positioned(
                       top: 12,
                       right: 12,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(8),
@@ -549,14 +599,19 @@ class _WebFarmerProductsState extends State<WebFarmerProducts> with TickerProvid
                               color: _primary,
                             ),
                           ),
-                           IconButton(
-                             onPressed: () => _openProduct(product),
-                             icon: const Icon(Icons.edit_note_rounded, color: _muted),
-                             style: IconButton.styleFrom(
-                               backgroundColor: _surface,
-                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                             ),
-                           ),
+                          IconButton(
+                            onPressed: () => _openProduct(product),
+                            icon: const Icon(
+                              Icons.edit_note_rounded,
+                              color: _muted,
+                            ),
+                            style: IconButton.styleFrom(
+                              backgroundColor: _surface,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -626,11 +681,24 @@ class _EditProductDialogState extends State<_EditProductDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.product['name']?.toString() ?? '');
-    _priceController = TextEditingController(text: widget.product['price']?.toString() ?? '0');
-    _stockController = TextEditingController(text: (widget.product['available_quantity'] ?? widget.product['available'] ?? 0).toString().replaceAll(RegExp(r'\.0$'), ''));
-    _descriptionController = TextEditingController(text: widget.product['description']?.toString() ?? '');
-    
+    _nameController = TextEditingController(
+      text: widget.product['name']?.toString() ?? '',
+    );
+    _priceController = TextEditingController(
+      text: widget.product['price']?.toString() ?? '0',
+    );
+    _stockController = TextEditingController(
+      text:
+          (widget.product['available_quantity'] ??
+                  widget.product['available'] ??
+                  0)
+              .toString()
+              .replaceAll(RegExp(r'\.0$'), ''),
+    );
+    _descriptionController = TextEditingController(
+      text: widget.product['description']?.toString() ?? '',
+    );
+
     final harvestVal = widget.product['harvest']?.toString() ?? '';
     _harvestDaysController = TextEditingController(
       text: harvestVal.replaceAll(RegExp(r'[^0-9]'), ''),
@@ -668,10 +736,13 @@ class _EditProductDialogState extends State<_EditProductDialog> {
           _selectedUnit = productData['unit_id']?.toString();
           _isPreorder = productData['is_preorder'] ?? false;
           if (productData['harvest_days'] != null) {
-            _harvestDaysController.text = productData['harvest_days'].toString();
+            _harvestDaysController.text = productData['harvest_days']
+                .toString();
           }
-          
-          _categories = cats.map((c) => {'id': c.categoryId, 'name': c.name}).toList();
+
+          _categories = cats
+              .map((c) => {'id': c.categoryId, 'name': c.name})
+              .toList();
           _units = unts.map((u) => {'id': u.unitId, 'name': u.name}).toList();
           _isLoadingDropdowns = false;
         });
@@ -697,23 +768,25 @@ class _EditProductDialogState extends State<_EditProductDialog> {
       final stock = double.tryParse(_stockController.text.trim()) ?? 0.0;
 
       final client = Supabase.instance.client;
-      
-      // Update basic product details
-      await client.from('products').update({
-        'name': name,
-        'price': price,
-        'description': description,
-        'harvest_days': harvestDays,
-        'is_preorder': _isPreorder,
-        if (_selectedCategory != null) 'category_id': _selectedCategory,
-        if (_selectedUnit != null) 'unit_id': _selectedUnit,
-      }).eq('product_id', widget.product['id']);
 
-      // Update available stock
+      // Update basic product details
+      await client
+          .from('products')
+          .update({
+            'name': name,
+            'price': price,
+            'description': description,
+            'harvest_days': harvestDays,
+            'is_preorder': _isPreorder,
+            if (_selectedCategory != null) 'category_id': _selectedCategory,
+            if (_selectedUnit != null) 'unit_id': _selectedUnit,
+          })
+          .eq('product_id', widget.product['id']);
+
       await client.from('product_inventory').upsert({
         'product_id': widget.product['id'],
         'available_quantity': stock,
-      });
+      }, onConflict: 'product_id');
 
       widget.onSaved();
       if (mounted) {
@@ -745,8 +818,14 @@ class _EditProductDialogState extends State<_EditProductDialog> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete Product?', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-        content: Text('Are you sure you want to permanently delete "${widget.product['name']}"? This action cannot be undone.', style: GoogleFonts.inter()),
+        title: Text(
+          'Delete Product?',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to permanently delete "${widget.product['name']}"? This action cannot be undone.',
+          style: GoogleFonts.inter(),
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         actions: [
           TextButton(
@@ -756,7 +835,10 @@ class _EditProductDialogState extends State<_EditProductDialog> {
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: Text('Delete', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+            child: Text(
+              'Delete',
+              style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -767,7 +849,9 @@ class _EditProductDialogState extends State<_EditProductDialog> {
     setState(() => _isLoading = true);
 
     try {
-      final success = await SupabaseDataService().deleteProduct(widget.product['id']);
+      final success = await SupabaseDataService().deleteProduct(
+        widget.product['id'],
+      );
       if (success) {
         widget.onSaved();
         if (mounted) {
@@ -800,13 +884,15 @@ class _EditProductDialogState extends State<_EditProductDialog> {
 
   @override
   Widget build(BuildContext context) {
-
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       elevation: 16,
       backgroundColor: Colors.white,
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 580, maxHeight: MediaQuery.of(context).size.height * 0.85),
+        constraints: BoxConstraints(
+          maxWidth: 580,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -822,7 +908,10 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                       color: const Color(0xFFDCFCE7),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.edit_note_rounded, color: Color(0xFF16A34A)),
+                    child: const Icon(
+                      Icons.edit_note_rounded,
+                      color: Color(0xFF16A34A),
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -859,11 +948,15 @@ class _EditProductDialogState extends State<_EditProductDialog> {
               ),
             ),
             const Divider(height: 1),
-            
+
             // Scrollable Content Form
             Expanded(
               child: _isLoadingDropdowns
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFF16A34A)))
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF16A34A),
+                      ),
+                    )
                   : SingleChildScrollView(
                       padding: const EdgeInsets.all(24),
                       child: Form(
@@ -876,8 +969,13 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                             TextFormField(
                               controller: _nameController,
                               style: GoogleFonts.inter(fontSize: 14),
-                              decoration: _buildInputDecoration('e.g. Organic Tomatoes'),
-                              validator: (val) => val == null || val.trim().isEmpty ? 'Product name is required' : null,
+                              decoration: _buildInputDecoration(
+                                'e.g. Organic Tomatoes',
+                              ),
+                              validator: (val) =>
+                                  val == null || val.trim().isEmpty
+                                  ? 'Product name is required'
+                                  : null,
                             ),
                             const SizedBox(height: 16),
 
@@ -887,18 +985,33 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       _buildFieldLabel('Category'),
                                       DropdownButtonFormField<String>(
                                         initialValue: _selectedCategory,
-                                        items: _categories.map((c) => DropdownMenuItem<String>(
-                                          value: c['id'],
-                                          child: Text(c['name'], style: GoogleFonts.inter(fontSize: 14)),
-                                        )).toList(),
-                                        onChanged: (val) => setState(() => _selectedCategory = val),
-                                        decoration: _buildInputDecoration('Select Category'),
-                                        validator: (val) => val == null ? 'Required' : null,
+                                        items: _categories
+                                            .map(
+                                              (c) => DropdownMenuItem<String>(
+                                                value: c['id'],
+                                                child: Text(
+                                                  c['name'],
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
+                                        onChanged: (val) => setState(
+                                          () => _selectedCategory = val,
+                                        ),
+                                        decoration: _buildInputDecoration(
+                                          'Select Category',
+                                        ),
+                                        validator: (val) =>
+                                            val == null ? 'Required' : null,
                                       ),
                                     ],
                                   ),
@@ -906,18 +1019,32 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       _buildFieldLabel('Unit'),
                                       DropdownButtonFormField<String>(
                                         initialValue: _selectedUnit,
-                                        items: _units.map((u) => DropdownMenuItem<String>(
-                                          value: u['id'],
-                                          child: Text(u['name'], style: GoogleFonts.inter(fontSize: 14)),
-                                        )).toList(),
-                                        onChanged: (val) => setState(() => _selectedUnit = val),
-                                        decoration: _buildInputDecoration('Select Unit'),
-                                        validator: (val) => val == null ? 'Required' : null,
+                                        items: _units
+                                            .map(
+                                              (u) => DropdownMenuItem<String>(
+                                                value: u['id'],
+                                                child: Text(
+                                                  u['name'],
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
+                                        onChanged: (val) =>
+                                            setState(() => _selectedUnit = val),
+                                        decoration: _buildInputDecoration(
+                                          'Select Unit',
+                                        ),
+                                        validator: (val) =>
+                                            val == null ? 'Required' : null,
                                       ),
                                     ],
                                   ),
@@ -932,17 +1059,25 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       _buildFieldLabel('Price (₱)'),
                                       TextFormField(
                                         controller: _priceController,
-                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                        keyboardType:
+                                            const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                            ),
                                         style: GoogleFonts.inter(fontSize: 14),
-                                        decoration: _buildInputDecoration('0.00'),
+                                        decoration: _buildInputDecoration(
+                                          '0.00',
+                                        ),
                                         validator: (val) {
-                                          if (val == null || val.trim().isEmpty) return 'Required';
-                                          if (double.tryParse(val) == null) return 'Invalid price';
+                                          if (val == null || val.trim().isEmpty)
+                                            return 'Required';
+                                          if (double.tryParse(val) == null)
+                                            return 'Invalid price';
                                           return null;
                                         },
                                       ),
@@ -952,17 +1087,23 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       _buildFieldLabel('Stock Quantity'),
                                       TextFormField(
                                         controller: _stockController,
-                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                        keyboardType:
+                                            const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                            ),
                                         style: GoogleFonts.inter(fontSize: 14),
                                         decoration: _buildInputDecoration('0'),
                                         validator: (val) {
-                                          if (val == null || val.trim().isEmpty) return 'Required';
-                                          if (double.tryParse(val) == null) return 'Invalid stock';
+                                          if (val == null || val.trim().isEmpty)
+                                            return 'Required';
+                                          if (double.tryParse(val) == null)
+                                            return 'Invalid stock';
                                           return null;
                                         },
                                       ),
@@ -979,12 +1120,18 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                                 Checkbox(
                                   value: _isPreorder,
                                   activeColor: const Color(0xFF16A34A),
-                                  onChanged: (val) => setState(() => _isPreorder = val ?? false),
+                                  onChanged: (val) => setState(
+                                    () => _isPreorder = val ?? false,
+                                  ),
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'This is a pre-order product',
-                                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF374151)),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF374151),
+                                  ),
                                 ),
                               ],
                             ),
@@ -997,7 +1144,8 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                                 style: GoogleFonts.inter(fontSize: 14),
                                 decoration: _buildInputDecoration('e.g. 30'),
                                 validator: (val) {
-                                  if (_isPreorder && (val == null || val.trim().isEmpty)) {
+                                  if (_isPreorder &&
+                                      (val == null || val.trim().isEmpty)) {
                                     return 'Harvest days required for pre-orders';
                                   }
                                   return null;
@@ -1012,7 +1160,9 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                               controller: _descriptionController,
                               maxLines: 4,
                               style: GoogleFonts.inter(fontSize: 14),
-                              decoration: _buildInputDecoration('Product description...'),
+                              decoration: _buildInputDecoration(
+                                'Product description...',
+                              ),
                             ),
                           ],
                         ),
@@ -1020,7 +1170,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                     ),
             ),
             const Divider(height: 1),
-            
+
             // Actions
             Padding(
               padding: const EdgeInsets.all(24),
@@ -1028,34 +1178,76 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                 children: [
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : _deleteProduct,
-                    icon: const Icon(Icons.delete_forever_rounded, color: Colors.red, size: 18),
-                    label: Text('Delete', style: GoogleFonts.inter(color: Colors.red, fontWeight: FontWeight.w700)),
+                    icon: const Icon(
+                      Icons.delete_forever_rounded,
+                      color: Colors.red,
+                      size: 18,
+                    ),
+                    label: Text(
+                      'Delete',
+                      style: GoogleFonts.inter(
+                        color: Colors.red,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.red),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                   const Spacer(),
                   OutlinedButton(
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   FilledButton(
                     onPressed: _isLoading ? null : _saveProduct,
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF16A34A),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: _isLoading
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Text('Save Changes', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            'Save Changes',
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                   ),
                 ],
               ),

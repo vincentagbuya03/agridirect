@@ -264,6 +264,11 @@ class OrderService {
   /// Update order status
   Future<Order> updateOrderStatus(String orderId, String newStatus) async {
     try {
+      // Retrieve current order to check status before updating
+      final currentOrder = await getOrderById(orderId);
+      final currentStatus = currentOrder?.status.toLowerCase() ?? '';
+      final targetStatus = newStatus.trim().toLowerCase();
+
       final orderStatusId = await _getOrderStatusId(newStatus);
       final response = await _supabase
           .from('orders')
@@ -275,6 +280,83 @@ class OrderService {
       final updatedOrder = await getOrderById(response['order_id'] as String);
       if (updatedOrder == null) {
         throw Exception('Order was updated but could not be reloaded');
+      }
+
+      // If transitioning to completed, deduct stock
+      if (currentStatus != 'completed' && targetStatus == 'completed') {
+        final items = await getOrderItems(orderId);
+        for (final item in items) {
+          final inv = await _supabase
+              .from('product_inventory')
+              .select('available_quantity, reserved_quantity')
+              .eq('product_id', item.productId)
+              .maybeSingle();
+
+          if (inv != null) {
+            final prod = await _supabase
+                .from('products')
+                .select('is_preorder')
+                .eq('product_id', item.productId)
+                .maybeSingle();
+            final isPreorder = prod?['is_preorder'] == true;
+
+            if (isPreorder) {
+              final reserved = (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
+              await _supabase
+                  .from('product_inventory')
+                  .update({
+                    'reserved_quantity': (reserved - item.quantity).clamp(0.0, double.infinity),
+                  })
+                  .eq('product_id', item.productId);
+            } else {
+              final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
+              await _supabase
+                  .from('product_inventory')
+                  .update({
+                    'available_quantity': (available - item.quantity).clamp(0.0, double.infinity),
+                  })
+                  .eq('product_id', item.productId);
+            }
+          }
+        }
+      }
+      // If transitioning away from completed, restore stock
+      else if (currentStatus == 'completed' && targetStatus != 'completed') {
+        final items = await getOrderItems(orderId);
+        for (final item in items) {
+          final inv = await _supabase
+              .from('product_inventory')
+              .select('available_quantity, reserved_quantity')
+              .eq('product_id', item.productId)
+              .maybeSingle();
+
+          if (inv != null) {
+            final prod = await _supabase
+                .from('products')
+                .select('is_preorder')
+                .eq('product_id', item.productId)
+                .maybeSingle();
+            final isPreorder = prod?['is_preorder'] == true;
+
+            if (isPreorder) {
+              final reserved = (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
+              await _supabase
+                  .from('product_inventory')
+                  .update({
+                    'reserved_quantity': reserved + item.quantity,
+                  })
+                  .eq('product_id', item.productId);
+            } else {
+              final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
+              await _supabase
+                  .from('product_inventory')
+                  .update({
+                    'available_quantity': available + item.quantity,
+                  })
+                  .eq('product_id', item.productId);
+            }
+          }
+        }
       }
 
       final normalizedStatus = newStatus.trim().toLowerCase();

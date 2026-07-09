@@ -11,6 +11,7 @@ import '../../../shared/models/auth/user_address_model.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import 'cart_screen.dart';
 import 'farmer_public_profile_screen.dart';
+import 'community_stories_screen.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/screens/post_detail_screen.dart';
@@ -19,6 +20,8 @@ import 'marketplace_screen.dart';
 import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/services/community/message_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../shared/widgets/forum_video_player.dart';
 
 /// Home Screen - Premium Customer Interface
 class HomeScreen extends StatefulWidget {
@@ -36,14 +39,17 @@ class _HomeScreenState extends State<HomeScreen> {
   late Stream<int> _unreadCountStream;
 
   String _aiInsightTitle = 'Scanning market prices...';
-  String _aiInsightDesc = 'Our AI is analyzing local supply and pricing trends to find the best deals.';
+  String _aiInsightDesc =
+      'Our AI is analyzing local supply and pricing trends to find the best deals.';
   bool _isLoadingInsight = true;
 
   @override
   void initState() {
     super.initState();
     _forumStream = SupabaseDataService().watchForumPosts();
-    _unreadCountStream = MessageService().watchTotalUnreadCount(asFarmer: false);
+    _unreadCountStream = MessageService().watchTotalUnreadCount(
+      asFarmer: false,
+    );
     _loadDefaultAddress();
     _loadAIMarketInsight();
   }
@@ -55,7 +61,8 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) {
           setState(() {
             _aiInsightTitle = 'Market is fresh today';
-            _aiInsightDesc = 'Browse the marketplace to discover fresh harvests from local farmers.';
+            _aiInsightDesc =
+                'Browse the marketplace to discover fresh harvests from local farmers.';
             _isLoadingInsight = false;
           });
         }
@@ -72,7 +79,8 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) {
           setState(() {
             _aiInsightTitle = 'Fresh harvests available';
-            _aiInsightDesc = 'Explore the marketplace to see fresh items listed today.';
+            _aiInsightDesc =
+                'Explore the marketplace to see fresh items listed today.';
             _isLoadingInsight = false;
           });
         }
@@ -90,8 +98,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final list = categories[peakCategory]!;
       list.sort((a, b) {
-        final priceA = double.tryParse(a.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
-        final priceB = double.tryParse(b.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+        final priceA =
+            double.tryParse(a.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+        final priceB =
+            double.tryParse(b.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
         return priceA.compareTo(priceB);
       });
       final cheapest = list.first;
@@ -99,7 +109,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _aiInsightTitle = '${cheapest.name} starting at ${cheapest.price}';
-          _aiInsightDesc = 'Peak supply detected in $peakCategory from ${cheapest.farm}. Grab fresh harvests at wholesale prices today.';
+          _aiInsightDesc =
+              'Peak supply detected in $peakCategory from ${cheapest.farm}. Grab fresh harvests at wholesale prices today.';
           _isLoadingInsight = false;
         });
       }
@@ -107,7 +118,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _aiInsightTitle = 'Discover local produce';
-          _aiInsightDesc = 'Local farmers are offering fresh harvests at great prices. Tap below to browse.';
+          _aiInsightDesc =
+              'Local farmers are offering fresh harvests at great prices. Tap below to browse.';
           _isLoadingInsight = false;
         });
       }
@@ -166,8 +178,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 32),
                   _buildSectionHeader(
                     'Community Stories',
-                    'Join Chat',
-                    () => context.push(AppRoutes.customerMessages),
+                    'See All',
+                    () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CommunityStoriesScreen(),
+                        ),
+                      ).then((_) {
+                        if (mounted) setState(() {});
+                      });
+                    },
                   ),
                   _buildCommunityFeed(context),
                   const SizedBox(height: 40),
@@ -310,7 +330,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: TextField(
                         readOnly: true,
                         onTap: () {
-                          SupabaseDataService.marketplaceCategoryNotifier.value =
+                          SupabaseDataService
+                                  .marketplaceCategoryNotifier
+                                  .value =
                               null;
                           SupabaseDataService.navigationTabNotifier.value = 1;
                         },
@@ -572,7 +594,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: SizedBox(
                   width: 24,
                   height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ] else ...[
@@ -644,7 +669,10 @@ class _HomeScreenState extends State<HomeScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20),
-            child: SizedBox(height: 160, child: Center(child: AppShimmerLoader())),
+            child: SizedBox(
+              height: 160,
+              child: Center(child: AppShimmerLoader()),
+            ),
           );
         }
 
@@ -742,7 +770,9 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
               child: SizedBox(
                 height: 108,
                 width: double.infinity,
@@ -784,7 +814,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Text(
                         isProduct ? 'NEW PRODUCT' : 'NEW POST',
                         style: AppTextStyles.labelSmall.copyWith(
-                          color: isProduct ? AppColors.secondary : AppColors.primary,
+                          color: isProduct
+                              ? AppColors.secondary
+                              : AppColors.primary,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.8,
                         ),
@@ -889,9 +921,9 @@ class _HomeScreenState extends State<HomeScreen> {
       isLiked: false,
     );
 
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)));
     if (mounted) setState(() {});
   }
 
@@ -1079,7 +1111,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              // Rating Badge
               Positioned(
                 top: 16,
                 left: 16,
@@ -1303,7 +1334,15 @@ class _HomeScreenState extends State<HomeScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: InkWell(
-                onTap: () => _showAllCommunityStories(posts),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const CommunityStoriesScreen(),
+                    ),
+                  ).then((_) {
+                    if (mounted) setState(() {});
+                  });
+                },
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   width: double.infinity,
@@ -1389,87 +1428,116 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.person_rounded,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      post.userName,
-                      style: AppTextStyles.headline3.copyWith(fontSize: 15),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      '${post.title.isEmpty ? 'Farmer' : post.title} • ${post.time}',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textSubtle,
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: ClipOval(
+                    child: SafeCircleAvatar(
+                      imageUrl: post.authorAvatarUrl,
+                      radius: 22,
+                      child: const Icon(
+                        Icons.person_rounded,
+                        color: AppColors.primary,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        post.userName,
+                        style: AppTextStyles.headline3.copyWith(fontSize: 15),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${post.title.isEmpty ? 'Farmer' : post.title} • ${post.time}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSubtle,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              post.body,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textHeadline.withValues(alpha: 0.9),
+                height: 1.5,
+              ),
+            ),
+            if (post.videoUrl != null && post.videoUrl!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: ForumVideoPlayer(videoUrl: post.videoUrl!),
+              ),
+            ] else if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: CachedNetworkImage(
+                  imageUrl: post.imageUrl!,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => const SizedBox(
+                    height: 200,
+                    child: Center(child: AppShimmerLoader()),
+                  ),
+                  errorWidget: (context, url, error) => const SizedBox.shrink(),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            post.body,
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textHeadline.withValues(alpha: 0.9),
-              height: 1.5,
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _buildPostAction(
+                  post.isLiked
+                      ? Icons.thumb_up_rounded
+                      : Icons.thumb_up_alt_outlined,
+                  post.likes.toString(),
+                  isActive: post.isLiked,
+                  onTap: () async {
+                    await SupabaseDataService().togglePostLike(post.id);
+                    if (mounted) setState(() {});
+                  },
+                ),
+                const SizedBox(width: 20),
+                _buildPostAction(
+                  Icons.chat_bubble_outline_rounded,
+                  post.comments.toString(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PostDetailScreen(post: post),
+                      ),
+                    );
+                  },
+                ),
+                const Spacer(),
+                const Icon(
+                  Icons.share_outlined,
+                  size: 20,
+                  color: AppColors.textSubtle,
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildPostAction(
-                post.isLiked
-                    ? Icons.thumb_up_rounded
-                    : Icons.thumb_up_alt_outlined,
-                post.likes.toString(),
-                isActive: post.isLiked,
-                onTap: () async {
-                  await SupabaseDataService().togglePostLike(post.id);
-                  if (mounted) setState(() {});
-                },
-              ),
-              const SizedBox(width: 20),
-              _buildPostAction(
-                Icons.chat_bubble_outline_rounded,
-                post.comments.toString(),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => PostDetailScreen(post: post),
-                    ),
-                  );
-                },
-              ),
-              const Spacer(),
-              const Icon(
-                Icons.share_outlined,
-                size: 20,
-                color: AppColors.textSubtle,
-              ),
-            ],
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -1517,60 +1585,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
   }
 
-  void _showAllCommunityStories(List<ForumPostItem> posts) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => Container(
-        height: MediaQuery.of(ctx).size.height * 0.85,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 42,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.textSubtle.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(99),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Community Stories',
-                      style: AppTextStyles.headline2.copyWith(fontSize: 22),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.only(bottom: 24),
-                physics: const BouncingScrollPhysics(),
-                itemCount: posts.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (_, index) =>
-                    _buildCommunityPostCard(post: posts[index]),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   // ── Address Picker Bottom Sheet ──
   void _showAddressPicker(BuildContext context) async {
