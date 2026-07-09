@@ -615,7 +615,7 @@ class _InAppCallScreenState extends State<InAppCallScreen>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _buildHeader(),
-                if (!widget.isVideo || _remoteUid == null || _isCameraOff)
+                if (!widget.isVideo || _remoteUid == null)
                   _buildAvatarSection(isWide)
                 else
                   _buildSmallOverlayInfo(),

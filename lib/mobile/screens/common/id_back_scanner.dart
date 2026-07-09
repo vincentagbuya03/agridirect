@@ -36,11 +36,10 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
   static const double _cardWidthFraction = 0.88;
   static const double _cardAspectRatio = 1.586;
   static const double _guideInset = 10.0;
-  static const double _guideTolerance = 40.0; // Much more tolerant guide fit
-  static const double _guideFilterMargin = 80.0; // Wider filter area
-  static const double _minGuideIntersectionRatio =
-      0.45; // More lenient intersection
-  static const double _minDetectedWidthCoverage = 0.30; // Relaxed from 0.62
+  static const double _guideTolerance = 40.0;
+  static const double _guideFilterMargin = 80.0;
+  static const double _minGuideIntersectionRatio = 0.45;
+  static const double _minDetectedWidthCoverage = 0.30;
   static const double _minDetectedHeightCoverage = 0.25; // Relaxed from 0.50
   static const double _minQrWidthCoverage = 0.08; // Relaxed from 0.18
   static const int _requiredStableFrames = 3; // Reduced from 4
@@ -483,7 +482,6 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
       }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {

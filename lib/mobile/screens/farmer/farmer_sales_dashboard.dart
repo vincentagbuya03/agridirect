@@ -18,7 +18,6 @@ import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/services/community/message_service.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 
-/// Farmer Sales Dashboard
 class FarmerSalesDashboard extends StatefulWidget {
   const FarmerSalesDashboard({super.key});
 
