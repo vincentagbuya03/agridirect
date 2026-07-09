@@ -286,12 +286,15 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
     final String fullText = recognizedText.text.toUpperCase();
     final int blockCount = recognizedText.blocks.length;
     final int keywordHits = _countKeywordMatches(fullText);
-    final bool hasFace = faces.isNotEmpty;
+    final bool isBack = widget.label.toLowerCase().contains('back');
+    final bool hasFace = isBack ? true : faces.isNotEmpty;
     final bool isForbidden = _hasForbiddenKeyword(fullText);
 
     // ID-like: 1+ keyword AND (3+ keywords OR 5+ text blocks)
-    final bool hasKeywords =
-        keywordHits >= 1 && (keywordHits >= 3 || blockCount >= 5);
+    // For back scan, just require at least 2 text blocks
+    final bool hasKeywords = isBack
+        ? (blockCount >= 2)
+        : (keywordHits >= 1 && (keywordHits >= 3 || blockCount >= 5));
 
     // ── 1. Build a combined bounding box of ALL features ──
     Rect? combinedFeatureBox;
@@ -822,6 +825,25 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
                       color: Colors.white60,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onTap: _autoCapture,
+                    child: Container(
+                      height: 72,
+                      width: 72,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 4),
+                      ),
+                      child: Container(
+                        margin: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),

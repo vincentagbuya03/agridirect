@@ -11,7 +11,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/farmer/farmer_service.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../../../shared/models/farmer/farmer_profile_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 
 class FarmerOrderDetailsScreen extends StatefulWidget {
@@ -96,9 +99,59 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
     setState(() => _isLoading = true);
     try {
       final items = await _orderService.getOrderItems(widget.order.orderId);
+      String? deliveryAddressId = widget.order.deliveryAddressId;
+      if (deliveryAddressId == null || deliveryAddressId.isEmpty) {
+        try {
+          final orderData = await Supabase.instance.client
+              .from('orders')
+              .select('delivery_address_id')
+              .eq('order_id', widget.order.orderId)
+              .maybeSingle();
+          if (orderData != null) {
+            deliveryAddressId = orderData['delivery_address_id']?.toString();
+          }
+        } catch (_) {}
+      }
+
       Map<String, dynamic>? address;
-      if (widget.order.deliveryAddressId != null && widget.order.deliveryAddressId!.isNotEmpty) {
-        address = await _orderService.getDeliveryAddress(widget.order.deliveryAddressId!);
+      if (deliveryAddressId != null && deliveryAddressId.isNotEmpty) {
+        address = await _orderService.getDeliveryAddress(deliveryAddressId);
+        
+        if (address != null &&
+            (address['latitude'] == null || address['longitude'] == null)) {
+          try {
+            final parts = <String>[
+              address['street']?.toString() ?? '',
+              address['barangay']?.toString() ?? '',
+              address['city']?.toString() ?? '',
+              address['province']?.toString() ?? '',
+            ].where((s) => s.isNotEmpty).toList();
+            final addressText = parts.join(', ');
+
+            if (addressText.isNotEmpty) {
+              final encodedAddr = Uri.encodeComponent(addressText);
+              final searchUri = Uri.parse(
+                'https://nominatim.openstreetmap.org/search?format=json&q=$encodedAddr&limit=1',
+              );
+              final res = await http.get(
+                searchUri,
+                headers: const {
+                  'User-Agent': 'AgriDirect/1.0 (support: noreplyagridirect@gmail.com)',
+                },
+              );
+              if (res.statusCode == 200) {
+                final list = jsonDecode(res.body) as List;
+                if (list.isNotEmpty) {
+                  final first = list.first as Map<String, dynamic>;
+                  // Create a mutable copy of the map to inject geocoded coordinates
+                  address = Map<String, dynamic>.from(address);
+                  address['latitude'] = double.tryParse(first['lat']?.toString() ?? '');
+                  address['longitude'] = double.tryParse(first['lon']?.toString() ?? '');
+                }
+              }
+            }
+          } catch (_) {}
+        }
       }
       FarmerProfile? farmerProfile;
       if (widget.order.farmerId.isNotEmpty) {
@@ -573,7 +626,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
       final hasLocation = _farmerProfile?.location != null && _farmerProfile!.location!.isNotEmpty;
       final lat = _farmerProfile?.farmLatitude;
       final lng = _farmerProfile?.farmLongitude;
-      final shouldShowFarmAddress = isPickup && isReadyForPickup && hasLocation;
+      final shouldShowFarmAddress = isPickup && hasLocation;
 
       return Column(
         children: [

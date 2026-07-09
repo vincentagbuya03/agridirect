@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/admin/admin_service.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:agridirect/shared/widgets/image_widgets.dart';
+import '../../../shared/services/core/supabase_config.dart';
 import 'admin_ui.dart';
 
 class AdminFarmersTab extends StatefulWidget {
@@ -564,7 +565,11 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                           _showDetails(farmer);
                         } else if (value == 'edit') {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Edit profile feature is under development.')),
+                            const SnackBar(
+                              content: Text(
+                                'Edit profile feature is under development.',
+                              ),
+                            ),
                           );
                         } else if (value == 'deactivate') {
                           widget.adminService.deactivateUser(farmer['user_id']);
@@ -778,175 +783,170 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
   // BOTTOM INSIGHTS (Farmer Onboarding Insights + Verification Queue)
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildBottomInsights() {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Farmer Onboarding Insights Card
-          Expanded(
-            flex: 1,
-            child: Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AdminUi.brand, const Color(0xFF0D7C5F)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Farmer Onboarding Insights Card
+        Expanded(
+          flex: 1,
+          child: Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AdminUi.brand, const Color(0xFF0D7C5F)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: AdminUi.radiusLg,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Farmer Onboarding\nInsights',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    height: 1.2,
+                  ),
                 ),
-                borderRadius: AdminUi.radiusLg,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Farmer Onboarding\nInsights',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
+                const SizedBox(height: 12),
+                Text(
+                  'Platform verification throughput remains stable. Real-time monitoring of document submission trends is active.',
+                  style: AdminUi.body(
+                    size: 13,
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                OutlinedButton(
+                  onPressed: () {},
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AdminUi.radiusSm,
+                    ),
+                  ),
+                  child: Text(
+                    'REVIEW REPORT',
+                    style: AdminUi.label(
+                      size: 11,
                       color: Colors.white,
-                      height: 1.2,
+                      weight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Platform verification throughput remains stable. Real-time monitoring of document submission trends is active.',
-                    style: AdminUi.body(
-                      size: 13,
-                      color: Colors.white.withValues(alpha: 0.9),
-                    ),
-                  ),
-                  const Spacer(),
-                  const SizedBox(height: 24),
-                  OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AdminUi.radiusSm,
-                      ),
-                    ),
-                    child: Text(
-                      'REVIEW REPORT',
-                      style: AdminUi.label(
-                        size: 11,
-                        color: Colors.white,
-                        weight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 24),
-          // Verification Queue Card
-          Expanded(
-            flex: 1,
-            child: Container(
-              padding: const EdgeInsets.all(28),
-              decoration: AdminUi.cardDecoration(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Verification Queue',
-                        style: AdminUi.title(size: 18),
-                      ),
-                      InkWell(
-                        onTap: () {
-                          setState(() {
-                            _filterStatus = 'pending';
-                            _loadData();
-                          });
-                        },
-                        borderRadius: AdminUi.radiusSm,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 4,
-                          ),
-                          child: Text(
-                            'View All',
-                            style: AdminUi.label(
-                              size: 12,
-                              color: AdminUi.brand,
-                              weight: FontWeight.w700,
-                            ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          flex: 1,
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: AdminUi.cardDecoration(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Verification Queue', style: AdminUi.title(size: 18)),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _filterStatus = 'pending';
+                          _loadData();
+                        });
+                      },
+                      borderRadius: AdminUi.radiusSm,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          'View All',
+                          style: AdminUi.label(
+                            size: 12,
+                            color: AdminUi.brand,
+                            weight: FontWeight.w700,
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                  Text(
-                    'High priority requests waiting for approval',
-                    style: AdminUi.body(size: 12, color: AdminUi.textSecondary),
-                  ),
-                  const SizedBox(height: 20),
-                  FutureBuilder<List<Map<String, dynamic>>>(
-                    future: _pendingFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: AppShimmerLoader(strokeWidth: 2),
-                        );
-                      }
-
-                      final pending = snapshot.data ?? const [];
-                      if (pending.isEmpty) {
-                        return Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AdminUi.panelAlt,
-                            borderRadius: AdminUi.radiusMd,
-                          ),
-                          child: Text(
-                            'No pending verification requests.',
-                            style: AdminUi.body(
-                              size: 12,
-                              color: AdminUi.textSecondary,
-                            ),
-                          ),
-                        );
-                      }
-
-                      final queueItems = pending.take(3).toList();
-                      return Column(
-                        children: [
-                          for (var i = 0; i < queueItems.length; i++) ...[
-                            _queueItem(
-                              Icons.verified_user_rounded,
-                              AdminUi.warning,
-                              (queueItems[i]['full_name'] ??
-                                      queueItems[i]['applicant_name'] ??
-                                      queueItems[i]['name'] ??
-                                      'Pending Applicant')
-                                  .toString(),
-                              (queueItems[i]['farm_name'] ?? 'Pending Farm')
-                                  .toString(),
-                              _formatQueueTime(queueItems[i]['created_at']),
-                            ),
-                            if (i != queueItems.length - 1)
-                              const SizedBox(height: 12),
-                          ],
-                        ],
+                    ),
+                  ],
+                ),
+                Text(
+                  'High priority requests waiting for approval',
+                  style: AdminUi.body(size: 12, color: AdminUi.textSecondary),
+                ),
+                const SizedBox(height: 20),
+                FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _pendingFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: AppShimmerLoader(strokeWidth: 2),
                       );
-                    },
-                  ),
-                ],
-              ),
+                    }
+
+                    final pending = snapshot.data ?? const [];
+                    if (pending.isEmpty) {
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AdminUi.panelAlt,
+                          borderRadius: AdminUi.radiusMd,
+                        ),
+                        child: Text(
+                          'No pending verification requests.',
+                          style: AdminUi.body(
+                            size: 12,
+                            color: AdminUi.textSecondary,
+                          ),
+                        ),
+                      );
+                    }
+
+                    final queueItems = pending.take(3).toList();
+                    return Column(
+                      children: [
+                        for (var i = 0; i < queueItems.length; i++) ...[
+                          _queueItem(
+                            Icons.verified_user_rounded,
+                            AdminUi.warning,
+                            (queueItems[i]['full_name'] ??
+                                    queueItems[i]['applicant_name'] ??
+                                    queueItems[i]['name'] ??
+                                    'Pending Applicant')
+                                .toString(),
+                            (queueItems[i]['farm_name'] ?? 'Pending Farm')
+                                .toString(),
+                            _formatQueueTime(queueItems[i]['created_at']),
+                          ),
+                          if (i != queueItems.length - 1)
+                            const SizedBox(height: 12),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1065,6 +1065,39 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
         );
       },
     );
+  }
+
+  Future<Map<String, dynamic>> _fetchExtraDetails(String farmerId) async {
+    if (farmerId.trim().isEmpty) {
+      return {'education': [], 'crops': [], 'livestock': []};
+    }
+    try {
+      final eduFuture = SupabaseConfig.client
+          .from('farmer_education')
+          .select('degree, institution, year_graduated')
+          .eq('farmer_id', farmerId.trim());
+
+      final cropFuture = SupabaseConfig.client
+          .from('farmer_crop_types')
+          .select('crop_type')
+          .eq('farmer_id', farmerId.trim());
+
+      final liveFuture = SupabaseConfig.client
+          .from('farmer_livestock')
+          .select('livestock_type')
+          .eq('farmer_id', farmerId.trim());
+
+      final results = await Future.wait([eduFuture, cropFuture, liveFuture]);
+
+      return {
+        'education': List<Map<String, dynamic>>.from(results[0] as List),
+        'crops': (results[1] as List).map((c) => c['crop_type'].toString()).toList(),
+        'livestock': (results[2] as List).map((l) => l['livestock_type'].toString()).toList(),
+      };
+    } catch (e) {
+      debugPrint('Error fetching extra details: $e');
+      return {'education': [], 'crops': [], 'livestock': []};
+    }
   }
 
   Widget _buildDetailContent(Map<String, dynamic> farmer) {
@@ -1193,9 +1226,9 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                     _formatIdType(farmer['id_type']),
                     Icons.badge_rounded,
                   ),
-                  if (farmer['id_type'] == 'national_id')
+                  if (farmer['id_type'] == 'national_id' || farmer['id_type'] == 'local_id')
                     _detailItem(
-                      'PhilSys PCN',
+                      farmer['id_type'] == 'local_id' ? 'Local ID Number' : 'PhilSys PCN',
                       farmer['pcn'] ?? 'Not provided',
                       Icons.qr_code_scanner_rounded,
                     ),
@@ -1216,6 +1249,54 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                   ),
                 ]),
                 const SizedBox(height: 32),
+                FutureBuilder<Map<String, dynamic>>(
+                  future: _fetchExtraDetails(farmer['farmer_id'] ?? ''),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+                      );
+                    }
+                    final extra = snapshot.data ?? {'education': [], 'crops': [], 'livestock': []};
+                    final List<dynamic> edu = extra['education'] ?? [];
+                    final List<String> crops = List<String>.from(extra['crops'] ?? []);
+                    final List<String> livestock = List<String>.from(extra['livestock'] ?? []);
+
+                    String elem = 'Not provided';
+                    String hs = 'Not provided';
+                    String college = 'Not provided';
+                    for (var e in edu) {
+                      final degree = (e['degree'] ?? '').toString().toLowerCase();
+                      final inst = (e['institution'] ?? '').toString();
+                      if (degree.contains('elementary')) {
+                        elem = inst;
+                      } else if (degree.contains('high') || degree.contains('secondary')) {
+                        hs = inst;
+                      } else {
+                        college = inst;
+                      }
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _detailSection('ACADEMIC BACKGROUND', [
+                          _detailItem('Elementary', elem, Icons.school_outlined),
+                          _detailItem('High School', hs, Icons.school_rounded),
+                          _detailItem('College / Tertiary', college, Icons.workspace_premium_rounded),
+                        ]),
+                        const SizedBox(height: 32),
+                        _detailSection('FARMING PROFILE', [
+                          _detailItem('Farming History', farmer['farming_history'] ?? 'None', Icons.history_rounded),
+                          _detailItem('Crops Produced', crops.isEmpty ? 'None' : crops.join(', '), Icons.agriculture_rounded),
+                          _detailItem('Livestock Produced', livestock.isEmpty ? 'None' : livestock.join(', '), Icons.pets_rounded),
+                        ]),
+                        const SizedBox(height: 32),
+                      ],
+                    );
+                  },
+                ),
                 _detailSection('VERIFICATION STATUS', [
                   _detailStatusItem(status),
                 ]),
@@ -1228,22 +1309,24 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                     onTap: () =>
                         _viewDocument('Face Recognition Match', facePhoto),
                   ),
-                  _documentPlaceholder(
-                    'Valid Government ID (Front)',
-                    path: validId,
-                    icon: Icons.badge_rounded,
-                    onTap: () =>
-                        _viewDocument('Valid Government ID (Front)', validId),
-                  ),
-                  _documentPlaceholder(
-                    'Valid Government ID (Back / QR)',
-                    path: farmer['valid_id_back_path'],
-                    icon: Icons.qr_code_rounded,
-                    onTap: () => _viewDocument(
-                      'Valid Government ID (Back / QR)',
-                      farmer['valid_id_back_path'],
+                  if (farmer['id_type'] != 'local_id') ...[
+                    _documentPlaceholder(
+                      'Valid Government ID (Front)',
+                      path: validId,
+                      icon: Icons.badge_rounded,
+                      onTap: () =>
+                          _viewDocument('Valid Government ID (Front)', validId),
                     ),
-                  ),
+                    _documentPlaceholder(
+                      'Valid Government ID (Back / QR)',
+                      path: farmer['valid_id_back_path'],
+                      icon: Icons.qr_code_rounded,
+                      onTap: () => _viewDocument(
+                        'Valid Government ID (Back / QR)',
+                        farmer['valid_id_back_path'],
+                      ),
+                    ),
+                  ],
                 ]),
               ],
             ),

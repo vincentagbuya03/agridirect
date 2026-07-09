@@ -1179,7 +1179,10 @@ class AdminService extends ChangeNotifier {
       // Self-heal: If registration is pending but the farmer is already verified,
       // update the registration status in the database to 'approved' in background.
       for (var row in list) {
-        final farmers = row['farmers'] as Map<String, dynamic>?;
+        final farmerData = row['farmers'];
+        final farmers = farmerData is List
+            ? (farmerData.isNotEmpty ? farmerData[0] : null)
+            : farmerData as Map<String, dynamic>?;
         final isVerified = farmers?['is_verified'] == true;
         if (isVerified) {
           final regId = row['registration_id'];
@@ -1198,7 +1201,10 @@ class AdminService extends ChangeNotifier {
 
       // Filter out registrations where the farmer is already verified
       final pendingOnly = list.where((row) {
-        final farmers = row['farmers'] as Map<String, dynamic>?;
+        final farmerData = row['farmers'];
+        final farmers = farmerData is List
+            ? (farmerData.isNotEmpty ? farmerData[0] : null)
+            : farmerData as Map<String, dynamic>?;
         return farmers?['is_verified'] != true;
       }).toList();
 
@@ -1607,10 +1613,14 @@ class AdminService extends ChangeNotifier {
           })
           .eq('farmer_id', farmerId);
 
-      final farmers = registration['farmers'] as Map<String, dynamic>?;
-      final targetUserId = (farmers?['user_id'] ?? '').toString();
-      final farmName = (farmers?['farm_name'] ?? '').toString();
-      final fullName = (farmers?['full_name'] ?? '').toString();
+      final farmerData = registration['farmers'];
+      final farmerMap = farmerData is List
+          ? (farmerData.isNotEmpty ? farmerData[0] : null)
+          : farmerData as Map<String, dynamic>?;
+
+      final targetUserId = (farmerMap?['user_id'] ?? '').toString();
+      final farmName = (farmerMap?['farm_name'] ?? '').toString();
+      final fullName = (farmerMap?['full_name'] ?? '').toString();
 
       if (targetUserId.isNotEmpty && fullName.isNotEmpty) {
         // Update user's name to their verified legal name

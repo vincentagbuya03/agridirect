@@ -218,10 +218,15 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
       final isHttpUrl =
           rawUrl.startsWith('http://') || rawUrl.startsWith('https://');
       final isSignedUrl = rawUrl.contains('token=');
-      final needsSupabaseResolution =
-          !isHttpUrl || rawUrl.contains('supabase.co/storage/v1/object/');
+      // Public Supabase storage URLs (/object/public/) are already accessible
+      // and don't support signed URL generation — use them directly.
+      final isPublicStorageUrl =
+          rawUrl.contains('supabase.co/storage/v1/object/public/');
+      final needsSupabaseResolution = !isHttpUrl ||
+          (rawUrl.contains('supabase.co/storage/v1/object/') &&
+              !isPublicStorageUrl);
 
-      if (isSignedUrl || !needsSupabaseResolution) {
+      if (isSignedUrl || isPublicStorageUrl || !needsSupabaseResolution) {
         _urlFuture = Future.value(rawUrl);
       } else {
         _urlFuture = SupabaseDatabase.getSafeUrl(

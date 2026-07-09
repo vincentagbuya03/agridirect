@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
-import '../../../shared/widgets/app_shimmer_loader.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import '../../widgets/animated_components.dart';
 import '../../../shared/services/commerce/order_service.dart';
@@ -28,12 +27,24 @@ class WebFarmerOrders extends StatefulWidget {
   State<WebFarmerOrders> createState() => _WebFarmerOrdersState();
 }
 
-class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderStateMixin {
+class _WebFarmerOrdersState extends State<WebFarmerOrders>
+    with TickerProviderStateMixin {
   late AnimationController _fadeInController;
   int _hoveredNav = -1;
   String _searchQuery = '';
   String _selectedStatus = 'ALL';
-  final List<String> _statusFilters = ['ALL', 'PENDING', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
+  final List<String> _statusFilters = [
+    'ALL',
+    'PENDING',
+    'SHIPPED',
+    'DELIVERED',
+    'CANCELLED',
+  ];
+
+  // Cached orders — only replaced when user explicitly refreshes or updates
+  Future<List<Map<String, dynamic>>>? _ordersFuture;
+  List<Map<String, dynamic>> _orders = [];
+  bool _ordersLoaded = false;
 
   static const Color _primary = Color(0xFF16A34A);
   static const Color _dark = Color(0xFF111827);
@@ -48,12 +59,55 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
       duration: const Duration(milliseconds: 800),
       vsync: this,
     )..forward();
+    _loadOrders();
+  }
+
+  void _loadOrders() {
+    _ordersFuture = SupabaseDataService().getFarmerOrders().then((data) {
+      if (mounted) {
+        setState(() {
+          _orders = List<Map<String, dynamic>>.from(data);
+          _ordersLoaded = true;
+        });
+      }
+      return data;
+    });
+  }
+
+  /// Optimistic update: change just one row in-memory, no full reload
+  void _updateOrderStatusLocally(String rawOrderId, String newStatus) {
+    setState(() {
+      final idx = _orders.indexWhere(
+        (o) => o['rawOrderId']?.toString() == rawOrderId,
+      );
+      if (idx != -1) {
+        _orders[idx] = Map<String, dynamic>.from(_orders[idx])
+          ..['status'] = newStatus;
+      }
+    });
   }
 
   @override
   void dispose() {
     _fadeInController.dispose();
     super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _filteredOrders {
+    return _orders.where((o) {
+      final id = o['orderId']?.toString().toLowerCase() ?? '';
+      final customer = o['customerName']?.toString().toLowerCase() ?? '';
+      final status = o['status']?.toString().toUpperCase() ?? '';
+
+      final matchesSearch =
+          _searchQuery.isEmpty ||
+          id.contains(_searchQuery.toLowerCase()) ||
+          customer.contains(_searchQuery.toLowerCase());
+      final matchesStatus =
+          _selectedStatus == 'ALL' || status == _selectedStatus;
+
+      return matchesSearch && matchesStatus;
+    }).toList();
   }
 
   @override
@@ -67,7 +121,10 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
         children: [
           Positioned.fill(
             child: CustomPaint(
-              painter: DotPatternPainter(opacity: 0.03, color: const Color(0xFF10B981)),
+              painter: DotPatternPainter(
+                opacity: 0.03,
+                color: const Color(0xFF10B981),
+              ),
             ),
           ),
           Column(
@@ -75,7 +132,12 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
               _buildNavBar(),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(isMobile ? 16 : 40, 0, isMobile ? 16 : 40, 40),
+                  padding: EdgeInsets.fromLTRB(
+                    isMobile ? 16 : 40,
+                    0,
+                    isMobile ? 16 : 40,
+                    40,
+                  ),
                   child: FadeTransition(
                     opacity: _fadeInController,
                     child: Column(
@@ -83,7 +145,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
                       children: [
                         _buildHeader(),
                         SizedBox(height: isMobile ? 20 : 32),
-                        _buildOrderTable(),
+                        _buildOrderList(),
                       ],
                     ),
                   ),
@@ -111,7 +173,13 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
       );
     }
 
-    final navItems = ['Dashboard', 'Products', 'Orders', 'Community', 'Pre-Orders'];
+    final navItems = [
+      'Dashboard',
+      'Products',
+      'Orders',
+      'Community',
+      'Pre-Orders',
+    ];
     return Container(
       margin: isMobile
           ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
@@ -121,7 +189,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
         vertical: isMobile ? 12 : 14,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.8),
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: _border.withValues(alpha: 0.5)),
         boxShadow: [
@@ -157,7 +225,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
                   child: GestureDetector(
                     onTap: () => widget.onNavigate(i),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
+                      duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 20,
                         vertical: 12,
@@ -236,49 +304,84 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 650;
 
-    final title = Text(
-      'Order Management',
-      style: GoogleFonts.plusJakartaSans(
-        fontSize: isMobile ? 24 : 32,
-        fontWeight: FontWeight.w800,
-        color: _dark,
-      ),
+    final title = Row(
+      children: [
+        Text(
+          'Order Management',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: isMobile ? 24 : 32,
+            fontWeight: FontWeight.w800,
+            color: _dark,
+          ),
+        ),
+        const Spacer(),
+        // Refresh button
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: _loadOrders,
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _border),
+              ),
+              child: const Icon(Icons.refresh_rounded, size: 20, color: _muted),
+            ),
+          ),
+        ),
+      ],
     );
 
-    final statusFiltersList = SingleChildScrollView(
+    final filters = SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
       child: Row(
-        children: List.generate(_statusFilters.length, (index) {
-          final status = _statusFilters[index];
+        children: _statusFilters.map((status) {
           final isSelected = _selectedStatus == status;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(status),
-              selected: isSelected,
-              onSelected: (val) => setState(() => _selectedStatus = status),
-              selectedColor: _primary.withValues(alpha: 0.1),
-              labelStyle: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? _primary : _muted,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => setState(() => _selectedStatus = status),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? _primary.withValues(alpha: 0.1)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? _primary : _border,
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Text(
+                    status,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      color: isSelected ? _primary : _muted,
+                    ),
+                  ),
+                ),
               ),
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-                side: BorderSide(color: isSelected ? _primary : _border),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              showCheckmark: false,
             ),
           );
-        }),
+        }).toList(),
       ),
     );
 
     final searchField = Container(
-      width: isMobile ? double.infinity : 300,
+      width: isMobile ? double.infinity : 280,
       height: 44,
       decoration: BoxDecoration(
         color: Colors.white,
@@ -287,12 +390,13 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
       ),
       child: TextField(
         onChanged: (val) => setState(() => _searchQuery = val),
+        style: GoogleFonts.inter(fontSize: 14, color: _dark),
         decoration: InputDecoration(
           hintText: 'Search order ID, customer...',
           hintStyle: GoogleFonts.inter(color: _muted, fontSize: 13),
           prefixIcon: const Icon(Icons.search_rounded, color: _muted, size: 18),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+          contentPadding: const EdgeInsets.symmetric(vertical: 11),
         ),
       ),
     );
@@ -303,7 +407,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
         children: [
           title,
           const SizedBox(height: 20),
-          statusFiltersList,
+          filters,
           const SizedBox(height: 16),
           searchField,
         ],
@@ -317,7 +421,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
         const SizedBox(height: 24),
         Row(
           children: [
-            Expanded(child: statusFiltersList),
+            Expanded(child: filters),
             const SizedBox(width: 16),
             searchField,
           ],
@@ -326,9 +430,111 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
     );
   }
 
-  Widget _buildOrderTable() {
+  Widget _buildOrderList() {
+    if (!_ordersLoaded) {
+      return _buildSkeleton();
+    }
+
+    final filtered = _filteredOrders;
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+
+    if (filtered.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 80),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _border),
+        ),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(
+                Icons.inbox_outlined,
+                size: 56,
+                color: _muted.withValues(alpha: 0.3),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No orders match your criteria',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  color: _muted,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (isMobile) {
+      return ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: filtered.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, i) => _buildMobileOrderCard(filtered[i]),
+      );
+    }
+
     return Container(
-      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          children: [
+            // Table header
+            Container(
+              color: _surface,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Row(
+                children: [
+                  _headerCell('Order ID', flex: 3),
+                  _headerCell('Date', flex: 2),
+                  _headerCell('Customer', flex: 3),
+                  _headerCell('Items', flex: 3),
+                  _headerCell('Total', flex: 2),
+                  _headerCell('Status', flex: 2),
+                  _headerCell('Actions', flex: 2),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE5E7EB)),
+            // Rows
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: filtered.length,
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 1, color: Color(0xFFE5E7EB)),
+              itemBuilder: (context, i) => _buildOrderRow(filtered[i]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileOrderCard(Map<String, dynamic> o) {
+    final status = o['status']?.toString().toUpperCase() ?? 'PENDING';
+    final canProgress = status != 'DELIVERED' && status != 'CANCELLED';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -336,192 +542,371 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: FutureBuilder<List<Map<String, dynamic>>>(
-        future: SupabaseDataService().getFarmerOrders(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Padding(
-              padding: EdgeInsets.all(40),
-              child: Center(child: AppShimmerLoader()),
-            );
-          }
-
-          final allOrders = snapshot.data ?? [];
-          final orders = allOrders.where((o) {
-            final id = o['orderId']?.toString().toLowerCase() ?? '';
-            final customer = o['customerName']?.toString().toLowerCase() ?? '';
-            final status = o['status']?.toString().toUpperCase() ?? '';
-            
-            final matchesSearch = id.contains(_searchQuery.toLowerCase()) || 
-                                customer.contains(_searchQuery.toLowerCase());
-            final matchesStatus = _selectedStatus == 'ALL' || status == _selectedStatus;
-            
-            return matchesSearch && matchesStatus;
-          }).toList();
-
-          if (orders.isEmpty) {
-            return Padding(
-              padding: const EdgeInsets.all(80),
-              child: Center(
-                child: Text('No orders match your criteria.', style: GoogleFonts.inter(color: _muted)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                o['orderId'] ?? '#0000',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _dark,
+                ),
               ),
-            );
-          }
-
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Theme(
-              data: Theme.of(context).copyWith(dividerColor: _border.withValues(alpha: 0.5)),
-              child: DataTable(
-                headingRowHeight: 64,
-                dataRowMinHeight: 72,
-                dataRowMaxHeight: 72,
-                horizontalMargin: 24,
-                columnSpacing: 24,
-                columns: [
-                  _buildColumn('Order ID'),
-                  _buildColumn('Date'),
-                  _buildColumn('Customer'),
-                  _buildColumn('Items'),
-                  _buildColumn('Total'),
-                  _buildColumn('Status'),
-                  _buildColumn('Actions'),
-                ],
-                rows: orders.map((o) => _buildDataRow(o)).toList(),
+              _StatusBadge(status: status, paymentMethod: o['paymentMethod']),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text(
+                o['timeAgo'] ?? '',
+                style: GoogleFonts.inter(fontSize: 12, color: _muted),
               ),
-            ),
-          );
-        },
+              const Spacer(),
+              Text(
+                o['total'] ?? '₱0.00',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: _dark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: _primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    (o['customerName'] ?? 'C')[0].toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: _primary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  o['customerName'] ?? 'Customer',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _dark,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.shopping_bag_outlined, size: 14, color: _muted),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  o['items'] ?? '',
+                  style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: () => _viewOrderDetails(o),
+                icon: const Icon(Icons.visibility_outlined, size: 16),
+                label: Text(
+                  'Details',
+                  style: GoogleFonts.inter(fontSize: 13),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: _muted,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (canProgress)
+                ElevatedButton.icon(
+                  onPressed: () => _processOrderConfirmation(o),
+                  icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                  label: Text(
+                    _getNextActionLabel(status, o['paymentMethod']),
+                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  DataColumn _buildColumn(String label) {
-    return DataColumn(
-      label: Text(
+  Widget _headerCell(String label, {int flex = 1}) {
+    return Expanded(
+      flex: flex,
+      child: Text(
         label,
         style: GoogleFonts.inter(
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: _dark,
+          color: _muted,
+          letterSpacing: 0.5,
         ),
       ),
     );
   }
 
-  DataRow _buildDataRow(Map<String, dynamic> o) {
+  Widget _buildOrderRow(Map<String, dynamic> o) {
     final status = o['status']?.toString().toUpperCase() ?? 'PENDING';
-    Color statusColor = Colors.orange;
-    if (status == 'DELIVERED') statusColor = _primary;
-    if (status == 'SHIPPED') statusColor = Colors.blue;
-    if (status == 'CANCELLED') statusColor = Colors.red;
+    final canProgress = status != 'DELIVERED' && status != 'CANCELLED';
 
-    return DataRow(
-      cells: [
-        DataCell(Text(o['orderId'] ?? '#0000', style: GoogleFonts.inter(fontWeight: FontWeight.w600))),
-        DataCell(Text(o['timeAgo'] ?? 'Recently', style: GoogleFonts.inter(fontSize: 13))),
-        DataCell(
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 14,
-                backgroundColor: _primary.withValues(alpha: 0.1),
-                child: Text(
-                  (o['customerName'] ?? 'C')[0],
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _primary),
+    return _HoverableRow(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          children: [
+            // Order ID
+            Expanded(
+              flex: 3,
+              child: Text(
+                o['orderId'] ?? '#0000',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _dark,
                 ),
               ),
-              const SizedBox(width: 10),
-              Text(o['customerName'] ?? 'Customer', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500)),
-            ],
-          ),
-        ),
-        DataCell(
-          SizedBox(
-            width: 150,
-            child: Text(
-              o['items'] ?? 'Various items',
-              style: GoogleFonts.inter(fontSize: 12, color: _muted),
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ),
-        DataCell(Text(o['total'] ?? '₱0.00', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _dark))),
-        DataCell(
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+            // Date
+            Expanded(
+              flex: 2,
+              child: Text(
+                o['timeAgo'] ?? '',
+                style: GoogleFonts.inter(fontSize: 13, color: _muted),
+              ),
             ),
-            child: Text(
-              status,
-              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: statusColor),
-            ),
-          ),
-        ),
-        DataCell(
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.visibility_outlined, size: 20),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => FarmerOrderDetailsScreen(
-                        order: Order(
-                          orderId: o['rawOrderId'].toString(),
-                          orderNumber: o['orderId'].toString().replaceFirst('#', ''),
-                          customerId: o['customerId'] ?? '',
-                          farmerId: '',
-                          status: o['status'] ?? 'PENDING',
-                          createdAt: o['createdAt'] as DateTime,
-                          updatedAt: o['createdAt'] as DateTime,
-                          deliveryAddressId: o['deliveryAddressId'],
-                          total: o['rawTotal'] as double?,
-                          subtotal: o['subtotal'] as double?,
-                          deliveryFee: o['deliveryFee'] as double?,
-                          paymentMethod: o['paymentMethod'],
+            // Customer
+            Expanded(
+              flex: 3,
+              child: Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: _primary.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        (o['customerName'] ?? 'C')[0].toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: _primary,
                         ),
-                        customerName: o['customerName'] ?? 'Customer',
-                        customerImage: o['customerImage']?.toString() ?? '',
                       ),
                     ),
-                  ).then((_) => setState(() {}));
-                },
-                tooltip: 'View Details',
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      o['customerName'] ?? 'Customer',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _dark,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
-              IconButton(
-                icon: Icon(
-                  Icons.check_circle_outline,
-                  size: 20,
-                  color: (status == 'DELIVERED' || status == 'CANCELLED')
-                      ? Colors.grey
-                      : _primary,
+            ),
+            // Items
+            Expanded(
+              flex: 3,
+              child: Text(
+                o['items'] ?? '',
+                style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            // Total
+            Expanded(
+              flex: 2,
+              child: Text(
+                o['total'] ?? '₱0.00',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: _dark,
                 ),
-                onPressed: (status == 'DELIVERED' || status == 'CANCELLED')
-                    ? null
-                    : () => _processOrderConfirmation(o),
-                tooltip: status == 'PENDING'
-                    ? 'Confirm Order'
-                    : status == 'CONFIRMED'
-                        ? 'Prepare Order'
-                        : status == 'PROCESSING'
-                            ? (o['paymentMethod']?.toString().toUpperCase() == 'COP' ? 'Mark Ready for Pickup' : 'Ship Order')
-                            : status == 'SHIPPED'
-                                ? (o['paymentMethod']?.toString().toUpperCase() == 'COP' ? 'Complete Pickup' : 'Deliver Order')
-                                : 'Order Completed',
               ),
-            ],
+            ),
+            // Status badge
+            Expanded(
+              flex: 2,
+              child: _StatusBadge(
+                status: status,
+                paymentMethod: o['paymentMethod'],
+              ),
+            ),
+            // Actions
+            Expanded(
+              flex: 2,
+              child: Row(
+                children: [
+                  _ActionButton(
+                    icon: Icons.visibility_outlined,
+                    tooltip: 'View Details',
+                    color: _muted,
+                    onTap: () => _viewOrderDetails(o),
+                  ),
+                  const SizedBox(width: 4),
+                  _ActionButton(
+                    icon: Icons.check_circle_outline_rounded,
+                    tooltip: _getNextActionLabel(status, o['paymentMethod']),
+                    color: canProgress ? _primary : Colors.grey.shade300,
+                    onTap: canProgress
+                        ? () => _processOrderConfirmation(o)
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getNextActionLabel(String status, dynamic paymentMethod) {
+    final isCop = paymentMethod?.toString().toUpperCase() == 'COP';
+    switch (status) {
+      case 'PENDING':
+        return 'Confirm Order';
+      case 'CONFIRMED':
+        return 'Prepare Order';
+      case 'PROCESSING':
+        return isCop ? 'Mark Ready for Pickup' : 'Ship Order';
+      case 'SHIPPED':
+        return isCop ? 'Complete Pickup' : 'Mark Delivered';
+      default:
+        return 'Order Completed';
+    }
+  }
+
+  Widget _buildSkeleton() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        children: List.generate(
+          6,
+          (i) => Container(
+            height: 64,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            decoration: BoxDecoration(
+              border: i < 5
+                  ? const Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))
+                  : null,
+            ),
+            child: Row(
+              children: [
+                _skeletonBox(120),
+                const SizedBox(width: 24),
+                _skeletonBox(80),
+                const SizedBox(width: 24),
+                _skeletonBox(140),
+                const SizedBox(width: 24),
+                _skeletonBox(160),
+                const Spacer(),
+                _skeletonBox(60),
+                const SizedBox(width: 16),
+                _skeletonBox(80),
+                const SizedBox(width: 16),
+                _skeletonBox(64),
+              ],
+            ),
           ),
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _skeletonBox(double width) {
+    return Container(
+      width: width,
+      height: 14,
+      decoration: BoxDecoration(
+        color: _border,
+        borderRadius: BorderRadius.circular(6),
+      ),
+    );
+  }
+
+  void _viewOrderDetails(Map<String, dynamic> o) {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, a1, a2) => FarmerOrderDetailsScreen(
+          order: Order(
+            orderId: o['rawOrderId'].toString(),
+            orderNumber: o['orderId'].toString().replaceFirst('#', ''),
+            customerId: o['customerId'] ?? '',
+            farmerId: '',
+            status: o['status'] ?? 'PENDING',
+            createdAt: o['createdAt'] as DateTime,
+            updatedAt: o['createdAt'] as DateTime,
+            deliveryAddressId: o['deliveryAddressId'],
+            total: o['rawTotal'] as double?,
+            subtotal: o['subtotal'] as double?,
+            deliveryFee: o['deliveryFee'] as double?,
+            paymentMethod: o['paymentMethod'],
+          ),
+          customerName: o['customerName'] ?? 'Customer',
+          customerImage: o['customerImage']?.toString() ?? '',
+        ),
+        transitionsBuilder: (_, a, __, child) =>
+            FadeTransition(opacity: a, child: child),
+        transitionDuration: const Duration(milliseconds: 200),
+      ),
     );
   }
 
@@ -531,103 +916,459 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders> with TickerProviderSt
     if (rawOrderId == null) return;
 
     final status = o['status']?.toString().toUpperCase() ?? 'PENDING';
-    
     final isCop = o['paymentMethod']?.toString().toUpperCase() == 'COP';
 
     String nextStatus = 'CONFIRMED';
     String actionText = 'Confirm Order';
-    String confirmationMsg = 'Are you sure you want to mark Order $orderIdStr as CONFIRMED?';
+    String confirmationMsg = 'Mark Order $orderIdStr as CONFIRMED?';
 
     if (status == 'CONFIRMED') {
       nextStatus = 'PROCESSING';
       actionText = 'Prepare Order';
-      confirmationMsg = 'Are you sure you want to mark Order $orderIdStr as PROCESSING?';
+      confirmationMsg = 'Mark Order $orderIdStr as PROCESSING?';
     } else if (status == 'PROCESSING') {
       nextStatus = 'SHIPPED';
       actionText = isCop ? 'Ready for Pickup' : 'Ship Order';
-      confirmationMsg = isCop 
-          ? 'Are you sure you want to mark Order $orderIdStr as Ready for Pickup?'
-          : 'Are you sure you want to mark Order $orderIdStr as SHIPPED?';
+      confirmationMsg = isCop
+          ? 'Mark Order $orderIdStr as Ready for Pickup?'
+          : 'Mark Order $orderIdStr as SHIPPED?';
     } else if (status == 'SHIPPED') {
       nextStatus = 'DELIVERED';
       actionText = isCop ? 'Complete Pickup' : 'Deliver Order';
       confirmationMsg = isCop
-          ? 'Are you sure you want to mark Order $orderIdStr as Picked Up?'
-          : 'Are you sure you want to mark Order $orderIdStr as DELIVERED?';
+          ? 'Mark Order $orderIdStr as Picked Up?'
+          : 'Mark Order $orderIdStr as DELIVERED?';
     }
 
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          actionText,
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          confirmationMsg,
-          style: GoogleFonts.inter(color: _muted),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel', style: GoogleFonts.inter(color: _muted)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: Text(actionText, style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-          ),
-        ],
+      builder: (context) => _ConfirmDialog(
+        title: actionText,
+        message: confirmationMsg,
+        confirmLabel: actionText,
       ),
     );
 
-    if (confirm == true) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-              ),
-              SizedBox(width: 12),
-              Text('Updating order status...'),
-            ],
-          ),
-          duration: Duration(seconds: 10),
-        ),
-      );
+    if (confirm == true && mounted) {
+      // Optimistic update — no full reload
+      _updateOrderStatusLocally(rawOrderId, nextStatus);
 
       try {
         await OrderService().updateOrderStatus(rawOrderId, nextStatus);
         if (mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Order $orderIdStr status updated to $nextStatus'),
-              backgroundColor: _primary,
+          String successMsg = 'Order status updated successfully.';
+          if (nextStatus == 'SHIPPED') {
+            successMsg = isCop
+                ? 'Order is ready for pickup! Customer has been notified.'
+                : 'Order is shipped and on the way!';
+          } else if (nextStatus == 'DELIVERED') {
+            successMsg = isCop
+                ? 'Pickup completed successfully! Order finalized.'
+                : 'Order delivered successfully!';
+          } else if (nextStatus == 'CONFIRMED') {
+            successMsg = 'Order accepted! Preparing items.';
+          } else if (nextStatus == 'PROCESSING') {
+            successMsg = 'Order is now processing!';
+          }
+
+          late OverlayEntry overlayEntry;
+          overlayEntry = OverlayEntry(
+            builder: (context) => Scaffold(
+              backgroundColor: Colors.transparent,
+              body: _StatusSuccessOverlay(
+                statusTitle: nextStatus,
+                message: successMsg,
+                onFinished: () {
+                  overlayEntry.remove();
+                },
+              ),
             ),
           );
-          setState(() {}); // Refresh list
+          Overlay.of(context).insert(overlayEntry);
         }
       } catch (e) {
+        // Revert optimistic update on failure
+        _updateOrderStatusLocally(rawOrderId, status);
         if (mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to update status: $e'),
+              content: Text('Failed to update: $e'),
               backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           );
         }
       }
     }
+  }
+}
+
+// ─── Status Badge ────────────────────────────────────────────────────────────
+
+class _StatusBadge extends StatelessWidget {
+  final String status;
+  final dynamic paymentMethod;
+  const _StatusBadge({required this.status, this.paymentMethod});
+
+  Color get _bg {
+    switch (status) {
+      case 'DELIVERED':
+        return const Color(0xFF16A34A);
+      case 'SHIPPED':
+        return const Color(0xFF2563EB);
+      case 'PROCESSING':
+        return const Color(0xFF7C3AED);
+      case 'CONFIRMED':
+        return const Color(0xFF0891B2);
+      case 'CANCELLED':
+        return const Color(0xFFDC2626);
+      default:
+        return const Color(0xFFD97706); // PENDING
+    }
+  }
+
+  String get _labelText {
+    final isCop = paymentMethod?.toString().toUpperCase() == 'COP';
+    if (isCop) {
+      if (status == 'DELIVERED') return 'PICKED UP';
+      if (status == 'SHIPPED') return 'READY FOR PICKUP';
+    }
+    return status;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: _bg.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _bg.withValues(alpha: 0.25)),
+      ),
+      child: Text(
+        _labelText,
+        style: GoogleFonts.inter(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: _bg,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Action Button ───────────────────────────────────────────────────────────
+
+class _ActionButton extends StatefulWidget {
+  final IconData icon;
+  final String tooltip;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _ActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.color,
+    this.onTap,
+  });
+
+  @override
+  State<_ActionButton> createState() => _ActionButtonState();
+}
+
+class _ActionButtonState extends State<_ActionButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDisabled = widget.onTap == null;
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        cursor: isDisabled
+            ? SystemMouseCursors.forbidden
+            : SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: _hovered && !isDisabled
+                  ? widget.color.withValues(alpha: 0.1)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(widget.icon, size: 18, color: widget.color),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Hoverable Row ───────────────────────────────────────────────────────────
+
+class _HoverableRow extends StatefulWidget {
+  final Widget child;
+  const _HoverableRow({required this.child});
+
+  @override
+  State<_HoverableRow> createState() => _HoverableRowState();
+}
+
+class _HoverableRowState extends State<_HoverableRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        color: _hovered ? const Color(0xFFF9FAFB) : Colors.white,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+// ─── Confirm Dialog ──────────────────────────────────────────────────────────
+
+class _ConfirmDialog extends StatelessWidget {
+  final String title;
+  final String message;
+  final String confirmLabel;
+
+  const _ConfirmDialog({
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+  });
+
+  static const Color _primary = Color(0xFF16A34A);
+  static const Color _muted = Color(0xFF6B7280);
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        width: 400,
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: _primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: _primary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text(
+              message,
+              style: GoogleFonts.inter(fontSize: 14, color: _muted),
+            ),
+            const SizedBox(height: 28),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.inter(color: _muted),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      confirmLabel,
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Success Overlay Animation (Like Mobile) ───────────────────────────────
+
+class _StatusSuccessOverlay extends StatefulWidget {
+  final String statusTitle;
+  final String message;
+  final VoidCallback onFinished;
+
+  const _StatusSuccessOverlay({
+    required this.statusTitle,
+    required this.message,
+    required this.onFinished,
+  });
+
+  @override
+  State<_StatusSuccessOverlay> createState() => _StatusSuccessOverlayState();
+}
+
+class _StatusSuccessOverlayState extends State<_StatusSuccessOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 0.0,
+          end: 1.2,
+        ).chain(CurveTween(curve: Curves.easeOutBack)),
+        weight: 35,
+      ),
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 1.2,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeIn)),
+        weight: 15,
+      ),
+      TweenSequenceItem(tween: ConstantTween<double>(1.0), weight: 35),
+    ]).animate(_controller);
+
+    _opacityAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 15),
+      TweenSequenceItem(tween: ConstantTween<double>(1.0), weight: 70),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 15),
+    ]).animate(_controller);
+
+    _controller.forward().then((_) => widget.onFinished());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacityAnimation,
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.85),
+        child: Center(
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.greenAccent,
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: Colors.white,
+                    size: 64,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  'Status Updated!',
+                  style: GoogleFonts.poppins(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Text(
+                    widget.message,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

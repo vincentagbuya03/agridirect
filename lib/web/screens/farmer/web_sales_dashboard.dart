@@ -1387,14 +1387,18 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Sales Performance',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: _dark,
+              Expanded(
+                child: Text(
+                  'Sales Performance',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: _dark,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 'Last 7 Days',
                 style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: _muted),

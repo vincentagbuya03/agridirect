@@ -241,6 +241,48 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 ),
               ),
               _buildProgressCircle(),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _idType = 'local_id';
+                    _fullNameController.text = 'JOLORETA F. PASOQUIN';
+                    _sexController.text = 'Female';
+                    _birthDateController.text = '09/05/1966';
+                    _registration.birthDate = '1966-09-05';
+                    _placeOfBirthController.text = 'San Carlos City, Pangasinan';
+                    _addressController.text = 'Brgy. Turac, San Carlos City, Pangasinan';
+                    _pcnController.text = '2729-20';
+                    _farmNameController.text = 'Pasoquin Farm';
+                    _specialtyController.text = 'Rice & Vegetable Crops';
+                    _yearsController.text = '15';
+                    _farmingHistoryController.text = 'Farming rice and Swine breeding in Pangasinan.';
+                    _elementaryController.text = 'Turac Elementary School';
+                    _highSchoolController.text = 'Turac National High School';
+                    _selectedCrops.addAll(['Rice', 'Corn']);
+                    _selectedLivestock.addAll(['Swine']);
+                    _faceScanned = true;
+                    _idUploaded = true;
+                    _idBackUploaded = true;
+                    _farmLatitude = 15.9189;
+                    _farmLongitude = 120.3489;
+                    _resolvedFarmLocation = 'Brgy. Turac, San Carlos City, Pangasinan';
+                  });
+                },
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'Prefill',
+                  style: GoogleFonts.plusJakartaSans(
+                    color: _primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
             ],
           ),
         ],
@@ -452,13 +494,13 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 readOnly: _idType == 'national_id' && _qrData != null,
               ),
               const SizedBox(height: 20),
-              _buildLabel('PCN (PhilSys Card Number)'),
+              _buildLabel(_idType == 'local_id' ? 'Local ID Number' : 'PCN (PhilSys Card Number)'),
               const SizedBox(height: 10),
               _buildTextField(
                 _pcnController,
-                '16-digit number (if applicable)',
+                _idType == 'local_id' ? 'e.g., 2729-20' : '16-digit number (if applicable)',
                 prefixIcon: Icons.numbers_rounded,
-                keyboardType: TextInputType.number,
+                keyboardType: _idType == 'local_id' ? TextInputType.text : TextInputType.number,
               ),
             ],
           ),
@@ -1081,8 +1123,9 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
           ),
         ),
 
-        const SizedBox(height: 40),
-        _buildSectionTitle('ID Front Scan', Icons.badge_rounded),
+        if (_idType != 'local_id') ...[
+          const SizedBox(height: 40),
+          _buildSectionTitle('ID Front Scan', Icons.badge_rounded),
         const SizedBox(height: 16),
 
         // Upload box Front
@@ -1308,6 +1351,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         ),
 
         const SizedBox(height: 32),
+        ],
       ],
     );
   }
@@ -1867,17 +1911,19 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         _showError('Please complete the face scan');
         return;
       }
-      if (!_idUploaded) {
-        _showError('Please scan the front of your ID');
-        return;
-      }
-      if (!_idBackUploaded) {
-        _showError(
-          _idType == 'national_id'
-              ? 'Please scan the back QR code of your National ID'
-              : 'Please scan the back of your ID',
-        );
-        return;
+      if (_idType != 'local_id') {
+        if (!_idUploaded) {
+          _showError('Please scan the front of your ID');
+          return;
+        }
+        if (!_idBackUploaded) {
+          _showError(
+            _idType == 'national_id'
+                ? 'Please scan the back QR code of your National ID'
+                : 'Please scan the back of your ID',
+          );
+          return;
+        }
       }
     } else if (_currentStep == 1) {
       if (_fullNameController.text.trim().isEmpty) {
@@ -1896,6 +1942,10 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
           _pcnController.text.trim().isEmpty &&
           _qrData == null) {
         _showError('Please enter your PCN for National ID verification');
+        return;
+      }
+      if (_idType == 'local_id' && _pcnController.text.trim().isEmpty) {
+        _showError('Please enter your Local ID number');
         return;
       }
       if (_addressController.text.trim().isEmpty) {

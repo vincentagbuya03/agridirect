@@ -102,6 +102,17 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     if (auth.isSeller) {
       auth.switchToFarmerMode();
       widget.onModeChanged();
+    } else if (auth.registrationStatus == 'pending' || auth.registrationStatus == 'under_review') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Your registration is pending admin review.'),
+          backgroundColor: AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
     } else {
       context.push(AppRoutes.farmerRegister, extra: widget.onModeChanged);
     }
@@ -176,8 +187,12 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.agriculture,
+                          Icon(
+                            auth.isSeller
+                                ? Icons.agriculture
+                                : (auth.registrationStatus == 'pending' || auth.registrationStatus == 'under_review'
+                                    ? Icons.hourglass_empty_rounded
+                                    : Icons.agriculture),
                             size: 18,
                             color: AppColors.accent,
                           ),
@@ -185,7 +200,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                           Text(
                             auth.isSeller
                                 ? 'Switch to Selling'
-                                : 'Start Selling',
+                                : (auth.registrationStatus == 'pending' || auth.registrationStatus == 'under_review'
+                                    ? 'Pending Approval'
+                                    : 'Start Selling'),
                             style: AppTextStyles.labelSmall.copyWith(
                               color: AppColors.accent,
                               fontWeight: FontWeight.w700,

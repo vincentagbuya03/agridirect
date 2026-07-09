@@ -248,54 +248,104 @@ class _WebCheckoutScreenState extends State<WebCheckoutScreen> {
 
     return Scaffold(
       backgroundColor: _surface,
-      body: Column(
+      body: Stack(
         children: [
-          _buildTopBar(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                isCompact ? 16 : 32,
-                24,
-                isCompact ? 16 : 32,
-                48,
+          Column(
+            children: [
+              _buildTopBar(),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    isCompact ? 16 : 32,
+                    24,
+                    isCompact ? 16 : 32,
+                    48,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1200),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildBreadcrumbs(),
+                          const SizedBox(height: 24),
+                          isCompact
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildCheckoutDetailsCard(),
+                                    const SizedBox(height: 24),
+                                    _buildOrderSummaryCard(),
+                                  ],
+                                )
+                              : Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      flex: 7,
+                                      child: _buildCheckoutDetailsCard(),
+                                    ),
+                                    const SizedBox(width: 28),
+                                    Expanded(
+                                      flex: 5,
+                                      child: _buildOrderSummaryCard(),
+                                    ),
+                                  ],
+                                ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
+            ],
+          ),
+          if (_isSubmittingOrder)
+            Container(
+              color: Colors.black.withValues(alpha: 0.5),
               child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+                  decoration: BoxDecoration(
+                    color: _white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildBreadcrumbs(),
-                      const SizedBox(height: 24),
-                      isCompact
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildCheckoutDetailsCard(),
-                                const SizedBox(height: 24),
-                                _buildOrderSummaryCard(),
-                              ],
-                            )
-                          : Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 7,
-                                  child: _buildCheckoutDetailsCard(),
-                                ),
-                                const SizedBox(width: 28),
-                                Expanded(
-                                  flex: 5,
-                                  child: _buildOrderSummaryCard(),
-                                ),
-                              ],
-                            ),
+                      const CircularProgressIndicator(
+                        color: _primary,
+                        strokeWidth: 3,
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Processing transaction...',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: _dark,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Please do not refresh or navigate away',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: _muted,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

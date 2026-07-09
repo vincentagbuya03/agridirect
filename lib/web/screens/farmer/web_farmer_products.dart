@@ -32,6 +32,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
   int _hoveredNav = -1;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  Future<List<Map<String, dynamic>>>? _productsFuture;
 
   static const Color _primary = Color(0xFF16A34A);
   static const Color _dark = Color(0xFF111827);
@@ -46,6 +47,13 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     )..forward();
+    _productsFuture = SupabaseDataService().getFarmerProducts();
+  }
+
+  void _refreshProducts() {
+    setState(() {
+      _productsFuture = SupabaseDataService().getFarmerProducts();
+    });
   }
 
   @override
@@ -65,9 +73,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
       barrierDismissible: true,
       builder: (context) => _EditProductDialog(
         product: product,
-        onSaved: () {
-          if (mounted) setState(() {});
-        },
+        onSaved: _refreshProducts,
       ),
     );
   }
@@ -425,7 +431,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
     }
 
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: SupabaseDataService().getFarmerProducts(),
+      future: _productsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const GridShimmer();

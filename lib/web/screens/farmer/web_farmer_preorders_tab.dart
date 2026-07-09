@@ -436,6 +436,36 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
   }
 
   Widget _buildAnalyticsSection() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+
+    if (isMobile) {
+      return Column(
+        children: [
+          _analyticsCard(
+            'Active Pre-orders',
+            '${_preorders.length}',
+            Icons.spa_rounded,
+            const Color(0xFF10B981),
+          ),
+          const SizedBox(height: 12),
+          _analyticsCard(
+            'Total Reserved Qty',
+            '${_totalReservations.toStringAsFixed(0)} units',
+            Icons.bookmark_added_rounded,
+            const Color(0xFF3B82F6),
+          ),
+          const SizedBox(height: 12),
+          _analyticsCard(
+            'Projected Revenue',
+            '₱${_totalProjectedRevenue.toStringAsFixed(2)}',
+            Icons.monetization_on_rounded,
+            const Color(0xFFF59E0B),
+          ),
+        ],
+      );
+    }
+
     return Row(
       children: [
         Expanded(
@@ -534,6 +564,9 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
       );
     }
 
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -549,6 +582,144 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
         final createdAt = product['created_at'] != null ? DateTime.parse(product['created_at'].toString()) : DateTime.now();
         final daysLeft = createdAt.add(Duration(days: harvestDays)).difference(DateTime.now()).inDays + 1;
 
+        final contentWidget = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              product['name']?.toString() ?? 'Crop Name',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Price: ₱${product['price']}/$unitName  •  Harvest in: ${daysLeft > 0 ? "$daysLeft days" : "Harvested"}',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 16),
+            isMobile
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: percent,
+                          minHeight: 8,
+                          backgroundColor: const Color(0xFFE2E8F0),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFF10B981),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${(percent * 100).toStringAsFixed(0)}% Reserved ($reserved / $target $unitName)',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF047857),
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: percent,
+                            minHeight: 8,
+                            backgroundColor: const Color(0xFFE2E8F0),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(0xFF10B981),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Text(
+                        '${(percent * 100).toStringAsFixed(0)}% Reserved ($reserved / $target $unitName)',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF047857),
+                        ),
+                      ),
+                    ],
+                  ),
+          ],
+        );
+
+        final actionButtons = [
+          OutlinedButton.icon(
+            onPressed: () => _showPostUpdateDialog(
+              product['product_id'],
+              product['name'],
+            ),
+            icon: const Icon(Icons.add_a_photo_rounded, size: 16),
+            label: const Text('Post Update'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF10B981),
+              side: const BorderSide(color: Color(0xFF10B981)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          FilledButton.icon(
+            onPressed: () => _markHarvestComplete(
+              product['product_id'],
+              product['name'],
+            ),
+            icon: const Icon(Icons.check_circle_rounded, size: 16),
+            label: const Text('Mark Harvested'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ];
+
+        if (isMobile) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                contentWidget,
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: actionButtons.map((w) {
+                    if (w is OutlinedButton || w is FilledButton) {
+                      return Expanded(child: w);
+                    }
+                    return w;
+                  }).toList(),
+                ),
+              ],
+            ),
+          );
+        }
+
         return Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
@@ -560,76 +731,11 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
             children: [
               Expanded(
                 flex: 4,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product['name']?.toString() ?? 'Crop Name',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF1E293B),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Price: ₱${product['price']}/$unitName  •  Harvest in: ${daysLeft > 0 ? "$daysLeft days" : "Harvested"}',
-                      style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: percent,
-                              minHeight: 8,
-                              backgroundColor: const Color(0xFFE2E8F0),
-                              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Text(
-                          '${(percent * 100).toStringAsFixed(0)}% Reserved ($reserved / $target $unitName)',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF047857),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                child: contentWidget,
               ),
               const SizedBox(width: 24),
               Row(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => _showPostUpdateDialog(product['product_id'], product['name']),
-                    icon: const Icon(Icons.add_a_photo_rounded, size: 16),
-                    label: const Text('Post Update'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF10B981),
-                      side: const BorderSide(color: Color(0xFF10B981)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton.icon(
-                    onPressed: () => _markHarvestComplete(product['product_id'], product['name']),
-                    icon: const Icon(Icons.check_circle_rounded, size: 16),
-                    label: const Text('Mark Harvested'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ],
+                children: actionButtons,
               ),
             ],
           ),

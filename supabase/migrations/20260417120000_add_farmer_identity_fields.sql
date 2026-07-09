@@ -14,5 +14,5 @@ ALTER TABLE farmer_registrations
 ADD COLUMN IF NOT EXISTS full_name TEXT;
 
 -- Documentation
-COMMENT ON COLUMN farmers.id_type IS 'Type of ID used (national_id, local_id)';
+COMMENT ON COLUMN farmers.id_type IS 'Type of ID used (national_id, loca    l_id)';
 COMMENT ON COLUMN farmer_registrations.full_name IS 'The legal name extracted from the ID, to be synced to users.name upon approval';
