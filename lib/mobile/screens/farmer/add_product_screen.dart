@@ -974,10 +974,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                 height: 120,
                                 width: 120,
                                 fit: BoxFit.cover,
-                                placeholder: (_, __) => const Center(
+                                placeholder: (_, _) => const Center(
                                   child: CircularProgressIndicator(),
                                 ),
-                                errorWidget: (_, __, ___) => const Icon(Icons.error),
+                                errorWidget: (_, _, _) => const Icon(Icons.error),
                               )
                             : Image.memory(
                                 _selectedImageFiles[index].bytes,

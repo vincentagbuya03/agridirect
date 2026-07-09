@@ -563,7 +563,9 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                         if (value == 'view') {
                           _showDetails(farmer);
                         } else if (value == 'edit') {
-                          // TODO: Implement edit profile
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Edit profile feature is under development.')),
+                          );
                         } else if (value == 'deactivate') {
                           widget.adminService.deactivateUser(farmer['user_id']);
                           _loadData();

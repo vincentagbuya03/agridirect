@@ -3,14 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/commerce/product_service.dart';
-import '../../../shared/services/core/supabase_config.dart';
-import '../../../shared/models/product/crop_milestone_model.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
 import '../../../shared/router/app_routes.dart';
-import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/widgets/brand_logo.dart';
-import '../../web_navigation.dart';
 import '../../widgets/web_hamburger_menu_button.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 
@@ -31,14 +27,10 @@ class WebFarmerPreordersTab extends StatefulWidget {
 class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
   // Premium Design Tokens
   static const Color _primary = Color(0xFF10B981); // Emerald
-  static const Color _secondary = Color(0xFF3B82F6); // Blue
-  static const Color _accent = Color(0xFFF59E0B); // Amber
   
   static const Color _dark = Color(0xFF0F172A);
   static const Color _muted = Color(0xFF64748B);
   static const Color _border = Color(0xFFE2E8F0);
-  static const Color _surface = Color(0xFFF8FAFC);
-  static const Color _white = Color(0xFFFFFFFF);
 
   final _supabase = Supabase.instance.client;
   final _productService = ProductService();
@@ -174,14 +166,14 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
                               ? imgController.text.trim()
                               : null,
                         );
-                        if (!mounted) return;
+                        if (!context.mounted) return;
                         Navigator.pop(context);
                         _loadPreorders();
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Growth milestone posted successfully!')),
                         );
                       } catch (e) {
-                        if (!mounted) return;
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Error: $e')),
                         );

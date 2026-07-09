@@ -332,6 +332,17 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   }
 
   Widget _buildOrderCard(Map<String, dynamic> order) {
+    final isCop = order['paymentMethod']?.toString().toUpperCase() == 'COP';
+    final rawStatus = order['status'].toString().toUpperCase();
+    String displayStatus = order['status'].toString();
+    if (isCop) {
+      if (rawStatus == 'SHIPPED') {
+        displayStatus = 'Ready for Pickup';
+      } else if (rawStatus == 'DELIVERED') {
+        displayStatus = 'Picked Up';
+      }
+    }
+
     return InkWell(
       onTap: () {
         Navigator.push(
@@ -421,7 +432,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
-                          order['status'],
+                          displayStatus,
                           style: AppTextStyles.labelSmall.copyWith(
                             fontSize: 9,
                             fontWeight: FontWeight.w800,

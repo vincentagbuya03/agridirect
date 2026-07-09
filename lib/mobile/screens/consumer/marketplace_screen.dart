@@ -2286,6 +2286,93 @@ class _AddressEditorSheetState extends State<AddressEditorSheet> {
           ),
           const SizedBox(height: 24),
 
+          // ── Location pin ─────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: (_latitude != null)
+                  ? AppColors.primary.withValues(alpha: 0.06)
+                  : AppColors.error.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: (_latitude != null)
+                    ? AppColors.primary.withValues(alpha: 0.3)
+                    : AppColors.error.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: (_latitude != null)
+                        ? AppColors.primary.withValues(alpha: 0.12)
+                        : AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.location_on_rounded,
+                    color: (_latitude != null)
+                        ? AppColors.primary
+                        : AppColors.error,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Delivery Pin Location',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textHeadline,
+                        ),
+                      ),
+                      Text(
+                        (_latitude != null)
+                            ? '📍 ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}'
+                            : 'Tap "Select" to pin your location on the map',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: (_latitude != null)
+                              ? AppColors.primary
+                              : AppColors.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: _openLocationPicker,
+                  icon: Icon(
+                    (_latitude != null)
+                        ? Icons.edit_location_alt_rounded
+                        : Icons.map_rounded,
+                    size: 15,
+                  ),
+                  label: Text((_latitude != null) ? 'Change' : 'Select'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary, width: 1.5),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    textStyle: GoogleFonts.inter(
+                        fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
           // ── Address Tag ──────────────────────────────────────────────────
           _buildSectionLabel('Address Tag'),
           const SizedBox(height: 8),
@@ -2409,93 +2496,6 @@ class _AddressEditorSheetState extends State<AddressEditorSheet> {
               icon: Icons.map_outlined,
             ),
           ],
-          const SizedBox(height: 20),
-
-          // ── Location pin ─────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: (_latitude != null)
-                  ? AppColors.primary.withValues(alpha: 0.06)
-                  : AppColors.error.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: (_latitude != null)
-                    ? AppColors.primary.withValues(alpha: 0.3)
-                    : AppColors.error.withValues(alpha: 0.25),
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: (_latitude != null)
-                        ? AppColors.primary.withValues(alpha: 0.12)
-                        : AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.location_on_rounded,
-                    color: (_latitude != null)
-                        ? AppColors.primary
-                        : AppColors.error,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Delivery Pin Location',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textHeadline,
-                        ),
-                      ),
-                      Text(
-                        (_latitude != null)
-                            ? '📍 ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}'
-                            : 'Tap "Select" to pin your location on the map',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: (_latitude != null)
-                              ? AppColors.primary
-                              : AppColors.error,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                OutlinedButton.icon(
-                  onPressed: _openLocationPicker,
-                  icon: Icon(
-                    (_latitude != null)
-                        ? Icons.edit_location_alt_rounded
-                        : Icons.map_rounded,
-                    size: 15,
-                  ),
-                  label: Text((_latitude != null) ? 'Change' : 'Select'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary, width: 1.5),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    textStyle: GoogleFonts.inter(
-                        fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 16),
 
           // ── Default toggle ───────────────────────────────────────────────
@@ -2579,10 +2579,10 @@ class _AddressEditorSheetState extends State<AddressEditorSheet> {
                           ),
                         ),
                       )
-                    : InkWell(
+                    : GestureDetector(
                         onTap: _save,
-                        borderRadius: BorderRadius.circular(16),
-                        child: Ink(
+                        child: Container(
+                          height: 54,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
                               colors: [
@@ -2595,28 +2595,25 @@ class _AddressEditorSheetState extends State<AddressEditorSheet> {
                             ),
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: Container(
-                            height: 54,
-                            alignment: Alignment.center,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.save_alt_rounded,
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.save_alt_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Save Address',
+                                style: GoogleFonts.inter(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
                                   color: Colors.white,
-                                  size: 18,
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Save Address',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ),

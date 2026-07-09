@@ -172,7 +172,6 @@ class AppShimmerLoader extends StatelessWidget {
             );
             break;
           case ShimmerType.rectangle:
-          default:
             final resolvedWidth = width ??
                 (constraints.maxWidth.isFinite
                     ? double.infinity

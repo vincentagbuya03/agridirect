@@ -222,7 +222,7 @@ class _AdminSupportTabState extends State<AdminSupportTab> {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: filtered.length,
-                        separatorBuilder: (_, __) => const Divider(height: 20),
+                        separatorBuilder: (_, _) => const Divider(height: 20),
                         itemBuilder: (context, index) {
                           final ticket = filtered[index];
                           final isSelected = _selectedTicket?['ticket_id'] == ticket['ticket_id'];

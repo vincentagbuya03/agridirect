@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../shared/data/app_data.dart';
-import '../../../shared/models/auth/user_address_model.dart';
 import '../../../shared/models/product/product_review_model.dart';
 import '../../../shared/models/product/crop_milestone_model.dart';
 import '../../../shared/router/app_routes.dart';

@@ -593,6 +593,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                 });
               } catch (e) {
                 setModalState(() => isSaving = false);
+                if (!dialogCtx.mounted) return;
                 ScaffoldMessenger.of(dialogCtx).showSnackBar(
                   SnackBar(content: Text('Failed to create voucher: $e')),
                 );
@@ -959,7 +960,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: DropdownButtonFormField<String>(
-                                      value: discountType,
+                                      initialValue: discountType,
                                       decoration: InputDecoration(
                                         labelText: 'Discount Type',
                                         prefixIcon: const Icon(Icons.style_outlined, size: 20),

@@ -291,7 +291,7 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
     final isWide = MediaQuery.of(context).size.width >= 900;
     return PopScope(
       canPop: _selectedConversationId == null || isWide,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         if (_selectedConversationId != null && !isWide) {
           setState(() {

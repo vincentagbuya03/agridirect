@@ -2,9 +2,6 @@
 import 'package:flutter/material.dart';
 import '../shared/services/auth/auth_service.dart';
 import '../shared/services/core/supabase_data_service.dart';
-import '../shared/services/communication/call_service.dart';
-import '../shared/services/user/user_service.dart';
-import '../shared/screens/messages/in_app_call_screen.dart';
 import 'screens/consumer/home_screen.dart';
 import 'screens/consumer/marketplace_screen.dart';
 import 'screens/consumer/preorder_hub_screen.dart';

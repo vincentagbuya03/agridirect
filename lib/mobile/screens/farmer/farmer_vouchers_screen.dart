@@ -264,7 +264,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: 3,
-      itemBuilder: (_, __) => Padding(
+      itemBuilder: (_, _) => Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: SizedBox(
           height: 120,

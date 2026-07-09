@@ -472,6 +472,23 @@ class _OrdersScreenState extends State<OrdersScreen> {
               progress = 0.0;
             }
 
+            final isCop = order.paymentMethod?.toUpperCase() == 'COP';
+            String displayStatus = order.status;
+            if (isCop) {
+              if (order.isShipped) {
+                displayStatus = 'Ready for Pickup';
+              } else if (order.isDelivered) {
+                displayStatus = 'Picked Up';
+              }
+            }
+
+            String displayEstimatedTime = 'Pending Update';
+            if (order.isDelivered) {
+              displayEstimatedTime = isCop ? 'Picked Up' : 'Delivered';
+            } else if (order.isShipped) {
+              displayEstimatedTime = isCop ? 'Ready for Pickup' : 'Shipped';
+            }
+
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: _buildOrderCard(
@@ -481,9 +498,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 orderId: order.orderNumber,
                 itemCount: order.itemCount ?? 1,
                 price: '₱${(order.total ?? 0).toStringAsFixed(2)}',
-                status: order.status,
+                status: displayStatus,
                 statusColor: statusColor,
-                estimatedTime: order.isDelivered ? 'Delivered' : 'Pending Update',
+                estimatedTime: displayEstimatedTime,
                 progress: progress,
               ),
             );

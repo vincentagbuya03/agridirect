@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../shared/services/auth/auth_service.dart';
-import '../shared/services/communication/call_service.dart';
 import '../shared/router/app_routes.dart';
-import '../shared/services/user/user_service.dart';
 import 'screens/consumer/web_marketplace_home.dart';
 import 'screens/consumer/web_shop_screen.dart';
 import 'screens/farmer/web_sales_dashboard.dart';
@@ -35,7 +33,6 @@ class _WebNavigationState extends State<WebNavigation> {
   late int _currentIndex;
   final _auth = AuthService();
   String? _selectedCategoryFilter;
-  bool _isShowingIncomingCall = false;
 
   @override
   void initState() {
