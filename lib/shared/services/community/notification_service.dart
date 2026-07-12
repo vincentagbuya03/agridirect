@@ -714,7 +714,7 @@ class NotificationService {
       return;
     }
 
-    if (linkType == 'order') {
+    if (linkType == 'order' || linkType == 'orders') {
       final isFarmer = AuthService().isViewingAsFarmer;
       final ctx = appNavigatorKey.currentContext;
       if (ctx != null && ctx.mounted) {
@@ -729,6 +729,28 @@ class NotificationService {
             GoRouter.of(ctx).go(AppRoutes.home);
           } else {
             GoRouter.of(ctx).go(AppRoutes.customerOrders);
+          }
+        }
+      }
+      return;
+    }
+
+    if (linkType == 'farmer_registration' ||
+        linkType == 'farmer_approved' ||
+        linkType == 'farmer_verification') {
+      final ctx = appNavigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        final authService = AuthService();
+        final hasSellerRole = authService.isSeller;
+        
+        if (hasSellerRole) {
+          authService.switchToFarmerMode();
+          GoRouter.of(ctx).go(AppRoutes.farmerDashboard);
+        } else {
+          if (kIsWeb) {
+            GoRouter.of(ctx).go(AppRoutes.profile);
+          } else {
+            GoRouter.of(ctx).go(AppRoutes.farmerRegister);
           }
         }
       }

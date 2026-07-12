@@ -13,8 +13,9 @@ import 'report_content_dialog.dart';
 
 class PostDetailDialog extends StatefulWidget {
   final ForumPostItem post;
+  final Function(ForumPostItem)? onPostUpdated;
 
-  const PostDetailDialog({super.key, required this.post});
+  const PostDetailDialog({super.key, required this.post, this.onPostUpdated});
 
   @override
   State<PostDetailDialog> createState() => _PostDetailDialogState();
@@ -92,6 +93,7 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
         authorAvatarUrl: _currentPost.authorAvatarUrl,
       );
     });
+    widget.onPostUpdated?.call(_currentPost);
 
     try {
       await SupabaseDataService().togglePostLike(_currentPost.id);
@@ -101,6 +103,7 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
         setState(() {
           _currentPost = widget.post;
         });
+        widget.onPostUpdated?.call(_currentPost);
       }
     }
   }
@@ -141,6 +144,7 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
             authorAvatarUrl: _currentPost.authorAvatarUrl,
           );
         });
+        widget.onPostUpdated?.call(_currentPost);
         
         // Scroll to top of comments list
         _scrollController.animateTo(
@@ -213,6 +217,62 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Comment reported. Our team will review it.')),
       );
+    }
+  }
+
+  Future<void> _deleteComment(ForumComment comment) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text('Are you sure you want to delete this comment? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _forumService.deleteComment(comment.commentId);
+      if (mounted) {
+        setState(() {
+          _comments.removeWhere((c) => c.commentId == comment.commentId);
+          _currentPost = ForumPostItem(
+            id: _currentPost.id,
+            userId: _currentPost.userId,
+            userName: _currentPost.userName,
+            time: _currentPost.time,
+            title: _currentPost.title,
+            body: _currentPost.body,
+            imageUrl: _currentPost.imageUrl,
+            likes: _currentPost.likes,
+            comments: _currentPost.comments - 1 >= 0 ? _currentPost.comments - 1 : 0,
+            isLiked: _currentPost.isLiked,
+            isPinned: _currentPost.isPinned,
+            authorAvatarUrl: _currentPost.authorAvatarUrl,
+          );
+        });
+        widget.onPostUpdated?.call(_currentPost);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Comment deleted.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete comment: $e'), backgroundColor: AppColors.error),
+        );
+      }
     }
   }
 
@@ -372,7 +432,7 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
                 ),
               ),
               IconButton(
-                onPressed: () => Navigator.of(context).pop(true),
+                onPressed: () => Navigator.of(context).pop(_currentPost),
                 icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 22),
               ),
             ],
@@ -662,6 +722,9 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
   // ─── Single Comment Item Widget ───
   Widget _buildCommentItemWidget(ForumComment comment) {
     final isLiked = _likedCommentIds.contains(comment.commentId);
+    final currentUserId = AuthService().userId;
+    final isMyComment = comment.userId == currentUserId;
+    final canDelete = isMyComment || AuthService().isAdmin;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -704,13 +767,21 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
                             onSelected: (value) {
                               if (value == 'report') {
                                 _reportComment(comment);
+                              } else if (value == 'delete') {
+                                _deleteComment(comment);
                               }
                             },
-                            itemBuilder: (context) => const [
-                              PopupMenuItem<String>(
-                                value: 'report',
-                                child: Text('Report comment', style: TextStyle(fontSize: 12)),
-                              ),
+                            itemBuilder: (context) => [
+                              if (canDelete)
+                                const PopupMenuItem<String>(
+                                  value: 'delete',
+                                  child: Text('Delete comment', style: TextStyle(fontSize: 12, color: AppColors.error)),
+                                )
+                              else
+                                const PopupMenuItem<String>(
+                                  value: 'report',
+                                  child: Text('Report comment', style: TextStyle(fontSize: 12)),
+                                ),
                             ],
                             child: const Icon(Icons.more_horiz_rounded, size: 14, color: Color(0xFF64748B)),
                           ),

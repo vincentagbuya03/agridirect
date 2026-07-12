@@ -2,7 +2,7 @@ flutter run -d chrome --web-port=3000
 flutter run -d chrome --release --web-port=3000
 & "$HOME\.shorebird\bin\shorebird" patch android
 & "$HOME\.shorebird\bin\shorebird" release android --artifact apk
-
+flutter build apk --release --split-per-abi
 npx vercel deploy --prod --yes
 npx.cmd vercel@latest deploy --prod --yes
 .\scripts\build-android-universal-release.ps1

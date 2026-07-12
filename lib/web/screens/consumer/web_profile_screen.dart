@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1021,256 +1022,15 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   }
 
   void _showEditProfileDialog(AuthService auth) {
-    final isFarmer = auth.isViewingAsFarmer;
-    final nameController = TextEditingController(
-      text: isFarmer && _farmerProfile != null
-          ? (_farmerProfile!['farm_name']?.toString() ?? auth.userName)
-          : auth.userName,
-    );
-    final specialtyController = TextEditingController(
-      text: isFarmer && _farmerProfile != null
-          ? (_farmerProfile!['specialty']?.toString() ?? 'Fresh Produce')
-          : '',
-    );
-    final locationController = TextEditingController(
-      text: isFarmer && _farmerProfile != null
-          ? (_farmerProfile!['location']?.toString() ?? '')
-          : '',
-    );
-    final imageController = TextEditingController(
-      text: isFarmer && _farmerProfile != null
-          ? (_farmerProfile!['image_url']?.toString() ?? '')
-          : auth.userAvatarUrl,
-    );
-    final bioController = TextEditingController(
-      text: isFarmer && _farmerProfile != null
-          ? (_farmerProfile!['residential_address']?.toString() ?? '')
-          : '',
-    );
-    final freeDeliveryMinAmountController = TextEditingController(
-      text: isFarmer && _farmerProfile != null
-          ? (_farmerProfile!['free_delivery_min_amount']?.toString() ?? '0')
-          : '',
-    );
-
-    final formKey = GlobalKey<FormState>();
-    bool isSaving = false;
-
     showDialog(
       context: context,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (ctx, setModalState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: Text(
-            isFarmer ? 'Edit Farm Profile' : 'Edit Personal Profile',
-            style: GoogleFonts.plusJakartaSans(
-              fontWeight: FontWeight.w800,
-              fontSize: 22,
-              color: _dark,
-            ),
-          ),
-          content: SizedBox(
-            width: 480,
-            child: SingleChildScrollView(
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: nameController,
-                      decoration: InputDecoration(
-                        labelText: isFarmer ? 'Farm Name' : 'Full Name',
-                        prefixIcon: const Icon(Icons.person_outline_rounded),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      validator: (v) => (v == null || v.isEmpty)
-                          ? 'Please enter a name'
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    if (isFarmer) ...[
-                      TextFormField(
-                        controller: specialtyController,
-                        decoration: InputDecoration(
-                          labelText: 'Specialty',
-                          prefixIcon: const Icon(Icons.spa_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        validator: (v) => (v == null || v.isEmpty)
-                            ? 'Please enter farm specialty'
-                            : null,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: locationController,
-                        decoration: InputDecoration(
-                          labelText: 'Farm Location Address',
-                          prefixIcon: const Icon(Icons.location_on_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: freeDeliveryMinAmountController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: InputDecoration(
-                          labelText: 'Minimum Order for Free Delivery (₱)',
-                          prefixIcon: const Icon(Icons.local_shipping_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        validator: (v) {
-                          final text = v?.trim() ?? '';
-                          if (text.isEmpty) return null;
-                          final parsed = double.tryParse(text);
-                          if (parsed == null || parsed < 0) {
-                            return 'Please enter a valid positive number';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    TextFormField(
-                      controller: imageController,
-                      decoration: InputDecoration(
-                        labelText: isFarmer
-                            ? 'Farm Cover Image URL'
-                            : 'Avatar Image URL',
-                        prefixIcon: const Icon(Icons.image_outlined),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: bioController,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        labelText: isFarmer ? 'Farm Bio / Description' : 'Bio',
-                        prefixIcon: const Icon(Icons.description_outlined),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          actionsPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 16,
-          ),
-          actions: [
-            TextButton(
-              onPressed: isSaving ? null : () => Navigator.of(dialogCtx).pop(),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: isSaving
-                  ? null
-                  : () async {
-                      if (!formKey.currentState!.validate()) return;
-                      setModalState(() => isSaving = true);
-                      try {
-                        if (isFarmer) {
-                          // Find farmer row first or update if exists
-                          final userId = auth.userId;
-                          await SupabaseConfig.client
-                              .from('farmers')
-                              .update({
-                                'farm_name': nameController.text.trim(),
-                                'specialty': specialtyController.text.trim(),
-                                'location': locationController.text.trim(),
-                                'image_url': imageController.text.trim(),
-                                'residential_address': bioController.text
-                                    .trim(),
-                                'free_delivery_min_amount': double.tryParse(freeDeliveryMinAmountController.text) ?? 0.0,
-                              })
-                              .eq('user_id', userId);
-                        } else {
-                          final userId = auth.userId;
-                          await SupabaseConfig.client
-                              .from('users')
-                              .update({
-                                'name': nameController.text.trim(),
-                                'avatar_url': imageController.text.trim(),
-                                'bio': bioController.text.trim(),
-                              })
-                              .eq('user_id', userId);
-                        }
-
-                        await auth.initialize();
-                        await _loadFarmerProfile();
-                        if (mounted && dialogCtx.mounted) {
-                          Navigator.of(dialogCtx).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Profile updated successfully!'),
-                              backgroundColor: primary,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        debugPrint('Error updating profile: $e');
-                        setModalState(() => isSaving = false);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to save changes: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-              ),
-              child: isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.5,
-                      ),
-                    )
-                  : const Text(
-                      'Save Changes',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-            ),
-          ],
-        ),
+      barrierDismissible: false,
+      builder: (dialogCtx) => _EditProfileDialog(
+        auth: auth,
+        farmerProfile: _farmerProfile,
+        onSaveSuccess: () async {
+          await _loadFarmerProfile();
+        },
       ),
     );
   }
@@ -1506,4 +1266,716 @@ class _SettingsItem {
   final String subtitle;
   final VoidCallback? onTap;
   const _SettingsItem(this.icon, this.title, this.subtitle, {this.onTap});
+}
+
+class _EditProfileDialog extends StatefulWidget {
+  final AuthService auth;
+  final Map<String, dynamic>? farmerProfile;
+  final Future<void> Function() onSaveSuccess;
+
+  const _EditProfileDialog({
+    required this.auth,
+    required this.farmerProfile,
+    required this.onSaveSuccess,
+  });
+
+  @override
+  State<_EditProfileDialog> createState() => _EditProfileDialogState();
+}
+
+class _EditProfileDialogState extends State<_EditProfileDialog> {
+  late final bool isFarmer;
+  late final TextEditingController nameController;
+  late final TextEditingController specialtyController;
+  late final TextEditingController locationController;
+  late final TextEditingController imageController;
+  late final TextEditingController bioController;
+  late final TextEditingController freeDeliveryMinAmountController;
+  late final TextEditingController phoneController;
+  late final TextEditingController emailController;
+
+  final formKey = GlobalKey<FormState>();
+  bool isSaving = false;
+  bool isUploadingImage = false;
+  String imageUrl = '';
+
+  @override
+  void initState() {
+    super.initState();
+    isFarmer = widget.auth.isViewingAsFarmer;
+    nameController = TextEditingController(
+      text: isFarmer && widget.farmerProfile != null
+          ? (widget.farmerProfile!['farm_name']?.toString() ?? widget.auth.userName)
+          : widget.auth.userName,
+    );
+    specialtyController = TextEditingController(
+      text: isFarmer && widget.farmerProfile != null
+          ? (widget.farmerProfile!['specialty']?.toString() ?? 'Fresh Produce')
+          : '',
+    );
+    locationController = TextEditingController(
+      text: isFarmer && widget.farmerProfile != null
+          ? (widget.farmerProfile!['location']?.toString() ?? '')
+          : '',
+    );
+    imageController = TextEditingController(
+      text: isFarmer && widget.farmerProfile != null
+          ? (widget.farmerProfile!['image_url']?.toString() ?? '')
+          : widget.auth.userAvatarUrl,
+    );
+    bioController = TextEditingController(
+      text: isFarmer && widget.farmerProfile != null
+          ? (widget.farmerProfile!['residential_address']?.toString() ?? '')
+          : '',
+    );
+    freeDeliveryMinAmountController = TextEditingController(
+      text: isFarmer && widget.farmerProfile != null
+          ? (widget.farmerProfile!['free_delivery_min_amount']?.toString() ?? '0')
+          : '',
+    );
+    phoneController = TextEditingController();
+    emailController = TextEditingController(text: widget.auth.userEmail);
+
+    imageUrl = imageController.text;
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final userId = widget.auth.userId;
+      final users = await SupabaseConfig.client
+          .from('users')
+          .select()
+          .eq('user_id', userId)
+          .limit(1);
+      if (users.isNotEmpty && mounted) {
+        final user = users[0];
+        setState(() {
+          phoneController.text = (user['phone'] ?? user['phone_number'] ?? '').toString();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user profile details: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    specialtyController.dispose();
+    locationController.dispose();
+    imageController.dispose();
+    bioController.dispose();
+    freeDeliveryMinAmountController.dispose();
+    phoneController.dispose();
+    emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    if (isUploadingImage || isSaving) return;
+
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1000,
+      imageQuality: 85,
+    );
+
+    if (image == null) return;
+
+    setState(() => isUploadingImage = true);
+    try {
+      final bytes = await image.readAsBytes();
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${image.name}';
+      final path = 'avatars/$fileName';
+
+      final resultPath = await SupabaseDatabase.uploadImage(
+        bucket: 'uploads',
+        path: path,
+        bytes: bytes,
+      );
+
+      if (resultPath != null) {
+        final publicUrl = SupabaseConfig.client.storage
+            .from('uploads')
+            .getPublicUrl(path);
+
+        setState(() {
+          imageUrl = publicUrl;
+          imageController.text = publicUrl;
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to upload image. Please try again.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading image: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isUploadingImage = false);
+      }
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    if (!formKey.currentState!.validate()) return;
+    setState(() => isSaving = true);
+    try {
+      if (isFarmer) {
+        final userId = widget.auth.userId;
+        await SupabaseConfig.client
+            .from('farmers')
+            .update({
+              'farm_name': nameController.text.trim(),
+              'specialty': specialtyController.text.trim(),
+              'location': locationController.text.trim(),
+              'image_url': imageController.text.trim(),
+              'residential_address': bioController.text.trim(),
+              'free_delivery_min_amount': double.tryParse(freeDeliveryMinAmountController.text) ?? 0.0,
+            })
+            .eq('user_id', userId);
+      } else {
+        final userId = widget.auth.userId;
+        await SupabaseConfig.client
+            .from('users')
+            .update({
+              'name': nameController.text.trim(),
+              'avatar_url': imageController.text.trim(),
+              'bio': bioController.text.trim(),
+              'phone': phoneController.text.trim(),
+            })
+            .eq('user_id', userId);
+      }
+
+      await widget.auth.initialize();
+      await widget.onSaveSuccess();
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully!'),
+            backgroundColor: Color(0xFF16A34A),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error updating profile: $e');
+      if (mounted) {
+        setState(() => isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save changes: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? Function(String?)? validator,
+    int maxLines = 1,
+    TextInputType? keyboardType,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF374151),
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          validator: validator,
+          style: GoogleFonts.plusJakartaSans(fontSize: 14),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+            prefixIcon: Icon(icon, color: const Color(0xFF9CA3AF), size: 20),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReadOnlyField({
+    required String value,
+    required String label,
+    required IconData icon,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF374151),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3F4F6),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: const Color(0xFF9CA3AF), size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  value,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    color: const Color(0xFF6B7280),
+                  ),
+                ),
+              ),
+              const Icon(Icons.lock_outline_rounded, color: Color(0xFF9CA3AF), size: 16),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      backgroundColor: Colors.white,
+      elevation: 12,
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        width: 520,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isFarmer ? 'Edit Farm Profile' : 'Edit Personal Profile',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 22,
+                            color: const Color(0xFF111827),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isFarmer
+                              ? 'Customize your farm info, location and visuals'
+                              : 'Update your personal profile details',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            color: const Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: isSaving ? null : () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded, color: Color(0xFF6B7280)),
+                    splashRadius: 20,
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE5E7EB)),
+
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Preview Box
+                      Text(
+                        isFarmer ? 'Farm Cover Preview' : 'Avatar Preview',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF374151),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: isFarmer
+                            ? GestureDetector(
+                                onTap: _pickAndUploadImage,
+                                child: Container(
+                                  height: 160,
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    color: const Color(0xFFF3F4F6),
+                                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: Stack(
+                                    children: [
+                                      Positioned.fill(
+                                        child: imageUrl.isNotEmpty
+                                            ? Image.network(
+                                                imageUrl,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error, stackTrace) => Center(
+                                                  child: Column(
+                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                    children: [
+                                                      const Icon(Icons.broken_image_outlined,
+                                                          size: 40, color: Color(0xFF9CA3AF)),
+                                                      const SizedBox(height: 8),
+                                                      Text(
+                                                        'Failed to load image',
+                                                        style: GoogleFonts.plusJakartaSans(
+                                                            color: const Color(0xFF6B7280), fontSize: 12),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              )
+                                            : Center(
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    const Icon(Icons.image_outlined,
+                                                        size: 40, color: Color(0xFF9CA3AF)),
+                                                    const SizedBox(height: 8),
+                                                    Text(
+                                                      'No cover image provided',
+                                                      style: GoogleFonts.plusJakartaSans(
+                                                          color: const Color(0xFF6B7280), fontSize: 12),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                      ),
+                                      if (isUploadingImage)
+                                        Container(
+                                          color: Colors.black.withValues(alpha: 0.4),
+                                          child: const Center(
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 3,
+                                            ),
+                                          ),
+                                        )
+                                      else
+                                        Positioned(
+                                          bottom: 12,
+                                          right: 12,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withValues(alpha: 0.6),
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 14),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  'Change Cover',
+                                                  style: GoogleFonts.plusJakartaSans(
+                                                    color: Colors.white,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : Column(
+                                children: [
+                                  Stack(
+                                    alignment: Alignment.bottomRight,
+                                    children: [
+                                      GestureDetector(
+                                        onTap: _pickAndUploadImage,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: const Color(0xFFE5E7EB), width: 4),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withValues(alpha: 0.05),
+                                                blurRadius: 10,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Stack(
+                                            alignment: Alignment.center,
+                                            children: [
+                                              CircleAvatar(
+                                                radius: 60,
+                                                backgroundColor: const Color(0xFFF3F4F6),
+                                                backgroundImage: imageUrl.isNotEmpty
+                                                    ? NetworkImage(imageUrl)
+                                                    : null,
+                                                child: imageUrl.isEmpty
+                                                    ? const Icon(Icons.person_rounded,
+                                                        size: 60, color: Color(0xFF9CA3AF))
+                                                    : null,
+                                              ),
+                                              if (isUploadingImage)
+                                                Container(
+                                                  width: 120,
+                                                  height: 120,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black.withValues(alpha: 0.4),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Center(
+                                                    child: CircularProgressIndicator(
+                                                      color: Colors.white,
+                                                      strokeWidth: 3,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      if (!isUploadingImage)
+                                        GestureDetector(
+                                          onTap: _pickAndUploadImage,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF16A34A),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.camera_alt_rounded,
+                                              color: Colors.white,
+                                              size: 16,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextButton.icon(
+                                    onPressed: isUploadingImage ? null : _pickAndUploadImage,
+                                    icon: const Icon(Icons.photo_library_outlined, size: 16),
+                                    label: Text(
+                                      isUploadingImage ? 'Uploading...' : 'Change Photo',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: const Color(0xFF16A34A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Fields
+                      _buildTextField(
+                        controller: nameController,
+                        label: isFarmer ? 'Farm Name' : 'Full Name',
+                        icon: Icons.person_outline_rounded,
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? 'Please enter a name'
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+
+                      if (isFarmer) ...[
+                        _buildTextField(
+                          controller: specialtyController,
+                          label: 'Specialty',
+                          icon: Icons.spa_outlined,
+                          validator: (v) => (v == null || v.isEmpty)
+                              ? 'Please enter farm specialty'
+                              : null,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: locationController,
+                          label: 'Farm Location Address',
+                          icon: Icons.location_on_outlined,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: freeDeliveryMinAmountController,
+                          label: 'Minimum Order for Free Delivery (₱)',
+                          icon: Icons.local_shipping_outlined,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          validator: (v) {
+                            final text = v?.trim() ?? '';
+                            if (text.isEmpty) return null;
+                            final parsed = double.tryParse(text);
+                            if (parsed == null || parsed < 0) {
+                              return 'Please enter a valid positive number';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                      ] else ...[
+                        _buildTextField(
+                          controller: phoneController,
+                          label: 'Phone Number',
+                          icon: Icons.phone_rounded,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      _buildReadOnlyField(
+                        value: emailController.text,
+                        label: 'Email Address',
+                        icon: Icons.email_outlined,
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildTextField(
+                        controller: bioController,
+                        label: isFarmer ? 'Farm Bio / Description' : 'Bio',
+                        icon: Icons.description_outlined,
+                        maxLines: 3,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE5E7EB)),
+
+            // Actions
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: isSaving ? null : () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: const Color(0xFF4B5563),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: isSaving ? null : _saveChanges,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF16A34A),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    ),
+                    child: isSaving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            'Save Changes',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

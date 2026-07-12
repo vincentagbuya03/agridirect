@@ -3012,27 +3012,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       spacing: 12,
                       runSpacing: 8,
                       children: [
-                        Text(
-                          'Privacy Policy',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: AgriColors.muted,
-                          ),
-                        ),
-                        Text(
-                          'Terms of Service',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: AgriColors.muted,
-                          ),
-                        ),
-                        Text(
-                          'Cookie Policy',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: AgriColors.muted,
-                          ),
-                        ),
+                        _buildBottomLink('Privacy Policy'),
+                        _buildBottomLink('Terms of Service'),
+                        _buildBottomLink('Cookie Policy'),
                       ],
                     ),
                   ],
@@ -3050,29 +3032,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     ),
                     Row(
                       children: [
-                        Text(
-                          'Privacy Policy',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: AgriColors.muted,
-                          ),
-                        ),
+                        _buildBottomLink('Privacy Policy'),
                         const SizedBox(width: 24),
-                        Text(
-                          'Terms of Service',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: AgriColors.muted,
-                          ),
-                        ),
+                        _buildBottomLink('Terms of Service'),
                         const SizedBox(width: 24),
-                        Text(
-                          'Cookie Policy',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: AgriColors.muted,
-                          ),
-                        ),
+                        _buildBottomLink('Cookie Policy'),
                       ],
                     ),
                   ],
@@ -3084,16 +3048,225 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     );
   }
 
-  Widget _socialIcon(IconData icon) {
-    return Container(
-      width: 38,
-      height: 38,
-      decoration: BoxDecoration(
-        color: AgriColors.darkMuted,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF374151)),
+  static const String _privacyPolicyText = 'At AgriDirect, we value your privacy. We collect basic account details (name, email, phone) to facilitate purchases and connect you with local farmers. We never share your data with third parties without your consent. By using the app, you agree to our standard data handling procedures.';
+  static const String _termsOfServiceText = 'Welcome to AgriDirect. By registering as a consumer or farmer, you agree to comply with our community guidelines. Farmers must supply authentic information and fresh, high-quality produce. Customers must complete transaction payments in good faith.';
+  static const String _cookiePolicyText = 'AgriDirect uses cookies to enhance your browsing experience, store session parameters, and analyze site metrics. Cookies are stored locally on your device and can be managed through your browser settings at any time.';
+
+  void _handleFooterLinkTap(String text) {
+    if (text == 'Find a Farmer') {
+      _completeWelcome();
+    } else if (text == 'Vegetables' || text == 'Fruits & Berries' || text == 'Dairy & Eggs' || text == 'Organic Grains') {
+      _completeWelcome();
+    } else if (text == 'Seasonal Calendar') {
+      _showSeasonalCalendar();
+    } else if (text == 'Pricing Plans') {
+      _showPricingPlans();
+    } else if (text == 'Help Center') {
+      _showHelpCenter();
+    } else if (text == 'Privacy Policy') {
+      _showPolicyModal('Privacy Policy', _privacyPolicyText);
+    } else if (text == 'Terms of Service') {
+      _showPolicyModal('Terms of Service', _termsOfServiceText);
+    } else if (text == 'Cookie Policy') {
+      _showPolicyModal('Cookie Policy', _cookiePolicyText);
+    }
+  }
+
+  void _showHelpCenter() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('AgriDirect Help Center', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Frequently Asked Questions', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16)),
+              const SizedBox(height: 12),
+              _buildFAQItem('How do I buy fresh products?', 'Browse our marketplace, add items to your cart, and checkout. You can pay via Cash on Delivery (COD) or Cash on Pickup (COP).'),
+              _buildFAQItem('Are the products really fresh?', 'Yes! All products are directly sourced and harvested by our local verified farmers.'),
+              _buildFAQItem('How can I contact support?', 'You can reach us at support@agridirect.com or call 09122354762.'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
       ),
-      child: Icon(icon, size: 16, color: AgriColors.mutedLight),
+    );
+  }
+
+  Widget _buildFAQItem(String question, String answer) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Q: $question', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13, color: AgriColors.emerald700)),
+          const SizedBox(height: 4),
+          Text(answer, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[700])),
+        ],
+      ),
+    );
+  }
+
+  void _showSeasonalCalendar() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Seasonal Harvest Calendar', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Optimal Harvest Seasons', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16)),
+              const SizedBox(height: 12),
+              _buildCalendarItem('Rice', 'October - December'),
+              _buildCalendarItem('Vegetables (Tomato, Eggplant)', 'January - May'),
+              _buildCalendarItem('Mangoes', 'March - June'),
+              _buildCalendarItem('Corn', 'June - August'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarItem(String crop, String season) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(crop, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13)),
+          Text(season, style: GoogleFonts.inter(fontSize: 13, color: AgriColors.emerald700, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  void _showPricingPlans() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Platform Pricing Plans', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildPlanCard('Free Consumer Plan', '₱0 / month', 'Perfect for buyers. Access full marketplace, view farmer profiles, track orders.'),
+              const SizedBox(height: 12),
+              _buildPlanCard('Premium Farmer Plan', '₱0 / month (Beta)', 'Start selling directly. Unlimited listings, priority search placement, direct notifications.'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlanCard(String name, String price, String desc) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AgriColors.emerald50,
+        border: Border.all(color: AgriColors.emerald200),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(name, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14)),
+              Text(price, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14, color: AgriColors.emerald700)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(desc, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[700])),
+        ],
+      ),
+    );
+  }
+
+  void _showPolicyModal(String title, String content) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: 500,
+          child: SingleChildScrollView(
+            child: Text(
+              content,
+              style: GoogleFonts.inter(fontSize: 12, height: 1.6, color: Colors.grey[800]),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomLink(String text) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => _handleFooterLinkTap(text),
+        child: Text(
+          text,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            color: AgriColors.muted,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _socialIcon(IconData icon) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Redirecting to official social media channel...')),
+          );
+        },
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: AgriColors.darkMuted,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFF374151)),
+          ),
+          child: Icon(icon, size: 16, color: AgriColors.mutedLight),
+        ),
+      ),
     );
   }
 
@@ -3102,9 +3275,12 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
       padding: const EdgeInsets.only(bottom: 12),
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
-        child: Text(
-          text,
-          style: GoogleFonts.inter(fontSize: 13, color: AgriColors.mutedLight),
+        child: GestureDetector(
+          onTap: () => _handleFooterLinkTap(text),
+          child: Text(
+            text,
+            style: GoogleFonts.inter(fontSize: 13, color: AgriColors.mutedLight),
+          ),
         ),
       ),
     );

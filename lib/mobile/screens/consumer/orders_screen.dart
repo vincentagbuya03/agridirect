@@ -12,6 +12,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:agridirect/shared/services/farmer/farmer_service.dart';
 import 'package:agridirect/shared/models/farmer/farmer_profile_model.dart';
 import '../../../shared/models/order/order_item_model.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:agridirect/shared/services/core/supabase_config.dart';
 
 /// Orders Screen - Professional Order Management (Responsive Web & Mobile)
 class OrdersScreen extends StatefulWidget {
@@ -1046,6 +1048,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ],
                   ),
                 ),
+                if (order.isDelivered) ...[
+                  const SizedBox(height: 12),
+                  _FarmerRatingSection(order: order),
+                ],
                 if (snapshot.connectionState == ConnectionState.waiting) ...[
                   const SizedBox(height: 12),
                   const ClipRRect(
@@ -1338,66 +1344,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 ),
                 itemBuilder: (context, index) {
                   final item = items[index];
-                  return Row(
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: item.productImage != null
-                              ? SafeNetworkImage(
-                                  imageUrl: item.productImage,
-                                  defaultBucket: 'products',
-                                  width: 56,
-                                  height: 56,
-                                  fit: BoxFit.cover,
-                                )
-                              : const Icon(
-                                  Icons.shopping_basket_rounded,
-                                  color: AppColors.primary,
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.productName ?? 'Product',
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                                color: AppColors.textHeadline,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Qty: ${item.quantity.toInt()} x ₱${item.unitPrice.toStringAsFixed(2)}',
-                              style: AppTextStyles.bodySmall.copyWith(
-                                color: AppColors.textSubtle,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        '₱${(item.subtotal ?? (item.quantity * item.unitPrice)).toStringAsFixed(2)}',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: AppColors.textHeadline,
-                        ),
-                      ),
-                    ],
-                  );
+                  return _OrderItemRow(item: item, order: order);
                 },
               ),
             );
@@ -1766,6 +1713,884 @@ class _HorizontalProgressLine extends StatelessWidget {
           );
         }
       }),
+    );
+  }
+}
+
+class _OrderItemRow extends StatefulWidget {
+  final OrderItem item;
+  final Order order;
+
+  const _OrderItemRow({
+    required this.item,
+    required this.order,
+  });
+
+  @override
+  State<_OrderItemRow> createState() => _OrderItemRowState();
+}
+
+class _OrderItemRowState extends State<_OrderItemRow> {
+  bool _hasReviewed = false;
+  bool _checking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkReviewStatus();
+  }
+
+  Future<void> _checkReviewStatus() async {
+    try {
+      final userId = AuthService().userId;
+      final customerResponse = await SupabaseConfig.client
+          .from('customers')
+          .select('customer_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      final customerId = customerResponse?['customer_id']?.toString();
+      if (customerId != null) {
+        final reviewResponse = await SupabaseConfig.client
+            .from('product_reviews')
+            .select('review_id')
+            .eq('order_id', widget.order.orderId)
+            .eq('product_id', widget.item.productId)
+            .eq('customer_id', customerId)
+            .maybeSingle();
+        if (mounted) {
+          setState(() {
+            _hasReviewed = reviewResponse != null;
+            _checking = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _checking = false);
+      }
+    } catch (e) {
+      debugPrint('Error checking review status: $e');
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  void _showWriteReviewDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _WriteReviewDialog(
+        item: widget.item,
+        order: widget.order,
+        onReviewSubmitted: () {
+          setState(() {
+            _hasReviewed = true;
+          });
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: item.productImage != null
+                  ? SafeNetworkImage(
+                      imageUrl: item.productImage,
+                      defaultBucket: 'products',
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                    )
+                  : const Icon(
+                      Icons.shopping_basket_rounded,
+                      color: AppColors.primary,
+                    ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.productName ?? 'Product',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: AppColors.textHeadline,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Qty: ${item.quantity.toInt()} x ₱${item.unitPrice.toStringAsFixed(2)}',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSubtle,
+                  ),
+                ),
+                if (widget.order.isDelivered && !_checking) ...[
+                  const SizedBox(height: 6),
+                  _hasReviewed
+                      ? Row(
+                          children: [
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              color: AppColors.success,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Reviewed',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.success,
+                              ),
+                            ),
+                          ],
+                        )
+                      : MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () => _showWriteReviewDialog(context),
+                            child: Text(
+                              'Write a Review',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '₱${(item.subtotal ?? (item.quantity * item.unitPrice)).toStringAsFixed(2)}',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: AppColors.textHeadline,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FarmerRatingSection extends StatefulWidget {
+  final Order order;
+
+  const _FarmerRatingSection({required this.order});
+
+  @override
+  State<_FarmerRatingSection> createState() => _FarmerRatingSectionState();
+}
+
+class _FarmerRatingSectionState extends State<_FarmerRatingSection> {
+  bool _hasRated = false;
+  bool _checking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkRatingStatus();
+  }
+
+  Future<void> _checkRatingStatus() async {
+    try {
+      final userId = AuthService().userId;
+      final customerResponse = await SupabaseConfig.client
+          .from('customers')
+          .select('customer_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      final customerId = customerResponse?['customer_id']?.toString();
+      if (customerId != null) {
+        final ratingResponse = await SupabaseConfig.client
+            .from('farmer_ratings')
+            .select('rating_id')
+            .eq('order_id', widget.order.orderId)
+            .eq('farmer_id', widget.order.farmerId)
+            .eq('customer_id', customerId)
+            .maybeSingle();
+        if (mounted) {
+          setState(() {
+            _hasRated = ratingResponse != null;
+            _checking = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _checking = false);
+      }
+    } catch (e) {
+      debugPrint('Error checking farmer rating status: $e');
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  void _showRateFarmerDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _RateFarmerDialog(
+        order: widget.order,
+        onRatingSubmitted: () {
+          setState(() {
+            _hasRated = true;
+          });
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_checking) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: _hasRated
+            ? AppColors.success.withValues(alpha: 0.05)
+            : AppColors.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _hasRated
+              ? AppColors.success.withValues(alpha: 0.2)
+              : AppColors.primary.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(
+                _hasRated ? Icons.stars_rounded : Icons.star_border_rounded,
+                color: _hasRated ? AppColors.success : AppColors.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _hasRated ? 'Farmer Rated' : 'Rate this Farmer',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _hasRated ? AppColors.success : AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          if (!_hasRated)
+            TextButton(
+              onPressed: () => _showRateFarmerDialog(context),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                'Rate Now',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            )
+          else
+            Row(
+              children: [
+                const Icon(Icons.check_rounded, color: AppColors.success, size: 16),
+                const SizedBox(width: 4),
+                Text(
+                  'Completed',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.success,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WriteReviewDialog extends StatefulWidget {
+  final OrderItem item;
+  final Order order;
+  final VoidCallback onReviewSubmitted;
+
+  const _WriteReviewDialog({
+    required this.item,
+    required this.order,
+    required this.onReviewSubmitted,
+  });
+
+  @override
+  State<_WriteReviewDialog> createState() => _WriteReviewDialogState();
+}
+
+class _WriteReviewDialogState extends State<_WriteReviewDialog> {
+  double _rating = 5.0;
+  final _reviewTextController = TextEditingController();
+  bool _isSaving = false;
+  bool _isUploadingImage = false;
+  String? _reviewImageUrl;
+
+  @override
+  void dispose() {
+    _reviewTextController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    if (_isUploadingImage || _isSaving) return;
+
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+      imageQuality: 85,
+    );
+
+    if (image == null) return;
+
+    setState(() => _isUploadingImage = true);
+    try {
+      final bytes = await image.readAsBytes();
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_review_${image.name}';
+      final path = 'reviews/$fileName';
+
+      final resultPath = await SupabaseDatabase.uploadImage(
+        bucket: 'uploads',
+        path: path,
+        bytes: bytes,
+      );
+
+      if (resultPath != null) {
+        final publicUrl = SupabaseConfig.client.storage
+            .from('uploads')
+            .getPublicUrl(path);
+
+        setState(() {
+          _reviewImageUrl = publicUrl;
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to upload image. Please try again.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error uploading review image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading review image: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingImage = false);
+      }
+    }
+  }
+
+  Future<void> _submitReview() async {
+    setState(() => _isSaving = true);
+    try {
+      final userId = AuthService().userId;
+      final customerResponse = await SupabaseConfig.client
+          .from('customers')
+          .select('customer_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      final customerId = customerResponse?['customer_id']?.toString();
+      if (customerId == null) {
+        throw Exception('Customer profile not found');
+      }
+
+      final reviewResult = await SupabaseConfig.client
+          .from('product_reviews')
+          .insert({
+            'product_id': widget.item.productId,
+            'customer_id': customerId,
+            'order_id': widget.order.orderId,
+            'rating': _rating,
+            'review_text': _reviewTextController.text.trim().isEmpty ? null : _reviewTextController.text.trim(),
+            'is_verified_purchase': true,
+          })
+          .select('review_id')
+          .single();
+
+      final reviewId = reviewResult['review_id']?.toString();
+      if (reviewId != null && _reviewImageUrl != null) {
+        await SupabaseConfig.client
+            .from('review_images')
+            .insert({
+              'review_id': reviewId,
+              'image_url': _reviewImageUrl!,
+            });
+      }
+
+      widget.onReviewSubmitted();
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Thank you! Your review has been submitted.'),
+            backgroundColor: Color(0xFF16A34A),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error submitting review: $e');
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit review: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Write a Review',
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textHeadline,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  widget.item.productName ?? 'Product',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textHeadline,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Center(
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(5, (index) {
+                          final starVal = index + 1;
+                          return IconButton(
+                            icon: Icon(
+                              _rating >= starVal
+                                  ? Icons.star_rounded
+                                  : Icons.star_outline_rounded,
+                              color: Colors.amber,
+                              size: 36,
+                            ),
+                            onPressed: () => setState(() => _rating = starVal.toDouble()),
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _rating == 1
+                            ? 'Terrible'
+                            : _rating == 2
+                                ? 'Poor'
+                                : _rating == 3
+                                    ? 'Fair'
+                                    : _rating == 4
+                                        ? 'Good'
+                                        : 'Excellent!',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Review Description',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textHeadline,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _reviewTextController,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    hintText: 'Share details of your experience with this product...',
+                    hintStyle: GoogleFonts.inter(color: AppColors.textSubtle, fontSize: 13),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.textSubtle.withValues(alpha: 0.3)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Add Photo',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textHeadline,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: _pickAndUploadImage,
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.textSubtle.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: _isUploadingImage
+                            ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                            : const Icon(Icons.add_a_photo_rounded, color: AppColors.primary),
+                      ),
+                    ),
+                    if (_reviewImageUrl != null) ...[
+                      const SizedBox(width: 16),
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.textSubtle.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: SafeNetworkImage(
+                            imageUrl: _reviewImageUrl!,
+                            defaultBucket: 'uploads',
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isSaving || _isUploadingImage ? null : _submitReview,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : Text(
+                            'Submit Review',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RateFarmerDialog extends StatefulWidget {
+  final Order order;
+  final VoidCallback onRatingSubmitted;
+
+  const _RateFarmerDialog({
+    required this.order,
+    required this.onRatingSubmitted,
+  });
+
+  @override
+  State<_RateFarmerDialog> createState() => _RateFarmerDialogState();
+}
+
+class _RateFarmerDialogState extends State<_RateFarmerDialog> {
+  double _rating = 5.0;
+  final _reviewTextController = TextEditingController();
+  bool _isSaving = false;
+
+  @override
+  void dispose() {
+    _reviewTextController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitRating() async {
+    setState(() => _isSaving = true);
+    try {
+      final userId = AuthService().userId;
+      final customerResponse = await SupabaseConfig.client
+          .from('customers')
+          .select('customer_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      final customerId = customerResponse?['customer_id']?.toString();
+      if (customerId == null) {
+        throw Exception('Customer profile not found');
+      }
+
+      await SupabaseConfig.client
+          .from('farmer_ratings')
+          .insert({
+            'farmer_id': widget.order.farmerId,
+            'customer_id': customerId,
+            'order_id': widget.order.orderId,
+            'rating': _rating,
+            'review_text': _reviewTextController.text.trim().isEmpty ? null : _reviewTextController.text.trim(),
+          });
+
+      widget.onRatingSubmitted();
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Thank you! Your rating for the farmer has been submitted.'),
+            backgroundColor: Color(0xFF16A34A),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error submitting farmer rating: $e');
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit rating: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Rate Farmer',
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textHeadline,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  widget.order.farmName ?? 'Farmer / Farm',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textHeadline,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Center(
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(5, (index) {
+                          final starVal = index + 1;
+                          return IconButton(
+                            icon: Icon(
+                              _rating >= starVal
+                                  ? Icons.star_rounded
+                                  : Icons.star_outline_rounded,
+                              color: Colors.amber,
+                              size: 36,
+                            ),
+                            onPressed: () => setState(() => _rating = starVal.toDouble()),
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _rating == 1
+                            ? 'Terrible'
+                            : _rating == 2
+                                ? 'Poor'
+                                : _rating == 3
+                                    ? 'Fair'
+                                    : _rating == 4
+                                        ? 'Good'
+                                        : 'Excellent!',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Review details (optional)',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textHeadline,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _reviewTextController,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    hintText: 'Share details of your experience with this farmer...',
+                    hintStyle: GoogleFonts.inter(color: AppColors.textSubtle, fontSize: 13),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.textSubtle.withValues(alpha: 0.3)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _submitRating,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : Text(
+                            'Submit Rating',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

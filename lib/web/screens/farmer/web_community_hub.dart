@@ -1129,12 +1129,33 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Future<void> _showPostDetailFlow(ForumPostItem post) async {
-    final updated = await showDialog<bool>(
+    final result = await showDialog<dynamic>(
       context: context,
-      builder: (context) => PostDetailDialog(post: post),
+      builder: (context) => PostDetailDialog(
+        post: post,
+        onPostUpdated: (updatedPost) {
+          if (mounted) {
+            setState(() {
+              if (_postsList != null) {
+                final index = _postsList!.indexWhere((p) => p.id == updatedPost.id);
+                if (index != -1) {
+                  _postsList![index] = updatedPost;
+                }
+              }
+            });
+          }
+        },
+      ),
     );
-    if (updated == true && mounted) {
-      _refreshForumPosts();
+    if (result is ForumPostItem && mounted) {
+      setState(() {
+        if (_postsList != null) {
+          final index = _postsList!.indexWhere((p) => p.id == result.id);
+          if (index != -1) {
+            _postsList![index] = result;
+          }
+        }
+      });
     }
   }
 
