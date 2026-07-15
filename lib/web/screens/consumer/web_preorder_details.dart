@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/data/app_data.dart';
 import '../../../shared/models/product/product_review_model.dart';
@@ -91,10 +92,15 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
       final reservedFuture =
           product.productId != null && product.productId!.isNotEmpty
           ? Supabase.instance.client
-              .from('order_items')
-              .select('quantity, orders!inner(order_statuses!inner(code))')
-              .eq('product_id', product.productId!)
-              .inFilter('orders.order_statuses.code', ['pending', 'confirmed', 'PENDING', 'CONFIRMED'])
+                .from('order_items')
+                .select('quantity, orders!inner(order_statuses!inner(code))')
+                .eq('product_id', product.productId!)
+                .inFilter('orders.order_statuses.code', [
+                  'pending',
+                  'confirmed',
+                  'PENDING',
+                  'CONFIRMED',
+                ])
           : Future.value([]);
 
       final results = await Future.wait<dynamic>([
@@ -106,7 +112,10 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
       ]);
 
       final items = List<Map<String, dynamic>>.from(results[4] as List);
-      double reserved = items.fold<double>(0.0, (sum, item) => sum + ((item['quantity'] as num?)?.toDouble() ?? 0.0));
+      double reserved = items.fold<double>(
+        0.0,
+        (sum, item) => sum + ((item['quantity'] as num?)?.toDouble() ?? 0.0),
+      );
 
       final updatedProduct = ProductItem(
         productId: product.productId,
