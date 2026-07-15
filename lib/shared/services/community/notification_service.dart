@@ -728,8 +728,29 @@ class NotificationService {
           if (isFarmer) {
             GoRouter.of(ctx).go(AppRoutes.home);
           } else {
-            GoRouter.of(ctx).go(AppRoutes.customerOrders);
+            if (linkId.isNotEmpty) {
+              GoRouter.of(ctx).go('/orders/$linkId');
+            } else {
+              GoRouter.of(ctx).go(AppRoutes.customerOrders);
+            }
           }
+        }
+      }
+      return;
+    }
+
+    if (linkType == 'review' || linkType == 'rating') {
+      final isFarmer = AuthService().isViewingAsFarmer;
+      final ctx = appNavigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        if (kIsWeb) {
+          if (isFarmer) {
+            GoRouter.of(ctx).go(AppRoutes.farmerDashboard);
+          } else {
+            GoRouter.of(ctx).go(AppRoutes.profile);
+          }
+        } else {
+          GoRouter.of(ctx).go(AppRoutes.home);
         }
       }
       return;
@@ -923,6 +944,101 @@ class NotificationService {
       } catch (innerError) {
         debugPrint('❌ Fallback insertion failed: $innerError');
       }
+    }
+  }
+
+  /// Notifies the farmer when a consumer reviews their product
+  Future<void> notifyFarmerNewProductReview({
+    required String productId,
+    required double rating,
+  }) async {
+    try {
+      final currentUserId = supabase.auth.currentUser?.id;
+      if (currentUserId == null) return;
+
+      // Get reviewer's name
+      final reviewerProfile = await supabase
+          .from('users')
+          .select('name')
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+      final reviewerName = reviewerProfile?['name']?.toString() ?? 'A customer';
+
+      // Get product info (name and farmer_id)
+      final productData = await supabase
+          .from('products')
+          .select('name, farmer_id')
+          .eq('product_id', productId)
+          .maybeSingle();
+
+      if (productData == null) return;
+      final productName = productData['name']?.toString() ?? 'your product';
+      final farmerId = productData['farmer_id']?.toString();
+
+      if (farmerId == null) return;
+
+      // Get farmer user_id
+      final farmerProfile = await supabase
+          .from('farmers')
+          .select('user_id')
+          .eq('farmer_id', farmerId)
+          .maybeSingle();
+
+      final farmerUserId = farmerProfile?['user_id']?.toString();
+      if (farmerUserId == null) return;
+
+      // Insert notification (sends push notification via Edge Function)
+      await insertNotification(
+        userId: farmerUserId,
+        title: 'New Product Review',
+        content: '$reviewerName rated your product "$productName" $rating stars.',
+        type: 'review',
+        linkType: 'review',
+        linkId: productId,
+      );
+    } catch (e) {
+      debugPrint('Error notifying farmer of product review: $e');
+    }
+  }
+
+  /// Notifies the farmer when a consumer rates/reviews them
+  Future<void> notifyFarmerNewFarmerRating({
+    required String farmerId,
+    required double rating,
+  }) async {
+    try {
+      final currentUserId = supabase.auth.currentUser?.id;
+      if (currentUserId == null) return;
+
+      // Get reviewer's name
+      final reviewerProfile = await supabase
+          .from('users')
+          .select('name')
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+      final reviewerName = reviewerProfile?['name']?.toString() ?? 'A customer';
+
+      // Get farmer user_id
+      final farmerProfile = await supabase
+          .from('farmers')
+          .select('user_id')
+          .eq('farmer_id', farmerId)
+          .maybeSingle();
+
+      final farmerUserId = farmerProfile?['user_id']?.toString();
+      if (farmerUserId == null) return;
+
+      // Insert notification (sends push notification via Edge Function)
+      await insertNotification(
+        userId: farmerUserId,
+        title: 'New Farmer Review',
+        content: '$reviewerName rated you $rating stars.',
+        type: 'review',
+        linkType: 'review',
+        linkId: farmerId,
+      );
+    } catch (e) {
+      debugPrint('Error notifying farmer of rating: $e');
     }
   }
 

@@ -337,6 +337,14 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                 ),
                 _buildDivider(),
                 _buildMenuItem(
+                  icon: Icons.confirmation_number_outlined,
+                  title: 'My Vouchers',
+                  subtitle: 'View your claimed shop vouchers',
+                  color: Colors.orange,
+                  onTap: () => context.push(AppRoutes.claimedVouchers),
+                ),
+                _buildDivider(),
+                _buildMenuItem(
                   icon: Icons.chat_bubble_outline_rounded,
                   title: 'Messages',
                   subtitle: 'Contact support or sellers',

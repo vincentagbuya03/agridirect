@@ -153,15 +153,18 @@ class CropMilestonesTimeline extends StatelessWidget {
                                 height: 1.6,
                               ),
                             ),
-                            if (milestone.imageUrl != null && milestone.imageUrl!.isNotEmpty) ...[
+                             if (milestone.imageUrl != null && milestone.imageUrl!.isNotEmpty) ...[
                               const SizedBox(height: 14),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: AspectRatio(
-                                  aspectRatio: 16 / 9,
-                                  child: SafeNetworkImage(
-                                    imageUrl: milestone.imageUrl!,
-                                    fit: BoxFit.cover,
+                              SizedBox(
+                                width: 300,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: AspectRatio(
+                                    aspectRatio: 16 / 9,
+                                    child: SafeNetworkImage(
+                                      imageUrl: milestone.imageUrl!,
+                                      fit: BoxFit.cover,
+                                    ),
                                   ),
                                 ),
                               ),

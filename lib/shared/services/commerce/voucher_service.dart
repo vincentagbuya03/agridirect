@@ -92,6 +92,54 @@ class VoucherService {
     }
   }
 
+  /// Get all claimed vouchers for a user (both used and unused) enriched with farmer profiles
+  Future<List<Map<String, dynamic>>> getUserClaimedVouchersHistory(String userId) async {
+    try {
+      final response = await _supabase
+          .from('user_claimed_vouchers')
+          .select('*, vouchers(*)')
+          .eq('user_id', userId);
+
+      final List<Map<String, dynamic>> claimedList = List<Map<String, dynamic>>.from(response as List);
+      if (claimedList.isEmpty) return [];
+
+      // Collect unique farmer IDs
+      final farmerIds = claimedList
+          .map((item) => (item['vouchers'] as Map?)?['farmer_id']?.toString())
+          .where((id) => id != null && id.isNotEmpty)
+          .cast<String>()
+          .toSet()
+          .toList();
+
+      if (farmerIds.isEmpty) return claimedList;
+
+      // Query farm names
+      final farmersResponse = await _supabase
+          .from('farmers')
+          .select('user_id, farm_name')
+          .inFilter('user_id', farmerIds);
+
+      final farmNames = {
+        for (var f in farmersResponse as List)
+          f['user_id'].toString(): f['farm_name'].toString()
+      };
+
+      // Enrich claimed vouchers list with farm_name
+      for (var item in claimedList) {
+        final voucher = item['vouchers'] as Map<String, dynamic>?;
+        if (voucher != null) {
+          final fId = voucher['farmer_id']?.toString() ?? '';
+          voucher['farm_name'] = farmNames[fId] ?? 'Partner Farm';
+        }
+      }
+
+      return claimedList;
+    } catch (e) {
+      debugPrint('Error fetching claimed vouchers history: $e');
+      return [];
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getFarmerVouchersForUser({
     required String farmerId,
     required String userId,

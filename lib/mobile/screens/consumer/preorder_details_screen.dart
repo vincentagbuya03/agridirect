@@ -4,13 +4,15 @@ import 'package:go_router/go_router.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/models/cached_product.dart';
 import '../../../shared/router/app_router.dart';
-import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/offline/offline_cache_service.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/widgets/image_widgets.dart';
 
 import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/models/product/crop_milestone_model.dart';
+import '../../../shared/services/commerce/product_service.dart';
+import '../../../web/widgets/crop_milestones_timeline.dart';
 
 class PreOrderDetailsScreen extends StatefulWidget {
   const PreOrderDetailsScreen({super.key, this.initialProduct});
@@ -29,6 +31,7 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
   bool _isSubmitting = false;
   final OfflineCacheService _cacheService = OfflineCacheService();
   bool _isSaved = false;
+  List<CropMilestone> _milestones = const [];
 
   @override
   void initState() {
@@ -39,6 +42,8 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
     _refreshSavedState();
     if (_product == null) {
       _loadFallbackProduct();
+    } else {
+      _loadMilestones();
     }
   }
 
@@ -56,8 +61,24 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
       setState(() => _product = products.first);
       _cacheProductForOffline();
       _refreshSavedState();
+      _loadMilestones();
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadMilestones() async {
+    final productId = _product?.productId;
+    if (productId == null || productId.isEmpty) return;
+    try {
+      final milestones = await ProductService().getCropMilestones(productId);
+      if (mounted) {
+        setState(() {
+          _milestones = milestones;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading milestones: $e');
     }
   }
 
@@ -223,6 +244,8 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildCountdownBanner(product),
+          const SizedBox(height: 18),
           _farmChip(product),
           const SizedBox(height: 16),
           Text(
@@ -296,14 +319,95 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 28),
+          CropMilestonesTimeline(milestones: _milestones),
         ],
       ),
     );
   }
 
+  Widget _buildCountdownBanner(ProductItem product) {
+    final days = int.tryParse(product.harvestDays ?? '0') ?? 0;
+    final harvested = _isHarvested(product);
+    
+    String stageTitle = 'Growing Stage';
+    Color bannerColor = AppColors.primary.withValues(alpha: 0.1);
+    Color textColor = AppColors.primary;
+    IconData icon = Icons.spa_outlined;
+    String description = 'The crop is growing well. Stay tuned for updates!';
+
+    if (harvested) {
+      stageTitle = 'Ready for Harvest!';
+      bannerColor = Colors.orange.withValues(alpha: 0.1);
+      textColor = Colors.orange[800]!;
+      icon = Icons.shopping_basket_rounded;
+      description = 'This crop has been harvested and is ready for ordering!';
+    } else if (days <= 3) {
+      stageTitle = 'Nearing Harvest! 🕒';
+      bannerColor = AppColors.error.withValues(alpha: 0.1);
+      textColor = AppColors.error;
+      icon = Icons.alarm_rounded;
+      description = 'Almost ready! The crop will be harvested very soon.';
+    } else if (_milestones.isNotEmpty) {
+      final latest = _milestones.first;
+      stageTitle = 'Latest Status: ${latest.title}';
+      description = latest.description;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bannerColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: textColor.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: textColor, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  stageTitle,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textBody,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _isHarvested(ProductItem product) {
+    final days = int.tryParse(product.harvestDays ?? '');
+    if (days == null) return false;
+    if (days <= 0) return true;
+    if (product.createdAt != null) {
+      final harvestDate = product.createdAt!.add(Duration(days: days));
+      final now = DateTime.now();
+      return harvestDate.difference(now).isNegative;
+    }
+    return false;
+  }
+
   Widget _buildBottomBar(ProductItem product) {
-    final isOwnProduct =
-        AuthService().userId.isNotEmpty &&
+    final isOwnProduct = AuthService().userId.isNotEmpty &&
         product.farmerId == AuthService().userId;
 
     if (isOwnProduct) {
@@ -312,10 +416,10 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
         child: Container(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: AppColors.primary.withValues(alpha: 0.08),
             border: Border(
               top: BorderSide(
-                color: AppColors.textHeadline.withValues(alpha: 0.08),
+                color: AppColors.primary.withValues(alpha: 0.12),
               ),
             ),
           ),
@@ -337,6 +441,8 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
         ),
       );
     }
+
+    final harvested = _isHarvested(product);
 
     return SafeArea(
       top: false,
@@ -382,7 +488,18 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
             SizedBox(
               height: 52,
               child: ElevatedButton(
-                onPressed: _isSubmitting ? null : () => _submit(product),
+                onPressed: _isSubmitting
+                    ? null
+                    : () {
+                        context.push(
+                          AppRoutes.checkout,
+                          extra: {
+                            'product': product,
+                            'quantity': _quantity,
+                            'isPreOrder': !harvested,
+                          },
+                        );
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
@@ -401,7 +518,7 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
                           color: Colors.white,
                         ),
                       )
-                    : const Text('Pre-order Now'),
+                    : Text(harvested ? 'Order Now' : 'Pre-order Now'),
               ),
             ),
           ],
@@ -664,100 +781,6 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
     );
   }
 
-  Future<void> _submit(ProductItem product) async {
-    final productId = product.productId;
-    if (productId == null || productId.isEmpty) {
-      _showSnack('This pre-order is missing product details.');
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
-    try {
-      final result = await OrderService().createOfflinePreOrderByProductId(
-        productId: productId,
-        quantity: _quantity.toDouble(),
-        paymentMethod: _paymentMethod,
-        notes: _paymentMethod == 'COD'
-            ? 'Customer selected Cash on Delivery for this pre-order.'
-            : 'Customer selected Cash on Pickup for this pre-order.',
-      );
-
-      if (!mounted) return;
-      _showSnack('Pre-order placed successfully.');
-
-      final conversationId = result['conversation_id']?.toString();
-      if (conversationId != null && conversationId.isNotEmpty) {
-        context.push(
-          AppRoutes.messages,
-          extra: {'conversationId': conversationId, 'asFarmer': false},
-        );
-      }
-    } catch (error) {
-      if (!mounted) return;
-      final message = error.toString().replaceFirst('Exception: ', '');
-      if (_isAvailabilityError(message)) {
-        await _showInsufficientQuantityDialog(message, product);
-      } else {
-        _showSnack(message, isError: true);
-      }
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  bool _isAvailabilityError(String message) {
-    final lower = message.toLowerCase();
-    return lower.startsWith('only ') && lower.contains('available');
-  }
-
-  Future<void> _showInsufficientQuantityDialog(
-    String message,
-    ProductItem product,
-  ) async {
-    final available = _parseAvailableQuantity(message);
-    final unit = _unitLabel(product);
-    final body = available == null
-        ? message
-        : 'Only ${_formatQuantity(available)} $unit is available for this pre-order. Please lower your quantity.';
-
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Not enough quantity'),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Keep Editing'),
-          ),
-          if (available != null && available >= 1)
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                setState(() => _quantity = available.floor());
-              },
-              child: Text('Set to ${available.floor()}'),
-            ),
-        ],
-      ),
-    );
-  }
-
-  double? _parseAvailableQuantity(String message) {
-    final match = RegExp(
-      r'Only\s+([0-9]+(?:\.[0-9]+)?)\s+units?\s+are\s+available',
-      caseSensitive: false,
-    ).firstMatch(message);
-    if (match == null) return null;
-    return double.tryParse(match.group(1) ?? '');
-  }
-
-  String _formatQuantity(double quantity) {
-    return quantity.truncateToDouble() == quantity
-        ? quantity.toStringAsFixed(0)
-        : quantity.toStringAsFixed(2);
-  }
 
   void _showComingSoon() {
     _showSnack('This action is coming soon.');

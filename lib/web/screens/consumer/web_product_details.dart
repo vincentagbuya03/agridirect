@@ -539,54 +539,107 @@ class _WebProductDetailsState extends State<WebProductDetails> {
               ],
             )
           else
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _addToCart,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _primary,
-                      side: BorderSide(color: _primary.withValues(alpha: 0.35)),
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                    icon: const Icon(Icons.shopping_cart_outlined),
-                    label: const Text(
-                      'Add to Cart',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () {
-                      context.push(
-                        AppRoutes.checkout,
-                        extra: {'product': _product, 'quantity': _quantity},
-                      );
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _primary,
-                      foregroundColor: _white,
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                    child: const Text(
-                      'Buy Now',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            _buildActionsRow(),
         ],
       ),
     );
+  }
+
+  bool _isHarvested(ProductItem? product) {
+    if (product == null) return false;
+    final days = int.tryParse(product.harvestDays ?? '');
+    if (days == null) return false;
+    if (days <= 0) return true;
+    if (product.createdAt != null) {
+      final harvestDate = product.createdAt!.add(Duration(days: days));
+      final now = DateTime.now();
+      return harvestDate.difference(now).isNegative;
+    }
+    return false;
+  }
+
+  Widget _buildActionButtonsSection() {
+    final isPreOrder = _product?.targetQuantity != null;
+    final harvested = _isHarvested(_product);
+
+    if (isPreOrder && !harvested) {
+      return Row(
+        children: [
+          Expanded(
+            child: FilledButton(
+              onPressed: () {
+                context.push(
+                  AppRoutes.preorderDetails,
+                  extra: _product,
+                );
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: _primary,
+                foregroundColor: _white,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+              child: const Text(
+                'Pre-Order Now',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: _addToCart,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _primary,
+              side: BorderSide(color: _primary.withValues(alpha: 0.35)),
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+            icon: const Icon(Icons.shopping_cart_outlined),
+            label: const Text(
+              'Add to Cart',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: FilledButton(
+            onPressed: () {
+              context.push(
+                AppRoutes.checkout,
+                extra: {'product': _product, 'quantity': _quantity},
+              );
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: _primary,
+              foregroundColor: _white,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+            child: const Text(
+              'Buy Now',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionsRow() {
+    return _buildActionButtonsSection();
   }
 
   Widget _qtyButton(IconData icon, VoidCallback onTap) {

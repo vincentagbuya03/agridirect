@@ -347,6 +347,7 @@ class SupabaseDataService {
             farmer_id,
             category_id,
             unit_id,
+            created_at,
             units(abbreviation, name)
           ''')
           .eq('farmer_id', farmerId)
@@ -370,7 +371,7 @@ class SupabaseDataService {
         // Get inventory information
         final inventoryResponse = await _client
             .from('product_inventory')
-            .select('available_quantity')
+            .select('available_quantity, reserved_quantity')
             .eq('product_id', productId)
             .maybeSingle();
 
@@ -379,6 +380,8 @@ class SupabaseDataService {
         final unitAbbr = (unitData?['abbreviation'] as String?) ?? 'kg';
         final availableQuantity =
             (inventoryResponse?['available_quantity'] as num?)?.toDouble() ?? 0;
+        final reservedQuantity =
+            (inventoryResponse?['reserved_quantity'] as num?)?.toDouble() ?? 0;
 
         String status = 'IN STOCK';
 
@@ -390,6 +393,8 @@ class SupabaseDataService {
           'unit': unitAbbr,
           'available': availableQuantity,
           'available_quantity': availableQuantity,
+          'reserved_quantity': reservedQuantity,
+          'target_quantity': availableQuantity + reservedQuantity,
           'harvest':
               (item['harvest_days'] != null &&
                   (item['harvest_days'] as num) > 0)
@@ -401,6 +406,7 @@ class SupabaseDataService {
           'image': imageResponse?['image_url'] ?? '',
           'category_id': item['category_id'],
           'unit_id': item['unit_id'],
+          'created_at': item['created_at']?.toString(),
         });
       }
 

@@ -1410,7 +1410,14 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: CachedNetworkImage(imageUrl: widget.product.imageUrl, width: 64, height: 64, fit: BoxFit.cover),
+                        child: widget.product.imageUrl.isNotEmpty
+                            ? CachedNetworkImage(imageUrl: widget.product.imageUrl, width: 64, height: 64, fit: BoxFit.cover)
+                            : Container(
+                                width: 64,
+                                height: 64,
+                                color: AppColors.background,
+                                child: const Icon(Icons.image_not_supported_outlined, color: AppColors.textSubtle),
+                              ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -1731,9 +1738,13 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                 ? PageView.builder(
                     itemCount: widget.product.imageUrls.length,
                     onPageChanged: (i) => setState(() => _currentPage = i),
-                    itemBuilder: (context, i) => CachedNetworkImage(imageUrl: widget.product.imageUrls[i], fit: BoxFit.cover),
+                    itemBuilder: (context, i) => widget.product.imageUrls[i].isNotEmpty
+                        ? CachedNetworkImage(imageUrl: widget.product.imageUrls[i], fit: BoxFit.cover)
+                        : Container(color: AppColors.background, child: const Center(child: Icon(Icons.image_not_supported_outlined, color: AppColors.textSubtle, size: 48))),
                   )
-                : Hero(tag: 'product_image_${widget.product.productId}', child: CachedNetworkImage(imageUrl: widget.product.imageUrl, fit: BoxFit.cover)),
+                : widget.product.imageUrl.isNotEmpty
+                    ? Hero(tag: 'product_image_${widget.product.productId}', child: CachedNetworkImage(imageUrl: widget.product.imageUrl, fit: BoxFit.cover))
+                    : Container(color: AppColors.background, child: const Center(child: Icon(Icons.image_not_supported_outlined, color: AppColors.textSubtle, size: 64))),
           ),
         ),
         if (widget.product.imageUrls.length > 1)
@@ -1760,7 +1771,10 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
 
   Widget _buildHarvestBadge() {
     final days = int.tryParse(widget.product.harvestDays ?? '0') ?? 0;
-    final label = days > 0 ? 'Harvest in $days days' : (widget.product.targetQuantity != null ? 'Pre-order' : 'Ready Now');
+    final harvested = _isHarvested(widget.product);
+    final label = harvested
+        ? 'Order Now'
+        : (days > 0 ? 'Harvest in $days days' : (widget.product.targetQuantity != null ? 'Pre-order' : 'Ready Now'));
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.primary.withValues(alpha: 0.2))),
@@ -1818,6 +1832,18 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     return GestureDetector(onTap: onTap, child: Container(padding: const EdgeInsets.all(14), child: Icon(icon, color: onTap != null ? AppColors.primary : AppColors.textSubtle.withValues(alpha: 0.3))));
   }
 
+  bool _isHarvested(ProductItem product) {
+    final days = int.tryParse(product.harvestDays ?? '');
+    if (days == null) return false;
+    if (days <= 0) return true;
+    if (product.createdAt != null) {
+      final harvestDate = product.createdAt!.add(Duration(days: days));
+      final now = DateTime.now();
+      return harvestDate.difference(now).isNegative;
+    }
+    return false;
+  }
+
   Widget _buildActionButtons() {
     final isOwnProduct = AuthService().userId.isNotEmpty &&
         widget.product.farmerId == AuthService().userId;
@@ -1848,6 +1874,28 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
           ],
         ),
       );
+    }
+
+    final isPreOrder = widget.product.targetQuantity != null;
+
+    if (isPreOrder) {
+      final harvested = _isHarvested(widget.product);
+      if (!harvested) {
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => context.push(AppRoutes.preorderDetails, extra: widget.product),
+            icon: const Icon(Icons.hourglass_empty_rounded),
+            label: const Text('Pre-Order Now'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        );
+      }
     }
 
     return Row(children: [

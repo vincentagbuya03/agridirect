@@ -737,7 +737,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                       ),
                     ),
                     child: Text(
-                      isHarvested ? 'Buy Now' : 'Reserve Pre-order',
+                      isHarvested ? 'Order Now' : 'Reserve Pre-order',
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),

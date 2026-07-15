@@ -566,24 +566,38 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(28),
                 ),
-                child: CachedNetworkImage(
-                  imageUrl: product.imageUrl,
-                  height: 220,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) =>
-                      Container(color: AppColors.background),
-                  errorWidget: (context, url, error) => Container(
-                    color: AppColors.background,
-                    child: const Center(
-                      child: Icon(
-                        Icons.image_outlined,
-                        color: AppColors.textSubtle,
-                        size: 42,
+                child: product.imageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: product.imageUrl,
+                        height: 220,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) =>
+                            Container(color: AppColors.background),
+                        errorWidget: (context, url, error) => Container(
+                          color: AppColors.background,
+                          child: const Center(
+                            child: Icon(
+                              Icons.image_outlined,
+                              color: AppColors.textSubtle,
+                              size: 42,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        height: 220,
+                        width: double.infinity,
+                        color: AppColors.background,
+                        child: const Center(
+                          child: Icon(
+                            Icons.image_outlined,
+                            color: AppColors.textSubtle,
+                            size: 42,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ),
+
               ),
               Positioned(
                 top: 16,
@@ -657,7 +671,40 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
                               fontSize: 20,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          if (product.harvestDays != null) ...[
+                            Builder(
+                              builder: (context) {
+                                final days = int.tryParse(product.harvestDays!) ?? 7;
+                                if (product.createdAt != null) {
+                                  final harvestDate = product.createdAt!.add(Duration(days: days));
+                                  final diff = harvestDate.difference(DateTime.now());
+                                  final remainingDays = diff.inDays;
+                                  if (remainingDays >= 0 && remainingDays <= 3) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.error.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          '⚠️ Harvesting Soon!',
+                                          style: AppTextStyles.labelSmall.copyWith(
+                                            color: AppColors.error,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                                return const SizedBox.shrink();
+                              }
+                            ),
+                          ],
+                          const SizedBox(height: 6),
                           Row(
                             children: [
                               const Icon(
@@ -739,7 +786,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
                       ),
                     ),
                     child: Text(
-                      'RESERVE HARVEST',
+                      _isHarvested(product) ? 'ORDER NOW' : 'RESERVE HARVEST',
                       style: AppTextStyles.labelSmall.copyWith(
                         fontWeight: FontWeight.w800,
                         letterSpacing: 1.5,
@@ -807,6 +854,18 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
     final numeric = trimmed.replaceAll(RegExp(r'[^0-9.]'), '');
     if (numeric.isEmpty) return '₱0';
     return '₱$numeric';
+  }
+
+  bool _isHarvested(ProductItem product) {
+    final days = int.tryParse(product.harvestDays ?? '');
+    if (days == null) return false;
+    if (days <= 0) return true;
+    if (product.createdAt != null) {
+      final harvestDate = product.createdAt!.add(Duration(days: days));
+      final now = DateTime.now();
+      return harvestDate.difference(now).isNegative;
+    }
+    return false;
   }
 
   void _openPreOrderDetails(ProductItem product) {

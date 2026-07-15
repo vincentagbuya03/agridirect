@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/styles/app_theme.dart';
@@ -9,6 +10,9 @@ import '../../../shared/models/order/order_model.dart';
 import '../../../shared/router/app_routes.dart';
 import 'package:agridirect/shared/widgets/image_widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../shared/models/product/crop_milestone_model.dart';
+import '../../../shared/services/commerce/product_service.dart';
+import '../../../web/widgets/crop_milestones_timeline.dart';
 import 'package:agridirect/shared/services/farmer/farmer_service.dart';
 import 'package:agridirect/shared/models/farmer/farmer_profile_model.dart';
 import '../../../shared/models/order/order_item_model.dart';
@@ -1289,6 +1293,41 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ),
         const SizedBox(height: 16),
         _buildTimeline(order),
+        if (order.isPreorder == true) ...[
+          const SizedBox(height: 28),
+          FutureBuilder<List<OrderItem>>(
+            future: OrderService().getOrderItems(order.orderId),
+            builder: (context, itemSnapshot) {
+              if (!itemSnapshot.hasData || itemSnapshot.data!.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              final productId = itemSnapshot.data!.first.productId;
+              return FutureBuilder<List<CropMilestone>>(
+                future: ProductService().getCropMilestones(productId),
+                builder: (context, milestoneSnapshot) {
+                  if (!milestoneSnapshot.hasData || milestoneSnapshot.data!.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Crop Development Journey',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textHeadline,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      CropMilestonesTimeline(milestones: milestoneSnapshot.data!),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        ],
         const SizedBox(height: 32),
 
         // Order Items
@@ -2166,6 +2205,12 @@ class _WriteReviewDialogState extends State<_WriteReviewDialog> {
             });
       }
 
+      // Trigger push notification to farmer
+      unawaited(NotificationService().notifyFarmerNewProductReview(
+        productId: widget.item.productId,
+        rating: _rating,
+      ));
+
       widget.onReviewSubmitted();
       if (mounted) {
         Navigator.pop(context);
@@ -2431,6 +2476,12 @@ class _RateFarmerDialogState extends State<_RateFarmerDialog> {
             'rating': _rating,
             'review_text': _reviewTextController.text.trim().isEmpty ? null : _reviewTextController.text.trim(),
           });
+
+      // Trigger push notification to farmer
+      unawaited(NotificationService().notifyFarmerNewFarmerRating(
+        farmerId: widget.order.farmerId,
+        rating: _rating,
+      ));
 
       widget.onRatingSubmitted();
       if (mounted) {

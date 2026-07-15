@@ -7,6 +7,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:io';
 import 'dart:async';
 import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/services/commerce/product_service.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/models/cached_product.dart';
@@ -255,6 +256,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           await context.push(AppRoutes.addProduct);
+          _initializeStreams();
         },
         backgroundColor: AppColors.primary,
         elevation: 4,
@@ -865,7 +867,10 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
         buttonLabel: query.isNotEmpty ? null : 'Add Your First Product',
         action: query.isNotEmpty
             ? () {}
-            : () => context.push(AppRoutes.addProduct),
+            : () async {
+                await context.push(AppRoutes.addProduct);
+                _initializeStreams();
+              },
       );
     }
 
@@ -961,8 +966,9 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () {
-              context.push(AppRoutes.editProduct, extra: product);
+            onTap: () async {
+              await context.push(AppRoutes.editProduct, extra: product);
+              _initializeStreams();
             },
             child: Column(
               children: [
@@ -972,20 +978,32 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                       aspectRatio: 16 / 9,
                       child: isLocalFile
                           ? Image.file(File(imagePath), fit: BoxFit.cover)
-                          : CachedNetworkImage(
-                              imageUrl: imagePath,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                              errorWidget: (context, url, error) => Container(
-                                color: AppColors.background,
-                                child: const Icon(
-                                  Icons.image_not_supported_outlined,
-                                  color: AppColors.textSubtle,
+                          : imagePath.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: imagePath,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                  errorWidget: (context, url, error) => Container(
+                                    color: AppColors.background,
+                                    child: const Icon(
+                                      Icons.image_not_supported_outlined,
+                                      color: AppColors.textSubtle,
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  color: AppColors.background,
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.image_not_supported_outlined,
+                                      color: AppColors.textSubtle,
+                                      size: 40,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
+
                     ),
                     Positioned(
                       top: 16,
@@ -1092,32 +1110,116 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (product['is_preorder'] == true) ...[
+                        Builder(
+                          builder: (context) {
+                            final targetQty = (product['target_quantity'] as num?)?.toDouble() ?? 0.0;
+                            final reservedQty = (product['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
+                            int daysLeft = 999;
+                            final days = int.tryParse(product['harvest_days']?.toString() ?? '') ?? 0;
+                            final createdAtStr = product['created_at']?.toString() ?? '';
+                            if (createdAtStr.isNotEmpty) {
+                              final createdAt = DateTime.tryParse(createdAtStr);
+                              if (createdAt != null) {
+                                final harvestDate = createdAt.add(Duration(days: days));
+                                daysLeft = harvestDate.difference(DateTime.now()).inDays;
+                              }
+                            }
+
+                            final showUnderreservedAlert = daysLeft <= 5 &&
+                                daysLeft >= 0 &&
+                                targetQty > 0 &&
+                                (reservedQty / targetQty) < 0.5;
+
+                            if (!showUnderreservedAlert) return const SizedBox.shrink();
+
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.error.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 20),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        'Under-reserved Alert: Only ${((reservedQty / targetQty) * 100).toStringAsFixed(0)}% reserved with $daysLeft days remaining!',
+                                        style: AppTextStyles.bodySmall.copyWith(
+                                          color: AppColors.error,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       const Divider(height: 1),
                       const SizedBox(height: 16),
-                      Row(
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
-                          _buildDetailChip(
-                            Icons.inventory_2_outlined,
-                            '${product['available'] ?? 0} ${product['unit'] ?? 'kg'}',
-                          ),
-                          const SizedBox(width: 12),
-                          _buildDetailChip(
-                            Icons.calendar_month_outlined,
-                            product['harvest'] ?? 'Ready Now',
-                          ),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: () {
-                              context.push(AppRoutes.editProduct, extra: product);
-                            },
-                            child: Text(
-                              'Manage',
-                              style: AppTextStyles.labelSmall.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w700,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildDetailChip(
+                                Icons.inventory_2_outlined,
+                                '${product['available'] ?? 0} ${product['unit'] ?? 'kg'}',
                               ),
-                            ),
+                              const SizedBox(width: 12),
+                              _buildDetailChip(
+                                Icons.calendar_month_outlined,
+                                product['harvest'] ?? 'Ready Now',
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (product['is_preorder'] == true) ...[
+                                TextButton(
+                                  onPressed: () {
+                                    _showPostUpdateDialog(
+                                      product['id'] ?? '',
+                                      product['name'] ?? 'Product',
+                                    );
+                                  },
+                                  child: Text(
+                                    'Post Update',
+                                    style: AppTextStyles.labelSmall.copyWith(
+                                      color: AppColors.accent,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              TextButton(
+                                onPressed: () async {
+                                  await context.push(AppRoutes.editProduct, extra: product);
+                                  _initializeStreams();
+                                },
+                                child: Text(
+                                  'Manage',
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -1127,6 +1229,96 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showPostUpdateDialog(String productId, String cropName) async {
+    final titleController = TextEditingController();
+    final descController = TextEditingController();
+    final imgController = TextEditingController();
+    bool isPosting = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(
+            'Post Growth Update for $cropName',
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Milestone Title (e.g., Sprouting 🌱)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: descController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Update Description',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: imgController,
+                decoration: const InputDecoration(
+                  labelText: 'Progress Photo URL (Optional)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isPosting ? null : () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isPosting
+                  ? null
+                  : () async {
+                      if (titleController.text.trim().isEmpty ||
+                          descController.text.trim().isEmpty) {
+                        return;
+                      }
+                      setDialogState(() => isPosting = true);
+                      try {
+                        await ProductService().addCropMilestone(
+                          productId: productId,
+                          title: titleController.text.trim(),
+                          description: descController.text.trim(),
+                          imageUrl: imgController.text.trim().isNotEmpty
+                              ? imgController.text.trim()
+                              : null,
+                        );
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                        _initializeStreams();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Growth milestone posted successfully!')),
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e')),
+                        );
+                      } finally {
+                        setDialogState(() => isPosting = false);
+                      }
+                    },
+              child: Text(isPosting ? 'Posting...' : 'Post Update'),
+            ),
+          ],
         ),
       ),
     );

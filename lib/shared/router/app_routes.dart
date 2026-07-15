@@ -33,6 +33,7 @@ class AppRoutes {
   static const String helpCenter = '/help-center';
   static const String appSettings = '/app-settings';
   static const String farmerVouchers = '/farmer-vouchers';
+  static const String claimedVouchers = '/claimed-vouchers';
   // Web-specific
   static const String webWelcome = '/web-welcome';
   static const String marketplace = '/marketplace';
@@ -47,6 +48,7 @@ class AppRoutes {
   static const String farmerProfileBase = '/farm';
   static const String farmerDashboard = '/farmer-dashboard';
   static const String webFarmerRegister = '/web-farmer-register';
+  static const String farmerPreorderDetail = '/farmer-preorder-detail';
 
   static String farmerProfile(String farmerId) =>
       '$farmerProfileBase/$farmerId';

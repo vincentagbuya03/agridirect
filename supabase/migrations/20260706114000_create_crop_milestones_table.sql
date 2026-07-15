@@ -21,8 +21,9 @@ CREATE POLICY "Allow farmers to insert milestones for their own products"
     WITH CHECK (
         EXISTS (
             SELECT 1 FROM public.products p
+            JOIN public.farmers f ON p.farmer_id = f.farmer_id
             WHERE p.product_id = crop_milestones.product_id
-            AND p.farmer_id = auth.uid()
+            AND f.user_id = auth.uid()
         )
     );
 
@@ -31,7 +32,8 @@ CREATE POLICY "Allow farmers to delete milestones for their own products"
     USING (
         EXISTS (
             SELECT 1 FROM public.products p
+            JOIN public.farmers f ON p.farmer_id = f.farmer_id
             WHERE p.product_id = crop_milestones.product_id
-            AND p.farmer_id = auth.uid()
+            AND f.user_id = auth.uid()
         )
     );

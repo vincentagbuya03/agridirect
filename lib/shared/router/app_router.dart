@@ -13,6 +13,7 @@ import '../../mobile/screens/common/face_capture_screen.dart';
 import '../../mobile/screens/farmer/add_product_screen.dart';
 import '../../mobile/screens/farmer/farmer_followers_screen.dart';
 import '../../mobile/screens/farmer/farmer_vouchers_screen.dart';
+import '../../mobile/screens/consumer/claimed_vouchers_screen.dart';
 import '../../mobile/screens/consumer/cart_screen.dart';
 import '../../mobile/screens/consumer/marketplace_screen.dart';
 import '../../mobile/screens/consumer/preorder_details_screen.dart';
@@ -35,6 +36,7 @@ import '../../web/screens/consumer/web_cart_screen.dart';
 import '../../web/screens/consumer/web_farmer_public_profile_screen.dart';
 import '../../web/screens/consumer/web_preorder_details.dart';
 import '../../web/screens/consumer/web_product_details.dart';
+import '../../web/screens/farmer/web_farmer_preorder_details.dart';
 import '../../web/screens/consumer/web_preorder_hub.dart';
 import '../../web/screens/consumer/web_checkout_screen.dart';
 import '../../web/screens/consumer/web_cart_checkout_screen.dart';
@@ -97,6 +99,7 @@ GoRouter createAppRouter() {
         AppRoutes.cartCheckout,
         AppRoutes.orderSuccess,
         AppRoutes.customerOrders,
+        AppRoutes.claimedVouchers,
       };
 
       // Use View.of for a more stable width check that doesn't trigger loops
@@ -687,6 +690,13 @@ GoRouter createAppRouter() {
         ),
       ),
       GoRoute(
+        path: AppRoutes.farmerPreorderDetail,
+        builder: (context, state) {
+          final product = state.extra as ProductItem;
+          return WebFarmerPreorderDetails(product: product);
+        },
+      ),
+      GoRoute(
         path: AppRoutes.productDetails,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
@@ -812,6 +822,10 @@ GoRouter createAppRouter() {
       GoRoute(
         path: AppRoutes.favorites,
         builder: (context, state) => const FavoritesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.claimedVouchers,
+        builder: (context, state) => const ClaimedVouchersScreen(),
       ),
       GoRoute(
         path: AppRoutes.farmerFollowers,

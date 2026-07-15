@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/services/commerce/voucher_service.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
@@ -917,6 +918,12 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           'Delivery locations',
           onTap: () => context.push(AppRoutes.addressBook),
         ),
+        _SettingsItem(
+          Icons.confirmation_number_outlined,
+          'My Vouchers',
+          'Claimed shop vouchers',
+          onTap: () => _showWebClaimedVouchersDialog(),
+        ),
       ],
       _SettingsItem(
         Icons.chat_bubble_outline_rounded,
@@ -1254,6 +1261,322 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               ],
             );
           },
+        );
+      },
+    );
+  }
+
+  void _showWebClaimedVouchersDialog() {
+    final userId = AuthService().userId;
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        bool innerLoading = true;
+        List<Map<String, dynamic>> innerVouchers = [];
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            if (innerLoading) {
+              VoucherService().getUserClaimedVouchersHistory(userId).then((list) {
+                setDialogState(() {
+                  innerVouchers = list;
+                  innerLoading = false;
+                });
+              });
+            }
+
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              child: Container(
+                width: 800,
+                height: 600,
+                padding: const EdgeInsets.all(32),
+                color: const Color(0xFFF8FAFC),
+                child: innerLoading
+                    ? const Center(child: CircularProgressIndicator(color: primary))
+                    : DefaultTabController(
+                        length: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'My Claimed Vouchers',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w800,
+                                        color: _dark,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Use your claimed vouchers at checkout to get discounts',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 13,
+                                        color: _muted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                IconButton(
+                                  onPressed: () => Navigator.pop(ctx),
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            TabBar(
+                              labelColor: primary,
+                              unselectedLabelColor: _muted,
+                              indicatorColor: primary,
+                              indicatorSize: TabBarIndicatorSize.tab,
+                              labelStyle: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                              tabs: const [
+                                Tab(text: 'Active'),
+                                Tab(text: 'Used'),
+                                Tab(text: 'Expired'),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            Expanded(
+                              child: TabBarView(
+                                children: [
+                                  _buildWebVouchersTab(innerVouchers, 0),
+                                  _buildWebVouchersTab(innerVouchers, 1),
+                                  _buildWebVouchersTab(innerVouchers, 2),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildWebVouchersTab(List<Map<String, dynamic>> vouchers, int tabIndex) {
+    final now = DateTime.now();
+    final list = vouchers.where((item) {
+      final isUsed = item['is_used'] == true;
+      final voucher = item['vouchers'] as Map<String, dynamic>?;
+      if (voucher == null) return false;
+
+      final endDateStr = voucher['end_date']?.toString();
+      final endDate = endDateStr != null ? DateTime.tryParse(endDateStr) : null;
+      final isExpired = endDate != null && endDate.isBefore(now);
+
+      if (tabIndex == 0) {
+        return !isUsed && !isExpired;
+      } else if (tabIndex == 1) {
+        return isUsed;
+      } else {
+        return !isUsed && isExpired;
+      }
+    }).toList();
+
+    if (list.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.confirmation_number_outlined, size: 56, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              'No Vouchers Found',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: _dark,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Explore farms to claim active discount vouchers.',
+              style: GoogleFonts.inter(fontSize: 13, color: _muted),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        mainAxisExtent: 110,
+      ),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        final item = list[index];
+        final voucher = item['vouchers'] as Map<String, dynamic>;
+        final code = voucher['code']?.toString() ?? '';
+        final discountType = voucher['discount_type']?.toString() ?? 'fixed';
+        final discountVal = (voucher['discount_value'] as num?)?.toDouble() ?? 0.0;
+        final minSpend = (voucher['min_spend'] as num?)?.toDouble() ?? 0.0;
+        final farmName = voucher['farm_name']?.toString() ?? 'Partner Farm';
+        final endDateStr = voucher['end_date']?.toString();
+
+        String expiryText = 'Valid Period';
+        if (endDateStr != null) {
+          final endDate = DateTime.tryParse(endDateStr);
+          if (endDate != null) {
+            expiryText = 'Expires ${endDate.month}/${endDate.day}/${endDate.year}';
+          }
+        }
+
+        final isPercentage = discountType == 'percentage';
+        final valueText = isPercentage ? '${discountVal.toInt()}%' : '₱${discountVal.toInt()}';
+        final labelText = isPercentage ? 'Discount' : 'OFF';
+
+        final Color themeColor = tabIndex == 0 ? primary : Colors.grey[400]!;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.grey[200]!),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 90,
+                decoration: BoxDecoration(
+                  color: themeColor.withValues(alpha: 0.08),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(14),
+                    bottomLeft: Radius.circular(14),
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      valueText,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: themeColor,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      labelText,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: themeColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const VerticalDivider(width: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              farmName,
+                              style: GoogleFonts.plusJakartaSans(
+                                color: tabIndex == 0 ? _dark : Colors.grey[600],
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: tabIndex == 0 ? primary.withValues(alpha: 0.1) : Colors.grey[100],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              code,
+                              style: GoogleFonts.plusJakartaSans(
+                                color: themeColor,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 9,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Min. Spend ₱${minSpend.toInt()}',
+                        style: GoogleFonts.inter(
+                          color: Colors.grey[600],
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            expiryText,
+                            style: GoogleFonts.inter(
+                              color: Colors.grey[400],
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          if (tabIndex == 0)
+                            MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  context.go(AppRoutes.marketplace);
+                                },
+                                child: Text(
+                                  'USE NOW',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    color: primary,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );

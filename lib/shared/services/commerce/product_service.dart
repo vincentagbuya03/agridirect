@@ -12,6 +12,8 @@ import '../../models/product/product_review_model.dart';
 import '../../models/product/crop_milestone_model.dart';
 import '../logging/system_activity_logger.dart';
 import '../social/follow_service.dart';
+import '../community/notification_service.dart';
+import 'dart:async';
 
 class ProductService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -533,7 +535,15 @@ class ProductService {
           .select('*, customers(users(name, avatar_url))')
           .single();
 
-      return _reviewFromDatabase(response);
+      final review = _reviewFromDatabase(response);
+
+      // Trigger push notification to farmer
+      unawaited(NotificationService().notifyFarmerNewProductReview(
+        productId: productId,
+        rating: rating,
+      ));
+
+      return review;
     } catch (e) {
       throw Exception('Failed to create review: $e');
     }
@@ -698,6 +708,48 @@ class ProductService {
           'title': title,
         },
       );
+
+      // 1. Fetch product name to personalize the notification
+      String cropName = 'Crop';
+      try {
+        final prodResponse = await _supabase
+            .from('products')
+            .select('name')
+            .eq('product_id', productId)
+            .maybeSingle();
+        if (prodResponse != null) {
+          cropName = prodResponse['name']?.toString() ?? 'Crop';
+        }
+      } catch (_) {}
+
+      // 2. Find and notify all reserving customers
+      try {
+        final reservations = await _supabase
+            .from('orders')
+            .select('order_id, customer_id')
+            .inFilter('status_code', ['PENDING', 'CONFIRMED'])
+            .eq('order_items.product_id', productId);
+
+        final reservationList = List<Map<String, dynamic>>.from(reservations as List);
+
+        // 3. Send push notification + DB entry to each reserving customer
+        for (final reservation in reservationList) {
+          final customerId = reservation['customer_id']?.toString();
+          final orderId = reservation['order_id']?.toString();
+          if (customerId == null || orderId == null) continue;
+
+          await NotificationService().insertNotification(
+            userId: customerId,
+            title: '🌱 Pre-order Update: $cropName',
+            content: 'A new growth update was posted: "$title". Check your orders for details!',
+            type: 'system',
+            linkType: 'orders',
+            linkId: orderId,
+          );
+        }
+      } catch (notifErr) {
+        debugPrint('Error notifying pre-order customers: $notifErr');
+      }
 
       return milestone;
     } catch (e) {
