@@ -15,6 +15,7 @@ import 'admin_announcements_tab.dart';
 import 'admin_settings_tab.dart';
 import 'admin_support_tab.dart';
 import '../../../shared/widgets/brand_logo.dart';
+import 'package:agridirect/shared/widgets/premium_confirm_dialog.dart';
 
 class AdminDashboardRedesigned extends StatefulWidget {
   final VoidCallback onLogout;
@@ -57,21 +58,10 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
   Future<void> _confirmLogout() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Confirm Logout'),
-        content: const Text(
-          'Are you sure you want to log out of the admin panel?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Log Out'),
-          ),
-        ],
+      barrierDismissible: true,
+      builder: (dialogContext) => const PremiumConfirmDialog(
+        title: 'Confirm Logout',
+        content: 'Are you sure you want to log out of the admin panel?',
       ),
     );
 

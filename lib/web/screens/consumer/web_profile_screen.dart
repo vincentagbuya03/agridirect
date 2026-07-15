@@ -13,6 +13,7 @@ import '../../../shared/router/app_router.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 import '../../../shared/utils/apk_downloader.dart';
+import 'package:agridirect/shared/widgets/premium_confirm_dialog.dart';
 
 // Web Profile screen.
 /// Shows user info, "Start Selling" button, and account settings.
@@ -205,24 +206,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   Future<void> _confirmLogout() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Confirm Logout'),
-        content: const Text('Are you sure you want to log out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Log Out'),
-          ),
-        ],
+      barrierDismissible: true,
+      builder: (ctx) => const PremiumConfirmDialog(
+        title: 'Confirm Logout',
+        content: 'Are you sure you want to log out of AgriDirect?',
       ),
     );
 

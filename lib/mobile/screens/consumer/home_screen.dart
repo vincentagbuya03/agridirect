@@ -37,6 +37,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final FollowService _followService = FollowService();
   late Stream<List<ForumPostItem>> _forumStream;
   late Stream<int> _unreadCountStream;
+  late Future<Map<String, dynamic>> _followingHomeDataFuture;
+  late Future<List<CategoryItem>> _categoriesFuture;
 
   String _aiInsightTitle = 'Scanning market prices...';
   String _aiInsightDesc =
@@ -50,6 +52,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _unreadCountStream = MessageService().watchTotalUnreadCount(
       asFarmer: false,
     );
+    _followingHomeDataFuture = _loadFollowingHomeData();
+    _categoriesFuture = SupabaseDataService().getCategories();
     _loadDefaultAddress();
     _loadAIMarketInsight();
   }
@@ -664,7 +668,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildFollowingUpdatesSection() {
     return FutureBuilder<Map<String, dynamic>>(
-      future: _loadFollowingHomeData(),
+      future: _followingHomeDataFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
@@ -736,7 +740,7 @@ class _HomeScreenState extends State<HomeScreen> {
               )
             else
               SizedBox(
-                height: 198,
+                height: 290,
                 child: ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   scrollDirection: Axis.horizontal,
@@ -904,7 +908,11 @@ class _HomeScreenState extends State<HomeScreen> {
       await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => ProductViewScreen(product: product)),
       );
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {
+          _followingHomeDataFuture = _loadFollowingHomeData();
+        });
+      }
       return;
     }
 
@@ -916,6 +924,7 @@ class _HomeScreenState extends State<HomeScreen> {
       title: update['title']?.toString() ?? '',
       body: update['body']?.toString() ?? '',
       imageUrl: update['imageUrl']?.toString(),
+      videoUrl: update['videoUrl']?.toString(),
       likes: update['likes'] as int? ?? 0,
       comments: update['comments'] as int? ?? 0,
       isLiked: false,
@@ -924,7 +933,11 @@ class _HomeScreenState extends State<HomeScreen> {
     await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)));
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {
+        _followingHomeDataFuture = _loadFollowingHomeData();
+      });
+    }
   }
 
   String _formatRelativeTime(DateTime? dateTime) {
@@ -940,7 +953,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildCategoryGrid() {
     return FutureBuilder<List<CategoryItem>>(
-      future: SupabaseDataService().getCategories(),
+      future: _categoriesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(

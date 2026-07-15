@@ -636,7 +636,7 @@ class SupabaseDataService {
         final farmerImageUrl = profile['image_url']?.toString();
         item['farmer_avatar_url'] = (avatarUrl != null && avatarUrl.isNotEmpty)
             ? avatarUrl
-            : farmerImageUrl;
+            : null;
         item['farmer_image_url'] = farmerImageUrl;
         if ((item['farm_name']?.toString().trim().isEmpty ?? true)) {
           item['farm_name'] = profile['farm_name'];

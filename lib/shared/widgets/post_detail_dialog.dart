@@ -78,19 +78,9 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
     final newLikes = wasLiked ? _currentPost.likes - 1 : _currentPost.likes + 1;
     
     setState(() {
-      _currentPost = ForumPostItem(
-        id: _currentPost.id,
-        userId: _currentPost.userId,
-        userName: _currentPost.userName,
-        time: _currentPost.time,
-        title: _currentPost.title,
-        body: _currentPost.body,
-        imageUrl: _currentPost.imageUrl,
+      _currentPost = _currentPost.copyWith(
         likes: newLikes,
-        comments: _currentPost.comments,
         isLiked: !wasLiked,
-        isPinned: _currentPost.isPinned,
-        authorAvatarUrl: _currentPost.authorAvatarUrl,
       );
     });
     widget.onPostUpdated?.call(_currentPost);
@@ -129,19 +119,8 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
           _commentController.clear();
           _isPostingComment = false;
           // Increment comment count locally
-          _currentPost = ForumPostItem(
-            id: _currentPost.id,
-            userId: _currentPost.userId,
-            userName: _currentPost.userName,
-            time: _currentPost.time,
-            title: _currentPost.title,
-            body: _currentPost.body,
-            imageUrl: _currentPost.imageUrl,
-            likes: _currentPost.likes,
+          _currentPost = _currentPost.copyWith(
             comments: _currentPost.comments + 1,
-            isLiked: _currentPost.isLiked,
-            isPinned: _currentPost.isPinned,
-            authorAvatarUrl: _currentPost.authorAvatarUrl,
           );
         });
         widget.onPostUpdated?.call(_currentPost);
@@ -247,19 +226,8 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
       if (mounted) {
         setState(() {
           _comments.removeWhere((c) => c.commentId == comment.commentId);
-          _currentPost = ForumPostItem(
-            id: _currentPost.id,
-            userId: _currentPost.userId,
-            userName: _currentPost.userName,
-            time: _currentPost.time,
-            title: _currentPost.title,
-            body: _currentPost.body,
-            imageUrl: _currentPost.imageUrl,
-            likes: _currentPost.likes,
+          _currentPost = _currentPost.copyWith(
             comments: _currentPost.comments - 1 >= 0 ? _currentPost.comments - 1 : 0,
-            isLiked: _currentPost.isLiked,
-            isPinned: _currentPost.isPinned,
-            authorAvatarUrl: _currentPost.authorAvatarUrl,
           );
         });
         widget.onPostUpdated?.call(_currentPost);

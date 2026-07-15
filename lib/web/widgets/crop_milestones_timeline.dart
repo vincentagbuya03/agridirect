@@ -160,12 +160,13 @@ class CropMilestonesTimeline extends StatelessWidget {
                                   child: Text(
                                     milestone.title,
                                     style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 16,
+                                      fontSize: 15,
                                       fontWeight: FontWeight.w800,
                                       color: const Color(0xFF0F172A),
                                     ),
                                   ),
                                 ),
+                                const SizedBox(width: 12),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
@@ -183,7 +184,7 @@ class CropMilestonesTimeline extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 12),
                             Text(
                               milestone.description,
                               style: GoogleFonts.inter(
@@ -192,30 +193,16 @@ class CropMilestonesTimeline extends StatelessWidget {
                                 height: 1.6,
                               ),
                             ),
-                             if (milestone.imageUrl != null && milestone.imageUrl!.isNotEmpty) ...[
+                            if (milestone.imageUrl != null && milestone.imageUrl!.isNotEmpty) ...[
                               const SizedBox(height: 16),
-                              SizedBox(
-                                width: 280,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(14),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.05),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: AspectRatio(
-                                      aspectRatio: 16 / 9,
-                                      child: SafeNetworkImage(
-                                        imageUrl: milestone.imageUrl!,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  height: 160,
+                                  child: SafeNetworkImage(
+                                    imageUrl: milestone.imageUrl!,
+                                    fit: BoxFit.cover,
                                   ),
                                 ),
                               ),

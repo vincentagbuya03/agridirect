@@ -91,19 +91,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           _comments.insert(0, newComment);
           _commentController.clear();
           _isPosting = false;
-          _post = ForumPostItem(
-            id: _post.id,
-            userId: _post.userId,
-            userName: _post.userName,
-            time: _post.time,
-            title: _post.title,
-            body: _post.body,
-            imageUrl: _post.imageUrl,
-            likes: _post.likes,
+          _post = _post.copyWith(
             comments: _post.comments + 1,
-            isLiked: _post.isLiked,
-            isPinned: _post.isPinned,
-            authorAvatarUrl: _post.authorAvatarUrl,
           );
         });
       }
@@ -195,16 +184,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
     setState(() {
       _isUpdatingLike = true;
-      _post = ForumPostItem(
-        id: _post.id,
-        userId: _post.userId,
-        userName: _post.userName,
-        time: _post.time,
-        title: _post.title,
-        body: _post.body,
-        imageUrl: _post.imageUrl,
+      _post = _post.copyWith(
         likes: nextLikes < 0 ? 0 : nextLikes,
-        comments: _post.comments,
         isLiked: !wasLiked,
       );
     });

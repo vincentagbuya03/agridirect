@@ -6,6 +6,7 @@ import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/styles/app_theme.dart';
+import 'package:agridirect/shared/widgets/premium_confirm_dialog.dart';
 
 /// Mobile Profile screen specifically for Customers (Buyers).
 class CustomerProfileScreen extends StatefulWidget {
@@ -71,24 +72,10 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   Future<void> _confirmLogout() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Confirm Logout'),
-        content: const Text('Are you sure you want to log out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Log Out'),
-          ),
-        ],
+      barrierDismissible: true,
+      builder: (ctx) => const PremiumConfirmDialog(
+        title: 'Confirm Logout',
+        content: 'Are you sure you want to log out of AgriDirect?',
       ),
     );
 

@@ -211,7 +211,14 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
 
   void _initFuture() {
     _lastImageUrl = widget.imageUrl;
-    if (_lastImageUrl == null || _lastImageUrl!.isEmpty) {
+    final isSensitive = _lastImageUrl != null &&
+        (_lastImageUrl!.contains('face_scans') ||
+            _lastImageUrl!.contains('face_photo_path') ||
+            _lastImageUrl!.contains('valid_ids') ||
+            _lastImageUrl!.contains('valid_id_path') ||
+            _lastImageUrl!.contains('valid_id_back_path'));
+
+    if (_lastImageUrl == null || _lastImageUrl!.isEmpty || isSensitive) {
       _urlFuture = null;
     } else {
       final rawUrl = _lastImageUrl!;
@@ -239,7 +246,14 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_lastImageUrl == null || _lastImageUrl!.isEmpty) {
+    final isSensitive = _lastImageUrl != null &&
+        (_lastImageUrl!.contains('face_scans') ||
+            _lastImageUrl!.contains('face_photo_path') ||
+            _lastImageUrl!.contains('valid_ids') ||
+            _lastImageUrl!.contains('valid_id_path') ||
+            _lastImageUrl!.contains('valid_id_back_path'));
+
+    if (_lastImageUrl == null || _lastImageUrl!.isEmpty || isSensitive) {
       return widget.errorWidget ?? const Icon(Icons.error);
     }
 

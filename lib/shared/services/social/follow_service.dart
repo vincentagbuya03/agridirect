@@ -264,7 +264,7 @@ class FollowService {
         postRows = await _client
             .from('v_forum_posts')
             .select(
-              'post_id, user_id, title, body, image_url, created_at, author_name, likes_count, comments_count',
+              'post_id, user_id, title, body, image_url, video_url, created_at, author_name, likes_count, comments_count',
             )
             .inFilter('user_id', farmerUserIds)
             .order('created_at', ascending: false)
@@ -318,6 +318,7 @@ class FollowService {
           'title': row['title']?.toString() ?? '',
           'body': row['body']?.toString() ?? '',
           'imageUrl': row['image_url']?.toString() ?? '',
+          'videoUrl': row['video_url']?.toString() ?? '',
           'likes': (row['likes_count'] as num?)?.toInt() ?? 0,
           'comments': (row['comments_count'] as num?)?.toInt() ?? 0,
           'createdAt': DateTime.tryParse(row['created_at']?.toString() ?? ''),

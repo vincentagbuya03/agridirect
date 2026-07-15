@@ -891,19 +891,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                       final targetPost = _postsList![index];
                       final wasLiked = targetPost.isLiked;
                       setState(() {
-                        _postsList![index] = ForumPostItem(
-                          id: targetPost.id,
-                          userId: targetPost.userId,
-                          userName: targetPost.userName,
-                          time: targetPost.time,
-                          title: targetPost.title,
-                          body: targetPost.body,
-                          imageUrl: targetPost.imageUrl,
+                        _postsList![index] = targetPost.copyWith(
                           likes: wasLiked ? targetPost.likes - 1 : targetPost.likes + 1,
-                          comments: targetPost.comments,
                           isLiked: !wasLiked,
-                          isPinned: targetPost.isPinned,
-                          authorAvatarUrl: targetPost.authorAvatarUrl,
                         );
                       });
                     }

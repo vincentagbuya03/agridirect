@@ -96,6 +96,38 @@ class ForumPostItem {
     this.isPinned = false,
     this.authorAvatarUrl,
   });
+
+  ForumPostItem copyWith({
+    String? id,
+    String? userId,
+    String? userName,
+    String? time,
+    String? title,
+    String? body,
+    String? imageUrl,
+    String? videoUrl,
+    int? likes,
+    int? comments,
+    bool? isLiked,
+    bool? isPinned,
+    String? authorAvatarUrl,
+  }) {
+    return ForumPostItem(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      userName: userName ?? this.userName,
+      time: time ?? this.time,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      imageUrl: imageUrl ?? this.imageUrl,
+      videoUrl: videoUrl ?? this.videoUrl,
+      likes: likes ?? this.likes,
+      comments: comments ?? this.comments,
+      isLiked: isLiked ?? this.isLiked,
+      isPinned: isPinned ?? this.isPinned,
+      authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
+    );
+  }
 }
 
 class ArticleItem {

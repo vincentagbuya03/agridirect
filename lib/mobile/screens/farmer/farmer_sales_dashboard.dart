@@ -163,12 +163,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
   String _extractAvatarFromUserProfile(Map<String, dynamic> profile) {
     final avatarUrl = (profile['avatar_url'] as String?)?.trim() ?? '';
-    if (avatarUrl.isNotEmpty) return avatarUrl;
-
-    final imageUrl = (profile['image_url'] as String?)?.trim() ?? '';
-    if (imageUrl.isNotEmpty) return imageUrl;
-
-    return '';
+    return avatarUrl;
   }
 
   Future<void> _loadFarmerProfile() async {
@@ -176,76 +171,36 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     if (currentUserId.isEmpty) return;
 
     try {
-      // Match MobileProfileScreen behavior: farmer mode prefers farmers table.
       final farmers = await SupabaseConfig.client
           .from('farmers')
-          .select('farm_name, image_url')
+          .select('farm_name')
           .eq('user_id', currentUserId)
           .limit(1);
 
+      String? farmName;
       if (farmers.isNotEmpty) {
-        final farmName = (farmers[0]['farm_name'] as String?)?.trim();
-        final rawUrl = (farmers[0]['image_url'] as String?)?.trim();
-
-        final safeUrl = await SupabaseDatabase.getSafeUrl(
-          rawUrl,
-          defaultBucket: 'uploads',
-        );
-
-        if (mounted) {
-          setState(() {
-            _profileName = farmName;
-            _profileAvatarUrl = safeUrl;
-          });
-          await _persistDbAvatar(safeUrl);
-          await _precacheFarmerAvatar(safeUrl);
-        }
-
-        // If farmer row exists and we found a valid image, we're done
-        if (safeUrl.isNotEmpty) {
-          return;
-        }
+        farmName = (farmers[0]['farm_name'] as String?)?.trim();
       }
 
-      // Fallback to users table profile if no farmer row exists or farmer image is empty
       final profile = await SupabaseDatabase.getUserProfile(currentUserId);
-      if (!mounted || profile == null) return;
+      if (!mounted) return;
 
-      final rawAvatarUrl = _extractAvatarFromUserProfile(profile);
-      final safeAvatarUrl = await SupabaseDatabase.getSafeUrl(
+      final rawAvatarUrl = profile != null ? _extractAvatarFromUserProfile(profile) : '';
+      final safeUrl = await SupabaseDatabase.getSafeUrl(
         rawAvatarUrl,
         defaultBucket: 'uploads',
       );
 
-      setState(() {
-        _profileName = (profile['name'] as String?)?.trim();
-        _profileAvatarUrl = safeAvatarUrl;
-      });
-      await _persistDbAvatar(safeAvatarUrl);
-      await _precacheFarmerAvatar(safeAvatarUrl);
+      if (mounted) {
+        setState(() {
+          _profileName = farmName ?? (profile?['name'] as String?)?.trim();
+          _profileAvatarUrl = safeUrl;
+        });
+        await _persistDbAvatar(safeUrl);
+        await _precacheFarmerAvatar(safeUrl);
+      }
     } catch (e) {
       debugPrint('Error loading farmer profile header: $e');
-
-      // Final attempt: fallback to user profile
-      try {
-        final profile = await SupabaseDatabase.getUserProfile(currentUserId);
-        if (!mounted || profile == null) return;
-
-        final rawAvatarUrl = _extractAvatarFromUserProfile(profile);
-        final safeAvatarUrl = await SupabaseDatabase.getSafeUrl(
-          rawAvatarUrl,
-          defaultBucket: 'uploads',
-        );
-
-        setState(() {
-          _profileName = (profile['name'] as String?)?.trim();
-          _profileAvatarUrl = safeAvatarUrl;
-        });
-        await _persistDbAvatar(safeAvatarUrl);
-        await _precacheFarmerAvatar(safeAvatarUrl);
-      } catch (innerE) {
-        debugPrint('Final fallback error: $innerE');
-      }
     }
   }
 

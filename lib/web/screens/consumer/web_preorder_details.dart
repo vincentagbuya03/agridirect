@@ -89,33 +89,29 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
           product.productId != null && product.productId!.isNotEmpty
           ? _productService.getCropMilestones(product.productId!)
           : Future.value(<CropMilestone>[]);
-      final reservedFuture =
+      final inventoryFuture =
           product.productId != null && product.productId!.isNotEmpty
-          ? Supabase.instance.client
-                .from('order_items')
-                .select('quantity, orders!inner(order_statuses!inner(code))')
+          ? (Supabase.instance.client
+                .from('product_inventory')
+                .select('reserved_quantity, available_quantity')
                 .eq('product_id', product.productId!)
-                .inFilter('orders.order_statuses.code', [
-                  'pending',
-                  'confirmed',
-                  'PENDING',
-                  'CONFIRMED',
-                ])
-          : Future.value([]);
+                .maybeSingle() as Future<dynamic>)
+          : Future<dynamic>.value(null);
 
       final results = await Future.wait<dynamic>([
         farmerFuture,
         reviewsFuture,
         relatedFuture,
         milestonesFuture,
-        reservedFuture,
+        inventoryFuture,
       ]);
 
-      final items = List<Map<String, dynamic>>.from(results[4] as List);
-      double reserved = items.fold<double>(
-        0.0,
-        (sum, item) => sum + ((item['quantity'] as num?)?.toDouble() ?? 0.0),
-      );
+      final inventory = results[4] as Map<String, dynamic>?;
+      final reserved = (inventory?['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
+      final available = (inventory?['available_quantity'] as num?)?.toDouble() ?? 0.0;
+      final targetQty = reserved + available > 0
+          ? reserved + available
+          : (product.targetQuantity ?? 100.0);
 
       final updatedProduct = ProductItem(
         productId: product.productId,
@@ -135,7 +131,7 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
         harvestDays: product.harvestDays,
         description: product.description,
         reservedQuantity: reserved,
-        targetQuantity: product.targetQuantity,
+        targetQuantity: targetQty,
         latitude: product.latitude,
         longitude: product.longitude,
         isFeatured: product.isFeatured,

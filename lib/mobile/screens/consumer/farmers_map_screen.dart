@@ -282,7 +282,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
             final latitude = (farmer['farm_latitude'] as num).toDouble();
             final longitude = (farmer['farm_longitude'] as num).toDouble();
             final farmName = (farmer['farm_name'] ?? 'Farm').toString();
-            final avatarUrl = farmer['avatar_url'] ?? farmer['image_url'];
+            final avatarUrl = farmer['avatar_url']?.toString();
             final isSelected = index == _selectedIndex;
 
             return Marker(
@@ -538,7 +538,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
     final farmName = (farmer['farm_name'] ?? 'Farm').toString();
     final specialty = (farmer['specialty'] ?? 'General Farming').toString();
     final location = (farmer['location'] ?? 'Location unavailable').toString();
-    final avatarUrl = farmer['avatar_url'] ?? farmer['image_url'];
+    final avatarUrl = farmer['avatar_url']?.toString();
     final isVerified = farmer['is_verified'] == true;
     final exp = farmer['years_of_experience']?.toString() ?? '0';
 
@@ -723,7 +723,7 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
     final history = (farmer['farming_history'] ?? '').toString().trim();
     final phone = (farmer['farmer_phone'] ?? '').toString().trim();
     final experience = farmer['years_of_experience']?.toString() ?? '0';
-    final avatarUrl = farmer['avatar_url'] ?? farmer['image_url'];
+    final avatarUrl = farmer['avatar_url']?.toString();
     final isVerified = farmer['is_verified'] == true;
     final farmerId = (farmer['farmer_id'] ?? '').toString();
     final freeDeliveryMin = double.tryParse(farmer['free_delivery_min_amount']?.toString() ?? '0') ?? 0.0;
