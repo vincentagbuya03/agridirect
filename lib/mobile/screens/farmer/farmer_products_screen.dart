@@ -14,6 +14,7 @@ import '../../../shared/models/cached_product.dart';
 import '../../../shared/services/offline/offline_cache_service.dart';
 import '../../../shared/services/offline/offline_queue_service.dart';
 import '../../../shared/models/offline_product_queue.dart';
+import '../../../shared/models/product/crop_milestone_model.dart';
 import '../../widgets/offline_browse_widget.dart';
 import '../../widgets/offline_sync_widget.dart';
 import '../../../shared/services/auth/auth_service.dart';
@@ -1127,9 +1128,9 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                             }
 
                             final showUnderreservedAlert = daysLeft <= 5 &&
-                                daysLeft >= 0 &&
-                                targetQty > 0 &&
-                                (reservedQty / targetQty) < 0.5;
+                                 daysLeft >= 0 &&
+                                 targetQty > 0 &&
+                                 (reservedQty / targetQty) < 0.5;
 
                             if (!showUnderreservedAlert) return const SizedBox.shrink();
 
@@ -1160,6 +1161,93 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                               ),
                             );
                           }
+                        ),
+                        const SizedBox(height: 12),
+                        FutureBuilder<List<CropMilestone>>(
+                          future: ProductService().getCropMilestones(product['id'] ?? product['product_id'] ?? ''),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            final milestones = snapshot.data!;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Posted Milestones (${milestones.length})',
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textSubtle,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  height: 80,
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: milestones.length,
+                                    separatorBuilder: (c, idx) => const SizedBox(width: 10),
+                                    itemBuilder: (c, mIdx) {
+                                      final milestone = milestones[mIdx];
+                                      return Container(
+                                        width: 200,
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.background,
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            if (milestone.imageUrl != null && milestone.imageUrl!.isNotEmpty) ...[
+                                              ClipRRect(
+                                                borderRadius: BorderRadius.circular(6),
+                                                child: Image.network(
+                                                  milestone.imageUrl!,
+                                                  width: 40,
+                                                  height: 40,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (c, o, s) => Container(
+                                                    width: 40,
+                                                    height: 40,
+                                                    color: const Color(0xFFE2E8F0),
+                                                    child: const Icon(Icons.broken_image, size: 16, color: AppColors.textSubtle),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                            ],
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    milestone.title,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: AppTextStyles.labelSmall.copyWith(fontWeight: FontWeight.bold),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    milestone.description,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: AppTextStyles.bodySmall.copyWith(fontSize: 10, color: AppColors.textSubtle),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                       const SizedBox(height: 16),

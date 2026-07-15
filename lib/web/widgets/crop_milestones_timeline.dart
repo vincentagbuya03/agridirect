@@ -51,15 +51,32 @@ class CropMilestonesTimeline extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Crop Development Journey',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF1E293B),
-          ),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.spa_rounded,
+                color: Color(0xFF10B981),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Crop Development Journey',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 28),
         ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -76,45 +93,60 @@ class CropMilestonesTimeline extends StatelessWidget {
                   Column(
                     children: [
                       Container(
-                        width: 32,
-                        height: 32,
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF10B981), Color(0xFF059669)],
+                          ),
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF3B82F6), width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
                         child: const Icon(
                           Icons.spa_rounded,
-                          size: 16,
-                          color: Color(0xFF3B82F6),
+                          size: 18,
+                          color: Colors.white,
                         ),
                       ),
                       if (!isLast)
                         Expanded(
                           child: Container(
-                            width: 2,
-                            color: const Color(0xFFDBEAFE),
-                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            width: 3,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF10B981), Color(0xFFE2E8F0)],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            margin: const EdgeInsets.symmetric(vertical: 6),
                           ),
                         ),
                     ],
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 20),
                   // Content details card
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.only(bottom: 24),
+                      padding: const EdgeInsets.only(bottom: 28),
                       child: Container(
-                        padding: const EdgeInsets.all(18),
+                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.02),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                              color: Colors.black.withValues(alpha: 0.03),
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
                             ),
                           ],
                         ),
@@ -127,24 +159,31 @@ class CropMilestonesTimeline extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     milestone.title,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                      color: const Color(0xFF1E293B),
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFF0F172A),
                                     ),
                                   ),
                                 ),
-                                Text(
-                                  _formatDate(milestone.createdAt),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    color: const Color(0xFF94A3B8),
-                                    fontWeight: FontWeight.w500,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    _formatDate(milestone.createdAt),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: const Color(0xFF64748B),
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 10),
                             Text(
                               milestone.description,
                               style: GoogleFonts.inter(
@@ -154,16 +193,28 @@ class CropMilestonesTimeline extends StatelessWidget {
                               ),
                             ),
                              if (milestone.imageUrl != null && milestone.imageUrl!.isNotEmpty) ...[
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 16),
                               SizedBox(
-                                width: 300,
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: AspectRatio(
-                                    aspectRatio: 16 / 9,
-                                    child: SafeNetworkImage(
-                                      imageUrl: milestone.imageUrl!,
-                                      fit: BoxFit.cover,
+                                width: 280,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.05),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: AspectRatio(
+                                      aspectRatio: 16 / 9,
+                                      child: SafeNetworkImage(
+                                        imageUrl: milestone.imageUrl!,
+                                        fit: BoxFit.cover,
+                                      ),
                                     ),
                                   ),
                                 ),

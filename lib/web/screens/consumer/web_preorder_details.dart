@@ -88,21 +88,58 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
           product.productId != null && product.productId!.isNotEmpty
           ? _productService.getCropMilestones(product.productId!)
           : Future.value(<CropMilestone>[]);
+      final reservedFuture =
+          product.productId != null && product.productId!.isNotEmpty
+          ? Supabase.instance.client
+              .from('order_items')
+              .select('quantity, orders!inner(order_statuses!inner(code))')
+              .eq('product_id', product.productId!)
+              .inFilter('orders.order_statuses.code', ['pending', 'confirmed', 'PENDING', 'CONFIRMED'])
+          : Future.value([]);
 
       final results = await Future.wait<dynamic>([
         farmerFuture,
         reviewsFuture,
         relatedFuture,
         milestonesFuture,
+        reservedFuture,
       ]);
+
+      final items = List<Map<String, dynamic>>.from(results[4] as List);
+      double reserved = items.fold<double>(0.0, (sum, item) => sum + ((item['quantity'] as num?)?.toDouble() ?? 0.0));
+
+      final updatedProduct = ProductItem(
+        productId: product.productId,
+        farmerId: product.farmerId,
+        farmerName: product.farmerName,
+        farmerAvatarUrl: product.farmerAvatarUrl,
+        farmerImageUrl: product.farmerImageUrl,
+        name: product.name,
+        farm: product.farm,
+        price: product.price,
+        unit: product.unit,
+        imageUrl: product.imageUrl,
+        imageUrls: product.imageUrls,
+        categoryName: product.categoryName,
+        rating: product.rating,
+        reviews: product.reviews,
+        harvestDays: product.harvestDays,
+        description: product.description,
+        reservedQuantity: reserved,
+        targetQuantity: product.targetQuantity,
+        latitude: product.latitude,
+        longitude: product.longitude,
+        isFeatured: product.isFeatured,
+        createdAt: product.createdAt,
+      );
 
       if (!mounted) return;
       setState(() {
-        _product = product;
+        _product = updatedProduct;
         _farmerProfile = results[0] as Map<String, dynamic>?;
         _reviews = results[1] as List<ProductReview>;
         _moreFromFarmer = (results[2] as List<ProductItem>)
-            .where((item) => item.productId != product!.productId)
+            .where((item) => item.productId != updatedProduct.productId)
             .take(6)
             .toList();
         _milestones = results[3] as List<CropMilestone>;
