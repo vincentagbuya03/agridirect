@@ -697,7 +697,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       ),
                     ),
                     child: Text(
-                      'Track Order',
+                      order.isDelivered ? 'Review Order & Farmer' : 'Track Order',
                       style: AppTextStyles.labelSmall.copyWith(
                         fontWeight: FontWeight.w800,
                       ),

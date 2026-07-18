@@ -6,6 +6,8 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:io';
 import 'dart:async';
+import 'package:image_picker/image_picker.dart';
+import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/commerce/product_service.dart';
 import '../../../shared/router/app_router.dart';
@@ -1325,7 +1327,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
   Future<void> _showPostUpdateDialog(String productId, String cropName) async {
     final titleController = TextEditingController();
     final descController = TextEditingController();
-    final imgController = TextEditingController();
+    XFile? pickedImage;
     bool isPosting = false;
 
     await showDialog(
@@ -1337,34 +1339,94 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
             'Post Growth Update for $cropName',
             style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Milestone Title (e.g., Sprouting 🌱)',
-                  border: OutlineInputBorder(),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Milestone Title (e.g., Sprouting 🌱)',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Update Description',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Update Description',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: imgController,
-                decoration: const InputDecoration(
-                  labelText: 'Progress Photo URL (Optional)',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                Text(
+                  'Progress Photo',
+                  style: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                if (pickedImage != null)
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          File(pickedImage!.path),
+                          height: 120,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: GestureDetector(
+                          onTap: () {
+                            setDialogState(() {
+                              pickedImage = null;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final image = await ImagePicker().pickImage(
+                        source: ImageSource.gallery,
+                        imageQuality: 85,
+                      );
+                      if (image != null) {
+                        setDialogState(() {
+                          pickedImage = image;
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    label: const Text('Choose from Gallery'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -1381,13 +1443,21 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                       }
                       setDialogState(() => isPosting = true);
                       try {
+                        String? uploadedUrl;
+                        if (pickedImage != null) {
+                          final bytes = await pickedImage!.readAsBytes();
+                          final fileName = 'milestone_${DateTime.now().millisecondsSinceEpoch}_${pickedImage!.name}';
+                          final path = 'milestones/$fileName';
+                          final client = SupabaseConfig.client;
+                          await client.storage.from('uploads').uploadBinary(path, bytes);
+                          uploadedUrl = client.storage.from('uploads').getPublicUrl(path);
+                        }
+
                         await ProductService().addCropMilestone(
                           productId: productId,
                           title: titleController.text.trim(),
                           description: descController.text.trim(),
-                          imageUrl: imgController.text.trim().isNotEmpty
-                              ? imgController.text.trim()
-                              : null,
+                          imageUrl: uploadedUrl,
                         );
                         if (!context.mounted) return;
                         Navigator.pop(context);

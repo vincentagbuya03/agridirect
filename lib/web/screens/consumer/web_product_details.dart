@@ -134,7 +134,8 @@ class _WebProductDetailsState extends State<WebProductDetails> {
       reviews: raw['review_count']?.toString(),
       description: raw['description']?.toString(),
       harvestDays: raw['harvest_days']?.toString(),
-      targetQuantity: (raw['stock_quantity'] as num?)?.toDouble(),
+      targetQuantity: (raw['target_quantity'] as num?)?.toDouble(),
+      stockQuantity: (raw['stock_quantity'] as num?)?.toDouble(),
     );
   }
 
@@ -442,7 +443,7 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                 child: _infoTile(
                   Icons.schedule_rounded,
                   'Availability',
-                  'Available now',
+                  _product!.targetQuantity != null ? 'Pre-order' : 'Available now',
                 ),
               ),
               const SizedBox(width: 12),
@@ -451,8 +452,10 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                   Icons.inventory_2_rounded,
                   'Stock',
                   _product!.targetQuantity != null
-                      ? _product!.targetQuantity!.toStringAsFixed(0)
-                      : 'Available',
+                      ? '${_product!.targetQuantity!.toStringAsFixed(0)} target'
+                      : (_product!.stockQuantity != null && _product!.stockQuantity! > 0
+                          ? '${_product!.stockQuantity!.toStringAsFixed(0)} available'
+                          : 'Out of stock'),
                 ),
               ),
             ],
@@ -495,7 +498,11 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                       ),
                     ),
                     _qtyButton(Icons.add_rounded, () {
-                      if (_quantity < 99) setState(() => _quantity++);
+                      final isPreorder = _product!.targetQuantity != null;
+                      final maxQty = isPreorder ? 999 : (_product!.stockQuantity?.toInt() ?? 0);
+                      if (isPreorder || _quantity < maxQty) {
+                        setState(() => _quantity++);
+                      }
                     }),
                   ],
                 ),

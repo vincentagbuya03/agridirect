@@ -17,7 +17,7 @@ class FarmerOrdersScreen extends StatefulWidget {
 
 class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   int _selectedTab = 0;
-  final _tabs = ['Active', 'Completed', 'Refunds'];
+  final _tabs = ['Active', 'Completed', 'Cancelled'];
 
   @override
   void initState() {
@@ -91,8 +91,6 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
       ),
     );
   }
-
-
 
   Widget _buildSleekTabBar() {
     return Container(
@@ -494,53 +492,101 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                       ],
                     ),
                   ),
-                  if (order['specialInstructions'] != null &&
-                      order['specialInstructions'].toString().isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.orange.withValues(alpha: 0.1),
+                    if (order['specialInstructions'] != null &&
+                        order['specialInstructions'].toString().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.orange.withValues(alpha: 0.1),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.info_outline_rounded,
+                                    size: 14,
+                                    color: Colors.orange,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Special Instructions',
+                                    style: AppTextStyles.labelSmall.copyWith(
+                                      color: Colors.orange.shade800,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                order['specialInstructions'],
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.textHeadline,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.info_outline_rounded,
-                                  size: 14,
-                                  color: Colors.orange,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Special Instructions',
-                                  style: AppTextStyles.labelSmall.copyWith(
-                                    color: Colors.orange.shade800,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 10,
+                      ),
+                    if (order['cancellationReason'] != null &&
+                        order['cancellationReason'].toString().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: Colors.red.withValues(alpha: 0.18),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.cancel_outlined,
+                                    size: 14,
+                                    color: Colors.red,
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              order['specialInstructions'],
-                              style: AppTextStyles.bodySmall.copyWith(
-                                color: AppColors.textHeadline,
-                                fontStyle: FontStyle.italic,
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'CANCELLATION REASON',
+                                    style: AppTextStyles.labelSmall.copyWith(
+                                      color: Colors.red.shade700,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 10,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 6),
+                              Text(
+                                order['cancellationReason'],
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: Colors.red.shade900,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
                 ],
               ),
             ),
@@ -792,31 +838,373 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
         style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold),
       ),
       onTap: () async {
-        Navigator.pop(context);
-        try {
-          await OrderService().updateOrderStatus(
-            order['rawOrderId'].toString(),
-            status,
-          );
-          if (mounted) {
-            setState(() {}); // Refresh list
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Order status updated to $status'),
-                backgroundColor: Colors.green,
-              ),
+        if (status == 'CANCELLED') {
+          // Close the status sheet first, then show reason sheet
+          Navigator.pop(context);
+          await _showCancellationReasonSheet(order);
+        } else {
+          Navigator.pop(context);
+          try {
+            await OrderService().updateOrderStatus(
+              order['rawOrderId'].toString(),
+              status,
             );
-          }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to update status: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            if (mounted) {
+              setState(() {}); // Refresh list
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Order status updated to $status'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to update status: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           }
         }
+      },
+    );
+  }
+
+  Future<void> _showCancellationReasonSheet(
+    Map<String, dynamic> order,
+  ) async {
+    final predefinedReasons = [
+      'Out of stock',
+      'Customer requested',
+      'Pricing issue',
+      'Unable to deliver',
+      'Duplicate order',
+      'Payment failed',
+    ];
+
+    String? selectedReason;
+    final customController = TextEditingController();
+    bool isCustom = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Container(
+              margin: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(32),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 24,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Drag handle
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 20),
+                          decoration: BoxDecoration(
+                            color: AppColors.textSubtle.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      // Icon + title
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.cancel_outlined,
+                              color: Colors.red,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Cancel Order',
+                                style: AppTextStyles.headline2.copyWith(
+                                  fontSize: 18,
+                                ),
+                              ),
+                              Text(
+                                'Order #${order['orderId']}',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.textSubtle,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Please select a reason for cancellation:',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSubtle,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Predefined reason chips
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ...predefinedReasons.map((reason) {
+                            final isSelected = selectedReason == reason && !isCustom;
+                            return GestureDetector(
+                              onTap: () => setSheetState(() {
+                                selectedReason = reason;
+                                isCustom = false;
+                              }),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Colors.red
+                                      : Colors.red.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? Colors.red
+                                        : Colors.red.withValues(alpha: 0.2),
+                                  ),
+                                ),
+                                child: Text(
+                                  reason,
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.red.shade700,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                          // "Other" chip
+                          GestureDetector(
+                            onTap: () => setSheetState(() {
+                              isCustom = true;
+                              selectedReason = null;
+                            }),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isCustom
+                                    ? Colors.red
+                                    : Colors.red.withValues(alpha: 0.06),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: isCustom
+                                      ? Colors.red
+                                      : Colors.red.withValues(alpha: 0.2),
+                                ),
+                              ),
+                              child: Text(
+                                '✏️ Other',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: isCustom
+                                      ? Colors.white
+                                      : Colors.red.shade700,
+                                  fontWeight: isCustom
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Custom text field (visible only when "Other" selected)
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        child: isCustom
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: 14),
+                                child: TextField(
+                                  controller: customController,
+                                  autofocus: true,
+                                  maxLines: 2,
+                                  maxLength: 200,
+                                  style: AppTextStyles.bodyMedium,
+                                  decoration: InputDecoration(
+                                    hintText: 'Describe the reason…',
+                                    hintStyle: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.textSubtle,
+                                    ),
+                                    filled: true,
+                                    fillColor:
+                                        AppColors.background,
+                                    contentPadding: const EdgeInsets.all(14),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color: Colors.red.withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: const BorderSide(
+                                        color: Colors.red,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: BorderSide(
+                                        color:
+                                            Colors.red.withValues(alpha: 0.2),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                      const SizedBox(height: 24),
+                      // Action buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                side: BorderSide(
+                                  color: AppColors.textSubtle
+                                      .withValues(alpha: 0.4),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: Text(
+                                'Go Back',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.textSubtle,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                final reason = isCustom
+                                    ? customController.text.trim()
+                                    : selectedReason ?? '';
+                                if (reason.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Please select or enter a reason.',
+                                      ),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                Navigator.pop(ctx);
+                                try {
+                                  await OrderService().updateOrderStatus(
+                                    order['rawOrderId'].toString(),
+                                    'CANCELLED',
+                                    cancellationReason: reason,
+                                  );
+                                  if (mounted) {
+                                    setState(() {});
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content:
+                                            Text('Order cancelled successfully'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Failed to cancel order: $e',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: Text(
+                                'Cancel Order',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
       },
     );
   }

@@ -747,6 +747,7 @@ class SupabaseDataService {
       description: item['description']?.toString(),
       reservedQuantity: (item['reserved_quantity'] as num?)?.toDouble(),
       targetQuantity: (item['target_quantity'] as num?)?.toDouble(),
+      stockQuantity: (item['stock_quantity'] as num?)?.toDouble(),
       latitude: (item['latitude'] as num?)?.toDouble(),
       longitude: (item['longitude'] as num?)?.toDouble(),
       isFeatured: item['is_featured'] == true,
@@ -1607,7 +1608,7 @@ class SupabaseDataService {
             ]);
           } else if (status == 'Completed') {
             query = query.inFilter('status_code', ['delivered', 'DELIVERED']);
-          } else if (status == 'Refunds') {
+          } else if (status == 'Cancelled') {
             query = query.inFilter('status_code', [
               'cancelled',
               'refunded',
@@ -1653,7 +1654,7 @@ class SupabaseDataService {
               'delivered',
               'DELIVERED',
             ]);
-          } else if (status == 'Refunds') {
+          } else if (status == 'Cancelled') {
             query = query.inFilter('order_statuses.code', [
               'cancelled',
               'refunded',
@@ -1756,6 +1757,7 @@ class SupabaseDataService {
           'status': statusCode,
           'statusColor': _getStatusColor(statusCode),
           'specialInstructions': item['special_instructions']?.toString(),
+          'cancellationReason': item['cancellation_reason']?.toString(),
         });
         debugPrint(
           '📦 Mapped Order: ${mappedOrders.last['orderId']} - AddressID: ${mappedOrders.last['deliveryAddressId']} - Method: ${mappedOrders.last['paymentMethod']}',

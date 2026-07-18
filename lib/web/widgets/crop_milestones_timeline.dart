@@ -197,12 +197,14 @@ class CropMilestonesTimeline extends StatelessWidget {
                               const SizedBox(height: 16),
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: SizedBox(
-                                  width: double.infinity,
-                                  height: 160,
+                                child: Container(
+                                  constraints: const BoxConstraints(
+                                    maxHeight: 240,
+                                    maxWidth: 360,
+                                  ),
                                   child: SafeNetworkImage(
                                     imageUrl: milestone.imageUrl!,
-                                    fit: BoxFit.cover,
+                                    fit: BoxFit.contain,
                                   ),
                                 ),
                               ),

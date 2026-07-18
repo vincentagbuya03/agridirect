@@ -332,7 +332,14 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        final articles = snapshot.data ?? [];
+        final articles = (snapshot.data ?? [])
+            .where((article) {
+              if (_searchQuery.isEmpty) return true;
+              final haystack =
+                  '${article.title} ${article.author} ${article.excerpt} ${article.content ?? ''}'.toLowerCase();
+              return haystack.contains(_searchQuery);
+            })
+            .toList();
         if (articles.isEmpty) {
           return Center(
             child: Column(

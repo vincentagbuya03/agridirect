@@ -262,7 +262,11 @@ class OrderService {
   }
 
   /// Update order status
-  Future<Order> updateOrderStatus(String orderId, String newStatus) async {
+  Future<Order> updateOrderStatus(
+    String orderId,
+    String newStatus, {
+    String? cancellationReason,
+  }) async {
     try {
       // Retrieve current order to check status before updating
       final currentOrder = await getOrderById(orderId);
@@ -270,9 +274,13 @@ class OrderService {
       final targetStatus = newStatus.trim().toLowerCase();
 
       final orderStatusId = await _getOrderStatusId(newStatus);
+      final updatePayload = <String, dynamic>{'order_status_id': orderStatusId};
+      if (targetStatus == 'cancelled' && cancellationReason != null && cancellationReason.trim().isNotEmpty) {
+        updatePayload['cancellation_reason'] = cancellationReason.trim();
+      }
       final response = await _supabase
           .from('orders')
-          .update({'order_status_id': orderStatusId})
+          .update(updatePayload)
           .eq('order_id', orderId)
           .select()
           .single();

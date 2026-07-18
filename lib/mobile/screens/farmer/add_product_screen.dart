@@ -97,6 +97,74 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
+  Future<void> _deleteProduct() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Delete Product',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${widget.editProduct!['name']}"? This action cannot be undone.',
+          style: GoogleFonts.inter(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.inter(color: AppColors.textSubtle, fontWeight: FontWeight.w600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text(
+              'Delete',
+              style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _isLoading = true);
+      try {
+        if (!_isOnline) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Deleting products requires an active internet connection.')),
+          );
+          return;
+        }
+        await ProductService().deleteProduct(widget.editProduct!['id']);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Product deleted successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          context.pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete product: $e'), backgroundColor: Colors.red),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    }
+  }
+
   Future<void> _initializeOfflineService() async {
     final queueService = OfflineQueueService();
     final productService = ProductService();
@@ -220,6 +288,27 @@ class _AddProductScreenState extends State<AddProductScreen> {
           'product_id': productId,
           'available_quantity': qty,
         }, onConflict: 'product_id');
+
+        // 2.5. Delete removed images from product_images table
+        final currentDbImages = await client
+            .from('product_images')
+            .select('image_id, image_url')
+            .eq('product_id', productId);
+
+        final remainingExistingPaths = _selectedImageFiles
+            .where((img) => img.isExisting)
+            .map((img) => img.path)
+            .toList();
+
+        for (final dbImg in currentDbImages) {
+          final dbUrl = dbImg['image_url']?.toString();
+          if (dbUrl != null && !remainingExistingPaths.contains(dbUrl)) {
+            await client
+                .from('product_images')
+                .delete()
+                .eq('image_id', dbImg['image_id']);
+          }
+        }
 
         // 3. Upload new images and save to product_images table if selected
         final newImages = _selectedImageFiles.where((img) => !img.isExisting).toList();
@@ -492,6 +581,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
         ),
         centerTitle: true,
         actions: [
+          if (widget.editProduct != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+              onPressed: _isLoading ? null : _deleteProduct,
+            ),
           Padding(
             padding: const EdgeInsets.all(12),
             child: Center(
@@ -830,7 +924,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           ? const SizedBox(
                               height: 24,
                               width: 24,
-                              child: AppShimmerLoader(
+                              child: CircularProgressIndicator(
                                 color: Colors.white,
                                 strokeWidth: 3,
                               ),

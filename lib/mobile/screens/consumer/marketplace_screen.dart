@@ -723,7 +723,72 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     );
   }
 
+  Widget _buildNoProductsFoundState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.search_off_rounded,
+                size: 48,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Products Found',
+              style: AppTextStyles.headline3.copyWith(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'We couldn\'t find any products matching your filters. Try adjusting your search query, price range, or distance.',
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _minPrice = 0.0;
+                  _maxPrice = 500.0;
+                  _maxDistance = 5.0;
+                  _searchController.clear();
+                  _selectedFilter = 0;
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Reset All Filters'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildNoCategoryMatchState({bool isOffline = false}) {
+    if (!isOffline) {
+      return _buildNoProductsFoundState();
+    }
+
     final hasCategoryFilter = _selectedFilter > 0 && _selectedFilter < _filters.length;
     final selectedCategory = hasCategoryFilter ? _filters[_selectedFilter] : null;
 
@@ -746,9 +811,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              isOffline
-                  ? 'Try reconnecting or switch back to All Products.'
-                  : 'Try another category or switch back to All Products.',
+              'Try reconnecting or switch back to All Products.',
               style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
               textAlign: TextAlign.center,
             ),
@@ -1775,10 +1838,94 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     final label = harvested
         ? 'Order Now'
         : (days > 0 ? 'Harvest in $days days' : (widget.product.targetQuantity != null ? 'Pre-order' : 'Ready Now'));
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.primary.withValues(alpha: 0.2))),
-      child: Row(children: [const Icon(Icons.schedule_rounded, color: AppColors.primary, size: 18), const SizedBox(width: 8), Text(label, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600))]),
+
+    // Check if it's preorder or regular stock
+    final isPreorder = widget.product.targetQuantity != null;
+    final double? stock = isPreorder ? widget.product.targetQuantity : widget.product.stockQuantity;
+    final double? reserved = widget.product.reservedQuantity;
+
+    String stockText;
+    if (isPreorder) {
+      final double target = stock ?? 0;
+      final double res = reserved ?? 0;
+      stockText = '${res.toInt()} / ${target.toInt()} ordered';
+    } else {
+      final double available = stock ?? 0;
+      stockText = available > 0 ? '${available.toInt()} available' : 'Out of stock';
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.schedule_rounded, color: AppColors.primary, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isPreorder 
+                  ? AppColors.primary.withValues(alpha: 0.05)
+                  : ((stock ?? 0) > 0 ? Colors.orange.withValues(alpha: 0.08) : Colors.red.withValues(alpha: 0.05)),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isPreorder
+                    ? AppColors.primary.withValues(alpha: 0.2)
+                    : ((stock ?? 0) > 0 ? Colors.orange.withValues(alpha: 0.2) : Colors.red.withValues(alpha: 0.2)),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isPreorder 
+                      ? Icons.shopping_bag_outlined 
+                      : ((stock ?? 0) > 0 ? Icons.inventory_2_outlined : Icons.info_outline),
+                  color: isPreorder 
+                      ? AppColors.primary 
+                      : ((stock ?? 0) > 0 ? Colors.orange.shade800 : Colors.red),
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    stockText,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: isPreorder 
+                          ? AppColors.primary 
+                          : ((stock ?? 0) > 0 ? Colors.orange.shade800 : Colors.red),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1814,6 +1961,10 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   }
 
   Widget _buildQuantitySelector() {
+    final isPreorder = widget.product.targetQuantity != null;
+    final maxQty = isPreorder ? 999 : (widget.product.stockQuantity?.toInt() ?? 0);
+    final canAdd = isPreorder || _quantity < maxQty;
+
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Quantity', style: AppTextStyles.headline3),
       const SizedBox(height: 12),
@@ -1822,7 +1973,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           _buildQtySelectorBtn(Icons.remove_rounded, _quantity > 1 ? () => setState(() => _quantity--) : null),
           Text('$_quantity ${widget.product.unit}', style: AppTextStyles.headline3),
-          _buildQtySelectorBtn(Icons.add_rounded, () => setState(() => _quantity++)),
+          _buildQtySelectorBtn(Icons.add_rounded, canAdd ? () => setState(() => _quantity++) : null),
         ]),
       ),
     ]);

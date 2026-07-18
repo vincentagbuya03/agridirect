@@ -21,6 +21,7 @@ class ProductItem {
   final String? description;
   final double? reservedQuantity;
   final double? targetQuantity;
+  final double? stockQuantity;
   final double? latitude;
   final double? longitude;
   final bool isFeatured;
@@ -45,6 +46,7 @@ class ProductItem {
     this.description,
     this.reservedQuantity,
     this.targetQuantity,
+    this.stockQuantity,
     this.latitude,
     this.longitude,
     this.isFeatured = false,
