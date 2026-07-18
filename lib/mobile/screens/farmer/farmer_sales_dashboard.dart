@@ -8,6 +8,7 @@ import '../../../shared/models/weather_model.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
+import 'weather_detail_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
@@ -845,81 +846,136 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   }
 
   Widget _buildWeatherQuickGlance() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
+    if (_weatherData == null) return const SizedBox.shrink();
+    final temp = _weatherData!.temperature.toStringAsFixed(0);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.06),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(
             color: AppColors.primary.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            width: 1,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primary,
-                  AppColors.primary.withValues(alpha: 0.7),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              _getAlertIcon(_weatherData!.description.toLowerCase()),
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _weatherData!.location,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: AppColors.textHeadline,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => WeatherDetailScreen(
+                      weatherData: _weatherData!,
+                      forecast: _weatherForecast,
+                      currentPosition: _currentPosition,
+                      onRefresh: _loadWeatherData,
+                    ),
                   ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.primary,
+                            AppColors.primary.withValues(alpha: 0.8),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _getAlertIcon(_weatherData!.description.toLowerCase()),
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                _weatherData!.location,
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: AppColors.textHeadline,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'LIVE',
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 9,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${_weatherData!.description} • Tap to view details',
+                            style: GoogleFonts.plusJakartaSans(
+                              color: AppColors.textSubtle,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        '$temp°C',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  _weatherData!.description,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: AppColors.textSubtle,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              '${_weatherData!.temperature.toStringAsFixed(0)}°C',
-              style: GoogleFonts.plusJakartaSans(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w900,
-                fontSize: 20,
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1499,75 +1555,106 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
               final pop = ((forecast.rainProbability ?? 0.0) * 100).round();
               final showRainChance = pop > 10;
+              final timeParts = forecast.timeString.split(' ');
+              final timeStr = timeParts[0];
+              final amPm = timeParts.length > 1 ? timeParts[1] : '';
 
               return Container(
-                width: 100,
-                margin: const EdgeInsets.only(right: 12),
+                width: 95,
+                margin: const EdgeInsets.only(right: 12, bottom: 8, top: 4),
                 decoration: BoxDecoration(
                   color: isNow ? AppColors.primary : Colors.white,
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
                       color: isNow
-                          ? AppColors.primary.withValues(alpha: 0.3)
-                          : Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 12,
+                          ? AppColors.primary.withValues(alpha: 0.25)
+                          : const Color(0xFF0F172A).withValues(alpha: 0.04),
+                      blurRadius: 16,
                       offset: const Offset(0, 4),
                     ),
                   ],
                   border: isNow
                       ? null
                       : Border.all(
-                          color: AppColors.textHeadline.withValues(alpha: 0.05),
+                          color: AppColors.primary.withValues(alpha: 0.08),
+                          width: 1.5,
                         ),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      forecast.timeString,
+                      isNow ? 'Now' : timeStr,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: isNow
-                            ? Colors.white.withValues(alpha: 0.8)
-                            : AppColors.textSubtle,
+                        color: isNow ? Colors.white.withValues(alpha: 0.9) : AppColors.textHeadline,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    if (!isNow && amPm.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        amPm,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSubtle.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: isNow
-                            ? Colors.white.withValues(alpha: 0.1)
-                            : AppColors.primary.withValues(alpha: 0.05),
+                            ? Colors.white.withValues(alpha: 0.15)
+                            : AppColors.primary.withValues(alpha: 0.06),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         _getAlertIcon(forecast.description.toLowerCase()),
-                        size: 24,
+                        size: 18,
                         color: isNow ? Colors.white : AppColors.primary,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Text(
                       '${forecast.temperature.toStringAsFixed(0)}°',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
                         color: isNow ? Colors.white : AppColors.textHeadline,
                       ),
                     ),
                     if (showRainChance) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '🌧 $pop%',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
                           color: isNow
-                              ? Colors.white.withValues(alpha: 0.8)
-                              : AppColors.primary,
+                              ? Colors.white.withValues(alpha: 0.2)
+                              : const Color(0xFF3B82F6).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.water_drop_rounded,
+                              size: 9,
+                              color: isNow ? Colors.white : const Color(0xFF3B82F6),
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              '$pop%',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: isNow ? Colors.white : const Color(0xFF3B82F6),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
