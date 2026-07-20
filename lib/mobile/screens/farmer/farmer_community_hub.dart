@@ -373,6 +373,13 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
   }
 
   Widget _buildForumCard({required ForumPostItem post}) {
+    final cleanTitle = post.title.trim();
+    final cleanBody = post.body.trim();
+    final bool showTitle = cleanTitle.isNotEmpty && cleanBody != cleanTitle;
+    final String displayBody = (cleanBody.startsWith(cleanTitle) && cleanBody != cleanTitle)
+        ? cleanBody.substring(cleanTitle.length).trim()
+        : cleanBody;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       decoration: AppDecorations.cardDecoration.copyWith(
@@ -449,12 +456,15 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                   ],
                 ),
                 const SizedBox(height: 16),
-                Text(post.title, style: AppTextStyles.headline3.copyWith(fontSize: 17, height: 1.3)),
-                const SizedBox(height: 8),
-                Text(
-                  post.body,
-                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHeadline.withValues(alpha: 0.7), height: 1.5),
-                ),
+                if (showTitle) ...[
+                  Text(post.title, style: AppTextStyles.headline3.copyWith(fontSize: 17, height: 1.3)),
+                  const SizedBox(height: 8),
+                ],
+                if (displayBody.isNotEmpty)
+                  Text(
+                    displayBody,
+                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHeadline.withValues(alpha: 0.7), height: 1.5),
+                  ),
                 if (post.videoUrl != null && post.videoUrl!.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   ClipRRect(

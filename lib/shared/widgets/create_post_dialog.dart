@@ -17,7 +17,6 @@ class CreatePostDialog extends StatefulWidget {
 }
 
 class _CreatePostDialogState extends State<CreatePostDialog> {
-  final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
   bool _isLoading = false;
   XFile? _selectedMedia;
@@ -74,7 +73,6 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
   }
 
   Future<void> _submit() async {
-    var title = _titleController.text.trim();
     final body = _bodyController.text.trim();
 
     if (body.isEmpty) {
@@ -82,12 +80,10 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
       return;
     }
 
-    // Default title if empty
-    if (title.isEmpty) {
-      title = body.split('\n').first;
-      if (title.length > 40) {
-        title = '${title.substring(0, 37)}...';
-      }
+    // Auto-generate title from body
+    var title = body.split('\n').first;
+    if (title.length > 40) {
+      title = '${title.substring(0, 37)}...';
     }
 
     setState(() => _isLoading = true);
@@ -165,7 +161,6 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
 
   @override
   void dispose() {
-    _titleController.dispose();
     _bodyController.dispose();
     super.dispose();
   }
@@ -178,18 +173,18 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Container(
         width: double.infinity,
-        constraints: const BoxConstraints(maxWidth: 550),
+        constraints: const BoxConstraints(maxWidth: 500),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 32,
+              offset: const Offset(0, 12),
             ),
           ],
         ),
@@ -197,21 +192,35 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Styled Header (Centered Title, Close X removed)
+              // Styled Header with Close Button
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                child: Center(
-                  child: Text(
-                    'Create post',
-                    style: GoogleFonts.inter(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF0F172A),
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 28), // Spacer to balance close button
+                    Expanded(
+                      child: Text(
+                        'Create post',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
                     ),
-                  ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 20),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        padding: const EdgeInsets.all(8),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const Divider(height: 1, thickness: 1),
+              const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
 
               Padding(
                 padding: const EdgeInsets.all(20),
@@ -226,7 +235,7 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                           height: 44,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.2), width: 1.5),
+                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.15), width: 1.5),
                           ),
                           child: ClipOval(
                             child: SafeNetworkImage(
@@ -245,7 +254,7 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                             children: [
                               Text(
                                 displayName,
-                                style: GoogleFonts.inter(
+                                style: GoogleFonts.plusJakartaSans(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
                                   color: const Color(0xFF0F172A),
@@ -256,14 +265,14 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: const Color(0xFFE2E8F0)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const Icon(Icons.public, size: 12, color: Color(0xFF64748B)),
-                                    const SizedBox(width: 4),
+                                    const SizedBox(width: 6),
                                     Text(
                                       'Public Community Hub',
                                       style: GoogleFonts.inter(
@@ -272,8 +281,6 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                                         color: const Color(0xFF64748B),
                                       ),
                                     ),
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.arrow_drop_down, size: 12, color: Color(0xFF64748B)),
                                   ],
                                 ),
                               ),
@@ -282,56 +289,29 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 18),
-
-                    // Title Input (Optional)
-                    TextField(
-                      controller: _titleController,
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF0F172A),
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Add a title (optional)...',
-                        hintStyle: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF94A3B8),
-                        ),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        errorBorder: InputBorder.none,
-                        disabledBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                    const Divider(height: 16, thickness: 0.5),
+                    const SizedBox(height: 20),
 
                     // Body Input
                     TextField(
                       controller: _bodyController,
                       maxLines: null,
-                      minLines: 4,
+                      minLines: 5,
                       style: GoogleFonts.inter(
-                        fontSize: 17,
+                        fontSize: 16,
                         fontWeight: FontWeight.w400,
                         color: const Color(0xFF1E293B),
-                        height: 1.5,
+                        height: 1.6,
                       ),
                       decoration: InputDecoration(
                         hintText: "What's on your mind, ${displayName.split(' ').first}?",
                         hintStyle: GoogleFonts.inter(
-                          fontSize: 17,
+                          fontSize: 16,
                           fontWeight: FontWeight.w400,
                           color: const Color(0xFF94A3B8),
                         ),
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
-                        errorBorder: InputBorder.none,
-                        disabledBorder: InputBorder.none,
                         contentPadding: EdgeInsets.zero,
                       ),
                     ),
@@ -343,13 +323,13 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                         children: [
                           Container(
                             width: double.infinity,
-                            height: 240,
+                            height: 220,
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(16),
                               border: Border.all(color: const Color(0xFFE2E8F0)),
                             ),
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(16),
                               child: _selectedMediaIsVideo
                                   ? Container(
                                       color: const Color(0xFFF8FAFC),
@@ -359,24 +339,24 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                                           const Icon(
                                             Icons.video_file_rounded,
                                             color: AppColors.primary,
-                                            size: 56,
+                                            size: 48,
                                           ),
-                                          const SizedBox(height: 12),
+                                          const SizedBox(height: 10),
                                           Padding(
                                             padding: const EdgeInsets.symmetric(horizontal: 16),
                                             child: Text(
                                               _selectedMedia!.name,
                                               style: GoogleFonts.inter(
-                                                fontSize: 15,
+                                                fontSize: 14,
                                                 fontWeight: FontWeight.w600,
                                                 color: const Color(0xFF1E293B),
                                               ),
                                               textAlign: TextAlign.center,
-                                              maxLines: 2,
+                                              maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                          const SizedBox(height: 6),
+                                          const SizedBox(height: 4),
                                           Text(
                                             'Video selected (Ready to upload)',
                                             style: GoogleFonts.inter(
@@ -394,27 +374,27 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                             ),
                           ),
                           Positioned(
-                            right: 10,
-                            top: 10,
+                            right: 8,
+                            top: 8,
                             child: GestureDetector(
                               onTap: () => setState(() => _selectedMedia = null),
                               child: Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                                child: const Icon(Icons.close, color: Colors.white, size: 16),
+                                child: const Icon(Icons.close, color: Colors.white, size: 14),
                               ),
                             ),
                           ),
                         ],
                       ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 20),
 
-                    // Facebook-style Toolbar Box
+                    // Toolbar Box
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
                         border: Border.all(color: const Color(0xFFE2E8F0)),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
                         color: const Color(0xFFF8FAFC),
                       ),
                       child: Row(
@@ -422,7 +402,7 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                           Expanded(
                             child: Text(
                               'Add to your post',
-                              style: GoogleFonts.inter(
+                              style: GoogleFonts.plusJakartaSans(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
                                 color: const Color(0xFF334155),
@@ -431,28 +411,27 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                           ),
                           IconButton(
                             onPressed: _pickImage,
-                            icon: const Icon(Icons.photo_library_rounded, color: Color(0xFF22C55E)),
+                            icon: const Icon(Icons.photo_library_rounded, color: Color(0xFF10B981)),
                             tooltip: 'Photo',
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFFE6F4EA),
+                              padding: const EdgeInsets.all(8),
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           IconButton(
                             onPressed: _pickVideo,
-                            icon: const Icon(Icons.video_library_rounded, color: Color(0xFFE11D48)),
+                            icon: const Icon(Icons.video_library_rounded, color: Color(0xFFEF4444)),
                             tooltip: 'Video',
-                          ),
-                          IconButton(
-                            onPressed: () {},
-                            icon: const Icon(Icons.label_important_rounded, color: Color(0xFF3B82F6)),
-                            tooltip: 'Tag Farmer',
-                          ),
-                          IconButton(
-                            onPressed: () {},
-                            icon: const Icon(Icons.emoji_emotions_rounded, color: Color(0xFFEAB308)),
-                            tooltip: 'Feeling/activity',
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFFFCE8E6),
+                              padding: const EdgeInsets.all(8),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
                     // Cancel & Post Buttons
                     Row(
@@ -464,14 +443,14 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                               onPressed: () => Navigator.of(context).pop(),
                               style: OutlinedButton.styleFrom(
                                 side: const BorderSide(color: Color(0xFFE2E8F0)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                 foregroundColor: const Color(0xFF64748B),
                               ),
                               child: Text(
                                 'Cancel',
-                                style: GoogleFonts.inter(
+                                style: GoogleFonts.plusJakartaSans(
                                   fontSize: 15,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
@@ -487,7 +466,7 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                                 backgroundColor: AppColors.primary,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                               ),
                               child: _isLoading
                                   ? const SizedBox(
@@ -497,9 +476,9 @@ class _CreatePostDialogState extends State<CreatePostDialog> {
                                     )
                                   : Text(
                                       'Post',
-                                      style: GoogleFonts.inter(
+                                      style: GoogleFonts.plusJakartaSans(
                                         fontSize: 15,
-                                        fontWeight: FontWeight.w700,
+                                        fontWeight: FontWeight.w800,
                                       ),
                                     ),
                             ),

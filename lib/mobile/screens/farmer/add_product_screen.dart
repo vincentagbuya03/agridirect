@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
+import '../../../shared/services/mascot/mascot_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -377,13 +378,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ? 'Product added successfully!'
             : 'Product saved offline! Will sync when online.';
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: _isOnline ? Colors.green : Colors.orange,
-          ),
+        MascotService.showCelebration(
+          context,
+          message: message,
+          onDismiss: () => context.pop(),
         );
-        context.pop();
       }
     } catch (e) {
       if (mounted) {
@@ -581,11 +580,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
         ),
         centerTitle: true,
         actions: [
-          if (widget.editProduct != null)
-            IconButton(
-              icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-              onPressed: _isLoading ? null : _deleteProduct,
-            ),
           Padding(
             padding: const EdgeInsets.all(12),
             child: Center(
@@ -944,6 +938,32 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             ),
                     ),
                   ),
+                  if (widget.editProduct != null) ...[
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoading ? null : _deleteProduct,
+                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                        label: Text(
+                          'Delete Product',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.red,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.red, width: 1.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -751,6 +751,7 @@ class SupabaseDataService {
       latitude: (item['latitude'] as num?)?.toDouble(),
       longitude: (item['longitude'] as num?)?.toDouble(),
       isFeatured: item['is_featured'] == true,
+      isPreorder: item['is_preorder'] == true,
       createdAt: rawCreated.isNotEmpty ? DateTime.tryParse(rawCreated) : null,
     );
   }

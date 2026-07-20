@@ -241,48 +241,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 ),
               ),
               _buildProgressCircle(),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _idType = 'local_id';
-                    _fullNameController.text = 'JOLORETA F. PASOQUIN';
-                    _sexController.text = 'Female';
-                    _birthDateController.text = '09/05/1966';
-                    _registration.birthDate = '1966-09-05';
-                    _placeOfBirthController.text = 'San Carlos City, Pangasinan';
-                    _addressController.text = 'Brgy. Turac, San Carlos City, Pangasinan';
-                    _pcnController.text = '2729-20';
-                    _farmNameController.text = 'Pasoquin Farm';
-                    _specialtyController.text = 'Rice & Vegetable Crops';
-                    _yearsController.text = '15';
-                    _farmingHistoryController.text = 'Farming rice and Swine breeding in Pangasinan.';
-                    _elementaryController.text = 'Turac Elementary School';
-                    _highSchoolController.text = 'Turac National High School';
-                    _selectedCrops.addAll(['Rice', 'Corn']);
-                    _selectedLivestock.addAll(['Swine']);
-                    _faceScanned = true;
-                    _idUploaded = true;
-                    _idBackUploaded = true;
-                    _farmLatitude = 15.9189;
-                    _farmLongitude = 120.3489;
-                    _resolvedFarmLocation = 'Brgy. Turac, San Carlos City, Pangasinan';
-                  });
-                },
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text(
-                  'Prefill',
-                  style: GoogleFonts.plusJakartaSans(
-                    color: _primary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
             ],
           ),
         ],
@@ -439,7 +397,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 _fullNameController,
                 'As shown on your ID',
                 prefixIcon: Icons.badge_rounded,
-                readOnly: _idType == 'national_id' && _qrData != null,
               ),
               const SizedBox(height: 20),
               Row(
@@ -454,7 +411,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                           _sexController,
                           'Gender',
                           prefixIcon: Icons.wc_rounded,
-                          readOnly: _idType == 'national_id' && _qrData != null,
                         ),
                       ],
                     ),
@@ -467,15 +423,12 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                         _buildLabel('Birth Date'),
                         const SizedBox(height: 10),
                         GestureDetector(
-                          onTap: _idType == 'national_id'
-                              ? null
-                              : _pickBirthDate,
+                          onTap: _pickBirthDate,
                           child: AbsorbPointer(
                             child: _buildTextField(
                               _birthDateController,
                               'mm/dd/yyyy',
                               prefixIcon: Icons.calendar_today_rounded,
-                              readOnly: _idType == 'national_id',
                             ),
                           ),
                         ),
@@ -491,7 +444,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 _placeOfBirthController,
                 'City/Municipality, Province',
                 prefixIcon: Icons.location_city_rounded,
-                readOnly: _idType == 'national_id' && _qrData != null,
               ),
               const SizedBox(height: 20),
               _buildLabel(_idType == 'local_id' ? 'Local ID Number' : 'PCN (PhilSys Card Number)'),

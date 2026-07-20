@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart';
+import 'weather_map_screen.dart';
 import '../../../shared/models/weather_model.dart';
 import '../../../shared/styles/app_theme.dart';
 
@@ -26,6 +27,23 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
   int? _expandedIndex;
   bool _isRefreshing = false;
 
+  void _launchWeatherMap() {
+    final lat = widget.currentPosition?.latitude ?? 15.4828;
+    final lon = widget.currentPosition?.longitude ?? 120.7120;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WeatherMapScreen(
+          latitude: lat,
+          longitude: lon,
+          locationName: widget.weatherData.location,
+          temperature: widget.weatherData.temperature,
+          weatherDescription: widget.weatherData.description,
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleRefresh() async {
     setState(() => _isRefreshing = true);
     try {
@@ -42,7 +60,8 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     if (desc.contains('rain')) return Icons.umbrella_rounded;
     if (desc.contains('storm')) return Icons.thunderstorm_rounded;
     if (desc.contains('wind')) return Icons.air_rounded;
-    if (desc.contains('clear') || desc.contains('sun')) return Icons.wb_sunny_rounded;
+    if (desc.contains('clear') || desc.contains('sun'))
+      return Icons.wb_sunny_rounded;
     if (desc.contains('cloud')) return Icons.cloud_rounded;
     return Icons.wb_cloudy_rounded;
   }
@@ -50,7 +69,9 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
   // Agronomic calculations
   String _getSprayingStatus(double windSpeed, String description) {
     final cleanDesc = description.toLowerCase();
-    if (windSpeed > 25 || cleanDesc.contains('rain') || cleanDesc.contains('storm')) {
+    if (windSpeed > 25 ||
+        cleanDesc.contains('rain') ||
+        cleanDesc.contains('storm')) {
       return 'UNSAFE';
     }
     if (windSpeed > 15 || cleanDesc.contains('drizzle')) {
@@ -61,7 +82,9 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
 
   String _getHarvestingStatus(String description, double humidity) {
     final cleanDesc = description.toLowerCase();
-    if (cleanDesc.contains('rain') || cleanDesc.contains('storm') || humidity > 85) {
+    if (cleanDesc.contains('rain') ||
+        cleanDesc.contains('storm') ||
+        humidity > 85) {
       return 'POOR';
     }
     if (humidity > 70 || cleanDesc.contains('cloud')) {
@@ -114,8 +137,10 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final desc = widget.weatherData.description;
-    final isRainy = desc.toLowerCase().contains('rain') || desc.toLowerCase().contains('storm');
-    
+    final isRainy =
+        desc.toLowerCase().contains('rain') ||
+        desc.toLowerCase().contains('storm');
+
     // Dynamic Hero gradient based on weather
     final heroGradient = isRainy
         ? const LinearGradient(
@@ -124,7 +149,10 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
             end: Alignment.bottomRight,
           )
         : LinearGradient(
-            colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.75)],
+            colors: [
+              AppColors.primary,
+              AppColors.primary.withValues(alpha: 0.75),
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           );
@@ -149,7 +177,11 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textHeadline, size: 20),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppColors.textHeadline,
+            size: 20,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -159,12 +191,18 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
               child: SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
               ),
             )
           else
             IconButton(
-              icon: const Icon(Icons.refresh_rounded, color: AppColors.textHeadline),
+              icon: const Icon(
+                Icons.refresh_rounded,
+                color: AppColors.textHeadline,
+              ),
               onPressed: _handleRefresh,
             ),
         ],
@@ -188,7 +226,8 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                     borderRadius: BorderRadius.circular(32),
                     boxShadow: [
                       BoxShadow(
-                        color: (isRainy ? Colors.blueGrey : AppColors.primary).withValues(alpha: 0.25),
+                        color: (isRainy ? Colors.blueGrey : AppColors.primary)
+                            .withValues(alpha: 0.25),
                         blurRadius: 24,
                         offset: const Offset(0, 8),
                       ),
@@ -239,17 +278,114 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      Divider(color: Colors.white.withValues(alpha: 0.2), height: 1),
+                      Divider(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        height: 1,
+                      ),
                       const SizedBox(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildHeroMetric('Feels Like', '${widget.weatherData.feelsLike.toStringAsFixed(0)}°C'),
+                          _buildHeroMetric(
+                            'Feels Like',
+                            '${widget.weatherData.feelsLike.toStringAsFixed(0)}°C',
+                          ),
                           _buildHeroMetric('Condition', desc),
-                          _buildHeroMetric('Wind', '${widget.weatherData.windSpeed.toStringAsFixed(0)} km/h'),
+                          _buildHeroMetric(
+                            'Wind',
+                            '${widget.weatherData.windSpeed.toStringAsFixed(0)} km/h',
+                          ),
                         ],
                       ),
                     ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // INTERACTIVE WEATHER MAP CARD (Zoom Earth)
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF0F172A).withValues(alpha: 0.15),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _launchWeatherMap,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 18,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.map_rounded,
+                                  color: Color(0xFF38EF7D),
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Live Wind & Rain Radar Map',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Open live Zoom Earth maps for your location',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.7,
+                                        ),
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 11.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                color: Colors.white.withValues(alpha: 0.5),
+                                size: 16,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -262,12 +398,17 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+                      border: Border.all(
+                        color: AppColors.error.withValues(alpha: 0.2),
+                      ),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.warning_amber_rounded, color: AppColors.error),
+                        const Icon(
+                          Icons.warning_amber_rounded,
+                          color: AppColors.error,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -299,7 +440,152 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                   const SizedBox(height: 20),
                 ],
 
-                // 3. BENTO LAYOUT (AGRONOMIC ADVISORY & DETAILED METRICS)
+                // 3. KIKO CROP ADVISORY CARD (FULL WIDTH)
+                Builder(
+                  builder: (context) {
+                    final spraying = _getSprayingStatus(
+                      widget.weatherData.windSpeed,
+                      desc,
+                    );
+                    final harvesting = _getHarvestingStatus(
+                      desc,
+                      widget.weatherData.humidity,
+                    );
+                    final irrigation = _getIrrigationStatus(
+                      widget.weatherData.temperature,
+                      widget.weatherData.humidity,
+                    );
+                    final disease = _getDiseaseRiskStatus(
+                      widget.weatherData.humidity,
+                      widget.weatherData.temperature,
+                    );
+
+                    final bool isWarning =
+                        spraying == 'UNSAFE' ||
+                        harvesting == 'POOR' ||
+                        disease == 'HIGH' ||
+                        irrigation == 'HIGH NEED';
+
+                    String advisoryMessage = '';
+                    if (spraying == 'UNSAFE') {
+                      advisoryMessage =
+                          "High winds or rain make spraying unsafe today. Wait for calmer weather.";
+                    } else if (disease == 'HIGH') {
+                      advisoryMessage =
+                          "High humidity and temperature increase disease risk. Monitor crops closely.";
+                    } else if (harvesting == 'POOR') {
+                      advisoryMessage =
+                          "Wet conditions are not ideal for harvesting. Protect harvested crops.";
+                    } else if (irrigation == 'HIGH NEED') {
+                      advisoryMessage =
+                          "Hot and dry conditions! Ensure your fields are sufficiently irrigated.";
+                    } else if (spraying == 'CAUTION' || disease == 'MEDIUM') {
+                      advisoryMessage =
+                          "Moderate disease risk or breezy winds. Proceed with caution.";
+                    } else {
+                      advisoryMessage =
+                          "Great farming weather today! Ideal conditions for field activities.";
+                    }
+
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isWarning
+                              ? [
+                                  const Color(0xFFFFF5F5),
+                                  const Color(0xFFFFF0F0),
+                                ]
+                              : [
+                                  const Color(0xFFECFDF5),
+                                  const Color(0xFFF0FDF4),
+                                ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: isWarning
+                              ? const Color(0xFFFEE2E2)
+                              : const Color(0xFFD1FAE5),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Image.asset(
+                            isWarning
+                                ? 'assets/images/kiko_cloudy.png'
+                                : 'assets/images/kiko_happy.png',
+                            width: 52,
+                            height: 52,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  width: 52,
+                                  height: 52,
+                                  decoration: BoxDecoration(
+                                    color: isWarning
+                                        ? const Color(0xFFEF4444)
+                                        : const Color(0xFF10B981),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.face,
+                                    color: Colors.white,
+                                    size: 26,
+                                  ),
+                                ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isWarning
+                                      ? "KIKO'S WARNING"
+                                      : "KIKO'S FARM ADVICE",
+                                  style: GoogleFonts.plusJakartaSans(
+                                    color: isWarning
+                                        ? const Color(0xFF991B1B)
+                                        : const Color(0xFF047857),
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 10,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  advisoryMessage,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    color: isWarning
+                                        ? const Color(0xFF7F1D1D)
+                                        : const Color(0xFF065F46),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                // 4. BENTO LAYOUT (AGRONOMIC ADVISORY & DETAILED METRICS)
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -324,22 +610,34 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                             const SizedBox(height: 16),
                             _buildAdvisoryRow(
                               'Spraying',
-                              _getSprayingStatus(widget.weatherData.windSpeed, desc),
+                              _getSprayingStatus(
+                                widget.weatherData.windSpeed,
+                                desc,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             _buildAdvisoryRow(
                               'Harvesting',
-                              _getHarvestingStatus(desc, widget.weatherData.humidity),
+                              _getHarvestingStatus(
+                                desc,
+                                widget.weatherData.humidity,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             _buildAdvisoryRow(
                               'Irrigation',
-                              _getIrrigationStatus(widget.weatherData.temperature, widget.weatherData.humidity),
+                              _getIrrigationStatus(
+                                widget.weatherData.temperature,
+                                widget.weatherData.humidity,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             _buildAdvisoryRow(
                               'Disease Risk',
-                              _getDiseaseRiskStatus(widget.weatherData.humidity, widget.weatherData.temperature),
+                              _getDiseaseRiskStatus(
+                                widget.weatherData.humidity,
+                                widget.weatherData.temperature,
+                              ),
                             ),
                           ],
                         ),
@@ -365,11 +663,23 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            _buildMetricGridItem(Icons.water_drop_outlined, 'Humidity', '${widget.weatherData.humidity.toStringAsFixed(0)}%'),
+                            _buildMetricGridItem(
+                              Icons.water_drop_outlined,
+                              'Humidity',
+                              '${widget.weatherData.humidity.toStringAsFixed(0)}%',
+                            ),
                             const SizedBox(height: 14),
-                            _buildMetricGridItem(Icons.speed_outlined, 'Pressure', '${widget.weatherData.pressure.toStringAsFixed(0)} hPa'),
+                            _buildMetricGridItem(
+                              Icons.speed_outlined,
+                              'Pressure',
+                              '${widget.weatherData.pressure.toStringAsFixed(0)} hPa',
+                            ),
                             const SizedBox(height: 14),
-                            _buildMetricGridItem(Icons.cloud_outlined, 'Clouds', '${widget.weatherData.cloudiness}%'),
+                            _buildMetricGridItem(
+                              Icons.cloud_outlined,
+                              'Clouds',
+                              '${widget.weatherData.cloudiness}%',
+                            ),
                           ],
                         ),
                       ),
@@ -440,26 +750,31 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          action,
-          style: GoogleFonts.plusJakartaSans(
-            color: AppColors.textHeadline,
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
+        Expanded(
+          child: Text(
+            action,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppColors.textHeadline,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
+        const SizedBox(width: 6),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: statusColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
             status,
             style: GoogleFonts.plusJakartaSans(
               color: statusColor,
               fontWeight: FontWeight.w900,
-              fontSize: 10,
+              fontSize: 9,
               letterSpacing: 0.5,
             ),
           ),
@@ -522,7 +837,10 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
         pressure: widget.weatherData.pressure,
         description: widget.weatherData.description,
         icon: widget.weatherData.icon,
-        rainProbability: widget.weatherData.description.toLowerCase().contains('rain') ? 1.0 : 0.0,
+        rainProbability:
+            widget.weatherData.description.toLowerCase().contains('rain')
+            ? 1.0
+            : 0.0,
       ),
     );
 
@@ -532,7 +850,8 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     }).toList();
 
     for (final f in upcomingData) {
-      if (hourlyData.isEmpty || f.dateTime.difference(hourlyData.first.dateTime).inHours.abs() > 0) {
+      if (hourlyData.isEmpty ||
+          f.dateTime.difference(hourlyData.first.dateTime).inHours.abs() > 0) {
         hourlyData.add(f);
       }
     }
@@ -582,7 +901,9 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    color: isNow ? Colors.white.withValues(alpha: 0.9) : AppColors.textHeadline,
+                    color: isNow
+                        ? Colors.white.withValues(alpha: 0.9)
+                        : AppColors.textHeadline,
                   ),
                 ),
                 if (!isNow && amPm.isNotEmpty) ...[
@@ -623,7 +944,10 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                 if (showRain) ...[
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: isNow
                           ? Colors.white.withValues(alpha: 0.2)
@@ -644,7 +968,9 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
-                            color: isNow ? Colors.white : const Color(0xFF3B82F6),
+                            color: isNow
+                                ? Colors.white
+                                : const Color(0xFF3B82F6),
                           ),
                         ),
                       ],
@@ -661,7 +987,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
 
   Widget _buildWeeklyForecast() {
     if (widget.forecast == null) return const SizedBox.shrink();
-    
+
     final dailyData = widget.forecast!.getDailyForecast().take(5).toList();
     if (dailyData.isEmpty) return const SizedBox.shrink();
 
@@ -685,7 +1011,8 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
               isSevere: false,
             ),
           );
-          final hasAdvisory = dayAdvisory.day.isNotEmpty && dayAdvisory.message.isNotEmpty;
+          final hasAdvisory =
+              dayAdvisory.day.isNotEmpty && dayAdvisory.message.isNotEmpty;
 
           return Column(
             children: [
@@ -697,10 +1024,15 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                 },
                 borderRadius: BorderRadius.vertical(
                   top: index == 0 ? const Radius.circular(28) : Radius.zero,
-                  bottom: isLast && !isExpanded ? const Radius.circular(28) : Radius.zero,
+                  bottom: isLast && !isExpanded
+                      ? const Radius.circular(28)
+                      : Radius.zero,
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
                   child: Row(
                     children: [
                       SizedBox(
@@ -710,7 +1042,9 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                           style: GoogleFonts.plusJakartaSans(
                             fontWeight: FontWeight.w800,
                             fontSize: 12,
-                            color: hasAdvisory ? AppColors.error : AppColors.textHeadline,
+                            color: hasAdvisory
+                                ? AppColors.error
+                                : AppColors.textHeadline,
                           ),
                         ),
                       ),
@@ -718,7 +1052,9 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                       Icon(
                         _getWeatherIcon(f.description),
                         size: 22,
-                        color: hasAdvisory ? AppColors.error : AppColors.primary,
+                        color: hasAdvisory
+                            ? AppColors.error
+                            : AppColors.primary,
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -755,7 +1091,9 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
                       ),
                       const SizedBox(width: 8),
                       Icon(
-                        isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        isExpanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
                         size: 18,
                         color: AppColors.textSubtle,
                       ),
@@ -766,9 +1104,13 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
               if (isExpanded)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.only(left: 20, right: 20, bottom: 16),
+                  padding: const EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    bottom: 16,
+                  ),
                   child: Text(
-                    hasAdvisory 
+                    hasAdvisory
                         ? dayAdvisory.message
                         : 'Conditions are expected to be stable. Plan normal irrigation and harvest schedules.',
                     style: GoogleFonts.plusJakartaSans(

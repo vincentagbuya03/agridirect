@@ -66,30 +66,65 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
     });
   }
 
+  int get _expiredCount {
+    final now = DateTime.now();
+    return _vouchers.where((v) {
+      final endDate = DateTime.tryParse(v['end_date'] ?? '') ?? now;
+      return endDate.isBefore(now);
+    }).length;
+  }
+
   Future<void> _handleDeleteVoucher(String voucherId) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Delete Voucher',
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        titlePadding: const EdgeInsets.fromLTRB(24, 28, 24, 8),
+        contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Delete Voucher',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 17),
+            ),
+          ],
         ),
-        content: const Text('Are you sure you want to delete this voucher? Customers will no longer be able to claim or use it.'),
+        content: Text(
+          'Are you sure you want to delete this voucher? Customers will no longer be able to claim or use it.',
+          style: GoogleFonts.inter(color: AppColors.textSubtle, fontSize: 14, height: 1.5),
+        ),
         actions: [
-          TextButton(
+          OutlinedButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textSubtle,
+              side: BorderSide(color: Colors.grey.shade300),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.error,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
-            child: const Text('Delete'),
+            child: Text('Delete', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -100,9 +135,18 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
         await _voucherService.deleteVoucher(voucherId);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Voucher deleted successfully'),
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                  const SizedBox(width: 10),
+                  const Text('Voucher deleted successfully'),
+                ],
+              ),
               backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              margin: const EdgeInsets.all(16),
             ),
           );
           _fetchVouchers();
@@ -113,6 +157,9 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
             SnackBar(
               content: Text('Failed to delete voucher: $e'),
               backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              margin: const EdgeInsets.all(16),
             ),
           );
         }
@@ -136,43 +183,259 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          'Voucher Manager',
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
-            color: AppColors.textHeadline,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textHeadline, size: 20),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openCreateVoucherSheet,
-        backgroundColor: AppColors.primary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
-      ),
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: _buildAppBar(),
+      floatingActionButton: _buildFAB(),
       body: RefreshIndicator(
         onRefresh: _fetchVouchers,
         color: AppColors.primary,
+        backgroundColor: Colors.white,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(child: _buildStatsHeader()),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Text(
+                  'Your Vouchers',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textHeadline,
+                  ),
+                ),
+              ),
+            ),
+            if (_isLoading)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList.builder(
+                  itemCount: 3,
+                  itemBuilder: (_, __) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: SizedBox(height: 120, child: AppShimmerLoader.rectangle(borderRadius: 20)),
+                  ),
+                ),
+              )
+            else if (_vouchers.isEmpty)
+              SliverFillRemaining(child: _buildEmptyState())
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                sliver: SliverList.builder(
+                  itemCount: _vouchers.length,
+                  itemBuilder: (context, index) => _buildVoucherCard(_vouchers[index]),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      centerTitle: true,
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(
+          height: 1,
+          color: const Color(0xFFE2E8F0),
+        ),
+      ),
+      title: Text(
+        'Voucher Manager',
+        style: GoogleFonts.plusJakartaSans(
+          fontWeight: FontWeight.w800,
+          fontSize: 17,
+          color: AppColors.textHeadline,
+        ),
+      ),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textHeadline, size: 20),
+        onPressed: () => context.pop(),
+      ),
+    );
+  }
+
+  Widget _buildFAB() {
+    return FloatingActionButton.extended(
+      onPressed: _openCreateVoucherSheet,
+      backgroundColor: AppColors.primary,
+      foregroundColor: Colors.white,
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      icon: const Icon(Icons.add_rounded, size: 22),
+      label: Text(
+        'New Voucher',
+        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 14),
+      ),
+    );
+  }
+
+  Widget _buildStatsHeader() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF059669), Color(0xFF0D9488)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF059669).withValues(alpha: 0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.confirmation_number_rounded, color: Colors.white, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Overview',
+                style: GoogleFonts.inter(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              _buildStatCell(
+                icon: Icons.local_offer_rounded,
+                label: 'Active',
+                value: '$_activeVouchersCount',
+              ),
+              _buildStatDivider(),
+              _buildStatCell(
+                icon: Icons.people_alt_rounded,
+                label: 'Total Claims',
+                value: '$_totalClaimsCount',
+              ),
+              _buildStatDivider(),
+              _buildStatCell(
+                icon: Icons.timer_off_rounded,
+                label: 'Expired',
+                value: '$_expiredCount',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCell({required IconData icon, required String label, required String value}) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, color: Colors.white.withValues(alpha: 0.7), size: 18),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: GoogleFonts.plusJakartaSans(
+              color: Colors.white,
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              color: Colors.white.withValues(alpha: 0.75),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatDivider() {
+    return Container(
+      width: 1,
+      height: 52,
+      color: Colors.white.withValues(alpha: 0.2),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildStatsHeader(),
-            Expanded(
-              child: _isLoading
-                  ? _buildShimmerList()
-                  : _vouchers.isEmpty
-                      ? _buildEmptyState()
-                      : _buildVouchersList(),
+            Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.confirmation_number_outlined,
+                size: 64,
+                color: AppColors.primary.withValues(alpha: 0.5),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Vouchers Yet',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textHeadline,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Create store coupons and discount vouchers to encourage customers to purchase more from your farm stall.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                color: AppColors.textSubtle,
+                fontSize: 14,
+                height: 1.6,
+              ),
+            ),
+            const SizedBox(height: 28),
+            FilledButton.icon(
+              onPressed: _openCreateVoucherSheet,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              icon: const Icon(Icons.add_rounded),
+              label: Text(
+                'Create Your First Voucher',
+                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+              ),
             ),
           ],
         ),
@@ -180,362 +443,246 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
     );
   }
 
-  Widget _buildStatsHeader() {
+  Widget _buildVoucherCard(Map<String, dynamic> voucher) {
+    final now = DateTime.now();
+    final code = voucher['code'] ?? '';
+    final discValue = (voucher['discount_value'] as num?)?.toDouble() ?? 0.0;
+    final type = voucher['discount_type'] ?? 'flat';
+    final minSpend = (voucher['min_spend'] as num?)?.toDouble() ?? 0.0;
+    final limit = (voucher['usage_limit'] as num?)?.toInt() ?? 100;
+    final used = (voucher['used_count'] as num?)?.toInt() ?? 0;
+    final endDate = DateTime.tryParse(voucher['end_date'] ?? '') ?? now;
+
+    final isExpired = endDate.isBefore(now);
+    final isFullyClaimed = used >= limit;
+    final isActive = !isExpired && !isFullyClaimed;
+
+    final discountStr = type == 'percentage'
+        ? '${discValue.toStringAsFixed(0)}%'
+        : '₱${discValue.toStringAsFixed(0)}';
+
+    final statusLabel = isExpired
+        ? 'Expired'
+        : isFullyClaimed
+            ? 'Fully Claimed'
+            : 'Active';
+
+    final statusColor = isActive
+        ? AppColors.success
+        : isFullyClaimed
+            ? AppColors.accent
+            : AppColors.error;
+
+    final statusBgColor = statusColor.withValues(alpha: 0.1);
+
+    final progress = limit > 0 ? (used / limit).clamp(0.0, 1.0) : 0.0;
+
     return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isActive
+              ? AppColors.primary.withValues(alpha: 0.15)
+              : Colors.grey.shade200,
+          width: 1.5,
         ),
-        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.25),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Active Vouchers',
-                  style: GoogleFonts.inter(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              // ── Left Discount Badge ──
+              Container(
+                width: 90,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isActive
+                        ? [
+                            AppColors.primary.withValues(alpha: 0.12),
+                            AppColors.primary.withValues(alpha: 0.04),
+                          ]
+                        : [Colors.grey.shade100, Colors.grey.shade50],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '$_activeVouchersCount',
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                  ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      discountStr,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: isActive ? AppColors.primary : Colors.grey.shade500,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'OFF',
+                      style: GoogleFonts.inter(
+                        color: isActive
+                            ? AppColors.primary.withValues(alpha: 0.7)
+                            : Colors.grey.shade400,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 50,
-            color: Colors.white.withValues(alpha: 0.2),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  'Total Claims',
-                  style: GoogleFonts.inter(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '$_totalClaimsCount',
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShimmerList() {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: 3,
-      itemBuilder: (_, _) => Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: SizedBox(
-          height: 120,
-          child: AppShimmerLoader.rectangle(borderRadius: 20),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      children: [
-        const SizedBox(height: 80),
-        Center(
-          child: Container(
-            padding: const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.confirmation_number_outlined,
-              size: 72,
-              color: AppColors.primary.withValues(alpha: 0.6),
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          'No Vouchers Yet',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textHeadline,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Create store coupons and discount vouchers to encourage customers to purchase more from your farm stall.',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: AppColors.textSubtle,
-            height: 1.5,
-          ),
-        ),
-        const SizedBox(height: 32),
-        Center(
-          child: FilledButton.icon(
-            onPressed: _openCreateVoucherSheet,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Create New'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildVouchersList() {
-    final now = DateTime.now();
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: _vouchers.length,
-      itemBuilder: (context, index) {
-        final voucher = _vouchers[index];
-        final code = voucher['code'] ?? '';
-        final discValue = (voucher['discount_value'] as num?)?.toDouble() ?? 0.0;
-        final type = voucher['discount_type'] ?? 'flat';
-        final minSpend = (voucher['min_spend'] as num?)?.toDouble() ?? 0.0;
-        final limit = (voucher['usage_limit'] as num?)?.toInt() ?? 100;
-        final used = (voucher['used_count'] as num?)?.toInt() ?? 0;
-        final endDate = DateTime.tryParse(voucher['end_date'] ?? '') ?? now;
-
-        final isExpired = endDate.isBefore(now);
-        final isFullyClaimed = used >= limit;
-        final isActive = !isExpired && !isFullyClaimed;
-
-        final discountStr = type == 'percentage'
-            ? '${discValue.toStringAsFixed(0)}%'
-            : '₱${discValue.toStringAsFixed(0)}';
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
               ),
-            ],
-            border: Border.all(
-              color: isActive
-                  ? AppColors.primary.withValues(alpha: 0.15)
-                  : Colors.grey.shade200,
-              width: 1.5,
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Stack(
-              children: [
-                IntrinsicHeight(
-                  child: Row(
+
+              // ── Dashed Divider ──
+              CustomPaint(
+                size: const Size(1, double.infinity),
+                painter: _DashedLinePainter(color: Colors.grey.shade300),
+              ),
+
+              // ── Right Details ──
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Left Side (Discount Badge)
-                      Container(
-                        width: 100,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: isActive
-                                ? [AppColors.primary.withValues(alpha: 0.12), AppColors.primary.withValues(alpha: 0.05)]
-                                : [Colors.grey.shade100, Colors.grey.shade50],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              discountStr,
-                              style: GoogleFonts.plusJakartaSans(
-                                color: isActive ? AppColors.primary : Colors.grey.shade600,
-                                fontSize: 26,
-                                fontWeight: FontWeight.w900,
-                              ),
+                      // Code + Status Row
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isActive
+                                  ? AppColors.primary.withValues(alpha: 0.1)
+                                  : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            Text(
-                              'OFF',
+                            child: Text(
+                              code,
                               style: GoogleFonts.inter(
-                                color: isActive ? AppColors.primary.withValues(alpha: 0.8) : Colors.grey.shade500,
-                                fontSize: 10,
+                                color: isActive ? AppColors.primary : Colors.grey.shade600,
                                 fontWeight: FontWeight.w800,
+                                fontSize: 11,
                                 letterSpacing: 0.8,
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      // Dashed Divider simulation
-                      CustomPaint(
-                        size: const Size(1, double.infinity),
-                        painter: _DashedLinePainter(
-                          color: Colors.grey.shade300,
-                        ),
-                      ),
-                      // Right Side (Details)
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: isActive
-                                          ? AppColors.primary.withValues(alpha: 0.1)
-                                          : Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(999),
-                                    ),
-                                    child: Text(
-                                      code,
-                                      style: GoogleFonts.inter(
-                                        color: isActive ? AppColors.primary : Colors.grey.shade600,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 12,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  // Expiry status indicator
-                                  Text(
-                                    isExpired
-                                        ? 'Expired'
-                                        : isFullyClaimed
-                                            ? 'Fully Claimed'
-                                            : 'Active',
-                                    style: GoogleFonts.inter(
-                                      color: isActive
-                                          ? AppColors.success
-                                          : isFullyClaimed
-                                              ? AppColors.accent
-                                              : AppColors.error,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Min Spend: ₱${minSpend.toStringAsFixed(0)}',
-                                style: AppTextStyles.labelSmall.copyWith(
-                                  color: AppColors.textHeadline,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Expires: ${DateFormat('yMMMd').format(endDate)}',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.textSubtle,
-                                  fontSize: 11,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              // Progress bar
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(4),
-                                      child: LinearProgressIndicator(
-                                        value: limit > 0 ? used / limit : 0.0,
-                                        backgroundColor: Colors.grey.shade100,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          isActive ? AppColors.primary : Colors.grey.shade400,
-                                        ),
-                                        minHeight: 5,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    '$used/$limit used',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.textSubtle,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: statusBgColor,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              statusLabel,
+                              style: GoogleFonts.inter(
+                                color: statusColor,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          // Delete button
+                          GestureDetector(
+                            onTap: () => _handleDeleteVoucher(voucher['voucher_id']),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.delete_outline_rounded,
+                                color: AppColors.error,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      // Actions (Delete)
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
-                        onPressed: () => _handleDeleteVoucher(voucher['voucher_id']),
+                      const SizedBox(height: 10),
+
+                      // Min Spend & Expiry
+                      Row(
+                        children: [
+                          Icon(Icons.shopping_bag_outlined, size: 13, color: AppColors.textSubtle),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Min ₱${minSpend.toStringAsFixed(0)}',
+                            style: GoogleFonts.inter(
+                              color: AppColors.textBody,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.textSubtle),
+                          const SizedBox(width: 4),
+                          Text(
+                            DateFormat('MMM d, yyyy').format(endDate),
+                            style: GoogleFonts.inter(
+                              color: isExpired ? AppColors.error : AppColors.textSubtle,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Usage progress
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                backgroundColor: Colors.grey.shade100,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  isActive ? AppColors.primary : Colors.grey.shade400,
+                                ),
+                                minHeight: 6,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            '$used/$limit',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSubtle,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
 
+// ── Dashed Line Painter ──────────────────────────────────────────────────────
 class _DashedLinePainter extends CustomPainter {
   final Color color;
   _DashedLinePainter({required this.color});
@@ -561,6 +708,7 @@ class _DashedLinePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+// ── Create Voucher Bottom Sheet ───────────────────────────────────────────────
 class _CreateVoucherBottomSheet extends StatefulWidget {
   final VoidCallback onCreated;
   const _CreateVoucherBottomSheet({required this.onCreated});
@@ -576,7 +724,7 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
   final _minSpendController = TextEditingController();
   final _limitController = TextEditingController();
 
-  String _discountType = 'flat'; // 'flat' or 'percentage'
+  String _discountType = 'flat';
   DateTime? _selectedEndDate;
   bool _isSaving = false;
 
@@ -605,9 +753,7 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
               onSurface: AppColors.textHeadline,
             ),
             textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.primary,
-              ),
+              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
             ),
           ),
           child: child!,
@@ -626,9 +772,12 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedEndDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select an expiration date'),
+        SnackBar(
+          content: const Text('Please select an expiration date'),
           backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          margin: const EdgeInsets.all(16),
         ),
       );
       return;
@@ -641,8 +790,10 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
 
       final code = _codeController.text.trim().toUpperCase();
       final val = double.parse(_valController.text.trim());
-      final minSpend = double.parse(_minSpendController.text.trim().isEmpty ? '0' : _minSpendController.text.trim());
-      final limit = int.parse(_limitController.text.trim().isEmpty ? '100' : _limitController.text.trim());
+      final minSpend = double.parse(
+          _minSpendController.text.trim().isEmpty ? '0' : _minSpendController.text.trim());
+      final limit = int.parse(
+          _limitController.text.trim().isEmpty ? '100' : _limitController.text.trim());
 
       await VoucherService().createVoucher(
         farmerId: farmerId,
@@ -657,9 +808,18 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Voucher created successfully!'),
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                const SizedBox(width: 10),
+                const Text('Voucher created successfully!'),
+              ],
+            ),
             backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            margin: const EdgeInsets.all(16),
           ),
         );
         widget.onCreated();
@@ -671,6 +831,9 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
           SnackBar(
             content: Text('Failed to create voucher: $e'),
             backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
@@ -687,10 +850,10 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       padding: EdgeInsets.only(
-        top: 24,
+        top: 0,
         left: 24,
         right: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 28,
       ),
       child: SingleChildScrollView(
         child: Form(
@@ -699,43 +862,65 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Sheet Handle + Header
               Center(
-                child: Container(
-                  width: 50,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 14, bottom: 20),
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              Text(
-                'Create New Voucher',
-                style: GoogleFonts.plusJakartaSans(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 20,
-                  color: AppColors.textHeadline,
-                ),
-              ),
-              const SizedBox(height: 24),
 
-              // Code field
-              Text(
-                'Voucher Code',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textHeadline),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.confirmation_number_rounded, color: AppColors.primary, size: 20),
+                  ),
+                  const SizedBox(width: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Create Voucher',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                          color: AppColors.textHeadline,
+                        ),
+                      ),
+                      Text(
+                        'Set up a discount for your customers',
+                        style: GoogleFonts.inter(
+                          color: AppColors.textSubtle,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
+              const SizedBox(height: 28),
+
+              // ── Voucher Code ──
+              _buildLabel('Voucher Code'),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _codeController,
                 textCapitalization: TextCapitalization.characters,
-                decoration: InputDecoration(
-                  hintText: 'e.g., FRESH50',
-                  hintStyle: GoogleFonts.inter(color: Colors.grey[400], fontSize: 14),
-                  fillColor: Colors.grey.shade50,
-                  filled: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: _inputDecoration(
+                  hint: 'e.g., FRESH50',
+                  prefixIcon: Icons.tag_rounded,
                 ),
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) return 'Code is required';
@@ -743,128 +928,81 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
                   return null;
                 },
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
 
-              // Discount Type selector
-              Text(
-                'Discount Type',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textHeadline),
-              ),
+              // ── Discount Type ──
+              _buildLabel('Discount Type'),
               const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
-                    child: GestureDetector(
+                    child: _buildTypeChip(
+                      label: 'Flat (₱)',
+                      icon: Icons.currency_exchange_rounded,
+                      isSelected: _discountType == 'flat',
                       onTap: () => setState(() => _discountType = 'flat'),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: _discountType == 'flat' ? AppColors.primary.withValues(alpha: 0.1) : Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: _discountType == 'flat' ? AppColors.primary : Colors.transparent,
-                            width: 1.5,
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          'Flat Discount (₱)',
-                          style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w700,
-                            color: _discountType == 'flat' ? AppColors.primary : AppColors.textSubtle,
-                          ),
-                        ),
-                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: GestureDetector(
+                    child: _buildTypeChip(
+                      label: 'Percentage (%)',
+                      icon: Icons.percent_rounded,
+                      isSelected: _discountType == 'percentage',
                       onTap: () => setState(() => _discountType = 'percentage'),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: _discountType == 'percentage' ? AppColors.primary.withValues(alpha: 0.1) : Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: _discountType == 'percentage' ? AppColors.primary : Colors.transparent,
-                            width: 1.5,
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          'Percentage (%)',
-                          style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w700,
-                            color: _discountType == 'percentage' ? AppColors.primary : AppColors.textSubtle,
-                          ),
-                        ),
-                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
 
-              // Value & Min Spend Row
+              // ── Value & Min Spend Row ──
               Row(
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _discountType == 'flat' ? 'Discount Amount' : 'Percentage Value',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textHeadline),
-                        ),
+                        _buildLabel(_discountType == 'flat' ? 'Discount Amount' : 'Percentage Value'),
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _valController,
                           keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: _discountType == 'flat' ? 'e.g., 50' : 'e.g., 10',
-                            hintStyle: GoogleFonts.inter(color: Colors.grey[400], fontSize: 14),
-                            fillColor: Colors.grey.shade50,
-                            filled: true,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          decoration: _inputDecoration(
+                            hint: _discountType == 'flat' ? 'e.g., 50' : 'e.g., 10',
+                            prefixIcon: _discountType == 'flat'
+                                ? Icons.currency_exchange_rounded
+                                : Icons.percent_rounded,
                           ),
                           validator: (val) {
-                            if (val == null || val.trim().isEmpty) return 'Value required';
+                            if (val == null || val.trim().isEmpty) return 'Required';
                             final parsed = double.tryParse(val.trim());
-                            if (parsed == null || parsed <= 0) return 'Invalid amount';
-                            if (_discountType == 'percentage' && parsed > 100) return 'Max is 100%';
+                            if (parsed == null || parsed <= 0) return 'Invalid';
+                            if (_discountType == 'percentage' && parsed > 100) return 'Max 100%';
                             return null;
                           },
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Min Spend (₱)',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textHeadline),
-                        ),
+                        _buildLabel('Min Spend (₱)'),
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _minSpendController,
                           keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: 'e.g., 100',
-                            hintStyle: GoogleFonts.inter(color: Colors.grey[400], fontSize: 14),
-                            fillColor: Colors.grey.shade50,
-                            filled: true,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          decoration: _inputDecoration(
+                            hint: 'e.g., 100',
+                            prefixIcon: Icons.shopping_bag_outlined,
                           ),
                           validator: (val) {
                             if (val != null && val.trim().isNotEmpty) {
                               final parsed = double.tryParse(val.trim());
-                              if (parsed == null || parsed < 0) return 'Invalid spend';
+                              if (parsed == null || parsed < 0) return 'Invalid';
                             }
                             return null;
                           },
@@ -874,35 +1012,28 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
 
-              // Expiration & Limit Row
+              // ── Usage Limit & Expiry Row ──
               Row(
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Usage Limit',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textHeadline),
-                        ),
+                        _buildLabel('Usage Limit'),
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _limitController,
                           keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: 'e.g., 100',
-                            hintStyle: GoogleFonts.inter(color: Colors.grey[400], fontSize: 14),
-                            fillColor: Colors.grey.shade50,
-                            filled: true,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          decoration: _inputDecoration(
+                            hint: 'e.g., 100',
+                            prefixIcon: Icons.people_alt_outlined,
                           ),
                           validator: (val) {
                             if (val != null && val.trim().isNotEmpty) {
                               final parsed = int.tryParse(val.trim());
-                              if (parsed == null || parsed <= 0) return 'Invalid limit';
+                              if (parsed == null || parsed <= 0) return 'Invalid';
                             }
                             return null;
                           },
@@ -910,35 +1041,53 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Expiration Date',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textHeadline),
-                        ),
+                        _buildLabel('Expiration Date'),
                         const SizedBox(height: 8),
                         InkWell(
                           onTap: _pickEndDate,
                           borderRadius: BorderRadius.circular(16),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
                             decoration: BoxDecoration(
                               color: Colors.grey.shade50,
                               borderRadius: BorderRadius.circular(16),
-                            ),
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _selectedEndDate == null
-                                  ? 'Select Expiry'
-                                  : DateFormat('yMMMd').format(_selectedEndDate!),
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                color: _selectedEndDate == null ? Colors.grey[400] : AppColors.textHeadline,
-                                fontWeight: _selectedEndDate == null ? FontWeight.w400 : FontWeight.w700,
+                              border: Border.all(
+                                color: _selectedEndDate != null
+                                    ? AppColors.primary.withValues(alpha: 0.4)
+                                    : Colors.transparent,
                               ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.calendar_today_rounded,
+                                  size: 16,
+                                  color: _selectedEndDate == null ? Colors.grey.shade400 : AppColors.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _selectedEndDate == null
+                                        ? 'Pick date'
+                                        : DateFormat('MMM d, yy').format(_selectedEndDate!),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: _selectedEndDate == null
+                                          ? Colors.grey.shade400
+                                          : AppColors.textHeadline,
+                                      fontWeight: _selectedEndDate == null
+                                          ? FontWeight.w400
+                                          : FontWeight.w700,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -949,7 +1098,7 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
               ),
               const SizedBox(height: 32),
 
-              // Action button
+              // ── Submit Button ──
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
@@ -957,21 +1106,118 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                     elevation: 0,
                   ),
-                  child: Text(
-                    _isSaving ? 'Creating...' : 'Create Voucher',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                    ),
-                  ),
+                  child: _isSaving
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Creating...',
+                              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 16),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          'Create Voucher',
+                          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16),
+                        ),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLabel(String text) {
+    return Text(
+      text,
+      style: GoogleFonts.inter(
+        fontWeight: FontWeight.w700,
+        fontSize: 13,
+        color: AppColors.textHeadline,
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration({required String hint, required IconData prefixIcon}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: GoogleFonts.inter(color: Colors.grey.shade400, fontSize: 14),
+      fillColor: Colors.grey.shade50,
+      filled: true,
+      prefixIcon: Icon(prefixIcon, size: 18, color: Colors.grey.shade400),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.5), width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+  }
+
+  Widget _buildTypeChip({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? AppColors.primary : AppColors.textSubtle,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: isSelected ? AppColors.primary : AppColors.textSubtle,
+              ),
+            ),
+          ],
         ),
       ),
     );

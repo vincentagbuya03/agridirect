@@ -239,6 +239,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cleanTitle = _post.title.trim();
+    final cleanBody = _post.body.trim();
+    final bool showTitle = cleanTitle.isNotEmpty && cleanBody != cleanTitle;
+    final String displayBody = (cleanBody.startsWith(cleanTitle) && cleanBody != cleanTitle)
+        ? cleanBody.substring(cleanTitle.length).trim()
+        : cleanBody;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -294,9 +301,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  Text(_post.title, style: AppTextStyles.headline2.copyWith(fontSize: 22)),
-                  const SizedBox(height: 16),
-                  Text(_post.body, style: AppTextStyles.bodyMedium.copyWith(height: 1.6, color: AppColors.textBody.withValues(alpha: 0.85))),
+                  if (showTitle) ...[
+                    Text(_post.title, style: AppTextStyles.headline2.copyWith(fontSize: 22)),
+                    const SizedBox(height: 16),
+                  ],
+                  if (displayBody.isNotEmpty)
+                    Text(
+                      displayBody,
+                      style: AppTextStyles.bodyMedium.copyWith(height: 1.6, color: AppColors.textBody.withValues(alpha: 0.85)),
+                    ),
                 ],
               ),
             ),

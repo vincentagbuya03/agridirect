@@ -25,6 +25,7 @@ class ProductItem {
   final double? latitude;
   final double? longitude;
   final bool isFeatured;
+  final bool isPreorder;
   final DateTime? createdAt;
 
   const ProductItem({
@@ -50,6 +51,7 @@ class ProductItem {
     this.latitude,
     this.longitude,
     this.isFeatured = false,
+    this.isPreorder = false,
     this.createdAt,
   });
 }

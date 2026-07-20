@@ -18,6 +18,7 @@ import '../../../shared/services/offline/offline_product_service.dart';
 import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/services/community/message_service.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/widgets/mascot/mascot_widget.dart';
 
 class FarmerSalesDashboard extends StatefulWidget {
   const FarmerSalesDashboard({super.key});
@@ -52,6 +53,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   bool _isLoadingStats = true;
   bool _isSpeedDialOpen = false;
   late Stream<int> _unreadMessagesStream;
+  // Unused mascot state removed as dashboard tip card is completely removed.
 
   void _retryProfileLoadAfterStartup() {
     Future<void>.delayed(const Duration(milliseconds: 700), () async {
@@ -186,7 +188,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       final profile = await SupabaseDatabase.getUserProfile(currentUserId);
       if (!mounted) return;
 
-      final rawAvatarUrl = profile != null ? _extractAvatarFromUserProfile(profile) : '';
+      final rawAvatarUrl = profile != null
+          ? _extractAvatarFromUserProfile(profile)
+          : '';
       final safeUrl = await SupabaseDatabase.getSafeUrl(
         rawAvatarUrl,
         defaultBucket: 'uploads',
@@ -634,6 +638,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                 ),
               ),
             ),
+            const MascotWidget(
+              mode: MascotMode.floatingHelp,
+              expression: MascotExpression.happy,
+            ),
           ],
         );
       },
@@ -845,135 +853,304 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     );
   }
 
+  /// Maps weather description keywords → Kiko expression + card gradient colors + emoji
+  Map<String, dynamic> _getWeatherMood(String desc) {
+    final d = desc.toLowerCase();
+    if (d.contains('rain') || d.contains('drizzle') || d.contains('shower')) {
+      return {
+        'expression': 'assets/images/kiko_rainy.jpg',
+        'emoji': '🌧️',
+        'label': 'Rainy',
+        'gradientStart': const Color(0xFF2C3E50),
+        'gradientEnd': const Color(0xFF3498DB),
+        'textColor': Colors.white,
+        'tip':
+            'Heads up! Rain expected today. Consider moving delicate crops under cover.',
+      };
+    } else if (d.contains('storm') ||
+        d.contains('thunder') ||
+        d.contains('lightning')) {
+      return {
+        'expression': 'assets/images/kiko_stormy.png',
+        'emoji': '⛈️',
+        'label': 'Stormy',
+        'gradientStart': const Color(0xFF1A1A2E),
+        'gradientEnd': const Color(0xFF16213E),
+        'textColor': Colors.white,
+        'tip': 'Storm alert! Stay safe and secure your equipment, Farmer.',
+      };
+    } else if (d.contains('cloud') ||
+        d.contains('overcast') ||
+        d.contains('mist') ||
+        d.contains('fog')) {
+      return {
+        'expression': 'assets/images/kiko_cloudy.png',
+        'emoji': '☁️',
+        'label': 'Cloudy',
+        'gradientStart': const Color(0xFF636FA4),
+        'gradientEnd': const Color(0xFFE8CBC0),
+        'textColor': Colors.white,
+        'tip': 'Cloudy today. Good day for farm chores that need some shade!',
+      };
+    } else if (d.contains('snow') ||
+        d.contains('frost') ||
+        d.contains('ice') ||
+        d.contains('sleet')) {
+      return {
+        'expression': 'assets/images/kiko_frosty.png',
+        'emoji': '❄️',
+        'label': 'Frosty',
+        'gradientStart': const Color(0xFF74B9FF),
+        'gradientEnd': const Color(0xFFA29BFE),
+        'textColor': Colors.white,
+        'tip':
+            'Cold snap incoming! Protect your frost-sensitive crops tonight.',
+      };
+    } else if (d.contains('hot') ||
+        d.contains('sunny') ||
+        d.contains('clear')) {
+      return {
+        'expression': 'assets/images/kiko_happy.png',
+        'emoji': '☀️',
+        'label': 'Sunny',
+        'gradientStart': const Color(0xFF11998E),
+        'gradientEnd': const Color(0xFF38EF7D),
+        'textColor': Colors.white,
+        'tip':
+            'Great sunny day! Perfect time to harvest and list fresh produce.',
+      };
+    } else {
+      // Default: partly cloudy / fair
+      return {
+        'expression': 'assets/images/kiko_happy.png',
+        'emoji': '⛅',
+        'label': 'Fair',
+        'gradientStart': const Color(0xFF10B981),
+        'gradientEnd': const Color(0xFF059669),
+        'textColor': Colors.white,
+        'tip': 'Weather looks fine today. A great day to be a farmer!',
+      };
+    }
+  }
+
   Widget _buildWeatherQuickGlance() {
     if (_weatherData == null) return const SizedBox.shrink();
     final temp = _weatherData!.temperature.toStringAsFixed(0);
+    final mood = _getWeatherMood(_weatherData!.description);
+    final Color gradStart = mood['gradientStart'] as Color;
+    final Color gradEnd = mood['gradientEnd'] as Color;
+    final String mascotAsset = mood['expression'] as String;
+    final String emoji = mood['emoji'] as String;
+    final String label = mood['label'] as String;
+    final String kikoTip = mood['tip'] as String;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.06),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => WeatherDetailScreen(
+                weatherData: _weatherData!,
+                forecast: _weatherForecast,
+                currentPosition: _currentPosition,
+                onRefresh: _loadWeatherData,
+              ),
             ),
-          ],
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            width: 1,
+          );
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [gradStart, gradEnd],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: gradStart.withValues(alpha: 0.45),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => WeatherDetailScreen(
-                      weatherData: _weatherData!,
-                      forecast: _weatherForecast,
-                      currentPosition: _currentPosition,
-                      onRefresh: _loadWeatherData,
-                    ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Background decorative circles
+              Positioned(
+                right: -20,
+                top: -20,
+                child: Container(
+                  width: 130,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.08),
                   ),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(20),
+                ),
+              ),
+              Positioned(
+                right: 30,
+                bottom: -10,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+              ),
+              // Main content row
+              Padding(
+                padding: const EdgeInsets.all(16),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.primary,
-                            AppColors.primary.withValues(alpha: 0.8),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _getAlertIcon(_weatherData!.description.toLowerCase()),
-                        color: Colors.white,
-                        size: 24,
+                    // Kiko — peeking tall from the left
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutBack,
+                      child: Image.asset(
+                        mascotAsset,
+                        width: 85,
+                        height: 100,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) =>
+                            Image.asset(
+                              'assets/images/kiko_happy.png',
+                              width: 85,
+                              height: 100,
+                              fit: BoxFit.contain,
+                            ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
+                    // Info column
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Live badge + location
                           Row(
                             children: [
-                              Text(
-                                _weatherData!.location,
-                                style: GoogleFonts.plusJakartaSans(
-                                  color: AppColors.textHeadline,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
                               Container(
-                                width: 5,
-                                height: 5,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
                                 ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'LIVE',
-                                style: GoogleFonts.plusJakartaSans(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 9,
-                                  letterSpacing: 0.5,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 5,
+                                      height: 5,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF6EFF9F),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'LIVE',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 9,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _weatherData!.location,
+                            style: GoogleFonts.plusJakartaSans(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           const SizedBox(height: 2),
                           Text(
-                            '${_weatherData!.description} • Tap to view details',
+                            '$emoji  $label • Tap for details',
                             style: GoogleFonts.plusJakartaSans(
-                              color: AppColors.textSubtle,
+                              color: Colors.white.withValues(alpha: 0.85),
                               fontWeight: FontWeight.w500,
                               fontSize: 12,
                             ),
                           ),
+                          const SizedBox(height: 6),
+                          Text(
+                            kikoTip,
+                            style: GoogleFonts.plusJakartaSans(
+                              color: Colors.white.withValues(alpha: 0.75),
+                              fontWeight: FontWeight.w400,
+                              fontSize: 10.5,
+                              height: 1.4,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        '$temp°C',
-                        style: GoogleFonts.plusJakartaSans(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 18,
+                    const SizedBox(width: 8),
+                    // Temperature pill
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            '$temp°',
+                            style: GoogleFonts.plusJakartaSans(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 28,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '°C',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: Colors.white.withValues(alpha: 0.75),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -1589,7 +1766,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: isNow ? Colors.white.withValues(alpha: 0.9) : AppColors.textHeadline,
+                        color: isNow
+                            ? Colors.white.withValues(alpha: 0.9)
+                            : AppColors.textHeadline,
                       ),
                     ),
                     if (!isNow && amPm.isNotEmpty) ...[
@@ -1630,7 +1809,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                     if (showRainChance) ...[
                       const SizedBox(height: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: isNow
                               ? Colors.white.withValues(alpha: 0.2)
@@ -1643,7 +1825,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                             Icon(
                               Icons.water_drop_rounded,
                               size: 9,
-                              color: isNow ? Colors.white : const Color(0xFF3B82F6),
+                              color: isNow
+                                  ? Colors.white
+                                  : const Color(0xFF3B82F6),
                             ),
                             const SizedBox(width: 2),
                             Text(
@@ -1651,7 +1835,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 9,
                                 fontWeight: FontWeight.w800,
-                                color: isNow ? Colors.white : const Color(0xFF3B82F6),
+                                color: isNow
+                                    ? Colors.white
+                                    : const Color(0xFF3B82F6),
                               ),
                             ),
                           ],

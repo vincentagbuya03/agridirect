@@ -118,9 +118,7 @@ class _WebShopScreenState extends State<WebShopScreen>
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
     try {
-      final products = _showPreOrders
-          ? await _dataService.getPreOrderProducts()
-          : await _dataService.getNearbyProducts();
+      final products = await _dataService.getAllProducts();
       final categories = _deriveCategories(products);
       if (!mounted) return;
 
@@ -175,6 +173,21 @@ class _WebShopScreenState extends State<WebShopScreen>
       _filteredProducts = _allProducts.where((p) {
         if (currentUserId != null && p.farmerId == currentUserId) {
           return false;
+        }
+
+        final isPreorderItem = p.isPreorder;
+        final diff = DateTime.now().difference(p.createdAt ?? DateTime.now());
+        final harvestDays = int.tryParse(p.harvestDays ?? '') ?? 0;
+        final remainingDays = harvestDays - diff.inDays;
+
+        if (_showPreOrders) {
+          if (!isPreorderItem || remainingDays < 0) {
+            return false;
+          }
+        } else {
+          if (isPreorderItem && remainingDays >= 0) {
+            return false;
+          }
         }
 
         final matchesCategory =

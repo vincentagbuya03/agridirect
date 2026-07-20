@@ -510,14 +510,13 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                     // Profile Image Section (both farmers and customers)
+                    // Profile Image Section (both farmers and customers)
                     _buildProfileImageSection(isFarmer),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 52),
 
                     // Header card with role info
                     _buildHeaderCard(isFarmer),
                     const SizedBox(height: 28),
-
                     // Form fields
                     Text(
                       isFarmer ? 'Farm Information' : 'Personal Information',
@@ -730,23 +729,63 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   Widget _buildProfileImageSection(bool isFarmer) {
     final imageUrl = isFarmer ? _farmerImageUrl : _customerImageUrl;
     final icon = isFarmer ? Icons.agriculture : Icons.person;
-    final title = isFarmer ? 'Farm Profile Image' : 'Profile Image';
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
       children: [
-        Text(
-          title,
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.w800,
-            fontSize: 16,
-            color: AppColors.textHeadline,
+        // Cover Banner Container
+        Container(
+          height: 120,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isFarmer
+                  ? [const Color(0xFF047857), AppColors.primary]
+                  : [const Color(0xFF1D4ED8), Colors.blue],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -30,
+                  top: -30,
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: -20,
+                  bottom: -20,
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.04),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 16),
-        Center(
+
+        // Profile Photo Overlapping the Banner
+        Positioned(
+          bottom: -40,
           child: Stack(
-            alignment: Alignment.center,
+            clipBehavior: Clip.none,
             children: [
               GestureDetector(
                 onTap: (_isUploadingImage || _isImagePickerActive)
@@ -758,16 +797,17 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         _uploadFarmerImage();
                       },
                 child: Container(
-                  width: 140,
-                  height: 140,
+                  width: 100,
+                  height: 100,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.primary, width: 3),
+                    color: Colors.white,
+                    border: Border.all(color: Colors.white, width: 3),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.1),
+                        color: Colors.black.withValues(alpha: 0.08),
                         blurRadius: 16,
-                        offset: const Offset(0, 8),
+                        offset: const Offset(0, 6),
                       ),
                     ],
                   ),
@@ -776,60 +816,56 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         ? CachedNetworkImage(
                             imageUrl: imageUrl,
                             fit: BoxFit.cover,
-                            placeholder: (_, _) =>
-                                Container(color: Colors.grey[100]),
+                            placeholder: (_, _) => Container(color: Colors.grey[100]),
                             errorWidget: (_, _, _) => Container(
                               color: Colors.grey[200],
-                              child: Icon(icon, size: 50, color: Colors.grey),
+                              child: Icon(icon, size: 36, color: Colors.grey),
                             ),
                           )
                         : Container(
                             color: Colors.grey[200],
-                            child: Icon(icon, size: 50, color: Colors.grey),
+                            child: Icon(icon, size: 36, color: Colors.grey),
                           ),
                   ),
                 ),
               ),
-              if (_isEditing)
-                Positioned(
-                  bottom: -5,
-                  right: -5,
-                  child: GestureDetector(
-                    onTap: (_isUploadingImage || _isImagePickerActive)
-                        ? null
-                        : _uploadFarmerImage,
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.accent.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: _isUploadingImage
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: AppShimmerLoader(
-                                strokeWidth: 2.5,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                          : const Icon(
-                              Icons.camera_alt,
-                              color: Colors.white,
-                              size: 24,
-                            ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: (_isUploadingImage || _isImagePickerActive)
+                      ? null
+                      : _uploadFarmerImage,
+                  child: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.accent.withValues(alpha: 0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
+                    child: _isUploadingImage
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(
+                            Icons.camera_alt_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
                   ),
                 ),
+              ),
             ],
           ),
         ),
@@ -840,31 +876,23 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   Widget _buildHeaderCard(bool isFarmer) {
     final role = isFarmer ? 'Verified Farm Profile' : 'Buyer Profile';
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isFarmer
-              ? [
-                  AppColors.primary.withValues(alpha: 0.12),
-                  AppColors.primary.withValues(alpha: 0.04),
-                ]
-              : [
-                  Colors.blue.withValues(alpha: 0.12),
-                  Colors.blue.withValues(alpha: 0.04),
-                ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
+        color: isFarmer
+            ? AppColors.primary.withValues(alpha: 0.06)
+            : Colors.blue.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isFarmer ? AppColors.primary.withValues(alpha: 0.2) : Colors.blue.withValues(alpha: 0.2),
+          color: isFarmer
+              ? AppColors.primary.withValues(alpha: 0.15)
+              : Colors.blue.withValues(alpha: 0.15),
           width: 1.5,
         ),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: isFarmer ? AppColors.primary : Colors.blue,
               shape: BoxShape.circle,
@@ -872,10 +900,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             child: Icon(
               isFarmer ? Icons.agriculture : Icons.shopping_bag,
               color: Colors.white,
-              size: 24,
+              size: 20,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -884,16 +912,18 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                   role,
                   style: GoogleFonts.plusJakartaSans(
                     fontWeight: FontWeight.w800,
-                    fontSize: 15,
+                    fontSize: 14,
                     color: isFarmer ? AppColors.primary : Colors.blue,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
-                  isFarmer ? 'Manage your farm settings and stall location details' : 'Manage your default personal account',
+                  isFarmer
+                      ? 'Manage your farm settings and stall location details'
+                      : 'Manage your default personal account',
                   style: GoogleFonts.inter(
                     color: AppColors.textSubtle,
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

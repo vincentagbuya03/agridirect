@@ -363,7 +363,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
         final preOrders = (snapshot.data ?? [])
             .where((p) {
               final isNotMine = currentUserId.isEmpty || p.farmerId != currentUserId;
-              return _matchesCurrentFilters(p) && isNotMine;
+              return _matchesCurrentFilters(p) && isNotMine && !_isHarvested(p);
             })
             .toList();
 
