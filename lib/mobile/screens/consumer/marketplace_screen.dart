@@ -312,13 +312,30 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   void _runFlyToCartAnimation(GlobalKey startKey, String imageUrl) {
-    final RenderBox? buttonBox = startKey.currentContext?.findRenderObject() as RenderBox?;
-    final RenderBox? cartBox = _cartKey.currentContext?.findRenderObject() as RenderBox?;
+    final startCtx = startKey.currentContext;
+    final cartCtx = _cartKey.currentContext;
+    if (startCtx == null || cartCtx == null) return;
+
+    final RenderBox? buttonBox = startCtx.findRenderObject() as RenderBox?;
+    final RenderBox? cartBox = cartCtx.findRenderObject() as RenderBox?;
 
     if (buttonBox == null || cartBox == null) return;
+    if (!buttonBox.attached || !cartBox.attached) return;
+    if (!buttonBox.hasSize || !cartBox.hasSize) return;
 
     final startPosition = buttonBox.localToGlobal(Offset.zero);
     final endPosition = cartBox.localToGlobal(Offset.zero);
+
+    if (!startPosition.dx.isFinite || !startPosition.dy.isFinite ||
+        !endPosition.dx.isFinite || !endPosition.dy.isFinite) {
+      return;
+    }
+
+    final screenSize = MediaQuery.of(context).size;
+    if (endPosition.dx < 0 || endPosition.dx > screenSize.width ||
+        endPosition.dy < 0 || endPosition.dy > screenSize.height) {
+      return;
+    }
 
     late OverlayEntry overlayEntry;
     overlayEntry = OverlayEntry(
@@ -326,11 +343,18 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         startPosition: startPosition,
         endPosition: endPosition,
         imageUrl: imageUrl,
-        onComplete: () => overlayEntry.remove(),
+        onComplete: () {
+          if (overlayEntry.mounted) {
+            overlayEntry.remove();
+          }
+        },
       ),
     );
 
-    Overlay.of(context).insert(overlayEntry);
+    final overlay = Overlay.maybeOf(context);
+    if (overlay != null) {
+      overlay.insert(overlayEntry);
+    }
   }
 
   @override
@@ -1178,12 +1202,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                           ],
                         ),
                         _AddToCartButton(
-                          onTap: (GlobalKey buttonKey) {
+                          onTap: (GlobalKey buttonKey) async {
                             _runFlyToCartAnimation(buttonKey, product.imageUrl);
-                            CartService().addItem(product);
+                            final errorMsg = await CartService().addItem(product);
+                            if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('${product.name} added to cart'),
+                                content: Text(errorMsg ?? '${product.name} added to cart'),
                                 duration: const Duration(seconds: 1),
                                 backgroundColor: AppColors.primary,
                                 behavior: SnackBarBehavior.floating,
@@ -1680,7 +1705,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         deliveryFee: deliveryFee,
       );
       if (!mounted) return;
-      context.pushReplacement(AppRoutes.customerOrders);
+      context.push(AppRoutes.customerOrders);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     } finally {
@@ -1835,12 +1860,12 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   Widget _buildHarvestBadge() {
     final days = int.tryParse(widget.product.harvestDays ?? '0') ?? 0;
     final harvested = _isHarvested(widget.product);
-    final label = harvested
-        ? 'Order Now'
-        : (days > 0 ? 'Harvest in $days days' : (widget.product.targetQuantity != null ? 'Pre-order' : 'Ready Now'));
+    final isPreorder = widget.product.isPreorder && !harvested;
 
-    // Check if it's preorder or regular stock
-    final isPreorder = widget.product.targetQuantity != null;
+    final label = harvested
+        ? 'Ready Now'
+        : (days > 0 ? 'Harvest in $days days' : (isPreorder ? 'Pre-order' : 'Ready Now'));
+
     final double? stock = isPreorder ? widget.product.targetQuantity : widget.product.stockQuantity;
     final double? reserved = widget.product.reservedQuantity;
 
@@ -2053,13 +2078,14 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
       Expanded(
         child: ElevatedButton.icon(
           key: _addToCartBtnKey,
-          onPressed: () {
+          onPressed: () async {
             _runFlyToCartAnimation(_addToCartBtnKey, widget.product.imageUrl);
-            CartService().addItem(widget.product, _quantity);
+            final errorMsg = await CartService().addItem(widget.product, _quantity);
+            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Added to cart'),
-                duration: Duration(seconds: 1),
+              SnackBar(
+                content: Text(errorMsg ?? 'Added to cart'),
+                duration: const Duration(seconds: 1),
               ),
             );
           },
@@ -2089,13 +2115,30 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   }
 
   void _runFlyToCartAnimation(GlobalKey startKey, String imageUrl) {
-    final RenderBox? buttonBox = startKey.currentContext?.findRenderObject() as RenderBox?;
-    final RenderBox? cartBox = _cartKey.currentContext?.findRenderObject() as RenderBox?;
+    final startCtx = startKey.currentContext;
+    final cartCtx = _cartKey.currentContext;
+    if (startCtx == null || cartCtx == null) return;
+
+    final RenderBox? buttonBox = startCtx.findRenderObject() as RenderBox?;
+    final RenderBox? cartBox = cartCtx.findRenderObject() as RenderBox?;
 
     if (buttonBox == null || cartBox == null) return;
+    if (!buttonBox.attached || !cartBox.attached) return;
+    if (!buttonBox.hasSize || !cartBox.hasSize) return;
 
     final startPosition = buttonBox.localToGlobal(Offset.zero);
     final endPosition = cartBox.localToGlobal(Offset.zero);
+
+    if (!startPosition.dx.isFinite || !startPosition.dy.isFinite ||
+        !endPosition.dx.isFinite || !endPosition.dy.isFinite) {
+      return;
+    }
+
+    final screenSize = MediaQuery.of(context).size;
+    if (endPosition.dx < 0 || endPosition.dx > screenSize.width ||
+        endPosition.dy < 0 || endPosition.dy > screenSize.height) {
+      return;
+    }
 
     late OverlayEntry overlayEntry;
     overlayEntry = OverlayEntry(
@@ -2103,11 +2146,18 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         startPosition: startPosition,
         endPosition: endPosition,
         imageUrl: imageUrl,
-        onComplete: () => overlayEntry.remove(),
+        onComplete: () {
+          if (overlayEntry.mounted) {
+            overlayEntry.remove();
+          }
+        },
       ),
     );
 
-    Overlay.of(context).insert(overlayEntry);
+    final overlay = Overlay.maybeOf(context);
+    if (overlay != null) {
+      overlay.insert(overlayEntry);
+    }
   }
 
   Widget _buildStarRating(double rating) {

@@ -395,8 +395,19 @@ class _CartScreenState extends State<CartScreen> {
               ),
             ),
           ),
-          _buildQtyBtn(Icons.add, () {
-            CartService().updateQuantity(item.productId, item.quantity + 1);
+          _buildQtyBtn(Icons.add, () async {
+            final warning = await CartService().updateQuantity(item.productId, item.quantity + 1);
+            if (warning != null && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(warning),
+                  duration: const Duration(seconds: 1),
+                  backgroundColor: AppColors.primary,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              );
+            }
           }),
         ],
       ),

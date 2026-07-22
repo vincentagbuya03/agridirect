@@ -175,11 +175,11 @@ class _WebProductDetailsState extends State<WebProductDetails> {
 
   Future<void> _addToCart() async {
     if (_product == null) return;
-    await CartService().addItem(_product!, _quantity);
+    final errorMsg = await CartService().addItem(_product!, _quantity);
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('${_product!.name} added to cart')));
+    ).showSnackBar(SnackBar(content: Text(errorMsg ?? '${_product!.name} added to cart')));
   }
 
   @override

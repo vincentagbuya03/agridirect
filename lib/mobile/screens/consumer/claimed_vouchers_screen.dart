@@ -174,7 +174,7 @@ class _ClaimedVouchersScreenState extends State<ClaimedVouchersScreen>
               ElevatedButton.icon(
                 onPressed: () => context.go(AppRoutes.home),
                 icon: const Icon(Icons.shopping_bag_outlined, size: 18),
-                label: const Text('Explore Farms'),
+                label: const Text('Explore Marketplace'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,

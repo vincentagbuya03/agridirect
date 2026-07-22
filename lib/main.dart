@@ -177,13 +177,6 @@ class _BootstrapAppState extends State<_BootstrapApp> {
       _callkitSubscription =
           FlutterCallkitIncoming.onEvent.listen((CallEvent? event) {
         if (event is CallEventActionCallAccept && mounted) {
-          // If the app is already fully initialized and running, let the active
-          // NotificationService push the call screen natively instead of resetting the app.
-          if (_isFullyInitialized) {
-            debugPrint('📞 Bootstrap: App already running, delegating to NotificationService');
-            return;
-          }
-
           final params = event.callKitParams;
           final extra = params.extra ?? {};
           final callId = extra['callId']?.toString() ?? '';
@@ -192,6 +185,21 @@ class _BootstrapAppState extends State<_BootstrapApp> {
               extra['isVideo'] == true || extra['isVideo'] == 'true';
           final callerName = params.nameCaller ?? 'AgriDirect User';
           final avatarUrl = params.avatar;
+
+          if (_isFullyInitialized) {
+            debugPrint('📞 Bootstrap: App already running, delegating to NotificationService.launchCallScreen');
+            NotificationService.launchCallScreen(
+              name: callerName,
+              avatarUrl: avatarUrl,
+              callId: callId,
+              channelName: channelName,
+              isVideo: isVideo,
+              isIncoming: true,
+              isAlreadyAccepted: true,
+            );
+            return;
+          }
+
           if (callId.isNotEmpty && channelName.isNotEmpty) {
             debugPrint('📞 Bootstrap: CallKit accept received during cold start, forcing rebuild');
             setState(() {

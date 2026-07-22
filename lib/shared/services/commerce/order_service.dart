@@ -244,7 +244,8 @@ class OrderService {
             body: {
               'targetUserId': farmerUserId,
               'title': 'New Order Received',
-              'body': '$customerName has placed order ${createdOrder.orderNumber}',
+              'body':
+                  '$customerName has placed order ${createdOrder.orderNumber}',
               'notificationCode': 'new_order',
               'linkType': 'order',
               'linkId': createdOrder.orderId,
@@ -275,7 +276,9 @@ class OrderService {
 
       final orderStatusId = await _getOrderStatusId(newStatus);
       final updatePayload = <String, dynamic>{'order_status_id': orderStatusId};
-      if (targetStatus == 'cancelled' && cancellationReason != null && cancellationReason.trim().isNotEmpty) {
+      if (targetStatus == 'cancelled' &&
+          cancellationReason != null &&
+          cancellationReason.trim().isNotEmpty) {
         updatePayload['cancellation_reason'] = cancellationReason.trim();
       }
       final response = await _supabase
@@ -309,19 +312,27 @@ class OrderService {
             final isPreorder = prod?['is_preorder'] == true;
 
             if (isPreorder) {
-              final reserved = (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
+              final reserved =
+                  (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
               await _supabase
                   .from('product_inventory')
                   .update({
-                    'reserved_quantity': (reserved - item.quantity).clamp(0.0, double.infinity),
+                    'reserved_quantity': (reserved - item.quantity).clamp(
+                      0.0,
+                      double.infinity,
+                    ),
                   })
                   .eq('product_id', item.productId);
             } else {
-              final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
+              final available =
+                  (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
               await _supabase
                   .from('product_inventory')
                   .update({
-                    'available_quantity': (available - item.quantity).clamp(0.0, double.infinity),
+                    'available_quantity': (available - item.quantity).clamp(
+                      0.0,
+                      double.infinity,
+                    ),
                   })
                   .eq('product_id', item.productId);
             }
@@ -347,20 +358,18 @@ class OrderService {
             final isPreorder = prod?['is_preorder'] == true;
 
             if (isPreorder) {
-              final reserved = (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
+              final reserved =
+                  (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
               await _supabase
                   .from('product_inventory')
-                  .update({
-                    'reserved_quantity': reserved + item.quantity,
-                  })
+                  .update({'reserved_quantity': reserved + item.quantity})
                   .eq('product_id', item.productId);
             } else {
-              final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
+              final available =
+                  (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
               await _supabase
                   .from('product_inventory')
-                  .update({
-                    'available_quantity': available + item.quantity,
-                  })
+                  .update({'available_quantity': available + item.quantity})
                   .eq('product_id', item.productId);
             }
           }
@@ -398,7 +407,8 @@ class OrderService {
             body: {
               'targetUserId': customerUserId,
               'title': 'Order Status Updated',
-              'body': 'Your order ${updatedOrder.orderNumber} status is now ${newStatus.toUpperCase()}',
+              'body':
+                  'Your order ${updatedOrder.orderNumber} status is now ${newStatus.toUpperCase()}',
               'notificationCode': 'order_status_update',
               'linkType': 'order',
               'linkId': updatedOrder.orderId,
@@ -406,7 +416,9 @@ class OrderService {
           );
         }
       } catch (fcmError) {
-        debugPrint('Failed to send order status update push notification: $fcmError');
+        debugPrint(
+          'Failed to send order status update push notification: $fcmError',
+        );
       }
 
       return updatedOrder;

@@ -28,6 +28,17 @@ class InAppCallScreen extends StatefulWidget {
   /// and transition away from the standalone call MaterialApp when launched via CallKit.
   final VoidCallback? onCallEnded;
 
+  static _InAppCallScreenState? _activeState;
+
+  static bool acceptActiveCallIfRinging() {
+    final state = _activeState;
+    if (state != null && state.mounted) {
+      state.acceptCallFromExternal();
+      return true;
+    }
+    return false;
+  }
+
   const InAppCallScreen({
     super.key,
     required this.name,
@@ -77,6 +88,7 @@ class _InAppCallScreenState extends State<InAppCallScreen>
   @override
   void initState() {
     super.initState();
+    InAppCallScreen._activeState = this;
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1600),
@@ -95,6 +107,12 @@ class _InAppCallScreenState extends State<InAppCallScreen>
       }
     }
     _initCallSession();
+  }
+
+  void acceptCallFromExternal() {
+    if (_status == 'Ringing...' || !widget.isAlreadyAccepted) {
+      _acceptCall();
+    }
   }
 
   // ─────────────────────────────────────────────────────── call session ──
@@ -487,6 +505,9 @@ class _InAppCallScreenState extends State<InAppCallScreen>
 
   @override
   void dispose() {
+    if (InAppCallScreen._activeState == this) {
+      InAppCallScreen._activeState = null;
+    }
     _pulseController.dispose();
     try {
       FlutterRingtonePlayer().stop();

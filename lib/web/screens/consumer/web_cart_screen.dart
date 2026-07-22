@@ -441,8 +441,17 @@ class _WebCartScreenState extends State<WebCartScreen> {
             ),
           ),
           IconButton(
-            onPressed: () =>
-                CartService().updateQuantity(item.productId, item.quantity + 1),
+            onPressed: () async {
+              final warning = await CartService().updateQuantity(item.productId, item.quantity + 1);
+              if (warning != null && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(warning),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
             icon: const Icon(Icons.add_rounded, size: 18),
           ),
         ],

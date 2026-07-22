@@ -1393,6 +1393,23 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               'Explore farms to claim active discount vouchers.',
               style: GoogleFonts.inter(fontSize: 13, color: _muted),
             ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                context.go(AppRoutes.marketplace);
+              },
+              icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+              label: const Text('Explore Marketplace'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
           ],
         ),
       );

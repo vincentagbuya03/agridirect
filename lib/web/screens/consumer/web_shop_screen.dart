@@ -377,11 +377,11 @@ class _WebShopScreenState extends State<WebShopScreen>
   }
 
   Future<void> _addToCart(ProductItem product) async {
-    await CartService().addItem(product);
+    final errorMsg = await CartService().addItem(product);
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('${product.name} added to cart')));
+    ).showSnackBar(SnackBar(content: Text(errorMsg ?? '${product.name} added to cart')));
   }
 
   void _openProduct(ProductItem product) {

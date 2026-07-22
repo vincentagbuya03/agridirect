@@ -1003,12 +1003,13 @@ class _ProductsTab extends StatelessWidget {
                         ),
                         if (AuthService().userId.isEmpty || product.farmerId != AuthService().userId)
                           GestureDetector(
-                            onTap: () {
-                              CartService().addItem(product);
+                            onTap: () async {
+                              final errorMsg = await CartService().addItem(product);
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content:
-                                      Text('${product.name} added to cart'),
+                                      Text(errorMsg ?? '${product.name} added to cart'),
                                   duration: const Duration(seconds: 1),
                                   backgroundColor: AppColors.primary,
                                   behavior: SnackBarBehavior.floating,

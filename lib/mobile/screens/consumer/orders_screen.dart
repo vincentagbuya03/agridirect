@@ -92,14 +92,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          _buildPremiumHeader(),
-          _buildSleekTabs(),
-          Expanded(child: _buildOrdersListContent(isWeb: false)),
-        ],
+    return PopScope(
+      canPop: context.canPop(),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          context.go(AppRoutes.home);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Column(
+          children: [
+            _buildPremiumHeader(),
+            _buildSleekTabs(),
+            Expanded(child: _buildOrdersListContent(isWeb: false)),
+          ],
+        ),
       ),
     );
   }
@@ -231,12 +239,23 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 children: [
                   Row(
                     children: [
+                      IconButton(
+                        onPressed: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go(AppRoutes.home);
+                          }
+                        },
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textHeadline, size: 20),
+                      ),
+                      const SizedBox(width: 4),
                       const Icon(
                         Icons.receipt_long_rounded,
                         color: AppColors.primary,
                         size: 28,
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       Text(
                         'Orders',
                         style: AppTextStyles.headline1.copyWith(fontSize: 22),

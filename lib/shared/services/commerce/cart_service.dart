@@ -197,27 +197,58 @@ class CartService extends ChangeNotifier {
     }
   }
 
-  Future<void> addItem(ProductItem product, [int quantity = 1]) async {
-    if (product.productId == null) return;
+  Future<String?> addItem(ProductItem product, [int quantity = 1]) async {
+    if (product.productId == null) return 'Invalid product ID';
 
     final currentUserId = _supabase.auth.currentUser?.id;
 
     if (currentUserId != null && product.farmerId == currentUserId) {
       debugPrint('[Cart] 🛡️ Blocked attempt to add own product: ${product.productId}');
-      return;
+      return 'Cannot add your own product to cart';
+    }
+
+    // Retrieve fresh product/stock info from DB
+    final freshProduct = await SupabaseDataService().getProductById(product.productId!) ?? product;
+    final isPreorder = freshProduct.isPreorder || freshProduct.targetQuantity != null;
+    final maxStock = freshProduct.stockQuantity?.toInt() ?? 0;
+
+    if (!isPreorder && maxStock <= 0) {
+      return 'This product is currently out of stock';
     }
 
     final index = _items.indexWhere((item) => item.productId == product.productId);
 
     if (index != -1) {
-      _items[index].quantity += quantity;
+      final currentQty = _items[index].quantity;
+      int newQty = currentQty + quantity;
+      
+      if (!isPreorder && newQty > maxStock) {
+        _items[index].quantity = maxStock;
+        if (currentUserId != null) {
+          final customerId = await _getCustomerId();
+          if (customerId != null) {
+            await _supabase.from('cart_items').upsert({
+              'customer_id': customerId,
+              'product_id': product.productId!,
+              'quantity': maxStock,
+              'updated_at': DateTime.now().toIso8601String(),
+            }, onConflict: 'customer_id,product_id');
+          }
+        } else {
+          await _saveGuestCart();
+        }
+        notifyListeners();
+        return 'Only $maxStock available in stock. Cart updated to maximum.';
+      }
+
+      _items[index].quantity = newQty;
       if (currentUserId != null) {
         final customerId = await _getCustomerId();
         if (customerId != null) {
           await _supabase.from('cart_items').upsert({
             'customer_id': customerId,
             'product_id': product.productId!,
-            'quantity': _items[index].quantity,
+            'quantity': newQty,
             'updated_at': DateTime.now().toIso8601String(),
           }, onConflict: 'customer_id,product_id');
         }
@@ -225,6 +256,13 @@ class CartService extends ChangeNotifier {
         await _saveGuestCart();
       }
     } else {
+      int newQty = quantity;
+      String? warning;
+      if (!isPreorder && newQty > maxStock) {
+        newQty = maxStock;
+        warning = 'Only $maxStock available in stock. Added maximum available.';
+      }
+
       final newItem = CartItem(
         farmerId: product.farmerId ?? '',
         productId: product.productId!,
@@ -233,7 +271,7 @@ class CartService extends ChangeNotifier {
         price: product.price,
         unit: product.unit,
         imageUrl: product.imageUrl,
-        quantity: quantity,
+        quantity: newQty,
       );
       _items.add(newItem);
 
@@ -243,15 +281,18 @@ class CartService extends ChangeNotifier {
           await _supabase.from('cart_items').upsert({
             'customer_id': customerId,
             'product_id': product.productId!,
-            'quantity': quantity,
+            'quantity': newQty,
             'updated_at': DateTime.now().toIso8601String(),
           }, onConflict: 'customer_id,product_id');
         }
       } else {
         await _saveGuestCart();
       }
+      notifyListeners();
+      return warning;
     }
     notifyListeners();
+    return null;
   }
 
   Future<void> removeItem(String productId) async {
@@ -272,7 +313,7 @@ class CartService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateQuantity(String productId, int quantity) async {
+  Future<String?> updateQuantity(String productId, int quantity) async {
     final currentUserId = _supabase.auth.currentUser?.id;
     final index = _items.indexWhere((item) => item.productId == productId);
     
@@ -290,22 +331,39 @@ class CartService extends ChangeNotifier {
         } else {
           await _saveGuestCart();
         }
+        notifyListeners();
+        return null;
       } else {
-        _items[index].quantity = quantity;
+        // Fetch product to verify stock
+        final product = await SupabaseDataService().getProductById(productId);
+        int finalQuantity = quantity;
+        String? warning;
+
+        if (product != null && !product.isPreorder && product.stockQuantity != null) {
+          final maxStock = product.stockQuantity!.toInt();
+          if (quantity > maxStock) {
+            finalQuantity = maxStock;
+            warning = 'Only $maxStock available in stock';
+          }
+        }
+
+        _items[index].quantity = finalQuantity;
         if (currentUserId != null) {
           final customerId = await _getCustomerId();
           if (customerId != null) {
             await _supabase.from('cart_items').update({
-              'quantity': quantity,
+              'quantity': finalQuantity,
               'updated_at': DateTime.now().toIso8601String(),
             }).eq('customer_id', customerId).eq('product_id', productId);
           }
         } else {
           await _saveGuestCart();
         }
+        notifyListeners();
+        return warning;
       }
-      notifyListeners();
     }
+    return 'Item not found in cart';
   }
 
   Future<void> clear() async {

@@ -121,26 +121,15 @@ class NotificationService {
         final callerName = params.nameCaller ?? 'AgriDirect User';
         final avatarUrl = params.avatar;
 
-        if (callId.isNotEmpty) {
-          await CallService().updateCallStatus(callId, 'connected');
-        }
-
-        if (appNavigatorKey.currentContext != null) {
-          Navigator.push(
-            appNavigatorKey.currentContext!,
-            MaterialPageRoute(
-              builder: (_) => InAppCallScreen(
-                name: callerName,
-                avatarUrl: avatarUrl,
-                callId: callId,
-                channelName: channelName,
-                isVideo: isVideo,
-                isIncoming: true,
-                isAlreadyAccepted: true,
-              ),
-            ),
-          );
-        }
+        await launchCallScreen(
+          name: callerName,
+          avatarUrl: avatarUrl,
+          callId: callId,
+          channelName: channelName,
+          isVideo: isVideo,
+          isIncoming: true,
+          isAlreadyAccepted: true,
+        );
       } else if (event is CallEventActionCallDecline) {
         final params = event.callKitParams;
         final extra = params.extra ?? {};
@@ -412,6 +401,48 @@ class NotificationService {
         // Handled inside InAppCallScreen
       },
     );
+  }
+
+  static Future<void> launchCallScreen({
+    required String name,
+    required String? avatarUrl,
+    required String callId,
+    required String channelName,
+    required bool isVideo,
+    required bool isIncoming,
+    required bool isAlreadyAccepted,
+  }) async {
+    if (callId.isNotEmpty) {
+      await CallService().updateCallStatus(callId, 'connected');
+    }
+
+    if (InAppCallScreen.acceptActiveCallIfRinging()) {
+      return;
+    }
+
+    BuildContext? ctx = appNavigatorKey.currentContext;
+    int retries = 0;
+    while (ctx == null && retries < 25) {
+      await Future.delayed(const Duration(milliseconds: 80));
+      ctx = appNavigatorKey.currentContext;
+      retries++;
+    }
+
+    if (ctx != null && ctx.mounted) {
+      Navigator.of(ctx, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) => InAppCallScreen(
+            name: name,
+            avatarUrl: avatarUrl,
+            callId: callId,
+            channelName: channelName,
+            isVideo: isVideo,
+            isIncoming: isIncoming,
+            isAlreadyAccepted: isAlreadyAccepted,
+          ),
+        ),
+      );
+    }
   }
 
   void _stopGlobalIncomingCallListener() {

@@ -195,7 +195,6 @@ class SupabaseDataService {
       final response = await _client
           .from('v_products')
           .select()
-          .eq('is_preorder', false)
           .order('created_at', ascending: false);
       final items = response as List;
       final List<Map<String, dynamic>> enrichedItems = [];
@@ -229,7 +228,8 @@ class SupabaseDataService {
 
       await _enrichProductItemsWithFarmerProfiles(enrichedItems);
 
-      return enrichedItems.map((item) => _mapToProductItem(item)).toList();
+      final mapped = enrichedItems.map((item) => _mapToProductItem(item)).toList();
+      return mapped.where((p) => !p.isPreorder).toList();
     } catch (e) {
       debugPrint('Error fetching nearby products: $e');
       return [];
@@ -726,6 +726,16 @@ class SupabaseDataService {
 
   ProductItem _mapToProductItem(Map<String, dynamic> item) {
     final rawCreated = item['created_at']?.toString() ?? '';
+    final createdAtDate = rawCreated.isNotEmpty ? DateTime.tryParse(rawCreated) : null;
+    final harvestDaysNum = (item['harvest_days'] as num?)?.toInt() ?? 0;
+    bool isPre = item['is_preorder'] == true;
+    if (isPre && harvestDaysNum > 0 && createdAtDate != null) {
+      final harvestDate = createdAtDate.add(Duration(days: harvestDaysNum));
+      if (harvestDate.isBefore(DateTime.now())) {
+        isPre = false;
+      }
+    }
+
     return ProductItem(
       productId: item['product_id']?.toString(),
       farmerId: item['farmer_id']?.toString(),
@@ -751,8 +761,8 @@ class SupabaseDataService {
       latitude: (item['latitude'] as num?)?.toDouble(),
       longitude: (item['longitude'] as num?)?.toDouble(),
       isFeatured: item['is_featured'] == true,
-      isPreorder: item['is_preorder'] == true,
-      createdAt: rawCreated.isNotEmpty ? DateTime.tryParse(rawCreated) : null,
+      isPreorder: isPre,
+      createdAt: createdAtDate,
     );
   }
 
