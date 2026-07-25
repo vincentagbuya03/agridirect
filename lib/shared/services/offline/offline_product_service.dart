@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import '../core/supabase_config.dart';
 import '../commerce/product_service.dart';
 import '../offline/offline_queue_service.dart';
@@ -172,8 +170,9 @@ class OfflineProductService {
   Future<bool> isOnline() async {
     try {
       final result = await _connectivity.checkConnectivity();
-      if (result.isEmpty || result.first == ConnectivityResult.none)
+      if (result.isEmpty || result.first == ConnectivityResult.none) {
         return false;
+      }
 
       // InternetAddress.lookup is NOT supported on web and will throw UnimplementedError
       if (kIsWeb) return true;

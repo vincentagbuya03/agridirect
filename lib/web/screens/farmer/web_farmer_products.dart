@@ -1080,10 +1080,12 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                                           '0.00',
                                         ),
                                         validator: (val) {
-                                          if (val == null || val.trim().isEmpty)
+                                          if (val == null || val.trim().isEmpty) {
                                             return 'Required';
-                                          if (double.tryParse(val) == null)
+                                          }
+                                          if (double.tryParse(val) == null) {
                                             return 'Invalid price';
+                                          }
                                           return null;
                                         },
                                       ),
@@ -1106,10 +1108,12 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                                         style: GoogleFonts.inter(fontSize: 14),
                                         decoration: _buildInputDecoration('0'),
                                         validator: (val) {
-                                          if (val == null || val.trim().isEmpty)
+                                          if (val == null || val.trim().isEmpty) {
                                             return 'Required';
-                                          if (double.tryParse(val) == null)
+                                          }
+                                          if (double.tryParse(val) == null) {
                                             return 'Invalid stock';
+                                          }
                                           return null;
                                         },
                                       ),

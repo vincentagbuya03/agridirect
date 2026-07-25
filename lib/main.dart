@@ -141,6 +141,34 @@ void main() async {
     await SupabaseConfig.initialize();
   } catch (_) {}
 
+  if (!kIsWeb) {
+    try {
+      final activeCalls = await FlutterCallkitIncoming.activeCalls();
+      if (activeCalls.isNotEmpty) {
+        final call = activeCalls.first;
+        final extra = call.extra ?? {};
+        final callId = extra['callId']?.toString() ?? call.id;
+        final channelName = extra['channelName']?.toString() ?? '';
+        final isVideo = extra['isVideo'] == true || extra['isVideo'] == 'true';
+        final callerName = call.nameCaller ?? 'AgriDirect User';
+        final avatarUrl = call.avatar;
+
+        if (callId.isNotEmpty && channelName.isNotEmpty) {
+          _globalPendingAcceptedCall = (
+            callId: callId,
+            channelName: channelName,
+            isVideo: isVideo,
+            callerName: callerName,
+            avatarUrl: avatarUrl,
+          );
+          debugPrint('📞 Synchronous cold-start CallKit check found call: $callId');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Could not check active CallKit calls in main(): $e');
+    }
+  }
+
   runApp(const _BootstrapApp());
 }
 
@@ -173,6 +201,12 @@ class _BootstrapAppState extends State<_BootstrapApp> {
   void initState() {
     super.initState();
     if (!kIsWeb) {
+      if (_globalPendingAcceptedCall != null) {
+        _pendingCall = _globalPendingAcceptedCall;
+        _globalPendingAcceptedCall = null;
+        debugPrint('📞 Cold-start pending call pre-assigned in initState');
+      }
+
       // Listen in state so setState() can be called regardless of timing
       _callkitSubscription =
           FlutterCallkitIncoming.onEvent.listen((CallEvent? event) {
@@ -372,6 +406,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     // This runs before FutureBuilder is even evaluated, so no loading or splash screen shows!
     if (_pendingCall != null && !kIsWeb && !_callScreenLaunched) {
       _callScreenLaunched = true;
+      _isAnimationDone = true;
       final call = _pendingCall!;
       debugPrint('📞 Early Launch: standalone call screen for ${call.callId}');
       return MaterialApp(
@@ -391,6 +426,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
               setState(() {
                 _pendingCall = null;
                 _callScreenLaunched = true;
+                _isAnimationDone = true;
               });
             }
           },

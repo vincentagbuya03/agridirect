@@ -136,6 +136,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
 
     if (confirmed == true) {
+      if (!mounted) return;
       setState(() => _isLoading = true);
       try {
         if (!_isOnline) {

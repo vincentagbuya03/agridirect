@@ -9,10 +9,12 @@ import '../../../shared/router/app_router.dart';
 import '../../../shared/services/commerce/cart_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'marketplace_screen.dart';
+import 'cart_screen.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/social/follow_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../../shared/services/commerce/voucher_service.dart';
+import '../../../shared/widgets/flying_icon_animation.dart';
 
 /// Full-screen public profile for a farmer, with Products & Posts tabs.
 class FarmerPublicProfileScreen extends StatefulWidget {
@@ -28,6 +30,8 @@ class FarmerPublicProfileScreen extends StatefulWidget {
 class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final GlobalKey _cartKey = GlobalKey();
+  final List<OverlayEntry> _flyingOverlayEntries = [];
   String _calculatedDistance = 'Nearby';
   final FollowService _followService = FollowService();
   bool _isFollowing = false;
@@ -155,6 +159,12 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
 
   @override
   void dispose() {
+    for (final entry in _flyingOverlayEntries) {
+      if (entry.mounted) {
+        entry.remove();
+      }
+    }
+    _flyingOverlayEntries.clear();
     _tabController.dispose();
     super.dispose();
   }
@@ -297,6 +307,57 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
       actions: [
         Center(
           child: Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ListenableBuilder(
+              listenable: CartService(),
+              builder: (context, _) {
+                final count = CartService().itemCount;
+                return IconButton(
+                  key: _cartKey,
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const CartScreen()),
+                  ),
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        const Icon(Icons.shopping_cart_outlined,
+                            size: 18, color: Colors.white),
+                        if (count > 0)
+                          Positioned(
+                            top: -4,
+                            right: -4,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                  color: AppColors.accent, shape: BoxShape.circle),
+                              constraints: const BoxConstraints(
+                                  minWidth: 12, minHeight: 12),
+                              child: Text(
+                                '$count',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        Center(
+          child: Padding(
             padding: const EdgeInsets.only(right: 16),
             child: IconButton(
               onPressed: () {
@@ -367,6 +428,64 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
         ),
       ),
     );
+  }
+
+  void _runFlyToCartAnimation(GlobalKey startKey, String imageUrl) {
+    final startCtx = startKey.currentContext;
+    final cartCtx = _cartKey.currentContext;
+    if (startCtx == null || cartCtx == null) return;
+
+    final RenderBox? buttonBox = startCtx.findRenderObject() as RenderBox?;
+    final RenderBox? cartBox = cartCtx.findRenderObject() as RenderBox?;
+
+    if (buttonBox == null || cartBox == null) return;
+    if (!buttonBox.attached || !cartBox.attached) return;
+    if (!buttonBox.hasSize || !cartBox.hasSize) return;
+
+    final startPosition = buttonBox.localToGlobal(Offset.zero);
+    final endPosition = cartBox.localToGlobal(Offset.zero);
+
+    if (!startPosition.dx.isFinite ||
+        !startPosition.dy.isFinite ||
+        !endPosition.dx.isFinite ||
+        !endPosition.dy.isFinite) {
+      return;
+    }
+
+    final screenSize = MediaQuery.of(context).size;
+    if (startPosition.dx < 0 ||
+        startPosition.dx > screenSize.width ||
+        startPosition.dy < 0 ||
+        startPosition.dy > screenSize.height) {
+      return;
+    }
+    if (endPosition.dx < 0 ||
+        endPosition.dx > screenSize.width ||
+        endPosition.dy < 0 ||
+        endPosition.dy > screenSize.height) {
+      return;
+    }
+
+    late OverlayEntry overlayEntry;
+    overlayEntry = OverlayEntry(
+      builder: (context) => FlyingIconAnimation(
+        startPosition: startPosition,
+        endPosition: endPosition,
+        imageUrl: imageUrl,
+        onComplete: () {
+          _flyingOverlayEntries.remove(overlayEntry);
+          if (overlayEntry.mounted) {
+            overlayEntry.remove();
+          }
+        },
+      ),
+    );
+
+    _flyingOverlayEntries.add(overlayEntry);
+    final overlay = Overlay.maybeOf(context);
+    if (overlay != null) {
+      overlay.insert(overlayEntry);
+    }
   }
 
   Widget _buildProfileCard(BuildContext context) {
@@ -923,6 +1042,7 @@ class _ProductsTab extends StatelessWidget {
   }
 
   Widget _buildProductCard(BuildContext context, ProductItem product) {
+    final buttonKey = GlobalKey();
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
@@ -1003,7 +1123,12 @@ class _ProductsTab extends StatelessWidget {
                         ),
                         if (AuthService().userId.isEmpty || product.farmerId != AuthService().userId)
                           GestureDetector(
+                            key: buttonKey,
                             onTap: () async {
+                              final parentState = context.findAncestorStateOfType<_FarmerPublicProfileScreenState>();
+                              if (parentState != null) {
+                                parentState._runFlyToCartAnimation(buttonKey, product.imageUrl);
+                              }
                               final errorMsg = await CartService().addItem(product);
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(

@@ -118,6 +118,7 @@ class _InAppCallScreenState extends State<InAppCallScreen>
   // ─────────────────────────────────────────────────────── call session ──
 
   Future<void> _initCallSession() async {
+    // Request permissions FIRST before fetching tokens or initializing Agora hardware drivers
     final hasPermissions = await _callService.requestPermissions(
       requireCamera: widget.isVideo,
     );

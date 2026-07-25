@@ -622,7 +622,6 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
     if (_address == null) {
       final method = widget.order.paymentMethod?.toUpperCase() ?? '';
       final isPickup = method == 'COP';
-      final isReadyForPickup = widget.order.status.toUpperCase() == 'SHIPPED';
       final hasLocation = _farmerProfile?.location != null && _farmerProfile!.location!.isNotEmpty;
       final lat = _farmerProfile?.farmLatitude;
       final lng = _farmerProfile?.farmLongitude;

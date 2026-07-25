@@ -28,7 +28,7 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
   int _quantity = 1;
   String _paymentMethod = 'COD';
   bool _isLoading = false;
-  bool _isSubmitting = false;
+  final bool _isSubmitting = false;
   final OfflineCacheService _cacheService = OfflineCacheService();
   bool _isSaved = false;
   List<CropMilestone> _milestones = const [];

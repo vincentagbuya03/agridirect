@@ -519,6 +519,8 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                           const SizedBox(height: 16),
                           _buildMetricsGrid(),
                           const SizedBox(height: 24),
+                          _buildQuickActionsBento(),
+                          const SizedBox(height: 24),
                           _buildSectionHeader('Sales Analytics'),
                           const SizedBox(height: 16),
                           _buildSalesAnalytics(),
@@ -1208,6 +1210,91 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildQuickActionsBento() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: AppDecorations.cardDecoration.copyWith(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Quick Actions',
+            style: AppTextStyles.headline3.copyWith(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textHeadline,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildQuickActionButton(
+                label: 'Add Item',
+                icon: Icons.add_business_rounded,
+                color: AppColors.primary,
+                onTap: () => context.push(AppRoutes.addProduct),
+              ),
+              _buildQuickActionButton(
+                label: 'Vouchers',
+                icon: Icons.confirmation_number_outlined,
+                color: Colors.purple,
+                onTap: () => context.push(AppRoutes.farmerVouchers),
+              ),
+              _buildQuickActionButton(
+                label: 'Orders',
+                icon: Icons.assignment_outlined,
+                color: Colors.blue,
+                onTap: () => SupabaseDataService.navigationTabNotifier.value = 2,
+              ),
+              _buildQuickActionButton(
+                label: 'Post',
+                icon: Icons.forum_outlined,
+                color: AppColors.accent,
+                onTap: () => SupabaseDataService.navigationTabNotifier.value = 3,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionButton({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textHeadline,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

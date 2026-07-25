@@ -41,8 +41,6 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
     'CANCELLED',
   ];
 
-  // Cached orders — only replaced when user explicitly refreshes or updates
-  Future<List<Map<String, dynamic>>>? _ordersFuture;
   List<Map<String, dynamic>> _orders = [];
   bool _ordersLoaded = false;
 
@@ -63,7 +61,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
   }
 
   void _loadOrders() {
-    _ordersFuture = SupabaseDataService().getFarmerOrders().then((data) {
+    SupabaseDataService().getFarmerOrders().then((data) {
       if (mounted) {
         setState(() {
           _orders = List<Map<String, dynamic>>.from(data);
@@ -475,7 +473,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: filtered.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, i) => _buildMobileOrderCard(filtered[i]),
       );
     }
@@ -519,7 +517,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: filtered.length,
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (context, index) =>
                   const Divider(height: 1, color: Color(0xFFE5E7EB)),
               itemBuilder: (context, i) => _buildOrderRow(filtered[i]),
             ),
@@ -903,8 +901,8 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
           customerName: o['customerName'] ?? 'Customer',
           customerImage: o['customerImage']?.toString() ?? '',
         ),
-        transitionsBuilder: (_, a, __, child) =>
-            FadeTransition(opacity: a, child: child),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+            FadeTransition(opacity: animation, child: child),
         transitionDuration: const Duration(milliseconds: 200),
       ),
     );

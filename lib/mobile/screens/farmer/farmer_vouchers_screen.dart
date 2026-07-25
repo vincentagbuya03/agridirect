@@ -212,7 +212,7 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverList.builder(
                   itemCount: 3,
-                  itemBuilder: (_, __) => Padding(
+                  itemBuilder: (context, index) => Padding(
                     padding: const EdgeInsets.only(bottom: 14),
                     child: SizedBox(height: 120, child: AppShimmerLoader.rectangle(borderRadius: 20)),
                   ),

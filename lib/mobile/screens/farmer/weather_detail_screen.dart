@@ -60,8 +60,9 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     if (desc.contains('rain')) return Icons.umbrella_rounded;
     if (desc.contains('storm')) return Icons.thunderstorm_rounded;
     if (desc.contains('wind')) return Icons.air_rounded;
-    if (desc.contains('clear') || desc.contains('sun'))
+    if (desc.contains('clear') || desc.contains('sun')) {
       return Icons.wb_sunny_rounded;
+    }
     if (desc.contains('cloud')) return Icons.cloud_rounded;
     return Icons.wb_cloudy_rounded;
   }

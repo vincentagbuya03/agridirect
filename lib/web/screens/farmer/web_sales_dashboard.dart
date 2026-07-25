@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
 import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/animated_components.dart';
 import '../../../shared/widgets/brand_logo.dart';
@@ -13,6 +14,8 @@ import '../../../shared/router/app_routes.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 import '../../widgets/web_hamburger_menu_button.dart';
 import '../../../shared/services/commerce/voucher_service.dart';
+import 'package:geolocator/geolocator.dart';
+import 'web_weather_radar_screen.dart';
 
 
 class WebSalesDashboard extends StatefulWidget {
@@ -54,6 +57,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   int _activeListings = 0;
   double _weeklyRevenue = 0.0;
   List<Map<String, dynamic>> _recentOrders = [];
+  List<Map<String, dynamic>> _lowStockProducts = [];
   bool _isLoading = true;
   String _farmerName = '';
   List<double> _salesData = List.filled(7, 0.0);
@@ -63,6 +67,14 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   String _inventoryLegend3 = '0%';
   String _farmerRating = '0.0';
   String _farmerReviews = '0 Reviews';
+
+  // Weather & Location State
+  double? _farmLatitude;
+  double? _farmLongitude;
+  String? _farmLocationName;
+  WeatherData? _weatherData;
+  bool _isLoadingWeather = true;
+  bool _showWeatherPage = false;
 
   @override
   void initState() {
@@ -102,6 +114,37 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
       final rating = farmerResponse?['average_rating']?.toString() ?? '4.9';
       final reviews = farmerResponse?['review_count']?.toString() ?? '120+';
 
+      final lat = (farmerResponse?['farm_latitude'] as num?)?.toDouble();
+      final lon = (farmerResponse?['farm_longitude'] as num?)?.toDouble();
+      final locName = farmerResponse?['location']?.toString() ?? farmerResponse?['farm_name']?.toString() ?? 'My Farm';
+
+      WeatherData? weather;
+      double finalLat = lat ?? 14.5995;
+      double finalLon = lon ?? 120.9842;
+      String finalLocName = locName;
+
+      if (lat != null && lon != null) {
+        weather = await WeatherService().getWeatherByCoordinates(
+          latitude: lat,
+          longitude: lon,
+        );
+      } else {
+        try {
+          final permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+            final pos = await Geolocator.getCurrentPosition(timeLimit: const Duration(seconds: 3));
+            finalLat = pos.latitude;
+            finalLon = pos.longitude;
+            weather = await WeatherService().getWeatherByCoordinates(
+              latitude: pos.latitude,
+              longitude: pos.longitude,
+            );
+          }
+        } catch (_) {}
+
+        weather ??= await WeatherService().getWeatherByCity('Manila');
+      }
+
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       List<double> salesLast7Days = List.filled(7, 0.0);
@@ -129,13 +172,16 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
       int inStockCount = 0;
       int lowStockCount = 0;
       int outOfStockCount = 0;
+      List<Map<String, dynamic>> lowStockList = [];
 
       for (final product in products) {
         final qty = (product['available_quantity'] as num?)?.toDouble() ?? 0.0;
         if (qty <= 0) {
           outOfStockCount++;
+          lowStockList.add(Map<String, dynamic>.from(product));
         } else if (qty < 5) {
           lowStockCount++;
+          lowStockList.add(Map<String, dynamic>.from(product));
         } else {
           inStockCount++;
         }
@@ -144,7 +190,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
       final totalInventory = inStockCount + lowStockCount + outOfStockCount;
       List<double> inventoryData = [inStockCount.toDouble(), lowStockCount.toDouble(), outOfStockCount.toDouble()];
       if (totalInventory == 0) {
-        inventoryData = [1.0, 0.0, 0.0]; // fallback
+        inventoryData = [1.0, 0.0, 0.0];
       }
 
       if (mounted) {
@@ -154,10 +200,16 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           _pendingOrders = pending;
           _weeklyRevenue = revenue;
           _recentOrders = List<Map<String, dynamic>>.from(orders.take(6));
+          _lowStockProducts = lowStockList;
           _salesData = salesLast7Days;
           _inventoryData = inventoryData;
           _farmerRating = rating;
           _farmerReviews = '$reviews Reviews';
+          _farmLatitude = finalLat;
+          _farmLongitude = finalLon;
+          _farmLocationName = finalLocName;
+          _weatherData = weather;
+          _isLoadingWeather = false;
           if (totalInventory > 0) {
             _inventoryLegend1 = '${((inStockCount / totalInventory) * 100).toStringAsFixed(0)}%';
             _inventoryLegend2 = '${((lowStockCount / totalInventory) * 100).toStringAsFixed(0)}%';
@@ -186,6 +238,13 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
 
   @override
   Widget build(BuildContext context) {
+    if (_showWeatherPage) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF070E1B),
+        body: _buildWeatherRadarPage(),
+      );
+    }
+
     return Scaffold(
       backgroundColor: _surface,
       body: Stack(
@@ -225,7 +284,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               _buildNavBar(),
               Expanded(
                 child: _isLoading 
-                  ? const Center(child: AppShimmerLoader())
+                  ? _buildDashboardSkeleton()
                   : _buildMainScrollableArea(),
               ),
             ],
@@ -371,6 +430,106 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
     );
   }
 
+  Widget _buildDashboardSkeleton() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+    
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isMobile ? 16 : 40),
+      physics: const NeverScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header shimmer
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppShimmerLoader.rectangle(width: isMobile ? 180 : 320, height: 32, borderRadius: 8),
+                    const SizedBox(height: 12),
+                    AppShimmerLoader.rectangle(width: isMobile ? 220 : 450, height: 16, borderRadius: 6),
+                  ],
+                ),
+              ),
+              if (!isMobile) ...[
+                AppShimmerLoader.rectangle(width: 150, height: 48, borderRadius: 12),
+                const SizedBox(width: 16),
+                AppShimmerLoader.rectangle(width: 200, height: 60, borderRadius: 16),
+              ],
+            ],
+          ),
+          SizedBox(height: isMobile ? 24 : 40),
+          
+          // Metrics Row Shimmer
+          if (isMobile)
+            Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: AppShimmerLoader.rectangle(height: 120, borderRadius: 24)),
+                    const SizedBox(width: 12),
+                    Expanded(child: AppShimmerLoader.rectangle(height: 120, borderRadius: 24)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: AppShimmerLoader.rectangle(height: 120, borderRadius: 24)),
+                    const SizedBox(width: 12),
+                    Expanded(child: AppShimmerLoader.rectangle(height: 120, borderRadius: 24)),
+                  ],
+                ),
+              ],
+            )
+          else
+            Row(
+              children: List.generate(4, (i) => Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: i == 3 ? 0 : 24),
+                  child: AppShimmerLoader.rectangle(height: 140, borderRadius: 24),
+                ),
+              )),
+            ),
+          SizedBox(height: isMobile ? 24 : 40),
+          
+          // Insights Shimmer
+          if (isMobile)
+            Column(
+              children: [
+                AppShimmerLoader.rectangle(height: 300, borderRadius: 28),
+                const SizedBox(height: 24),
+                AppShimmerLoader.rectangle(height: 300, borderRadius: 28),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(flex: 2, child: AppShimmerLoader.rectangle(height: 400, borderRadius: 28)),
+                const SizedBox(width: 40),
+                Expanded(flex: 1, child: AppShimmerLoader.rectangle(height: 400, borderRadius: 28)),
+              ],
+            ),
+          SizedBox(height: isMobile ? 24 : 40),
+          
+          // Activity Shimmer
+          if (isMobile)
+            AppShimmerLoader.rectangle(height: 250, borderRadius: 28)
+          else
+            Row(
+              children: [
+                Expanded(flex: 2, child: AppShimmerLoader.rectangle(height: 300, borderRadius: 28)),
+                const SizedBox(width: 40),
+                Expanded(flex: 1, child: AppShimmerLoader.rectangle(height: 300, borderRadius: 28)),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMainScrollableArea() {
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 650;
@@ -388,7 +547,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             SizedBox(height: isMobile ? 24 : 40),
             _buildInsightsGrid(),
             SizedBox(height: isMobile ? 24 : 40),
-            _buildRecentActivitySection(),
+            _buildActivityAndAlertsGrid(),
           ],
         ),
       ),
@@ -421,51 +580,102 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           ),
         ),
       ],
-    );
+    );    Widget weatherWidget;
+    if (_isLoadingWeather || _weatherData == null) {
+      weatherWidget = AppShimmerLoader.rectangle(width: 260, height: 80, borderRadius: 20);
+    } else {
+      final data = _weatherData!;
+      final temp = data.temperature.toStringAsFixed(0);
+      final desc = data.description;
+      final wind = data.windSpeed.toStringAsFixed(1);
+      final humidity = data.humidity.toStringAsFixed(0);
+      final feelsLike = data.feelsLike.toStringAsFixed(0);
+      final isSunny = desc.toLowerCase().contains('sun') || desc.toLowerCase().contains('clear');
 
-    final weatherWidget = FutureBuilder<WeatherData?>(
-      future: WeatherService().getWeatherByCity('Manila'),
-      builder: (context, snapshot) {
-        final data = snapshot.data;
-        final temp = data?.temperature.toStringAsFixed(0) ?? '28';
-        final desc = data?.description ?? 'Sunny';
-        final isSunny = desc.toLowerCase().contains('sun') || desc.toLowerCase().contains('clear');
-        
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _border),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isSunny ? Icons.wb_sunny_rounded : Icons.cloud_rounded,
-                color: isSunny ? _accent : const Color(0xFF3B82F6),
-                size: 24,
-              ),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$desc · $temp°C',
-                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: _dark),
+      weatherWidget = MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () => _showWeatherDetailsModal(data),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: (isSunny ? _accent : const Color(0xFF3B82F6)).withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
                   ),
-                  Text(
-                    isSunny ? 'Perfect for harvesting' : 'Good day for maintenance',
-                    style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                  child: Icon(
+                    isSunny ? Icons.wb_sunny_rounded : Icons.cloud_rounded,
+                    color: isSunny ? _accent : const Color(0xFF3B82F6),
+                    size: 28,
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          '$desc · $temp°C',
+                          style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w800, color: _dark),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: _primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'Feels $feelsLike°C',
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: _primary),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.air_rounded, size: 14, color: _muted),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Wind: $wind m/s',
+                          style: GoogleFonts.inter(fontSize: 12, color: _muted, fontWeight: FontWeight.w500),
+                        ),
+                        const SizedBox(width: 12),
+                        const Icon(Icons.water_drop_outlined, size: 14, color: _muted),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Humidity: $humidity%',
+                          style: GoogleFonts.inter(fontSize: 12, color: _muted, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        );
-      }
-    );
+        ),
+      );
+    }
 
     if (isMobile) {
       return Column(
@@ -519,6 +729,22 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         const SizedBox(width: 16),
         weatherWidget,
       ],
+    );
+  }
+
+  void _showWeatherDetailsModal(WeatherData? data) {
+    setState(() {
+      _showWeatherPage = true;
+    });
+  }
+
+  Widget _buildWeatherRadarPage() {
+    return WebWeatherRadarScreen(
+      weatherData: _weatherData,
+      farmLatitude: _farmLatitude,
+      farmLongitude: _farmLongitude,
+      farmLocationName: _farmLocationName,
+      onBack: () => setState(() => _showWeatherPage = false),
     );
   }
 
@@ -1164,20 +1390,59 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
 
     if (isMobile) {
       return Column(
-        children: List.generate(
-          metrics.length,
-          (index) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: _buildAnimatedMetricCard(
-              index,
-              metrics[index].$1,
-              metrics[index].$2,
-              metrics[index].$3,
-              metrics[index].$4,
-              metrics[index].$5,
-            ),
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildAnimatedMetricCard(
+                  0,
+                  metrics[0].$1,
+                  metrics[0].$2,
+                  metrics[0].$3,
+                  metrics[0].$4,
+                  metrics[0].$5,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildAnimatedMetricCard(
+                  1,
+                  metrics[1].$1,
+                  metrics[1].$2,
+                  metrics[1].$3,
+                  metrics[1].$4,
+                  metrics[1].$5,
+                ),
+              ),
+            ],
           ),
-        ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildAnimatedMetricCard(
+                  2,
+                  metrics[2].$1,
+                  metrics[2].$2,
+                  metrics[2].$3,
+                  metrics[2].$4,
+                  metrics[2].$5,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildAnimatedMetricCard(
+                  3,
+                  metrics[3].$1,
+                  metrics[3].$2,
+                  metrics[3].$3,
+                  metrics[3].$4,
+                  metrics[3].$5,
+                ),
+              ),
+            ],
+          ),
+        ],
       );
     }
 
@@ -1269,6 +1534,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   }
 
   Widget _buildAnimatedMetricCard(int i, String l, String v, String s, IconData ic, Color c) {
+    final isMobile = MediaQuery.of(context).size.width < 650;
     return FadeTransition(
       opacity: _metricControllers[i],
       child: SlideTransition(
@@ -1280,7 +1546,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           onExit: (_) => setState(() => _hoveredMetrics.remove(i)),
           child: HoverScaleCard(
             child: Container(
-              padding: const EdgeInsets.all(28),
+              padding: EdgeInsets.all(isMobile ? 16 : 28),
               decoration: BoxDecoration(
                 color: _white,
                 borderRadius: BorderRadius.circular(24),
@@ -1298,39 +1564,46 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: EdgeInsets.all(isMobile ? 8 : 12),
                         decoration: BoxDecoration(
                           color: c.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(isMobile ? 10 : 14),
                         ),
-                        child: Icon(ic, color: c, size: 24),
+                        child: Icon(ic, color: c, size: isMobile ? 20 : 24),
                       ),
                       Icon(Icons.more_horiz_rounded, color: _muted.withValues(alpha: 0.5)),
                     ],
                   ),
-                  const SizedBox(height: 32),
-                  Text(
-                    v,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w800,
-                      color: _dark,
+                  SizedBox(height: isMobile ? 12 : 32),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      v,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: isMobile ? 22 : 32,
+                        fontWeight: FontWeight.w800,
+                        color: _dark,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     l.toUpperCase(),
                     style: GoogleFonts.inter(
-                      fontSize: 12,
+                      fontSize: isMobile ? 10 : 12,
                       fontWeight: FontWeight.w700,
                       color: _muted,
                       letterSpacing: 0.5,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -1373,13 +1646,24 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   }
 
   Widget _buildSalesPerformanceChart() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+    final total7Days = _salesData.fold<double>(0, (sum, item) => sum + item);
+
     return Container(
-      padding: const EdgeInsets.all(32),
-      height: 400,
+      padding: EdgeInsets.all(isMobile ? 20 : 32),
+      height: 420,
       decoration: BoxDecoration(
         color: _white,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: _border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1388,33 +1672,55 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  'Sales Performance',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: _dark,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sales Performance',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: isMobile ? 18 : 20,
+                        fontWeight: FontWeight.w800,
+                        color: _dark,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '7-Day Total: ${_currencyFormat.format(total7Days)}',
+                      style: GoogleFonts.inter(fontSize: 13, color: _muted, fontWeight: FontWeight.w500),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                'Last 7 Days',
-                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: _muted),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.show_chart_rounded, size: 18, color: _primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Last 7 Days',
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: _primary),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-          const Spacer(),
-          SizedBox(
-            height: 240,
-            child: MiniBarChart(
+          const SizedBox(height: 24),
+          Expanded(
+            child: InteractiveLineChart(
               values: _salesData,
               labels: List.generate(7, (i) {
                 final day = DateTime.now().subtract(Duration(days: 6 - i));
                 return DateFormat('E').format(day);
               }),
-              barColor: _primary,
+              lineColor: _primary,
             ),
           ),
         ],
@@ -1477,6 +1783,150 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         const Spacer(),
         Text(percent, style: GoogleFonts.inter(fontSize: 13, color: _muted, fontWeight: FontWeight.w600)),
       ],
+    );
+  }
+
+  Widget _buildActivityAndAlertsGrid() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobileOrTablet = sw < 1000;
+
+    if (isMobileOrTablet) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildRecentActivitySection(),
+          const SizedBox(height: 24),
+          _buildLowStockAlertsCard(),
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 2,
+          child: _buildRecentActivitySection(),
+        ),
+        const SizedBox(width: 40),
+        Expanded(
+          flex: 1,
+          child: _buildLowStockAlertsCard(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLowStockAlertsCard() {
+    final isMobile = MediaQuery.of(context).size.width < 650;
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 20 : 32),
+      decoration: BoxDecoration(
+        color: _white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Low Stock Alerts',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                    ),
+                  ),
+                ],
+              ),
+              TextButton(
+                onPressed: () => widget.onNavigate(1),
+                child: Text('Manage Stock', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _primary)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          if (_lowStockProducts.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Column(
+                  children: [
+                    const Icon(Icons.check_circle_outline_rounded, color: _primary, size: 36),
+                    const SizedBox(height: 8),
+                    Text(
+                      'All items fully stocked!',
+                      style: GoogleFonts.inter(color: _dark, fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _lowStockProducts.length > 4 ? 4 : _lowStockProducts.length,
+              separatorBuilder: (context, i) => Divider(color: _border.withValues(alpha: 0.5), height: 20),
+              itemBuilder: (context, i) {
+                final item = _lowStockProducts[i];
+                final name = item['name'] ?? 'Product';
+                final qty = (item['available_quantity'] as num?)?.toInt() ?? 0;
+                final isOutOfStock = qty <= 0;
+                return Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: isOutOfStock ? Colors.redAccent : Colors.amber,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: _dark, fontSize: 14),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isOutOfStock ? Colors.red.withValues(alpha: 0.1) : Colors.amber.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        isOutOfStock ? 'OUT OF STOCK' : '$qty left',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isOutOfStock ? Colors.redAccent : Colors.amber.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+        ],
+      ),
     );
   }
 
@@ -1580,4 +2030,216 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
       ],
     );
   }
+}
+
+class InteractiveLineChart extends StatefulWidget {
+  final List<double> values;
+  final List<String> labels;
+  final Color lineColor;
+
+  const InteractiveLineChart({
+    super.key,
+    required this.values,
+    required this.labels,
+    this.lineColor = const Color(0xFF10B981),
+  });
+
+  @override
+  State<InteractiveLineChart> createState() => _InteractiveLineChartState();
+}
+
+class _InteractiveLineChartState extends State<InteractiveLineChart> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  int _hoveredIndex = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxVal = widget.values.fold<double>(0, (prev, e) => e > prev ? e : prev);
+    final displayMax = maxVal == 0 ? 100.0 : maxVal * 1.2;
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final w = constraints.maxWidth;
+            final h = constraints.maxHeight - 30; // 30 for labels
+
+            return Stack(
+              children: [
+                // Custom Paint Smooth Line Graph
+                CustomPaint(
+                  size: Size(w, h),
+                  painter: _SalesLineGraphPainter(
+                    values: widget.values,
+                    maxVal: displayMax,
+                    color: widget.lineColor,
+                    progress: _controller.value,
+                    hoveredIndex: _hoveredIndex,
+                  ),
+                ),
+                // Mouse region detection for points
+                Positioned.fill(
+                  child: Row(
+                    children: List.generate(widget.values.length, (i) {
+                      return Expanded(
+                        child: MouseRegion(
+                          onEnter: (_) => setState(() => _hoveredIndex = i),
+                          onExit: (_) => setState(() => _hoveredIndex = -1),
+                          child: const SizedBox.expand(),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+                // X-Axis Labels at the bottom
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: List.generate(widget.labels.length, (i) {
+                      final isHovered = _hoveredIndex == i;
+                      return SizedBox(
+                        width: w / widget.labels.length,
+                        child: Text(
+                          widget.labels[i],
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: isHovered ? FontWeight.w800 : FontWeight.w600,
+                            color: isHovered ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _SalesLineGraphPainter extends CustomPainter {
+  final List<double> values;
+  final double maxVal;
+  final Color color;
+  final double progress;
+  final int hoveredIndex;
+
+  _SalesLineGraphPainter({
+    required this.values,
+    required this.maxVal,
+    required this.color,
+    required this.progress,
+    required this.hoveredIndex,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.isEmpty) return;
+
+    // Draw horizontal grid lines
+    final gridPaint = Paint()
+      ..color = const Color(0xFFE2E8F0).withValues(alpha: 0.5)
+      ..strokeWidth = 1;
+
+    for (int i = 0; i <= 3; i++) {
+      final y = size.height * (i / 3);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    final points = List.generate(values.length, (i) {
+      final x = values.length == 1 ? size.width / 2 : (size.width / (values.length - 1)) * i;
+      final valRatio = (values[i] / maxVal) * progress;
+      final y = size.height - (size.height * valRatio);
+      return Offset(x, y);
+    });
+
+    final linePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5
+      ..strokeCap = StrokeCap.round;
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [color.withValues(alpha: 0.35), color.withValues(alpha: 0.0)],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    final path = Path();
+    final fillPath = Path();
+
+    path.moveTo(points[0].dx, points[0].dy);
+    fillPath.moveTo(points[0].dx, points[0].dy);
+
+    for (int i = 0; i < points.length - 1; i++) {
+      final p1 = points[i];
+      final p2 = points[i + 1];
+      final controlPoint1 = Offset(p1.dx + (p2.dx - p1.dx) / 2, p1.dy);
+      final controlPoint2 = Offset(p1.dx + (p2.dx - p1.dx) / 2, p2.dy);
+
+      path.cubicTo(controlPoint1.dx, controlPoint1.dy, controlPoint2.dx, controlPoint2.dy, p2.dx, p2.dy);
+      fillPath.cubicTo(controlPoint1.dx, controlPoint1.dy, controlPoint2.dx, controlPoint2.dy, p2.dx, p2.dy);
+    }
+
+    fillPath.lineTo(size.width, size.height);
+    fillPath.lineTo(0, size.height);
+    fillPath.close();
+
+    canvas.drawPath(fillPath, fillPaint);
+    canvas.drawPath(path, linePaint);
+
+    // Draw Data Point Circles
+    for (int i = 0; i < points.length; i++) {
+      final pt = points[i];
+      final isHovered = hoveredIndex == i;
+
+      canvas.drawCircle(pt, isHovered ? 8 : 5, Paint()..color = Colors.white);
+      canvas.drawCircle(pt, isHovered ? 6 : 3.5, Paint()..color = color);
+
+      if (isHovered && values[i] > 0) {
+        final valText = '₱${values[i].toStringAsFixed(0)}';
+        final textSpan = TextSpan(
+          text: valText,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+        );
+        final textPainter = TextPainter(text: textSpan, textDirection: ui.TextDirection.ltr);
+        textPainter.layout();
+
+        final tooltipRect = RRect.fromRectAndRadius(
+          Rect.fromCenter(center: Offset(pt.dx, pt.dy - 22), width: textPainter.width + 12, height: textPainter.height + 8),
+          const Radius.circular(8),
+        );
+        canvas.drawRRect(tooltipRect, Paint()..color = const Color(0xFF0F172A));
+        textPainter.paint(canvas, Offset(pt.dx - textPainter.width / 2, pt.dy - 22 - textPainter.height / 2));
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SalesLineGraphPainter oldDelegate) => true;
 }
