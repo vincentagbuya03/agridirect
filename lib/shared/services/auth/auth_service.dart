@@ -545,7 +545,7 @@ class AuthService extends ChangeNotifier {
 
       final isOnline = await NetworkStatusService().isOnline().timeout(
         const Duration(seconds: 3),
-        onTimeout: () => true, // Assume online if check times out
+        onTimeout: () => false, // Assume offline if check times out
       );
 
       debugPrint('🔵 AuthService.initialize: isOnline=$isOnline');
@@ -670,6 +670,7 @@ class AuthService extends ChangeNotifier {
         _startWatchingRegistrationStatus(user.id);
       } catch (e) {
         debugPrint('Error fetching roles/status on initialize: $e');
+        await _restoreCachedUserState(user.id);
       }
 
       // Sync seller role if missing

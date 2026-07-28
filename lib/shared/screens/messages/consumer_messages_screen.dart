@@ -13,6 +13,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import '../../services/communication/call_service.dart';
 import 'in_app_call_screen.dart';
+import 'package:agridirect/mobile/screens/support/kiko_ai_chat_screen.dart';
 
 import '../../services/auth/auth_service.dart';
 import '../../services/core/supabase_config.dart';
@@ -43,6 +44,7 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
   final _composerController = TextEditingController();
 
   String? _selectedConversationId;
+  bool _isKikoSelected = false;
   String? _errorText;
   bool _startingInitialConversation = false;
   final List<ChatMessage> _optimisticMessages = [];
@@ -89,6 +91,7 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
 
       setState(() {
         _selectedConversationId = conversationId;
+        _isKikoSelected = false;
         NotificationService().setActiveConversation(conversationId);
       });
 
@@ -135,6 +138,7 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
   Future<void> _openConversation(MessageConversation conversation) async {
     setState(() {
       _selectedConversationId = conversation.conversationId;
+      _isKikoSelected = false;
       NotificationService().setActiveConversation(conversation.conversationId);
       _errorText = null;
     });
@@ -238,28 +242,73 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
             const SizedBox(height: 32),
             const Divider(),
             const SizedBox(height: 16),
-            _buildInfoTile(
-              icon: Icons.person_outline_rounded,
-              title: 'View Profile',
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            _buildInfoTile(
-              icon: Icons.notifications_off_outlined,
-              title: 'Mute Notifications',
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            _buildInfoTile(
-              icon: Icons.block_flipped,
-              title: 'Block User',
-              isDestructive: true,
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
+             _buildInfoTile(
+               icon: Icons.person_outline_rounded,
+               title: 'View Profile',
+               onTap: () async {
+                 Navigator.pop(context);
+                 try {
+                   final profile = await SupabaseDataService().getFarmerProfile(conversation.otherUserId);
+                   if (profile != null && profile['farmer_id'] != null) {
+                     if (context.mounted) {
+                       context.go(AppRoutes.farmerProfile(profile['farmer_id'].toString()));
+                     }
+                   } else {
+                     if (context.mounted) {
+                       ScaffoldMessenger.of(context).showSnackBar(
+                         SnackBar(content: Text('${conversation.otherDisplayName} is a customer profile.')),
+                       );
+                     }
+                   }
+                 } catch (e) {
+                   if (context.mounted) {
+                     ScaffoldMessenger.of(context).showSnackBar(
+                       const SnackBar(content: Text('Failed to load profile.')),
+                     );
+                   }
+                 }
+               },
+             ),
+             _buildInfoTile(
+               icon: Icons.notifications_off_outlined,
+               title: 'Mute Notifications',
+               onTap: () {
+                 Navigator.pop(context);
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   SnackBar(content: Text('Notifications muted for ${conversation.otherDisplayName}.')),
+                 );
+               },
+             ),
+             _buildInfoTile(
+               icon: Icons.block_flipped,
+               title: 'Block User',
+               isDestructive: true,
+               onTap: () {
+                 Navigator.pop(context);
+                 showDialog(
+                   context: context,
+                   builder: (ctx) => AlertDialog(
+                     title: Text('Block ${conversation.otherDisplayName}?'),
+                     content: const Text('You will no longer receive messages or notifications from this user.'),
+                     actions: [
+                       TextButton(
+                         onPressed: () => Navigator.pop(ctx),
+                         child: const Text('Cancel'),
+                       ),
+                       TextButton(
+                         onPressed: () {
+                           Navigator.pop(ctx);
+                           ScaffoldMessenger.of(context).showSnackBar(
+                             SnackBar(content: Text('${conversation.otherDisplayName} has been blocked.')),
+                           );
+                         },
+                         child: const Text('Block', style: TextStyle(color: Colors.red)),
+                       ),
+                     ],
+                   ),
+                 );
+               },
+             ),
             const SizedBox(height: 16),
           ],
         ),
@@ -412,9 +461,13 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                     }
                   }
 
-                  if (current == null && isWide && conversations.isNotEmpty) {
+                  if (current == null && isWide && conversations.isNotEmpty && !_isKikoSelected) {
                     current = conversations.first;
                     _selectedConversationId = current.conversationId;
+                  }
+
+                  if (isWide) {
+                    return _buildWebMessengerLayout(conversations, current);
                   }
 
                   if (current == null && _selectedConversationId == null) {
@@ -423,10 +476,6 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
 
                   if (current == null && _selectedConversationId != null) {
                     return const Center(child: AppShimmerLoader());
-                  }
-
-                  if (isWide) {
-                    return _buildWebMessengerLayout(conversations, current!);
                   }
 
                   return _buildChatPanel(current!);
@@ -506,7 +555,7 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
 
   Widget _buildWebMessengerLayout(
     List<MessageConversation> conversations,
-    MessageConversation current,
+    MessageConversation? current,
   ) {
     final filtered = conversations.where((c) {
       return c.otherDisplayName.toLowerCase().contains(
@@ -591,6 +640,108 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                       ),
                     ),
                   ],
+                ),
+              ),
+              // Pinned Kiko AI Assistant Contact
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: InkWell(
+                  onTap: () {
+                    final isWideLayout = MediaQuery.of(context).size.width >= 800;
+                    if (isWideLayout) {
+                      setState(() {
+                        _isKikoSelected = true;
+                        _selectedConversationId = null;
+                        NotificationService().setActiveConversation(null);
+                      });
+                    } else {
+                      context.push(AppRoutes.kikoAiChat);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: _isKikoSelected
+                          ? const Color(0xFFD1FAE5)
+                          : const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _isKikoSelected
+                            ? const Color(0xFF10B981)
+                            : const Color(0xFF10B981).withValues(alpha: 0.3),
+                        width: _isKikoSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFF10B981), width: 1.5),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4.0),
+                            child: Image.asset(
+                              'assets/images/kiko_happy.png',
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(Icons.support_agent_rounded, color: Color(0xFF10B981), size: 22),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Kiko AI Assistant 🌾',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 14,
+                                      color: AppColors.textHeadline,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'OFFICIAL AI',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Moo! Tap to chat with Kiko for farming & app support 24/7!',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  color: const Color(0xFF047857),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               Expanded(
@@ -767,7 +918,16 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
         Expanded(
           child: Container(
             color: const Color(0xFFF8FAFC),
-            child: _buildWebChatPanel(current),
+            child: _isKikoSelected
+                ? const KikoAiChatScreen(embedMode: true)
+                : (current != null
+                    ? _buildWebChatPanel(current)
+                    : const Center(
+                        child: Text(
+                          'Select a conversation to start messaging',
+                          style: TextStyle(color: AppColors.textSubtle),
+                        ),
+                      )),
           ),
         ),
       ],

@@ -43,6 +43,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
 
   List<Map<String, dynamic>> _orders = [];
   bool _ordersLoaded = false;
+  final Set<String> _updatingOrderIds = {};
 
   static const Color _primary = Color(0xFF16A34A);
   static const Color _dark = Color(0xFF111827);
@@ -158,7 +159,8 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
 
   Widget _buildNavBar() {
     final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 650;
+    final isMobile = sw < 900;
+    final isCompact = sw < 1100;
 
     if (!AuthService().isViewingAsFarmer) {
       return WebConsumerNavBar(
@@ -181,10 +183,12 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
     return Container(
       margin: isMobile
           ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-          : const EdgeInsets.fromLTRB(32, 24, 32, 12),
+          : (isCompact
+              ? const EdgeInsets.fromLTRB(20, 16, 20, 8)
+              : const EdgeInsets.fromLTRB(32, 24, 32, 12)),
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 28,
-        vertical: isMobile ? 12 : 14,
+        horizontal: isMobile ? 16 : (isCompact ? 16 : 28),
+        vertical: isMobile ? 12 : (isCompact ? 10 : 14),
       ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.9),
@@ -205,17 +209,17 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
             child: GestureDetector(
               onTap: () => widget.onNavigate(0),
               child: BrandLogo(
-                size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium,
+                size: (isMobile || isCompact) ? BrandLogoSize.small : BrandLogoSize.medium,
               ),
             ),
           ),
           if (!isMobile) ...[
-            const SizedBox(width: 48),
+            SizedBox(width: isCompact ? 16 : 48),
             ...List.generate(navItems.length, (i) {
               final isActive = i == widget.currentIndex;
               final isHovered = _hoveredNav == i;
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
+                padding: EdgeInsets.symmetric(horizontal: isCompact ? 2 : 4),
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   onEnter: (_) => setState(() => _hoveredNav = i),
@@ -224,9 +228,9 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                     onTap: () => widget.onNavigate(i),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isCompact ? 12 : 20,
+                        vertical: isCompact ? 10 : 12,
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
@@ -239,7 +243,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                       child: Text(
                         navItems[i],
                         style: GoogleFonts.inter(
-                          fontSize: 15,
+                          fontSize: isCompact ? 13 : 15,
                           fontWeight: isActive
                               ? FontWeight.w700
                               : FontWeight.w500,
@@ -263,8 +267,8 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
             child: GestureDetector(
               onTap: () => widget.onNavigate(5),
               child: Container(
-                width: isMobile ? 38 : 46,
-                height: isMobile ? 38 : 46,
+                width: (isMobile || isCompact) ? 38 : 46,
+                height: (isMobile || isCompact) ? 38 : 46,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [_primary, Color(0xFF059669)],
@@ -281,7 +285,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                 child: Icon(
                   Icons.person_outline_rounded,
                   color: Colors.white,
-                  size: isMobile ? 20 : 24,
+                  size: (isMobile || isCompact) ? 20 : 24,
                 ),
               ),
             ),
@@ -332,50 +336,45 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
       ],
     );
 
-    final filters = SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: _statusFilters.map((status) {
-          final isSelected = _selectedStatus == status;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () => setState(() => _selectedStatus = status),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? _primary.withValues(alpha: 0.1)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected ? _primary : _border,
-                      width: isSelected ? 1.5 : 1,
-                    ),
-                  ),
-                  child: Text(
-                    status,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: isSelected
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      color: isSelected ? _primary : _muted,
-                    ),
-                  ),
+    final filters = Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: _statusFilters.map((status) {
+        final isSelected = _selectedStatus == status;
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: () => setState(() => _selectedStatus = status),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 8,
+              ),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? _primary.withValues(alpha: 0.1)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected ? _primary : _border,
+                  width: isSelected ? 1.5 : 1,
+                ),
+              ),
+              child: Text(
+                status,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: isSelected
+                      ? FontWeight.w700
+                      : FontWeight.w500,
+                  color: isSelected ? _primary : _muted,
                 ),
               ),
             ),
-          );
-        }).toList(),
-      ),
+          ),
+        );
+      }).toList(),
     );
 
     final searchField = Container(
@@ -647,23 +646,38 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               ),
               const SizedBox(width: 8),
               if (canProgress)
-                ElevatedButton.icon(
-                  onPressed: () => _processOrderConfirmation(o),
-                  icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
-                  label: Text(
-                    _getNextActionLabel(status, o['paymentMethod']),
-                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
+                _updatingOrderIds.contains(o['rawOrderId']?.toString())
+                    ? const SizedBox(
+                        height: 38,
+                        width: 120,
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(_primary),
+                            ),
+                          ),
+                        ),
+                      )
+                    : ElevatedButton.icon(
+                        onPressed: () => _processOrderConfirmation(o),
+                        icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                        label: Text(
+                          _getNextActionLabel(status, o['paymentMethod']),
+                          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
             ],
           ),
         ],
@@ -794,14 +808,26 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                     onTap: () => _viewOrderDetails(o),
                   ),
                   const SizedBox(width: 4),
-                  _ActionButton(
-                    icon: Icons.check_circle_outline_rounded,
-                    tooltip: _getNextActionLabel(status, o['paymentMethod']),
-                    color: canProgress ? _primary : Colors.grey.shade300,
-                    onTap: canProgress
-                        ? () => _processOrderConfirmation(o)
-                        : null,
-                  ),
+                  _updatingOrderIds.contains(o['rawOrderId']?.toString())
+                      ? const SizedBox(
+                          width: 34,
+                          height: 34,
+                          child: Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(_primary),
+                            ),
+                          ),
+                        )
+                      : _ActionButton(
+                          icon: Icons.check_circle_outline_rounded,
+                          tooltip: _getNextActionLabel(status, o['paymentMethod']),
+                          color: canProgress ? _primary : Colors.grey.shade300,
+                          onTap: canProgress
+                              ? () => _processOrderConfirmation(o)
+                              : null,
+                        ),
                 ],
               ),
             ),
@@ -845,22 +871,25 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                   ? const Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))
                   : null,
             ),
-            child: Row(
-              children: [
-                _skeletonBox(120),
-                const SizedBox(width: 24),
-                _skeletonBox(80),
-                const SizedBox(width: 24),
-                _skeletonBox(140),
-                const SizedBox(width: 24),
-                _skeletonBox(160),
-                const Spacer(),
-                _skeletonBox(60),
-                const SizedBox(width: 16),
-                _skeletonBox(80),
-                const SizedBox(width: 16),
-                _skeletonBox(64),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _skeletonBox(120),
+                  const SizedBox(width: 24),
+                  _skeletonBox(80),
+                  const SizedBox(width: 24),
+                  _skeletonBox(140),
+                  const SizedBox(width: 24),
+                  _skeletonBox(160),
+                  const SizedBox(width: 24),
+                  _skeletonBox(60),
+                  const SizedBox(width: 16),
+                  _skeletonBox(80),
+                  const SizedBox(width: 16),
+                  _skeletonBox(64),
+                ],
+              ),
             ),
           ),
         ),
@@ -948,12 +977,14 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
     );
 
     if (confirm == true && mounted) {
-      // Optimistic update — no full reload
-      _updateOrderStatusLocally(rawOrderId, nextStatus);
+      setState(() {
+        _updatingOrderIds.add(rawOrderId);
+      });
 
       try {
         await OrderService().updateOrderStatus(rawOrderId, nextStatus);
         if (mounted) {
+          _updateOrderStatusLocally(rawOrderId, nextStatus);
           String successMsg = 'Order status updated successfully.';
           if (nextStatus == 'SHIPPED') {
             successMsg = isCop
@@ -985,8 +1016,6 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
           Overlay.of(context).insert(overlayEntry);
         }
       } catch (e) {
-        // Revert optimistic update on failure
-        _updateOrderStatusLocally(rawOrderId, status);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -998,6 +1027,12 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               ),
             ),
           );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _updatingOrderIds.remove(rawOrderId);
+          });
         }
       }
     }

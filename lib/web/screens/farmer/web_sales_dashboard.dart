@@ -296,7 +296,8 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
 
   Widget _buildNavBar() {
     final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 650;
+    final isMobile = sw < 900;
+    final isCompact = sw < 1100;
 
     if (!AuthService().isViewingAsFarmer) {
       return WebConsumerNavBar(
@@ -313,10 +314,12 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
     return Container(
       margin: isMobile
           ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-          : const EdgeInsets.fromLTRB(32, 24, 32, 12),
+          : (isCompact
+              ? const EdgeInsets.fromLTRB(20, 16, 20, 8)
+              : const EdgeInsets.fromLTRB(32, 24, 32, 12)),
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 28,
-        vertical: isMobile ? 12 : 14,
+        horizontal: isMobile ? 16 : (isCompact ? 16 : 28),
+        vertical: isMobile ? 12 : (isCompact ? 10 : 14),
       ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.8),
@@ -337,17 +340,17 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             child: GestureDetector(
               onTap: () => widget.onNavigate(0),
               child: BrandLogo(
-                size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium,
+                size: (isMobile || isCompact) ? BrandLogoSize.small : BrandLogoSize.medium,
               ),
             ),
           ),
           if (!isMobile) ...[
-            const SizedBox(width: 48),
+            SizedBox(width: isCompact ? 16 : 48),
             ...List.generate(navItems.length, (i) {
               final isActive = i == widget.currentIndex;
               final isHovered = _hoveredNav == i;
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
+                padding: EdgeInsets.symmetric(horizontal: isCompact ? 2 : 4),
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   onEnter: (_) => setState(() => _hoveredNav = i),
@@ -356,9 +359,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                     onTap: () => widget.onNavigate(i),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isCompact ? 12 : 20,
+                        vertical: isCompact ? 10 : 12,
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
@@ -371,7 +374,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                       child: Text(
                         navItems[i],
                         style: GoogleFonts.inter(
-                          fontSize: 15,
+                          fontSize: isCompact ? 13 : 15,
                           fontWeight: isActive
                               ? FontWeight.w700
                               : FontWeight.w500,
@@ -395,8 +398,8 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             child: GestureDetector(
               onTap: () => widget.onNavigate(5),
               child: Container(
-                width: isMobile ? 38 : 46,
-                height: isMobile ? 38 : 46,
+                width: (isMobile || isCompact) ? 38 : 46,
+                height: (isMobile || isCompact) ? 38 : 46,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [_primary, Color(0xFF059669)],
@@ -413,7 +416,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                 child: Icon(
                   Icons.person_outline_rounded,
                   color: Colors.white,
-                  size: isMobile ? 20 : 24,
+                  size: (isMobile || isCompact) ? 20 : 24,
                 ),
               ),
             ),
@@ -556,7 +559,6 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
 
   Widget _buildWelcomeHeader() {
     final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 650;
 
     final headerText = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -564,7 +566,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         Text(
           'Welcome back, $_farmerName!',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: isMobile ? 24 : 36,
+            fontSize: sw < 650 ? 24 : (sw < 1100 ? 30 : 36),
             fontWeight: FontWeight.w800,
             color: _dark,
             letterSpacing: -1,
@@ -574,7 +576,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         Text(
           "Manage your farm's performance and orders from one place.",
           style: GoogleFonts.inter(
-            fontSize: isMobile ? 14 : 16,
+            fontSize: sw < 650 ? 14 : 16,
             color: _muted,
             fontWeight: FontWeight.w400,
           ),
@@ -677,7 +679,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
       );
     }
 
-    if (isMobile) {
+    if (sw < 650) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -704,6 +706,35 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           ),
           const SizedBox(height: 16),
           weatherWidget,
+        ],
+      );
+    }
+
+    if (sw < 1100) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          headerText,
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              ElevatedButton.icon(
+                onPressed: _openVoucherManager,
+                icon: const Icon(Icons.confirmation_number_outlined),
+                label: const Text('Manage Vouchers'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              weatherWidget,
+            ],
+          ),
         ],
       );
     }

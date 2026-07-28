@@ -53,8 +53,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   final List<OverlayEntry> _flyingOverlayEntries = [];
 
   double _minPrice = 0.0;
-  double _maxPrice = 500.0;
-  double _maxDistance = 5.0; // default 5 km
+  double _maxPrice = 1000.0;
+  double _maxDistance = 50.0;
+  bool _distanceFilterEnabled = false; // only filter by distance when user explicitly sets it
+  bool _priceFilterEnabled = false; // only filter by price when user explicitly sets it
   Position? _userPosition;
 
   Widget _buildHeaderNotification(BuildContext context) {
@@ -660,11 +662,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 p.farm.toLowerCase().contains(query);
 
             final productPrice = _parsePrice(p.price);
-            final matchesPrice =
-                productPrice >= _minPrice && productPrice <= _maxPrice;
+            final matchesPrice = !_priceFilterEnabled ||
+                (productPrice >= _minPrice && productPrice <= _maxPrice);
 
             bool matchesDistance = true;
-            if (_userPosition != null &&
+            if (_distanceFilterEnabled &&
+                _userPosition != null &&
                 p.latitude != null &&
                 p.longitude != null) {
               final distInMeters = Geolocator.distanceBetween(
@@ -743,11 +746,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               p.farm.toLowerCase().contains(query);
 
           final productPrice = _parsePrice(p.price);
-          final matchesPrice =
-              productPrice >= _minPrice && productPrice <= _maxPrice;
+          final matchesPrice = !_priceFilterEnabled ||
+              (productPrice >= _minPrice && productPrice <= _maxPrice);
 
           bool matchesDistance = true;
-          if (_userPosition != null &&
+          if (_distanceFilterEnabled &&
+              _userPosition != null &&
               p.latitude != null &&
               p.longitude != null) {
             final distInMeters = Geolocator.distanceBetween(
@@ -842,8 +846,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               onPressed: () {
                 setState(() {
                   _minPrice = 0.0;
-                  _maxPrice = 500.0;
-                  _maxDistance = 5.0;
+                  _maxPrice = 1000.0;
+                  _maxDistance = 50.0;
+                  _distanceFilterEnabled = false;
+                  _priceFilterEnabled = false;
                   _searchController.clear();
                   _selectedFilter = 0;
                 });
@@ -1070,7 +1076,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                     _minPrice = values.start;
                     _maxPrice = values.end;
                   });
-                  setState(() {});
+                  setState(() {
+                    _priceFilterEnabled = true;
+                  });
                 },
               ),
               const SizedBox(height: 24),
@@ -1108,7 +1116,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   setSheetState(() {
                     _maxDistance = val;
                   });
-                  setState(() {});
+                  setState(() {
+                    _distanceFilterEnabled = true;
+                  });
                 },
               ),
               const SizedBox(height: 32),
@@ -1833,9 +1843,11 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                           (_paymentMethod == 'COD' && _address == null ||
                               _isOrdering)
                           ? null
-                          : () {
-                              Navigator.pop(sheetContext);
-                              _handleOrderNow(deliveryFee);
+                          : () async {
+                              setSheetState(() {
+                                _isOrdering = true;
+                              });
+                              await _handleOrderNow(deliveryFee);
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
@@ -1844,13 +1856,35 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: Text(
-                        _isOrdering ? 'Ordering...' : 'Confirm Order',
-                        style: AppTextStyles.headline3.copyWith(
-                          color: Colors.white,
-                          fontSize: 18,
-                        ),
-                      ),
+                      child: _isOrdering
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Placing Order...',
+                                  style: AppTextStyles.headline3.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Text(
+                              'Confirm Order',
+                              style: AppTextStyles.headline3.copyWith(
+                                color: Colors.white,
+                                fontSize: 18,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -1995,6 +2029,9 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     }
     setState(() => _isOrdering = true);
     try {
+      // Simulate/allow loading state transition
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+
       final unitPrice =
           double.tryParse(
             widget.product.price.replaceAll(RegExp(r'[^0-9.]'), ''),
@@ -2015,7 +2052,12 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         deliveryFee: deliveryFee,
       );
       if (!mounted) return;
-      context.push(AppRoutes.customerOrders);
+      
+      // Close checkout confirmation sheet
+      Navigator.of(context).pop();
+
+      // Route to our beautiful animated success page
+      context.go(AppRoutes.orderSuccess, extra: widget.product.categoryName);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

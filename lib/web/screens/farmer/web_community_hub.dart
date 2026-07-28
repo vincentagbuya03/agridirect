@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
@@ -53,6 +54,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   static const Color _border = Color(0xFFE2E8F0);
   static const Color _surface = Color(0xFFF8FAFC);
 
+  Future<List<Map<String, dynamic>>>? _marketPricesFuture;
+
   @override
   void initState() {
     super.initState();
@@ -65,6 +68,69 @@ class _WebCommunityHubState extends State<WebCommunityHub>
     _postControllers = [];
     _forumPostsFuture = SupabaseDataService().getForumPosts();
     _weatherFuture = WeatherService().getWeatherByCity('Manila');
+    _marketPricesFuture = _loadMarketPrices();
+  }
+
+  Future<List<Map<String, dynamic>>> _loadMarketPrices() async {
+    try {
+      final client = Supabase.instance.client;
+      final response = await client.from('products').select('name, price');
+      final products = response as List<dynamic>;
+      if (products.isEmpty) {
+        return [
+          {'item': 'Palay / Rice', 'price': '₱45 / kg', 'trend': 'Stable', 'up': null},
+          {'item': 'Fresh Eggs', 'price': '₱7 / pc', 'trend': 'Stable', 'up': null},
+        ];
+      }
+
+      final Map<String, List<double>> groups = {};
+      for (final p in products) {
+        final name = (p['name'] as String?)?.toLowerCase() ?? '';
+        final price = double.tryParse(p['price']?.toString() ?? '0') ?? 0;
+        
+        String key = '';
+        if (name.contains('rice') || name.contains('palay')) {
+          key = 'Palay / Rice';
+        } else if (name.contains('egg')) {
+          key = 'Fresh Eggs';
+        } else if (name.contains('onion')) {
+          key = 'Onion';
+        } else if (name.contains('tomato')) {
+          key = 'Tomato';
+        }
+
+        if (key.isNotEmpty) {
+          groups.putIfAbsent(key, () => []).add(price);
+        }
+      }
+
+      final List<Map<String, dynamic>> result = [];
+      groups.forEach((key, list) {
+        final avg = list.reduce((a, b) => a + b) / list.length;
+        String unit = 'kg';
+        if (key == 'Fresh Eggs') unit = 'pc';
+        result.add({
+          'item': key,
+          'price': '₱${avg.toStringAsFixed(0)} / $unit',
+          'trend': 'Active',
+          'up': true,
+        });
+      });
+
+      if (result.isEmpty) {
+        return [
+          {'item': 'Palay / Rice', 'price': '₱45 / kg', 'trend': 'Stable', 'up': null},
+          {'item': 'Fresh Eggs', 'price': '₱7 / pc', 'trend': 'Stable', 'up': null},
+        ];
+      }
+      return result;
+    } catch (e) {
+      debugPrint('Error loading market prices: $e');
+      return [
+        {'item': 'Palay / Rice', 'price': '₱45 / kg', 'trend': 'Stable', 'up': null},
+        {'item': 'Fresh Eggs', 'price': '₱7 / pc', 'trend': 'Stable', 'up': null},
+      ];
+    }
   }
 
   void _refreshForumPosts() {
@@ -218,7 +284,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   // ─── Site Header (consistent across all pages) ───
   Widget _buildNavBar() {
     final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 650;
+    final isMobile = sw < 900;
+    final isCompact = sw < 1100;
 
     if (!AuthService().isViewingAsFarmer) {
       return WebConsumerNavBar(
@@ -235,10 +302,12 @@ class _WebCommunityHubState extends State<WebCommunityHub>
     return Container(
       margin: isMobile
           ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-          : const EdgeInsets.fromLTRB(32, 24, 32, 12),
+          : (isCompact
+              ? const EdgeInsets.fromLTRB(20, 16, 20, 8)
+              : const EdgeInsets.fromLTRB(32, 24, 32, 12)),
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 28,
-        vertical: isMobile ? 12 : 14,
+        horizontal: isMobile ? 16 : (isCompact ? 16 : 28),
+        vertical: isMobile ? 12 : (isCompact ? 10 : 14),
       ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.8),
@@ -260,18 +329,18 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             child: GestureDetector(
               onTap: () => widget.onNavigate(0),
               child: BrandLogo(
-                size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium,
+                size: (isMobile || isCompact) ? BrandLogoSize.small : BrandLogoSize.medium,
               ),
             ),
           ),
           if (!isMobile) ...[
-            const SizedBox(width: 48),
+            SizedBox(width: isCompact ? 16 : 48),
             // Nav items
             ...List.generate(navItems.length, (i) {
               final isActive = i == widget.currentIndex;
               final isHovered = _hoveredNav == i;
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
+                padding: EdgeInsets.symmetric(horizontal: isCompact ? 2 : 4),
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   onEnter: (_) => setState(() => _hoveredNav = i),
@@ -280,9 +349,9 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                     onTap: () => widget.onNavigate(i),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isCompact ? 12 : 20,
+                        vertical: isCompact ? 10 : 12,
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
@@ -295,7 +364,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                       child: Text(
                         navItems[i],
                         style: GoogleFonts.inter(
-                          fontSize: 15,
+                          fontSize: isCompact ? 13 : 15,
                           fontWeight: isActive
                               ? FontWeight.w700
                               : FontWeight.w500,
@@ -320,8 +389,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
             child: GestureDetector(
               onTap: () => widget.onNavigate(5), // Profile is index 5
               child: Container(
-                width: isMobile ? 38 : 46,
-                height: isMobile ? 38 : 46,
+                width: (isMobile || isCompact) ? 38 : 46,
+                height: (isMobile || isCompact) ? 38 : 46,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [_primary, Color(0xFF059669)],
@@ -338,7 +407,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                 child: Icon(
                   Icons.person_outline_rounded,
                   color: Colors.white,
-                  size: isMobile ? 20 : 24,
+                  size: (isMobile || isCompact) ? 20 : 24,
                 ),
               ),
             ),
@@ -1326,7 +1395,6 @@ class _WebCommunityHubState extends State<WebCommunityHub>
     );
   }
 
-  // ─── Right Sidebar ───
   Widget _buildRightSidebar() {
     return Container(
       decoration: BoxDecoration(
@@ -1339,6 +1407,8 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           children: [
             _buildWeatherWidget(),
             const SizedBox(height: 24),
+            _buildMarketPriceTrends(),
+            const SizedBox(height: 24),
             _buildTrendingTopics(),
             const SizedBox(height: 24),
             _buildPopularTags(),
@@ -1347,6 +1417,102 @@ class _WebCommunityHubState extends State<WebCommunityHub>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMarketPriceTrends() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _marketPricesFuture,
+      builder: (context, snapshot) {
+        final prices = snapshot.data ?? [
+          {'item': 'Palay / Rice', 'price': '₱45 / kg', 'trend': 'Stable', 'up': null},
+          {'item': 'Fresh Eggs', 'price': '₱7 / pc', 'trend': 'Stable', 'up': null},
+        ];
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.trending_up_rounded, color: _primary, size: 20),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Market Price Index',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ...prices.map((p) {
+                final isUp = p['up'] == true;
+                final isDown = p['up'] == false;
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        p['item'] as String,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _dark,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          Text(
+                            p['price'] as String,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: _dark,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isUp
+                                  ? Colors.green.withValues(alpha: 0.1)
+                                  : (isDown
+                                      ? Colors.red.withValues(alpha: 0.1)
+                                      : Colors.grey.withValues(alpha: 0.1)),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              p['trend'] as String,
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: isUp
+                                    ? Colors.green[700]
+                                    : (isDown ? Colors.red[700] : Colors.grey[700]),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      }
     );
   }
 

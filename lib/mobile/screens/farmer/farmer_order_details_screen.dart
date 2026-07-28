@@ -120,16 +120,39 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
         if (address != null &&
             (address['latitude'] == null || address['longitude'] == null)) {
           try {
-            final parts = <String>[
-              address['street']?.toString() ?? '',
-              address['barangay']?.toString() ?? '',
-              address['city']?.toString() ?? '',
-              address['province']?.toString() ?? '',
-            ].where((s) => s.isNotEmpty).toList();
-            final addressText = parts.join(', ');
+            final street = address['street']?.toString() ?? '';
+            final barangay = address['barangay']?.toString() ?? '';
+            final city = address['city']?.toString() ?? '';
+            final province = address['province']?.toString() ?? '';
 
-            if (addressText.isNotEmpty) {
-              final encodedAddr = Uri.encodeComponent(addressText);
+            String cleanBrgy(String val) {
+              return val.replaceAll(RegExp(r'\b(brgy|brgy\.|barangay)\b', caseSensitive: false), '').trim();
+            }
+
+            String cleanStreet(String val) {
+              return val.replaceAll(RegExp(r'#\d+'), '').replaceAll(RegExp(r'\d+'), '').trim();
+            }
+
+            final listQueries = <String>[];
+            
+            final parts1 = <String>[street, barangay, city, province].where((s) => s.isNotEmpty).toList();
+            if (parts1.isNotEmpty) listQueries.add(parts1.join(', '));
+
+            final cStreet = cleanStreet(street);
+            final cBrgy = cleanBrgy(barangay);
+            final parts2 = <String>[cStreet, cBrgy, city, province].where((s) => s.isNotEmpty).toList();
+            if (parts2.isNotEmpty) listQueries.add(parts2.join(', '));
+
+            final parts3 = <String>[cBrgy, city, province].where((s) => s.isNotEmpty).toList();
+            if (parts3.isNotEmpty) listQueries.add(parts3.join(', '));
+
+            final parts4 = <String>[city, province].where((s) => s.isNotEmpty).toList();
+            if (parts4.isNotEmpty) listQueries.add(parts4.join(', '));
+
+            LatLng? foundCoords;
+            for (final q in listQueries) {
+              if (q.trim().isEmpty) continue;
+              final encodedAddr = Uri.encodeComponent(q);
               final searchUri = Uri.parse(
                 'https://nominatim.openstreetmap.org/search?format=json&q=$encodedAddr&limit=1',
               );
@@ -143,12 +166,20 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                 final list = jsonDecode(res.body) as List;
                 if (list.isNotEmpty) {
                   final first = list.first as Map<String, dynamic>;
-                  // Create a mutable copy of the map to inject geocoded coordinates
-                  address = Map<String, dynamic>.from(address);
-                  address['latitude'] = double.tryParse(first['lat']?.toString() ?? '');
-                  address['longitude'] = double.tryParse(first['lon']?.toString() ?? '');
+                  final latVal = double.tryParse(first['lat']?.toString() ?? '');
+                  final lonVal = double.tryParse(first['lon']?.toString() ?? '');
+                  if (latVal != null && lonVal != null) {
+                    foundCoords = LatLng(latVal, lonVal);
+                    break;
+                  }
                 }
               }
+            }
+
+            if (foundCoords != null) {
+              address = Map<String, dynamic>.from(address);
+              address['latitude'] = foundCoords.latitude;
+              address['longitude'] = foundCoords.longitude;
             }
           } catch (_) {}
         }
@@ -854,6 +885,40 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                       onPressed: () => _launchNavigation(lat, lng),
                       backgroundColor: AppColors.primary,
                       child: const Icon(Icons.navigation_rounded, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ] else ...[
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: () async {
+              final addressQuery = Uri.encodeComponent(addressText);
+              final mapUrl = 'https://www.google.com/maps/search/?api=1&query=$addressQuery';
+              if (await canLaunchUrl(Uri.parse(mapUrl))) {
+                await launchUrl(Uri.parse(mapUrl), mode: LaunchMode.externalApplication);
+              }
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.navigation_rounded, color: AppColors.primary, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Get Directions / View on Map',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],

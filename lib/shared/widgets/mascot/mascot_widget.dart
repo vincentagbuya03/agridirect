@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
+import '../../router/app_routes.dart';
 
 enum MascotExpression {
   happy,
@@ -38,7 +40,6 @@ class MascotWidget extends StatefulWidget {
 class _MascotWidgetState extends State<MascotWidget> with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _scaleAnimation;
-  bool _isHelpMenuOpen = false;
 
   @override
   void initState() {
@@ -212,80 +213,243 @@ class _MascotWidgetState extends State<MascotWidget> with SingleTickerProviderSt
 
   Widget _buildFloatingHelp() {
     return Positioned(
-      bottom: 16,
+      bottom: 20,
       left: 16,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_isHelpMenuOpen)
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+      child: GestureDetector(
+        onTap: () => _showKikoSupportSheet(context),
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: const Color(0xFF10B981),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF10B981).withValues(alpha: 0.35),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: SizedBox(
-                  width: 220,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ListTile(
-                        leading: const Icon(Icons.help_outline, color: Color(0xFF10B981)),
-                        title: const Text('App Tour / Guide'),
-                        dense: true,
-                        onTap: () {
-                          setState(() => _isHelpMenuOpen = false);
-                          _showGuideDialog();
-                        },
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.question_answer_outlined, color: Color(0xFF10B981)),
-                        title: const Text('FAQs'),
-                        dense: true,
-                        onTap: () {
-                          setState(() => _isHelpMenuOpen = false);
-                          _showFaqDialog();
-                        },
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.support_agent, color: Color(0xFF10B981)),
-                        title: const Text('Contact Support'),
-                        dense: true,
-                        onTap: () {
-                          setState(() => _isHelpMenuOpen = false);
-                          _showSupportSnackbar();
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          const SizedBox(height: 8),
-          FloatingActionButton(
-            heroTag: 'lando_helper_badge',
-            backgroundColor: const Color(0xFF10B981),
-            onPressed: () {
-              setState(() {
-                _isHelpMenuOpen = !_isHelpMenuOpen;
-              });
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(4.0),
-              child: Image.asset(
-                _getAssetPath(widget.expression),
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(Icons.contact_support, color: Colors.white, size: 28);
-                },
-              ),
+            ],
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(6.0),
+            child: Image.asset(
+              _getAssetPath(widget.expression),
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.support_agent_rounded, color: Colors.white, size: 28);
+              },
             ),
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  void _showKikoSupportSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Sheet Grab Handle
+              Container(
+                width: 38,
+                height: 4.5,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Header
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3), width: 1.5),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Image.asset(
+                        _getAssetPath(widget.expression),
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.support_agent_rounded, color: Color(0xFF10B981)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '🌱 Kiko Support Center',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'How can I help your farming & shopping today?',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Menu Grid
+              _buildSupportTile(
+                sheetContext,
+                icon: Icons.smart_toy_rounded,
+                iconColor: const Color(0xFF10B981),
+                bgColor: const Color(0xFFECFDF5),
+                title: 'Chat with Kiko AI Assistant',
+                subtitle: 'Ask about crops, market prices, or app help',
+                route: AppRoutes.kikoAiChat,
+              ),
+              _buildSupportTile(
+                sheetContext,
+                icon: Icons.explore_rounded,
+                iconColor: const Color(0xFF0EA5E9),
+                bgColor: const Color(0xFFF0F9FF),
+                title: 'App Tour & Feature Guide',
+                subtitle: 'Interactive walkthrough of AgriDirect features',
+                route: AppRoutes.appTour,
+              ),
+              _buildSupportTile(
+                sheetContext,
+                icon: Icons.quiz_rounded,
+                iconColor: const Color(0xFF8B5CF6),
+                bgColor: const Color(0xFFF5F3FF),
+                title: 'Frequently Asked Questions (FAQs)',
+                subtitle: 'Find answers on orders, payments & selling',
+                route: AppRoutes.faqs,
+              ),
+              _buildSupportTile(
+                sheetContext,
+                icon: Icons.headset_mic_rounded,
+                iconColor: const Color(0xFFF59E0B),
+                bgColor: const Color(0xFFFEF3C7),
+                title: 'Contact Support Team',
+                subtitle: 'Submit support tickets or email our team',
+                route: AppRoutes.contactSupport,
+              ),
+              _buildSupportTile(
+                sheetContext,
+                icon: Icons.menu_book_rounded,
+                iconColor: const Color(0xFF10B981),
+                bgColor: const Color(0xFFECFDF5),
+                title: 'Farmer Guides & Tutorials',
+                subtitle: 'Step-by-step guides on pre-orders & pricing',
+                route: AppRoutes.farmerGuides,
+              ),
+              _buildSupportTile(
+                sheetContext,
+                icon: Icons.bug_report_rounded,
+                iconColor: const Color(0xFFEF4444),
+                bgColor: const Color(0xFFFEF2F2),
+                title: 'Report an Issue / Bug',
+                subtitle: 'Notify our team of any app or order problems',
+                route: AppRoutes.reportIssue,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSupportTile(
+    BuildContext sheetContext, {
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required String title,
+    required String subtitle,
+    required String route,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10.0),
+      child: InkWell(
+        onTap: () {
+          Navigator.pop(sheetContext);
+          context.push(route);
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -377,79 +541,6 @@ class _MascotWidgetState extends State<MascotWidget> with SingleTickerProviderSt
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showGuideDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Image.asset(
-                'assets/images/kiko_happy.png',
-                width: 40,
-                height: 40,
-                errorBuilder: (context, error, stackTrace) => const Icon(Icons.face, color: Color(0xFF10B981)),
-              ),
-              const SizedBox(width: 10),
-              const Text('AgriDirect Quick Guide'),
-            ],
-          ),
-          content: const Text(
-            'Welcome to AgriDirect! Kiko is here to help you get the most out of your app.\n\n'
-            '• As a farmer, you can register products, view sales stats, and manage pre-orders.\n'
-            '• Use the community hub to connect with other farmers and share tips.\n'
-            '• As a consumer, explore fresh organic produce directly from local farms!',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Got it!'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showFaqDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Frequently Asked Questions'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView(
-              shrinkWrap: true,
-              children: const [
-                Text('Q: How do I list a new product?', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text('A: Go to your inventory/products screen and tap the "+" button.'),
-                SizedBox(height: 12),
-                Text('Q: How are order payments processed?', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text('A: Payments are managed securely via our commerce integrations.'),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showSupportSnackbar() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Support requested! A helper agent will contact you shortly.'),
-        backgroundColor: Color(0xFF10B981),
       ),
     );
   }

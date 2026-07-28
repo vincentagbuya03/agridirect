@@ -177,6 +177,8 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
 
     setState(() => _isSubmittingOrder = true);
     try {
+      // Simulate/allow loading state transition
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
       final orderService = OrderService();
       final Map<String, List<OrderItemInput>> itemsByFarmer = {};
       for (final item in _cartItems) {

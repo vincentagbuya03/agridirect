@@ -8,6 +8,7 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../widgets/animated_components.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
+import '../../widgets/quick_links/quick_links_dialogs.dart';
 
 /// Web Marketplace Home — Clean AgriDirect Landing Page
 /// Light mint/green design matching reference screenshot
@@ -2099,15 +2100,15 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
 
   void _handleFooterLinkTap(String text) {
     if (text == 'Find a Farmer') {
-      widget.onNavigate(1);
+      FindAFarmerDialog.show(context, onExploreFarmers: () => context.go(AppRoutes.farmersMap));
     } else if (text == 'Vegetables' || text == 'Fruits & Berries' || text == 'Dairy & Eggs' || text == 'Organic Grains') {
       widget.onNavigate(1, text);
     } else if (text == 'Seasonal Calendar') {
-      _showSeasonalCalendar();
+      SeasonalCalendarDialog.show(context);
     } else if (text == 'Pricing Plans') {
-      _showPricingPlans();
+      PricingPlansDialog.show(context);
     } else if (text == 'Help Center') {
-      _showHelpCenter();
+      HelpCenterDialog.show(context);
     } else if (text == 'Privacy Policy') {
       _showPolicyModal('Privacy Policy', _privacyPolicyText);
     } else if (text == 'Terms of Service') {
@@ -2115,141 +2116,6 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
     } else if (text == 'Cookie Policy') {
       _showPolicyModal('Cookie Policy', _cookiePolicyText);
     }
-  }
-
-  void _showHelpCenter() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('AgriDirect Help Center', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Frequently Asked Questions', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16)),
-              const SizedBox(height: 12),
-              _buildFAQItem('How do I buy fresh products?', 'Browse our marketplace, add items to your cart, and checkout. You can pay via Cash on Delivery (COD) or Cash on Pickup (COP).'),
-              _buildFAQItem('Are the products really fresh?', 'Yes! All products are directly sourced and harvested by our local verified farmers.'),
-              _buildFAQItem('How can I contact support?', 'You can reach us at support@agridirect.com or call 09122354762.'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFAQItem(String question, String answer) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Q: $question', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13, color: _primary)),
-          const SizedBox(height: 4),
-          Text(answer, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[700])),
-        ],
-      ),
-    );
-  }
-
-  void _showSeasonalCalendar() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Seasonal Harvest Calendar', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Optimal Harvest Seasons', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16)),
-              const SizedBox(height: 12),
-              _buildCalendarItem('Rice', 'October - December'),
-              _buildCalendarItem('Vegetables (Tomato, Eggplant)', 'January - May'),
-              _buildCalendarItem('Mangoes', 'March - June'),
-              _buildCalendarItem('Corn', 'June - August'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCalendarItem(String crop, String season) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(crop, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13)),
-          Text(season, style: GoogleFonts.inter(fontSize: 13, color: _primary, fontWeight: FontWeight.w500)),
-        ],
-      ),
-    );
-  }
-
-  void _showPricingPlans() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Platform Pricing Plans', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildPlanCard('Free Consumer Plan', '₱0 / month', 'Perfect for buyers. Access full marketplace, view farmer profiles, track orders.'),
-              const SizedBox(height: 12),
-              _buildPlanCard('Premium Farmer Plan', '₱0 / month (Beta)', 'Start selling directly. Unlimited listings, priority search placement, direct notifications.'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlanCard(String name, String price, String desc) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _primary.withValues(alpha: 0.05),
-        border: Border.all(color: _primary.withValues(alpha: 0.2)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(name, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14)),
-              Text(price, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14, color: _primary)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(desc, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[700])),
-        ],
-      ),
-    );
   }
 
   void _showPolicyModal(String title, String content) {

@@ -115,7 +115,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
         child: Column(
           children: [
             _buildCustomerHeader(auth),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
             _buildCustomerMenu(context),
             const SizedBox(height: 32),
             _buildLogoutButton(),
@@ -132,67 +132,128 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   }
 
   Widget _buildCustomerHeader(AuthService auth) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(40),
-          bottomRight: Radius.circular(40),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final canPop = Navigator.canPop(context);
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (canPop)
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                    onPressed: () => context.pop(),
+                  )
+                else
+                  const SizedBox(width: 48),
+                Text('Profile', style: AppTextStyles.headline3.copyWith(fontSize: 20)),
+                const SizedBox(width: 48),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: AppDecorations.cardDecoration.copyWith(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Column(
                 children: [
-                  Text('Profile', style: AppTextStyles.headline1),
-                  GestureDetector(
+                  Row(
+                    children: [
+                      _buildProfileImage(),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              auth.userName.isNotEmpty ? auth.userName : 'User',
+                              style: AppTextStyles.headline3.copyWith(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              auth.userEmail,
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSubtle,
+                                fontSize: 12,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'Premium Buyer',
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  const SizedBox(height: 16),
+                  InkWell(
                     onTap: _handleSwitchToFarmer,
+                    borderRadius: BorderRadius.circular(16),
                     child: Container(
+                      width: double.infinity,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
-                        vertical: 8,
+                        vertical: 14,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
+                        color: AppColors.accent.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: AppColors.accent.withValues(alpha: 0.2),
+                          color: AppColors.accent.withValues(alpha: 0.15),
                         ),
                       ),
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
                             auth.isSeller
-                                ? Icons.agriculture
+                                ? Icons.agriculture_rounded
                                 : (auth.registrationStatus == 'pending' || auth.registrationStatus == 'under_review'
                                     ? Icons.hourglass_empty_rounded
-                                    : Icons.agriculture),
+                                    : Icons.agriculture_rounded),
                             size: 18,
                             color: AppColors.accent,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             auth.isSeller
-                                ? 'Switch to Selling'
+                                ? 'Switch to Selling Mode'
                                 : (auth.registrationStatus == 'pending' || auth.registrationStatus == 'under_review'
-                                    ? 'Pending Approval'
-                                    : 'Start Selling'),
+                                    ? 'Pending Admin Review'
+                                    : 'Start Selling on AgriDirect'),
                             style: AppTextStyles.labelSmall.copyWith(
                               color: AppColors.accent,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
                             ),
                           ),
                         ],
@@ -201,51 +262,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  _buildProfileImage(),
-                  const SizedBox(width: 24),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          auth.userName.isNotEmpty ? auth.userName : 'User',
-                          style: AppTextStyles.headline2.copyWith(fontSize: 24),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          auth.userEmail,
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSubtle,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            'Premium Buyer',
-                            style: AppTextStyles.labelSmall.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -253,8 +271,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
 
   Widget _buildProfileImage() {
     return Container(
-      width: 100,
-      height: 100,
+      width: 80,
+      height: 80,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: AppColors.primary, width: 3),
@@ -269,11 +287,11 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                 fit: BoxFit.cover,
                 placeholder: (_, _) => Container(color: Colors.grey[100]),
                 errorWidget: (_, _, _) =>
-                    const Icon(Icons.person, size: 40, color: Colors.grey),
+                    const Icon(Icons.person, size: 36, color: Colors.grey),
               )
             : Container(
                 color: Colors.grey[100],
-                child: const Icon(Icons.person, size: 40, color: Colors.grey),
+                child: const Icon(Icons.person, size: 36, color: Colors.grey),
               ),
       ),
     );
@@ -285,11 +303,18 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Account Settings',
-            style: AppTextStyles.headline3.copyWith(fontSize: 18),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 8),
+            child: Text(
+              'Account',
+              style: AppTextStyles.labelSmall.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[500],
+                fontSize: 13,
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
           Container(
             decoration: AppDecorations.cardDecoration.copyWith(
               borderRadius: BorderRadius.circular(24),
@@ -299,8 +324,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                 _buildMenuItem(
                   icon: Icons.person_outline_rounded,
                   title: 'My Details',
-                  subtitle: 'Personal info and security',
-                  color: Colors.blue,
+                  color: AppColors.textBody,
                   onTap: () async {
                     await context.push(AppRoutes.myDetails);
                     _loadCustomerData();
@@ -310,40 +334,72 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                 _buildMenuItem(
                   icon: Icons.location_on_outlined,
                   title: 'Address Book',
-                  subtitle: 'Manage delivery addresses',
-                  color: Colors.orange,
+                  color: AppColors.textBody,
                   onTap: () => context.push(AppRoutes.addressBook),
                 ),
                 _buildDivider(),
                 _buildMenuItem(
                   icon: Icons.favorite_outline_rounded,
                   title: 'Favorites',
-                  subtitle: 'Saved products and farms',
-                  color: Colors.pink,
+                  color: AppColors.textBody,
                   onTap: () => context.push(AppRoutes.favorites),
                 ),
-                _buildDivider(),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 8),
+            child: Text(
+              'Preferences',
+              style: AppTextStyles.labelSmall.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[500],
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Container(
+            decoration: AppDecorations.cardDecoration.copyWith(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              children: [
                 _buildMenuItem(
                   icon: Icons.confirmation_number_outlined,
                   title: 'My Vouchers',
-                  subtitle: 'View your claimed shop vouchers',
-                  color: Colors.orange,
+                  color: AppColors.textBody,
                   onTap: () => context.push(AppRoutes.claimedVouchers),
                 ),
                 _buildDivider(),
                 _buildMenuItem(
                   icon: Icons.chat_bubble_outline_rounded,
                   title: 'Messages',
-                  subtitle: 'Contact support or sellers',
-                  color: Colors.teal,
+                  color: AppColors.textBody,
                   onTap: () => context.push(AppRoutes.customerMessages),
+                ),
+                _buildDivider(),
+                _buildMenuItem(
+                  icon: Icons.settings_outlined,
+                  title: 'App Settings',
+                  color: AppColors.textBody,
+                  onTap: () => context.push(AppRoutes.appSettings),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-          Text('Other', style: AppTextStyles.headline3.copyWith(fontSize: 18)),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 8),
+            child: Text(
+              'Security & Support',
+              style: AppTextStyles.labelSmall.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[500],
+                fontSize: 13,
+              ),
+            ),
+          ),
           Container(
             decoration: AppDecorations.cardDecoration.copyWith(
               borderRadius: BorderRadius.circular(24),
@@ -353,15 +409,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                 _buildMenuItem(
                   icon: Icons.help_center_outlined,
                   title: 'Help Center',
-                  color: Colors.purple,
+                  color: AppColors.textBody,
                   onTap: () => context.push(AppRoutes.helpCenter),
-                ),
-                _buildDivider(),
-                _buildMenuItem(
-                  icon: Icons.settings_outlined,
-                  title: 'App Settings',
-                  color: Colors.blueGrey,
-                  onTap: () => context.push(AppRoutes.appSettings),
                 ),
               ],
             ),
@@ -375,48 +424,30 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     required IconData icon,
     required String title,
     required Color color,
-    String? subtitle,
     VoidCallback? onTap,
   }) {
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, size: 22, color: color),
-            ),
+            Icon(icon, size: 22, color: Colors.grey[600]),
             const SizedBox(width: 16),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: AppTextStyles.bodyLarge.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (subtitle != null)
-                    Text(
-                      subtitle,
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textSubtle,
-                      ),
-                    ),
-                ],
+              child: Text(
+                title,
+                style: AppTextStyles.bodyLarge.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textHeadline,
+                ),
               ),
             ),
-            const Icon(
+            Icon(
               Icons.arrow_forward_ios_rounded,
-              size: 16,
-              color: Colors.grey,
+              size: 14,
+              color: Colors.grey[400],
             ),
           ],
         ),
@@ -425,22 +456,23 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   }
 
   Widget _buildDivider() =>
-      Divider(height: 1, indent: 70, endIndent: 20, color: Colors.grey[200]);
+      Divider(height: 1, indent: 58, endIndent: 20, color: Colors.grey[100]);
 
   Widget _buildLogoutButton() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: FilledButton.tonal(
+      child: OutlinedButton.icon(
         onPressed: _confirmLogout,
-        style: FilledButton.styleFrom(
+        icon: const Icon(Icons.logout_rounded, size: 18),
+        label: const Text('Log Out'),
+        style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.error,
-          backgroundColor: AppColors.error.withValues(alpha: 0.1),
+          side: BorderSide(color: AppColors.error.withValues(alpha: 0.3)),
           minimumSize: const Size(double.infinity, 56),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
         ),
-        child: const Text('Log Out'),
       ),
     );
   }

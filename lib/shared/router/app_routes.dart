@@ -34,6 +34,12 @@ class AppRoutes {
   static const String appSettings = '/app-settings';
   static const String farmerVouchers = '/farmer-vouchers';
   static const String claimedVouchers = '/claimed-vouchers';
+  static const String appTour = '/app-tour';
+  static const String faqs = '/faqs';
+  static const String contactSupport = '/contact-support';
+  static const String reportIssue = '/report-issue';
+  static const String farmerGuides = '/farmer-guides';
+  static const String kikoAiChat = '/kiko-ai-chat';
   // Web-specific
   static const String webWelcome = '/web-welcome';
   static const String marketplace = '/marketplace';

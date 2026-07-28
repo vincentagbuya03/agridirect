@@ -551,10 +551,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
       onTap: () => _showOrderDetails(order),
       child: Container(
         decoration: AppDecorations.cardDecoration.copyWith(
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFF1F5F9)),
         ),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -562,44 +562,44 @@ class _OrdersScreenState extends State<OrdersScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                      width: 2,
+                      color: AppColors.primary.withValues(alpha: 0.25),
+                      width: 1.5,
                     ),
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(10),
                     child: farmImage != null && farmImage.isNotEmpty
                         ? SafeNetworkImage(
                             imageUrl: farmImage,
                             defaultBucket: 'uploads',
-                            width: 56,
-                            height: 56,
+                            width: 52,
+                            height: 52,
                             fit: BoxFit.cover,
                             placeholder: const Icon(
                               Icons.agriculture_rounded,
                               color: AppColors.primary,
-                              size: 24,
+                              size: 22,
                             ),
                             errorWidget: const Icon(
                               Icons.agriculture_rounded,
                               color: AppColors.primary,
-                              size: 24,
+                              size: 22,
                             ),
                           )
                         : const Icon(
                             Icons.agriculture_rounded,
                             color: AppColors.primary,
-                            size: 24,
+                            size: 22,
                           ),
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -607,20 +607,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       Text(
                         farmName,
                         style: GoogleFonts.poppins(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textHeadline,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         '#${orderId.toUpperCase()}',
                         style: AppTextStyles.bodySmall.copyWith(
                           color: AppColors.textSubtle,
                           fontWeight: FontWeight.w700,
-                          fontSize: 11,
+                          fontSize: 10.5,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -629,7 +629,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         '$itemCount ${itemCount > 1 ? 'items' : 'item'}',
                         style: AppTextStyles.bodySmall.copyWith(
                           color: AppColors.textSubtle,
-                          fontSize: 11,
+                          fontSize: 10.5,
                         ),
                       ),
                     ],
@@ -639,42 +639,42 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 Text(
                   price,
                   style: GoogleFonts.poppins(
-                    fontSize: 18,
+                    fontSize: 17,
                     color: AppColors.primary,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
+                    horizontal: 8,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    color: statusColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        width: 6,
-                        height: 6,
+                        width: 5,
+                        height: 5,
                         decoration: BoxDecoration(
                           color: statusColor,
                           shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Text(
                         status.toUpperCase(),
                         style: AppTextStyles.labelSmall.copyWith(
                           color: statusColor,
                           fontWeight: FontWeight.w800,
-                          fontSize: 10,
+                          fontSize: 9.5,
                         ),
                       ),
                     ],
@@ -686,44 +686,46 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.textSubtle,
                     fontWeight: FontWeight.w600,
+                    fontSize: 11,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
                 value: progress,
-                minHeight: 6,
-                backgroundColor: statusColor.withValues(alpha: 0.2),
+                minHeight: 4,
+                backgroundColor: statusColor.withValues(alpha: 0.15),
                 valueColor: AlwaysStoppedAnimation<Color>(statusColor),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () => _showOrderDetails(order),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.08),
                       foregroundColor: AppColors.primary,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: Text(
                       order.isDelivered ? 'Review Order & Farmer' : 'Track Order',
                       style: AppTextStyles.labelSmall.copyWith(
                         fontWeight: FontWeight.w800,
+                        fontSize: 12,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 InkWell(
                   onTap: () {
                     context.push(
@@ -731,19 +733,19 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       extra: {'farmerId': order.farmerId},
                     );
                   },
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: AppColors.textHeadline.withValues(alpha: 0.1),
+                        color: AppColors.textHeadline.withValues(alpha: 0.08),
                       ),
                     ),
                     child: const Icon(
                       Icons.messenger_outline_rounded,
-                      size: 20,
+                      size: 18,
                       color: AppColors.textHeadline,
                     ),
                   ),
@@ -814,6 +816,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Future<void> _confirmCancelOrder(BuildContext context, Order order) async {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    final reasonController = TextEditingController();
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -823,9 +826,29 @@ class _OrdersScreenState extends State<OrdersScreen> {
           'Cancel Order',
           style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
         ),
-        content: Text(
-          'Are you sure you want to cancel order #${order.orderNumber}? This action cannot be undone.',
-          style: GoogleFonts.inter(),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to cancel order #${order.orderNumber}? This action cannot be undone.',
+              style: GoogleFonts.inter(),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Reason for cancellation:',
+              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: reasonController,
+              decoration: InputDecoration(
+                hintText: 'e.g., Change of mind, ordered wrong item...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              maxLines: 2,
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -836,7 +859,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () {
+              if (reasonController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Please provide a reason for cancelling.')),
+                );
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,
               foregroundColor: Colors.white,
@@ -861,7 +892,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
       );
 
       try {
-        await OrderService().cancelOrder(order.orderId);
+        await OrderService().updateOrderStatus(
+          order.orderId,
+          'cancelled',
+          cancellationReason: reasonController.text.trim(),
+        );
         navigator.pop(); // Pop loading
         navigator.pop(); // Pop details sheet
         messenger.showSnackBar(
@@ -1528,7 +1563,32 @@ class _OrdersScreenState extends State<OrdersScreen> {
             ),
           ),
         ],
-        if (!order.isShipped && !order.isDelivered && !order.isCancelled) ...[
+        if (order.isCancelled && order.cancellationReason != null && order.cancellationReason!.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text(
+            'Cancellation Reason',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textHeadline,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.red.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.15)),
+            ),
+            child: Text(
+              order.cancellationReason!,
+              style: AppTextStyles.bodyMedium.copyWith(color: Colors.red.shade700, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+        if (order.isPending) ...[
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,

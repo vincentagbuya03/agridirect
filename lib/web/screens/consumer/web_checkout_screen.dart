@@ -55,7 +55,10 @@ class _WebCheckoutScreenState extends State<WebCheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    _quantity = widget.initialQuantity;
+    final maxStock = widget.isPreOrder 
+        ? 999 
+        : (widget.product.stockQuantity?.toInt() ?? 0);
+    _quantity = widget.initialQuantity.clamp(1, maxStock > 0 ? maxStock : 1);
     _loadAddresses();
     _loadFarmerProfile();
   }
@@ -171,8 +174,20 @@ class _WebCheckoutScreenState extends State<WebCheckoutScreen> {
       return;
     }
 
+    final maxStock = widget.isPreOrder 
+        ? 999 
+        : (widget.product.stockQuantity?.toInt() ?? 0);
+    if (!widget.isPreOrder && _quantity > maxStock) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cannot order more than available stock ($maxStock available).')),
+      );
+      return;
+    }
+
     setState(() => _isSubmittingOrder = true);
     try {
+      // Simulate/allow loading state transition
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
       if (widget.isPreOrder) {
         final result = await _orderService.createOfflinePreOrderByProductId(
           productId: productId,
@@ -827,7 +842,10 @@ class _WebCheckoutScreenState extends State<WebCheckoutScreen> {
                     IconButton(
                       icon: const Icon(Icons.add_rounded, size: 16),
                       onPressed: () {
-                        if (_quantity < 99) {
+                        final maxStock = widget.isPreOrder 
+                            ? 999 
+                            : (widget.product.stockQuantity?.toInt() ?? 0);
+                        if (_quantity < maxStock) {
                           setState(() => _quantity++);
                         }
                       },

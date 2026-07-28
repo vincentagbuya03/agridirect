@@ -8,26 +8,26 @@ import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/farmer/farmer_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
-import '../../widgets/web_consumer_nav_bar.dart';
+import '../../../shared/styles/app_theme.dart';
 
-class WebOrderSuccessScreen extends StatefulWidget {
-  const WebOrderSuccessScreen({
+class MobileOrderSuccessScreen extends StatefulWidget {
+  final String? categoryName;
+
+  const MobileOrderSuccessScreen({
     super.key,
     required this.categoryName,
   });
 
-  final String? categoryName;
-
   @override
-  State<WebOrderSuccessScreen> createState() => _WebOrderSuccessScreenState();
+  State<MobileOrderSuccessScreen> createState() => _MobileOrderSuccessScreenState();
 }
 
-class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
-  static const Color _primary = Color(0xFF16A34A);
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _border = Color(0xFFE2E8F0);
-  static const Color _surface = Color(0xFFF8FAFC);
+class _MobileOrderSuccessScreenState extends State<MobileOrderSuccessScreen> {
+  static const Color _primary = AppColors.primary;
+  static const Color _dark = AppColors.textHeadline;
+  static const Color _muted = AppColors.textSubtle;
+  static const Color _border = Color(0xFFF1F5F9);
+  static const Color _surface = AppColors.background;
   static const Color _white = Colors.white;
 
   List<ProductItem> _relatedProducts = const [];
@@ -69,68 +69,46 @@ class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
     }
   }
 
-  void _handleNav(int index) {
-    context.go(AppRoutes.webTabRoute(index));
-  }
-
   @override
   Widget build(BuildContext context) {
-    final sw = MediaQuery.of(context).size.width;
-    final isCompact = sw < 900;
-
     return Scaffold(
       backgroundColor: _surface,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        centerTitle: true,
+        title: Text(
+          'Receipt',
+          style: AppTextStyles.headline3.copyWith(fontSize: 18),
+        ),
+      ),
       body: Stack(
         children: [
           // Premium confetti animation running in background
           const Positioned.fill(
             child: _ConfettiOverlay(),
           ),
-          Column(
-            children: [
-              WebConsumerNavBar(
-                currentIndex: -1,
-                onNavigate: _handleNav,
-                onCartTap: () => context.go(AppRoutes.cart),
-                margin: EdgeInsets.fromLTRB(
-                  isCompact ? 16 : 32,
-                  20,
-                  isCompact ? 16 : 32,
-                  12,
-                ),
+          SafeArea(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  _buildSuccessCard(),
+                  const SizedBox(height: 36),
+                  _buildRecommendationsSection(),
+                ],
               ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    isCompact ? 16 : 32,
-                    16,
-                    isCompact ? 16 : 32,
-                    48,
-                  ),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1000),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          const SizedBox(height: 16),
-                          _buildSuccessCard(isCompact),
-                          const SizedBox(height: 48),
-                          _buildRecommendationsSection(isCompact),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSuccessCard(bool isCompact) {
+  Widget _buildSuccessCard() {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.8, end: 1.0),
       duration: const Duration(milliseconds: 700),
@@ -147,16 +125,16 @@ class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
                 opacity: opacity,
                 child: Container(
                   width: double.infinity,
-                  padding: EdgeInsets.all(isCompact ? 24 : 40),
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     color: _white,
-                    borderRadius: BorderRadius.circular(32),
+                    borderRadius: BorderRadius.circular(28),
                     border: Border.all(color: _border),
                     boxShadow: [
                       BoxShadow(
-                        color: _dark.withValues(alpha: 0.04),
-                        blurRadius: 40,
-                        offset: const Offset(0, 16),
+                        color: _dark.withValues(alpha: 0.03),
+                        blurRadius: 30,
+                        offset: const Offset(0, 12),
                       ),
                     ],
                   ),
@@ -164,8 +142,8 @@ class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Premium Animated Checkmark with Pulsing Rings
-                      _AnimatedCheckmark(isCompact: isCompact),
-                      const SizedBox(height: 32),
+                      const _AnimatedCheckmark(),
+                      const SizedBox(height: 28),
 
                       // Staggered Title Animation
                       TweenAnimationBuilder<double>(
@@ -188,7 +166,7 @@ class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
                                 'Order Placed Successfully!',
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.plusJakartaSans(
-                                  fontSize: isCompact ? 24 : 32,
+                                  fontSize: 22,
                                   fontWeight: FontWeight.w800,
                                   color: _dark,
                                   height: 1.2,
@@ -221,16 +199,16 @@ class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
                                 'Thank you for your purchase! The farmer has been notified and will prepare your order shortly.',
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.inter(
-                                  fontSize: isCompact ? 14 : 15,
+                                  fontSize: 14,
                                   color: _muted,
-                                  height: 1.6,
+                                  height: 1.5,
                                 ),
                               ),
                             ),
                           );
                         },
                       ),
-                      const SizedBox(height: 36),
+                      const SizedBox(height: 32),
 
                       // Staggered Buttons Animation
                       TweenAnimationBuilder<double>(
@@ -249,23 +227,14 @@ class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
                                   child: child,
                                 );
                               },
-                              child: isCompact
-                                  ? Column(
-                                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                                      children: [
-                                        _buildHomeButton(),
-                                        const SizedBox(height: 12),
-                                        _buildOrdersButton(),
-                                      ],
-                                    )
-                                  : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        _buildHomeButton(width: 200),
-                                        const SizedBox(width: 16),
-                                        _buildOrdersButton(width: 200),
-                                      ],
-                                    ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildHomeButton(),
+                                  const SizedBox(height: 12),
+                                  _buildOrdersButton(),
+                                ],
+                              ),
                             ),
                           );
                         },
@@ -281,9 +250,8 @@ class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
     );
   }
 
-  Widget _buildHomeButton({double? width}) {
+  Widget _buildHomeButton() {
     return SizedBox(
-      width: width,
       height: 52,
       child: FilledButton.icon(
         onPressed: () => context.go(AppRoutes.marketplace),
@@ -300,9 +268,8 @@ class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
     );
   }
 
-  Widget _buildOrdersButton({double? width}) {
+  Widget _buildOrdersButton() {
     return SizedBox(
-      width: width,
       height: 52,
       child: OutlinedButton.icon(
         onPressed: () => context.go(AppRoutes.customerOrders),
@@ -310,7 +277,7 @@ class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
         label: const Text('View Orders'),
         style: OutlinedButton.styleFrom(
           foregroundColor: _dark,
-          side: const BorderSide(color: _border),
+          side: const BorderSide(color: Color(0xFFE2E8F0)),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -320,7 +287,7 @@ class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
     );
   }
 
-  Widget _buildRecommendationsSection(bool isCompact) {
+  Widget _buildRecommendationsSection() {
     if (_isLoadingProducts) {
       return const Center(child: CircularProgressIndicator(color: _primary));
     }
@@ -328,9 +295,6 @@ class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
     if (_relatedProducts.isEmpty) {
       return const SizedBox.shrink();
     }
-
-    final sw = MediaQuery.of(context).size.width;
-    final int crossCount = sw < 600 ? 2 : (sw < 900 ? 2 : 4);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,131 +308,126 @@ class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
                   ? 'More ${widget.categoryName} Products'
                   : 'You Might Also Like',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: isCompact ? 18 : 22,
+                fontSize: 18,
                 fontWeight: FontWeight.w800,
                 color: _dark,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossCount,
-            crossAxisSpacing: isCompact ? 12 : 20,
-            mainAxisSpacing: isCompact ? 12 : 20,
-            childAspectRatio: isCompact ? 0.72 : 0.8,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.75,
           ),
-          itemCount: _relatedProducts.length.clamp(0, crossCount),
+          itemCount: _relatedProducts.length.clamp(0, 4),
           itemBuilder: (context, index) {
             final item = _relatedProducts[index];
-            return MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () {
-                  final isPreOrder = item.harvestDays != null && item.harvestDays!.trim().isNotEmpty;
-                  final targetRoute = isPreOrder ? AppRoutes.preorderDetails : AppRoutes.productDetails;
-                  context.go(targetRoute, extra: item);
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _white,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: _border),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _dark.withValues(alpha: 0.01),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+            return GestureDetector(
+              onTap: () {
+                final isPreOrder = item.harvestDays != null && item.harvestDays!.trim().isNotEmpty;
+                final targetRoute = isPreOrder ? AppRoutes.preorderDetails : AppRoutes.productDetails;
+                context.go(targetRoute, extra: item);
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: _white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _dark.withValues(alpha: 0.01),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 1.4,
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(20),
+                        ),
+                        child: item.imageUrl.isNotEmpty
+                            ? SafeNetworkImage(
+                                imageUrl: item.imageUrl,
+                                fit: BoxFit.cover,
+                                placeholder: Container(color: _surface),
+                                errorWidget: Container(color: _surface),
+                              )
+                            : Container(color: _surface),
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Image Area - Proportional smaller height
-                      AspectRatio(
-                        aspectRatio: 1.4,
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(22),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: _dark,
+                            ),
                           ),
-                          child: item.imageUrl.isNotEmpty
-                              ? SafeNetworkImage(
-                                  imageUrl: item.imageUrl,
-                                  fit: BoxFit.cover,
-                                  placeholder: Container(color: _surface),
-                                  errorWidget: Container(color: _surface),
-                                )
-                              : Container(color: _surface),
-                        ),
-                      ),
-                      // Details
-                      Padding(
-                        padding: EdgeInsets.all(isCompact ? 10 : 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: isCompact ? 13 : 16,
-                                fontWeight: FontWeight.w700,
-                                color: _dark,
-                              ),
+                          const SizedBox(height: 2),
+                          Text(
+                            item.farm,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              color: _muted,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item.farm,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: isCompact ? 10 : 12,
-                                color: _muted,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                item.price,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: _primary,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  item.price,
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: isCompact ? 14 : 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: _primary,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _surface,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: _border),
+                                ),
+                                child: Text(
+                                  item.unit,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: _muted,
                                   ),
                                 ),
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: isCompact ? 6 : 8,
-                                    vertical: isCompact ? 2 : 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _surface,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: _border),
-                                  ),
-                                  child: Text(
-                                    item.unit,
-                                    style: GoogleFonts.inter(
-                                      fontSize: isCompact ? 9 : 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: _muted,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -480,8 +439,7 @@ class _WebOrderSuccessScreenState extends State<WebOrderSuccessScreen> {
 }
 
 class _AnimatedCheckmark extends StatefulWidget {
-  final bool isCompact;
-  const _AnimatedCheckmark({required this.isCompact});
+  const _AnimatedCheckmark();
 
   @override
   State<_AnimatedCheckmark> createState() => _AnimatedCheckmarkState();
@@ -508,14 +466,13 @@ class _AnimatedCheckmarkState extends State<_AnimatedCheckmark>
 
   @override
   Widget build(BuildContext context) {
-    final double size = widget.isCompact ? 80 : 96;
+    const double size = 80;
     return SizedBox(
       width: size * 1.5,
       height: size * 1.5,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // outer pulse ring 2
           AnimatedBuilder(
             animation: _controller,
             builder: (context, child) {
@@ -541,7 +498,6 @@ class _AnimatedCheckmarkState extends State<_AnimatedCheckmark>
               );
             },
           ),
-          // outer pulse ring 1
           AnimatedBuilder(
             animation: _controller,
             builder: (context, child) {
@@ -567,7 +523,6 @@ class _AnimatedCheckmarkState extends State<_AnimatedCheckmark>
               );
             },
           ),
-          // central checkmark container
           TweenAnimationBuilder<double>(
             tween: Tween<double>(begin: 0.0, end: 1.0),
             duration: const Duration(milliseconds: 800),
@@ -589,10 +544,10 @@ class _AnimatedCheckmarkState extends State<_AnimatedCheckmark>
                       ),
                     ],
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.check_circle_rounded,
-                    color: const Color(0xFF16A34A),
-                    size: widget.isCompact ? 48 : 56,
+                    color: Color(0xFF16A34A),
+                    size: 48,
                   ),
                 ),
               );
@@ -624,17 +579,16 @@ class _ConfettiOverlayState extends State<_ConfettiOverlay>
       duration: const Duration(seconds: 4),
     )..repeat();
 
-    // Initialize random confetti pieces
     final List<Color> colors = [
-      const Color(0xFF22C55E), // primary emerald
-      const Color(0xFFF59E0B), // amber
-      const Color(0xFF3B82F6), // blue
-      const Color(0xFFEC4899), // pink
-      const Color(0xFFA855F7), // purple
-      const Color(0xFF14B8A6), // teal
+      const Color(0xFF22C55E),
+      const Color(0xFFF59E0B),
+      const Color(0xFF3B82F6),
+      const Color(0xFFEC4899),
+      const Color(0xFFA855F7),
+      const Color(0xFF14B8A6),
     ];
 
-    for (int i = 0; i < 45; i++) {
+    for (int i = 0; i < 40; i++) {
       final double x = (i % 5) * 0.2 + (0.1 * (i % 3));
       final double y = -0.1 - (0.02 * i);
       final double rotationSpeed = 2.0 + (i % 4) * 1.5;
@@ -700,7 +654,6 @@ class _ConfettiParticle {
     x += 0.002 * (y * 5 % 2 == 0 ? 1 : -1);
     rotation += rotationSpeed * 0.02;
 
-    // Reset if it goes below screen
     if (y > 1.1) {
       y = -0.1;
       x = (x + 0.3) % 1.0;

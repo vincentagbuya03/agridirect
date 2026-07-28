@@ -122,7 +122,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
         child: Column(
           children: [
             _buildFarmerHeader(auth),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
             _buildFarmerMenu(context),
             const SizedBox(height: 32),
             _buildLogoutButton(),
@@ -139,129 +139,116 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
   }
 
   Widget _buildFarmerHeader(AuthService auth) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [const Color(0xFFFFF4DB), AppColors.surface],
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(40),
-          bottomRight: Radius.circular(40),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.accent.withValues(alpha: 0.1),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    final canPop = Navigator.canPop(context);
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (canPop)
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                    onPressed: () => context.pop(),
+                  )
+                else
+                  const SizedBox(width: 48),
+                Text('Farmer Profile', style: AppTextStyles.headline3.copyWith(fontSize: 20)),
+                const SizedBox(width: 48),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: AppDecorations.cardDecoration.copyWith(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Farmer Profile',
-                          style: AppTextStyles.headline2.copyWith(fontSize: 30),
-                          overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      _buildProfileImage(),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _farmerName ?? 'My Farm',
+                              style: AppTextStyles.headline3.copyWith(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              auth.userEmail,
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSubtle,
+                                fontSize: 12,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 10),
+                            _buildVerifiedBadge(),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Manage your farm, products, and followers',
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSubtle,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  _buildStatsStrip(),
+                  const SizedBox(height: 20),
+                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  const SizedBox(height: 16),
+                  InkWell(
+                    onTap: _handleSwitchToCustomer,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.15),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.shopping_bag_outlined,
+                            size: 18,
+                            color: AppColors.primary,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Text(
+                            'Switch to Buying Mode',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.75),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.textHeadline.withValues(alpha: 0.06),
-                      blurRadius: 24,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        _buildProfileImage(),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _farmerName ?? 'My Farm',
-                                style: AppTextStyles.headline2.copyWith(
-                                  fontSize: 26,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                auth.userEmail,
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: AppColors.textSubtle,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              _buildVerifiedBadge(),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    _buildStatsStrip(),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _handleSwitchToCustomer,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primaryLight,
-                          foregroundColor: AppColors.primaryDark,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                        ),
-                        icon: const Icon(Icons.shopping_bag_outlined, size: 18),
-                        label: const Text('Switch to Buying'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -269,8 +256,8 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
 
   Widget _buildProfileImage() {
     return Container(
-      width: 92,
-      height: 92,
+      width: 80,
+      height: 80,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
@@ -290,18 +277,18 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
             ? CachedNetworkImage(
                 key: ValueKey(
                   _farmerImageUrl,
-                ), // 🟢 Force refresh when URL changes
+                ),
                 imageUrl: _farmerImageUrl!,
                 fit: BoxFit.cover,
                 placeholder: (_, _) => Container(color: Colors.grey[100]),
                 errorWidget: (_, _, _) =>
-                    const Icon(Icons.agriculture, size: 40, color: Colors.grey),
+                    const Icon(Icons.agriculture, size: 36, color: Colors.grey),
               )
             : Container(
                 color: Colors.grey[100],
                 child: const Icon(
                   Icons.agriculture,
-                  size: 40,
+                  size: 36,
                   color: Colors.grey,
                 ),
               ),
@@ -408,11 +395,18 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Business Settings',
-            style: AppTextStyles.headline3.copyWith(fontSize: 18),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 8),
+            child: Text(
+              'Business Settings',
+              style: AppTextStyles.labelSmall.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[500],
+                fontSize: 13,
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
           Container(
             decoration: AppDecorations.cardDecoration.copyWith(
               borderRadius: BorderRadius.circular(24),
@@ -422,8 +416,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                 _buildMenuItem(
                   icon: Icons.dashboard_rounded,
                   title: 'Sales Dashboard',
-                  subtitle: 'Analytics and revenue overview',
-                  color: Colors.green,
+                  color: AppColors.textBody,
                   onTap: () {
                     SupabaseDataService.navigationTabNotifier.value = 0;
                     widget.onModeChanged();
@@ -433,8 +426,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                 _buildMenuItem(
                   icon: Icons.inventory_2_outlined,
                   title: 'My Products',
-                  subtitle: 'Manage listings and inventory',
-                  color: Colors.orange,
+                  color: AppColors.textBody,
                   onTap: () {
                     SupabaseDataService.navigationTabNotifier.value = 1;
                     widget.onModeChanged();
@@ -444,8 +436,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                 _buildMenuItem(
                   icon: Icons.business_center_outlined,
                   title: 'Farm Details',
-                  subtitle: 'Business info and location',
-                  color: Colors.blue,
+                  color: AppColors.textBody,
                   onTap: () async {
                     await context.push(AppRoutes.myDetails);
                     _loadFarmerData();
@@ -453,41 +444,63 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                 ),
                 _buildDivider(),
                 _buildMenuItem(
+                  icon: Icons.confirmation_number_outlined,
+                  title: 'Manage Vouchers',
+                  color: AppColors.textBody,
+                  onTap: () => context.push(AppRoutes.farmerVouchers),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 8),
+            child: Text(
+              'Community',
+              style: AppTextStyles.labelSmall.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[500],
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Container(
+            decoration: AppDecorations.cardDecoration.copyWith(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              children: [
+                _buildMenuItem(
                   icon: Icons.groups_rounded,
                   title: 'Followers',
-                  subtitle:
-                      '${_dashboardStats['followers'] ?? 0} customers following your farm',
-                  color: Colors.pink,
+                  color: AppColors.textBody,
                   onTap: () => context.push(AppRoutes.farmerFollowers),
                 ),
                 _buildDivider(),
                 _buildMenuItem(
                   icon: Icons.forum_outlined,
                   title: 'Farmer Community',
-                  subtitle: 'Connect with other growers',
-                  color: Colors.teal,
+                  color: AppColors.textBody,
                   onTap: () {
                     SupabaseDataService.navigationTabNotifier.value = 3;
                     widget.onModeChanged();
                   },
                 ),
-                _buildDivider(),
-                _buildMenuItem(
-                  icon: Icons.confirmation_number_outlined,
-                  title: 'Manage Vouchers',
-                  subtitle: 'Create and distribute discount coupons',
-                  color: Colors.purple,
-                  onTap: () => context.push(AppRoutes.farmerVouchers),
-                ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-          Text(
-            'Support',
-            style: AppTextStyles.headline3.copyWith(fontSize: 18),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 8),
+            child: Text(
+              'Security & Support',
+              style: AppTextStyles.labelSmall.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[500],
+                fontSize: 13,
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
           Container(
             decoration: AppDecorations.cardDecoration.copyWith(
               borderRadius: BorderRadius.circular(24),
@@ -497,14 +510,14 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                 _buildMenuItem(
                   icon: Icons.help_center_outlined,
                   title: 'Help Center',
-                  color: Colors.purple,
+                  color: AppColors.textBody,
                   onTap: () => context.push(AppRoutes.helpCenter),
                 ),
                 _buildDivider(),
                 _buildMenuItem(
                   icon: Icons.settings_outlined,
                   title: 'App Settings',
-                  color: Colors.blueGrey,
+                  color: AppColors.textBody,
                   onTap: () => context.push(AppRoutes.appSettings),
                 ),
               ],
@@ -519,48 +532,30 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
     required IconData icon,
     required String title,
     required Color color,
-    String? subtitle,
     VoidCallback? onTap,
   }) {
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, size: 22, color: color),
-            ),
+            Icon(icon, size: 22, color: Colors.grey[600]),
             const SizedBox(width: 16),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: AppTextStyles.bodyLarge.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (subtitle != null)
-                    Text(
-                      subtitle,
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textSubtle,
-                      ),
-                    ),
-                ],
+              child: Text(
+                title,
+                style: AppTextStyles.bodyLarge.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textHeadline,
+                ),
               ),
             ),
-            const Icon(
+            Icon(
               Icons.arrow_forward_ios_rounded,
-              size: 16,
-              color: Colors.grey,
+              size: 14,
+              color: Colors.grey[400],
             ),
           ],
         ),
@@ -569,18 +564,18 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
   }
 
   Widget _buildDivider() =>
-      Divider(height: 1, indent: 70, endIndent: 20, color: Colors.grey[200]);
+      Divider(height: 1, indent: 58, endIndent: 20, color: Colors.grey[100]);
 
   Widget _buildLogoutButton() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: OutlinedButton.icon(
         onPressed: _confirmLogout,
-        icon: const Icon(Icons.logout_rounded),
+        icon: const Icon(Icons.logout_rounded, size: 18),
         label: const Text('Log Out'),
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.error,
-          side: const BorderSide(color: AppColors.error),
+          side: BorderSide(color: AppColors.error.withValues(alpha: 0.3)),
           minimumSize: const Size(double.infinity, 56),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),

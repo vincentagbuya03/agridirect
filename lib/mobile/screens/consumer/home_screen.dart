@@ -1796,7 +1796,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: OutlinedButton.icon(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    context.push(AppRoutes.myDetails);
+                    context.push(AppRoutes.addressBook);
                   },
                   icon: const Icon(Icons.add_rounded, size: 18),
                   label: const Text('Manage Addresses'),

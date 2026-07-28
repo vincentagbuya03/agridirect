@@ -36,6 +36,7 @@ import '../../web/screens/consumer/web_cart_screen.dart';
 import '../../web/screens/consumer/web_farmer_public_profile_screen.dart';
 import '../../web/screens/consumer/web_preorder_details.dart';
 import '../../web/screens/consumer/web_product_details.dart';
+import '../../web/screens/consumer/web_find_farmer_screen.dart';
 import '../../web/screens/farmer/web_farmer_preorder_details.dart';
 import '../../web/screens/consumer/web_preorder_hub.dart';
 import '../../web/screens/consumer/web_checkout_screen.dart';
@@ -49,6 +50,13 @@ import '../../mobile/screens/common/loading_screen.dart';
 import '../../mobile/screens/common/notifications_screen.dart';
 import '../../mobile/screens/consumer/orders_screen.dart';
 import '../../mobile/screens/farmer/farmer_order_details_screen.dart';
+import '../../mobile/screens/consumer/order_success_screen.dart';
+import '../../mobile/screens/support/app_tour_screen.dart';
+import '../../mobile/screens/support/faqs_screen.dart';
+import '../../mobile/screens/support/contact_support_screen.dart';
+import '../../mobile/screens/support/report_issue_screen.dart';
+import '../../mobile/screens/support/farmer_guides_screen.dart';
+import '../../mobile/screens/support/kiko_ai_chat_screen.dart';
 import '../models/order/order_model.dart';
 import '../services/commerce/order_service.dart';
 import '../services/core/supabase_data_service.dart';
@@ -105,7 +113,7 @@ GoRouter createAppRouter() {
       // Use View.of for a more stable width check that doesn't trigger loops
       final view = View.of(context);
       final width = view.physicalSize.width / view.devicePixelRatio;
-      final isMobile = !kIsWeb && (width <= 800);
+      final isMobile = (width <= 800);
 
       // debugPrint('🔀 Router Redirect: [${isMobile ? "MOBILE" : "WEB"}] location=$location isLoggedIn=$isLoggedIn admin=$isAdmin needsProfile=${auth.needsProfileCompletion}');
 
@@ -220,7 +228,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.home,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (kIsWeb || constraints.maxWidth > 800) {
+            if (constraints.maxWidth > 800) {
               final tabParam = state.uri.queryParameters['tab'];
               final tabIndex = tabParam != null ? int.tryParse(tabParam) ?? 0 : 0;
               return WebNavigation(
@@ -246,7 +254,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.marketplace,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (kIsWeb || constraints.maxWidth > 800) {
+            if (constraints.maxWidth > 800) {
               return WebNavigation(
                 initialIndex: 0,
                 onLogout: () async {
@@ -272,7 +280,7 @@ GoRouter createAppRouter() {
               state.uri.queryParameters['mode'] == 'preorders';
           return LayoutBuilder(
           builder: (context, constraints) {
-            if (kIsWeb || constraints.maxWidth > 800) {
+            if (constraints.maxWidth > 800) {
               return WebNavigation(
                 initialIndex: 1,
                 showPreOrdersInShop: showPreOrders,
@@ -297,7 +305,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.community,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (kIsWeb || constraints.maxWidth > 800) {
+            if (constraints.maxWidth > 800) {
               return WebNavigation(
                 initialIndex: AuthService().isViewingAsFarmer ? 3 : 2,
                 onLogout: () async {
@@ -320,7 +328,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.profile,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (kIsWeb || constraints.maxWidth > 800) {
+            if (constraints.maxWidth > 800) {
               return WebNavigation(
                 initialIndex: AuthService().isViewingAsFarmer ? 4 : 3,
                 onLogout: () async {
@@ -343,7 +351,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.cart,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (kIsWeb || constraints.maxWidth > 800) {
+            if (constraints.maxWidth > 800) {
               return const WebCartScreen();
             }
             return const CartScreen();
@@ -354,7 +362,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.preorders,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (kIsWeb || constraints.maxWidth > 800) {
+            if (constraints.maxWidth > 800) {
               return WebPreOrderHub(
                 currentIndex: 1,
                 onNavigate: (index) => context.go(AppRoutes.webTabRoute(index)),
@@ -368,7 +376,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.farmerDashboard,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (kIsWeb || constraints.maxWidth > 800) {
+            if (constraints.maxWidth > 800) {
               final tabParam = state.uri.queryParameters['tab'];
               final tabIndex = tabParam != null ? int.tryParse(tabParam) ?? 0 : 0;
               return WebNavigation(
@@ -396,7 +404,7 @@ GoRouter createAppRouter() {
           
           final view = View.of(context);
           final width = view.physicalSize.width / view.devicePixelRatio;
-          final isMobile = !kIsWeb && (width <= 800);
+          final isMobile = (width <= 800);
 
           if (isMobile) {
             return FutureBuilder<Map<String, dynamic>?>(
@@ -463,7 +471,7 @@ GoRouter createAppRouter() {
       ),
       GoRoute(
         path: AppRoutes.farmersMap,
-        builder: (context, state) => const FarmersMapScreen(),
+        builder: (context, state) => kIsWeb ? const WebFindFarmerScreen() : const FarmersMapScreen(),
       ),
       GoRoute(
         path: AppRoutes.notifications,
@@ -752,6 +760,14 @@ GoRouter createAppRouter() {
         path: AppRoutes.orderSuccess,
         builder: (context, state) {
           final categoryName = state.extra as String?;
+          
+          final view = View.of(context);
+          final width = view.physicalSize.width / view.devicePixelRatio;
+          final isMobile = !kIsWeb && (width <= 800);
+          
+          if (isMobile) {
+            return MobileOrderSuccessScreen(categoryName: categoryName);
+          }
           return WebOrderSuccessScreen(categoryName: categoryName);
         },
       ),
@@ -838,6 +854,30 @@ GoRouter createAppRouter() {
       GoRoute(
         path: AppRoutes.appSettings,
         builder: (context, state) => const AppSettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.appTour,
+        builder: (context, state) => const AppTourScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.faqs,
+        builder: (context, state) => const FaqsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.contactSupport,
+        builder: (context, state) => const ContactSupportScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.reportIssue,
+        builder: (context, state) => const ReportIssueScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.farmerGuides,
+        builder: (context, state) => const FarmerGuidesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.kikoAiChat,
+        builder: (context, state) => const KikoAiChatScreen(),
       ),
 
       // ── Auth Callback (Google OAuth) ──────────────────────────────────────

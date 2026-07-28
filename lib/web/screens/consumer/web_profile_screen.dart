@@ -14,6 +14,7 @@ import '../../../shared/widgets/image_widgets.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 import '../../../shared/utils/apk_downloader.dart';
 import 'package:agridirect/shared/widgets/premium_confirm_dialog.dart';
+import '../../../shared/services/social/follow_service.dart';
 
 // Web Profile screen.
 /// Shows user info, "Start Selling" button, and account settings.
@@ -50,6 +51,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   StreamSubscription<String?>? _registrationStatusSubscription;
 
   Map<String, dynamic>? _farmerProfile;
+  int _totalOrdersCount = 0;
+  int _followersCount = 0;
 
   Future<void> _loadFarmerProfile() async {
     final auth = AuthService();
@@ -60,6 +63,22 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         setState(() {
           _farmerProfile = profile;
         });
+      }
+      if (profile != null) {
+        final farmerId = profile['farmer_id']?.toString() ?? '';
+        if (farmerId.isNotEmpty) {
+          final ordersRes = await SupabaseConfig.client
+              .from('orders')
+              .select('order_id')
+              .eq('farmer_id', farmerId);
+          final followersCount = await FollowService().getFollowerCount(farmerId);
+          if (mounted) {
+            setState(() {
+              _totalOrdersCount = (ordersRes as List).length;
+              _followersCount = followersCount;
+            });
+          }
+        }
       }
     } catch (e) {
       debugPrint('Error loading farmer profile in web_profile_screen: $e');
@@ -250,7 +269,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               padding: EdgeInsets.all(isMobile ? 16 : 32),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 860),
+                  constraints: const BoxConstraints(maxWidth: 1280),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -289,6 +308,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                 Expanded(flex: 4, child: _buildSellerCard(auth)),
                               ],
                             ),
+                      const SizedBox(height: 24),
+                      _buildShopPerformanceMetrics(auth),
                       const SizedBox(height: 24),
 
                       // Settings grid
@@ -355,6 +376,121 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       currentIndex: widget.currentIndex,
       onNavigate: widget.onNavigate,
       onCartTap: () => context.go(AppRoutes.cart),
+    );
+  }
+
+  Widget _buildShopPerformanceMetrics(AuthService auth) {
+    final ratingVal = _farmerProfile?['average_rating'] ?? 5.0;
+    final ratingText = '${ratingVal.toString()} ★';
+
+    final metrics = [
+      {'title': 'Total Orders', 'value': '$_totalOrdersCount', 'icon': Icons.local_shipping_outlined, 'color': primary},
+      {'title': 'Store Rating', 'value': ratingText, 'icon': Icons.star_rounded, 'color': Colors.amber.shade700},
+      {'title': 'Followers', 'value': '$_followersCount', 'icon': Icons.people_outline_rounded, 'color': Colors.blue},
+      {'title': 'Fulfillment', 'value': '98%', 'icon': Icons.verified_outlined, 'color': Colors.purple},
+    ];
+
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
+    if (isMobile) {
+      return Row(
+        children: metrics.take(2).map((m) {
+          return Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Column(
+                children: [
+                  Icon(m['icon'] as IconData, color: m['color'] as Color, size: 24),
+                  const SizedBox(height: 8),
+                  Text(
+                    m['value'] as String,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                    ),
+                  ),
+                  Text(
+                    m['title'] as String,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: _muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      );
+    }
+
+    return Row(
+      children: metrics.map((m) {
+        return Expanded(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[200]!),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: (m['color'] as Color).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    m['icon'] as IconData,
+                    color: m['color'] as Color,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      m['value'] as String,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: _dark,
+                      ),
+                    ),
+                    Text(
+                      m['title'] as String,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: _muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 

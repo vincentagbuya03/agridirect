@@ -31,6 +31,8 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
   late AnimationController _fadeInController;
   int _hoveredNav = -1;
   String _searchQuery = '';
+  String _selectedCategoryFilter = 'All';
+  String _selectedStockFilter = 'All';
   final TextEditingController _searchController = TextEditingController();
   Future<List<Map<String, dynamic>>>? _productsFuture;
 
@@ -136,7 +138,8 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
 
   Widget _buildNavBar() {
     final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 650;
+    final isMobile = sw < 900;
+    final isCompact = sw < 1100;
 
     if (!AuthService().isViewingAsFarmer) {
       return WebConsumerNavBar(
@@ -159,10 +162,12 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
     return Container(
       margin: isMobile
           ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-          : const EdgeInsets.fromLTRB(32, 24, 32, 12),
+          : (isCompact
+              ? const EdgeInsets.fromLTRB(20, 16, 20, 8)
+              : const EdgeInsets.fromLTRB(32, 24, 32, 12)),
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 28,
-        vertical: isMobile ? 12 : 14,
+        horizontal: isMobile ? 16 : (isCompact ? 16 : 28),
+        vertical: isMobile ? 12 : (isCompact ? 10 : 14),
       ),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.8),
@@ -183,17 +188,17 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
             child: GestureDetector(
               onTap: () => widget.onNavigate(0),
               child: BrandLogo(
-                size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium,
+                size: (isMobile || isCompact) ? BrandLogoSize.small : BrandLogoSize.medium,
               ),
             ),
           ),
           if (!isMobile) ...[
-            const SizedBox(width: 48),
+            SizedBox(width: isCompact ? 16 : 48),
             ...List.generate(navItems.length, (i) {
               final isActive = i == widget.currentIndex;
               final isHovered = _hoveredNav == i;
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
+                padding: EdgeInsets.symmetric(horizontal: isCompact ? 2 : 4),
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   onEnter: (_) => setState(() => _hoveredNav = i),
@@ -202,9 +207,9 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                     onTap: () => widget.onNavigate(i),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isCompact ? 12 : 20,
+                        vertical: isCompact ? 10 : 12,
                       ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
@@ -217,7 +222,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                       child: Text(
                         navItems[i],
                         style: GoogleFonts.inter(
-                          fontSize: 15,
+                          fontSize: isCompact ? 13 : 15,
                           fontWeight: isActive
                               ? FontWeight.w700
                               : FontWeight.w500,
@@ -241,8 +246,8 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
             child: GestureDetector(
               onTap: () => widget.onNavigate(5),
               child: Container(
-                width: isMobile ? 38 : 46,
-                height: isMobile ? 38 : 46,
+                width: (isMobile || isCompact) ? 38 : 46,
+                height: (isMobile || isCompact) ? 38 : 46,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [_primary, Color(0xFF059669)],
@@ -259,7 +264,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                 child: Icon(
                   Icons.person_outline_rounded,
                   color: Colors.white,
-                  size: isMobile ? 20 : 24,
+                  size: (isMobile || isCompact) ? 20 : 24,
                 ),
               ),
             ),
@@ -415,13 +420,285 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
     );
   }
 
+  Widget _buildKpiMetricsSummary(List<Map<String, dynamic>> allProducts) {
+    int totalProducts = allProducts.length;
+    double totalValuation = 0;
+    int lowStockCount = 0;
+    int preorderCount = 0;
+
+    for (final p in allProducts) {
+      final price = double.tryParse(p['price']?.toString() ?? '0') ?? 0;
+      final qty = double.tryParse(
+            (p['available_quantity'] ?? p['available'] ?? 0).toString(),
+          ) ??
+          0;
+      totalValuation += (price * qty);
+
+      if (qty <= 10) lowStockCount++;
+      if (p['is_preorder'] == true) preorderCount++;
+    }
+
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
+    Widget buildKpiCard({
+      required String title,
+      required String value,
+      required String badge,
+      required IconData icon,
+      required Color color,
+    }) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: _border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 15,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _muted,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      value,
+                      style: GoogleFonts.inter(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: _dark,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (isMobile) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              buildKpiCard(
+                title: 'Total Items',
+                value: '$totalProducts',
+                badge: 'Active',
+                icon: Icons.inventory_2_outlined,
+                color: _primary,
+              ),
+              const SizedBox(width: 12),
+              buildKpiCard(
+                title: 'Total Value',
+                value: '₱${totalValuation.toStringAsFixed(0)}',
+                badge: 'Valuation',
+                icon: Icons.payments_outlined,
+                color: Colors.blue,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              buildKpiCard(
+                title: 'Low Stock',
+                value: '$lowStockCount',
+                badge: 'Alert',
+                icon: Icons.warning_amber_rounded,
+                color: Colors.amber.shade700,
+              ),
+              const SizedBox(width: 12),
+              buildKpiCard(
+                title: 'Pre-Orders',
+                value: '$preorderCount',
+                badge: 'Harvest',
+                icon: Icons.eco_outlined,
+                color: Colors.purple,
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        buildKpiCard(
+          title: 'Total Products',
+          value: '$totalProducts',
+          badge: 'Active Listings',
+          icon: Icons.inventory_2_outlined,
+          color: _primary,
+        ),
+        const SizedBox(width: 16),
+        buildKpiCard(
+          title: 'Stock Valuation',
+          value: '₱${totalValuation.toStringAsFixed(2)}',
+          badge: 'Est. Revenue',
+          icon: Icons.payments_outlined,
+          color: Colors.blue,
+        ),
+        const SizedBox(width: 16),
+        buildKpiCard(
+          title: 'Low Stock Alerts',
+          value: '$lowStockCount items',
+          badge: 'Needs Restock',
+          icon: Icons.warning_amber_rounded,
+          color: Colors.amber.shade800,
+        ),
+        const SizedBox(width: 16),
+        buildKpiCard(
+          title: 'Active Pre-Orders',
+          value: '$preorderCount items',
+          badge: 'Upcoming Harvest',
+          icon: Icons.eco_outlined,
+          color: Colors.purple,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterBar() {
+    final categories = ['All', 'Vegetables', 'Fruits', 'Grains', 'Poultry', 'Pre-Orders'];
+    final stockOptions = ['All', 'In Stock', 'Low Stock', 'Out of Stock'];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border),
+      ),
+      child: Wrap(
+        spacing: 24,
+        runSpacing: 12,
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                'Category:',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _muted,
+                ),
+              ),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: categories.map((cat) {
+                  final isSelected = _selectedCategoryFilter == cat;
+                  return ChoiceChip(
+                    label: Text(
+                      cat,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected ? Colors.white : _dark,
+                      ),
+                    ),
+                    selected: isSelected,
+                    selectedColor: _primary,
+                    backgroundColor: const Color(0xFFF3F4F6),
+                    onSelected: (val) {
+                      if (val) setState(() => _selectedCategoryFilter = cat);
+                    },
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    side: BorderSide.none,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                'Stock Filter:',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _muted,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedStockFilter,
+                    icon: const Icon(Icons.arrow_drop_down_rounded),
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _dark,
+                    ),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _selectedStockFilter = val);
+                    },
+                    items: stockOptions.map((opt) {
+                      return DropdownMenuItem(value: opt, child: Text(opt));
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProductGrid() {
     final sw = MediaQuery.of(context).size.width;
     int crossAxisCount = 4;
-    double childAspectRatio = 0.82;
+    double childAspectRatio = 0.80;
     if (sw < 600) {
       crossAxisCount = 1;
-      childAspectRatio = 1.2;
+      childAspectRatio = 1.1;
     } else if (sw < 900) {
       crossAxisCount = 2;
       childAspectRatio = 0.82;
@@ -438,46 +715,75 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
         }
 
         final allProducts = snapshot.data ?? [];
-        final products = allProducts.where((p) {
+
+        final filteredProducts = allProducts.where((p) {
           final name = p['name']?.toString().toLowerCase() ?? '';
-          return name.contains(_searchQuery.toLowerCase());
+          final matchesSearch = name.contains(_searchQuery.toLowerCase());
+
+          bool matchesCategory = true;
+          if (_selectedCategoryFilter == 'Pre-Orders') {
+            matchesCategory = p['is_preorder'] == true;
+          } else if (_selectedCategoryFilter != 'All') {
+            final catName = p['category_name']?.toString() ?? p['category']?.toString() ?? '';
+            matchesCategory = catName.toLowerCase().contains(_selectedCategoryFilter.toLowerCase());
+          }
+
+          bool matchesStock = true;
+          final qty = double.tryParse((p['available_quantity'] ?? p['available'] ?? 0).toString()) ?? 0;
+          if (_selectedStockFilter == 'In Stock') {
+            matchesStock = qty > 10;
+          } else if (_selectedStockFilter == 'Low Stock') {
+            matchesStock = qty > 0 && qty <= 10;
+          } else if (_selectedStockFilter == 'Out of Stock') {
+            matchesStock = qty == 0;
+          }
+
+          return matchesSearch && matchesCategory && matchesStock;
         }).toList();
 
-        if (products.isEmpty) {
-          return Center(
-            child: Column(
-              children: [
-                const SizedBox(height: 80),
-                Icon(
-                  Icons.inventory_2_outlined,
-                  size: 64,
-                  color: _muted.withValues(alpha: 0.3),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildKpiMetricsSummary(allProducts),
+            const SizedBox(height: 24),
+            _buildFilterBar(),
+            const SizedBox(height: 24),
+            if (filteredProducts.isEmpty)
+              Center(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 60),
+                    Icon(
+                      Icons.inventory_2_outlined,
+                      size: 64,
+                      color: _muted.withValues(alpha: 0.3),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No products found matching filter criteria',
+                      style: GoogleFonts.inter(fontSize: 16, color: _muted),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'No products found',
-                  style: GoogleFonts.inter(fontSize: 18, color: _muted),
+              )
+            else
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  childAspectRatio: childAspectRatio,
+                  crossAxisSpacing: 24,
+                  mainAxisSpacing: 24,
                 ),
-              ],
-            ),
-          );
-        }
-
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            childAspectRatio: childAspectRatio,
-            crossAxisSpacing: 24,
-            mainAxisSpacing: 24,
-          ),
-          itemCount: products.length,
-          itemBuilder: (context, index) => ScrollReveal(
-            delay: Duration(milliseconds: index * 60),
-            duration: const Duration(milliseconds: 600),
-            child: _buildProductCard(products[index]),
-          ),
+                itemCount: filteredProducts.length,
+                itemBuilder: (context, index) => ScrollReveal(
+                  delay: Duration(milliseconds: index * 40),
+                  duration: const Duration(milliseconds: 500),
+                  child: _buildProductCard(filteredProducts[index]),
+                ),
+              ),
+          ],
         );
       },
     );

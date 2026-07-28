@@ -67,6 +67,28 @@ class _AddProductScreenState extends State<AddProductScreen> {
     if (widget.editProduct != null) {
       _prefillFields();
     }
+    _nameController.addListener(_onFormStateChanged);
+    _priceController.addListener(_onFormStateChanged);
+    _quantityController.addListener(_onFormStateChanged);
+    _harvestDaysController.addListener(_onFormStateChanged);
+  }
+
+  void _onFormStateChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _nameController.removeListener(_onFormStateChanged);
+    _priceController.removeListener(_onFormStateChanged);
+    _quantityController.removeListener(_onFormStateChanged);
+    _harvestDaysController.removeListener(_onFormStateChanged);
+    _nameController.dispose();
+    _priceController.dispose();
+    _descriptionController.dispose();
+    _harvestDaysController.dispose();
+    _quantityController.dispose();
+    super.dispose();
   }
 
   void _prefillFields() {
@@ -533,40 +555,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   @override
-  void dispose() {
-    _nameController.dispose();
-    _priceController.dispose();
-    _descriptionController.dispose();
-    _harvestDaysController.dispose();
-    _quantityController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: GestureDetector(
           onTap: () => context.pop(),
           child: Container(
             margin: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
             ),
             child: const Icon(
               Icons.arrow_back_ios_new_rounded,
-              size: 18,
+              size: 16,
               color: Color(0xFF0F172A),
             ),
           ),
@@ -579,10 +585,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
             color: const Color(0xFF0F172A),
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
         actions: [
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Center(
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -624,350 +630,675 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-            child: Form(
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWidescreen = constraints.maxWidth >= 900;
+            return Form(
               key: _formKey,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildFormCard(
-                    title: 'Media',
-                    icon: Icons.photo_library_rounded,
-                    child: _buildImagePicker(),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildFormCard(
-                    title: 'Basic Information',
-                    icon: Icons.info_outline_rounded,
-                    child: Column(
-                      children: [
-                        _buildTextField(
-                          controller: _nameController,
-                          label: 'Product Name',
-                          hint: 'e.g., Fresh Organic Tomatoes',
-                          validator: (value) => value?.isEmpty ?? true
-                              ? 'Product name is required'
-                              : null,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          controller: _descriptionController,
-                          label: 'Description',
-                          hint: 'Highlight key details (organic, size, origin)...',
-                          maxLines: 4,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildFormCard(
-                    title: 'Pricing & Category',
-                    icon: Icons.sell_outlined,
-                    child: Column(
-                      children: [
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final useStackedLayout = constraints.maxWidth < 360;
-
-                            if (useStackedLayout) {
-                              return Column(
-                                children: [
-                                  _buildTextField(
-                                    controller: _priceController,
-                                    label: 'Price',
-                                    hint: '0.00',
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                          decimal: true,
-                                        ),
-                                    prefixIcon: Icons.sell_outlined,
-                                    prefixText: '₱ ',
-                                    validator: (value) {
-                                      if (value?.isEmpty ?? true) return 'Required';
-                                      if (double.tryParse(value!) == null) {
-                                        return 'Invalid';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 12),
-                                  _buildDropdownField(
-                                    label: 'Unit',
-                                    value: _selectedUnit,
-                                    items: _units,
-                                    onChanged: (value) =>
-                                        setState(() => _selectedUnit = value),
-                                  ),
-                                ],
-                              );
-                            }
-
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 3,
-                                  child: _buildTextField(
-                                    controller: _priceController,
-                                    label: 'Price',
-                                    hint: '0.00',
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                          decimal: true,
-                                        ),
-                                    prefixIcon: Icons.sell_outlined,
-                                    prefixText: '₱ ',
-                                    validator: (value) {
-                                      if (value?.isEmpty ?? true) return 'Required';
-                                      if (double.tryParse(value!) == null) {
-                                        return 'Invalid';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  flex: 2,
-                                  child: _buildDropdownField(
-                                    label: 'Unit',
-                                    value: _selectedUnit,
-                                    items: _units,
-                                    onChanged: (value) =>
-                                        setState(() => _selectedUnit = value),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final useStackedLayout = constraints.maxWidth < 360;
-
-                            if (useStackedLayout) {
-                              return Column(
-                                children: [
-                                  _buildTextField(
-                                    controller: _quantityController,
-                                    label: 'Available Quantity',
-                                    hint: '0',
-                                    keyboardType: TextInputType.number,
-                                    prefixIcon: Icons.inventory_2_outlined,
-                                    validator: (value) {
-                                      if (value?.isEmpty ?? true) return 'Required';
-                                      if (double.tryParse(value!) == null) {
-                                        return 'Invalid';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF8FAFC),
-                                      border: Border.all(color: Colors.grey[200]!),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            'Total Value',
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.grey[500],
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            _calculateTotalValue(),
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w700,
-                                              color: const Color(0xFF13EC5B),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }
-
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: _buildTextField(
-                                    controller: _quantityController,
-                                    label: 'Available Quantity',
-                                    hint: '0',
-                                    keyboardType: TextInputType.number,
-                                    prefixIcon: Icons.inventory_2_outlined,
-                                    validator: (value) {
-                                      if (value?.isEmpty ?? true) return 'Required';
-                                      if (double.tryParse(value!) == null) {
-                                        return 'Invalid';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  flex: 2,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF8FAFC),
-                                      border: Border.all(color: Colors.grey[200]!),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            'Total Value',
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.grey[500],
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            _calculateTotalValue(),
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w700,
-                                              color: const Color(0xFF13EC5B),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _buildDropdownField(
-                          label: 'Category',
-                          value: _selectedCategory,
-                          items: _categories,
-                          onChanged: (value) =>
-                              setState(() => _selectedCategory = value),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildFormCard(
-                    title: 'Farming Details',
-                    icon: Icons.eco_outlined,
-                    child: Column(
-                      children: [
-                        _buildTextField(
-                          controller: _harvestDaysController,
-                          label: 'Days to Harvest (Optional)',
-                          hint: 'e.g., 30',
-                          keyboardType: TextInputType.number,
-                          prefixIcon: Icons.calendar_month_rounded,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildCheckboxTile(
-                          title: 'Pre-order Product',
-                          subtitle: 'Allow customers to buy before harvest',
-                          value: _isPreorder,
-                          onChanged: (value) =>
-                              setState(() => _isPreorder = value ?? false),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _submitForm,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primary,
-                        disabledBackgroundColor: primary.withValues(alpha: 0.5),
-                        elevation: 4,
-                        shadowColor: primary.withValues(alpha: 0.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isWidescreen ? 32 : 16,
+                        vertical: 24,
+                      ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: isWidescreen ? 1240 : 680,
+                          ),
+                          child: isWidescreen
+                              ? _buildDesktopWidescreenLayout()
+                              : _buildMobileStackedLayout(),
                         ),
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 3,
+                    ),
+                  ),
+                  _buildBottomStickyActionBar(isWidescreen),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopWidescreenLayout() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 5,
+          child: Column(
+            children: [
+              _buildFormCard(
+                title: 'Media',
+                icon: Icons.photo_library_rounded,
+                child: _buildImagePicker(),
+              ),
+              const SizedBox(height: 24),
+              _buildLivePreviewCard(),
+            ],
+          ),
+        ),
+        const SizedBox(width: 32),
+        Expanded(
+          flex: 7,
+          child: Column(
+            children: [
+              _buildBasicInfoCard(),
+              const SizedBox(height: 24),
+              _buildPricingCategoryCard(),
+              const SizedBox(height: 24),
+              _buildFarmingDetailsCard(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileStackedLayout() {
+    return Column(
+      children: [
+        _buildFormCard(
+          title: 'Media',
+          icon: Icons.photo_library_rounded,
+          child: _buildImagePicker(),
+        ),
+        const SizedBox(height: 20),
+        _buildLivePreviewCard(),
+        const SizedBox(height: 20),
+        _buildBasicInfoCard(),
+        const SizedBox(height: 20),
+        _buildPricingCategoryCard(),
+        const SizedBox(height: 20),
+        _buildFarmingDetailsCard(),
+      ],
+    );
+  }
+
+  Widget _buildBasicInfoCard() {
+    return _buildFormCard(
+      title: 'Basic Information',
+      icon: Icons.info_outline_rounded,
+      child: Column(
+        children: [
+          _buildTextField(
+            controller: _nameController,
+            label: 'Product Name',
+            hint: 'e.g., Fresh Organic Tomatoes',
+            validator: (value) =>
+                value?.isEmpty ?? true ? 'Product name is required' : null,
+          ),
+          const SizedBox(height: 16),
+          _buildTextField(
+            controller: _descriptionController,
+            label: 'Description',
+            hint: 'Highlight key details (organic, size, origin)...',
+            maxLines: 4,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPricingCategoryCard() {
+    return _buildFormCard(
+      title: 'Pricing & Category',
+      icon: Icons.sell_outlined,
+      child: Column(
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final useStackedLayout = constraints.maxWidth < 360;
+
+              if (useStackedLayout) {
+                return Column(
+                  children: [
+                    _buildTextField(
+                      controller: _priceController,
+                      label: 'Price',
+                      hint: '0.00',
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      prefixIcon: Icons.sell_outlined,
+                      prefixText: '₱ ',
+                      validator: (value) {
+                        if (value?.isEmpty ?? true) return 'Required';
+                        if (double.tryParse(value!) == null) {
+                          return 'Invalid';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDropdownField(
+                      label: 'Unit',
+                      value: _selectedUnit,
+                      items: _units,
+                      onChanged: (value) =>
+                          setState(() => _selectedUnit = value),
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: _buildTextField(
+                      controller: _priceController,
+                      label: 'Price',
+                      hint: '0.00',
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      prefixIcon: Icons.sell_outlined,
+                      prefixText: '₱ ',
+                      validator: (value) {
+                        if (value?.isEmpty ?? true) return 'Required';
+                        if (double.tryParse(value!) == null) {
+                          return 'Invalid';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: _buildDropdownField(
+                      label: 'Unit',
+                      value: _selectedUnit,
+                      items: _units,
+                      onChanged: (value) =>
+                          setState(() => _selectedUnit = value),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final useStackedLayout = constraints.maxWidth < 360;
+
+              if (useStackedLayout) {
+                return Column(
+                  children: [
+                    _buildTextField(
+                      controller: _quantityController,
+                      label: 'Available Quantity',
+                      hint: '0',
+                      keyboardType: TextInputType.number,
+                      prefixIcon: Icons.inventory_2_outlined,
+                      validator: (value) {
+                        if (value?.isEmpty ?? true) return 'Required';
+                        if (double.tryParse(value!) == null) {
+                          return 'Invalid';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        border: Border.all(color: Colors.grey[200]!),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Total Value',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[500],
                               ),
-                            )
-                          : Text(
-                              widget.editProduct != null
-                                  ? 'Save Changes'
-                                  : (_isOnline
-                                      ? 'Publish Product'
-                                      : 'Save Offline & Publish Later'),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _calculateTotalValue(),
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
+                                color: primary,
                               ),
                             ),
-                    ),
-                  ),
-                  if (widget.editProduct != null) ...[
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: OutlinedButton.icon(
-                        onPressed: _isLoading ? null : _deleteProduct,
-                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-                        label: Text(
-                          'Delete Product',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.red,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.red, width: 1.5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
+                          ],
                         ),
                       ),
                     ),
                   ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: _buildTextField(
+                      controller: _quantityController,
+                      label: 'Available Quantity',
+                      hint: '0',
+                      keyboardType: TextInputType.number,
+                      prefixIcon: Icons.inventory_2_outlined,
+                      validator: (value) {
+                        if (value?.isEmpty ?? true) return 'Required';
+                        if (double.tryParse(value!) == null) {
+                          return 'Invalid';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        border: Border.all(color: Colors.grey[200]!),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Total Value',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _calculateTotalValue(),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
-              ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildDropdownField(
+            label: 'Category',
+            value: _selectedCategory,
+            items: _categories,
+            onChanged: (value) => setState(() => _selectedCategory = value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFarmingDetailsCard() {
+    return _buildFormCard(
+      title: 'Farming Details',
+      icon: Icons.eco_outlined,
+      child: Column(
+        children: [
+          _buildTextField(
+            controller: _harvestDaysController,
+            label: 'Days to Harvest (Optional)',
+            hint: 'e.g., 30',
+            keyboardType: TextInputType.number,
+            prefixIcon: Icons.calendar_month_rounded,
+          ),
+          const SizedBox(height: 16),
+          _buildCheckboxTile(
+            title: 'Pre-order Product',
+            subtitle: 'Allow customers to buy before harvest',
+            value: _isPreorder,
+            onChanged: (value) => setState(() => _isPreorder = value ?? false),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLivePreviewCard() {
+    final name = _nameController.text.trim().isEmpty
+        ? 'Fresh Farm Product'
+        : _nameController.text.trim();
+    final priceText = _priceController.text.trim().isEmpty
+        ? '0.00'
+        : _priceController.text.trim();
+    final qty = _quantityController.text.trim();
+
+    String categoryName = 'General Produce';
+    if (_selectedCategory != null) {
+      final cat = _categories.firstWhere(
+        (c) => c['id']?.toString() == _selectedCategory,
+        orElse: () => {},
+      );
+      if (cat['name'] != null) categoryName = cat['name'].toString();
+    }
+
+    String unitName = '';
+    if (_selectedUnit != null) {
+      final u = _units.firstWhere(
+        (un) => un['id']?.toString() == _selectedUnit,
+        orElse: () => {},
+      );
+      if (u['name'] != null) unitName = '/ ${u['name']}';
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
             ),
+            child: Row(
+              children: [
+                const Icon(Icons.remove_red_eye_rounded, size: 16, color: primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Live Marketplace Preview',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'BUYER VIEW',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: primary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AspectRatio(
+            aspectRatio: 1.4,
+            child: Container(
+              width: double.infinity,
+              color: const Color(0xFFF1F5F9),
+              child: _selectedImageFiles.isNotEmpty
+                  ? ClipRRect(
+                      child: _selectedImageFiles.first.isExisting
+                          ? CachedNetworkImage(
+                              imageUrl: _selectedImageFiles.first.path,
+                              fit: BoxFit.cover,
+                              placeholder: (_, _) => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                              errorWidget: (_, _, _) => const Icon(Icons.error),
+                            )
+                          : Image.memory(
+                              _selectedImageFiles.first.bytes,
+                              fit: BoxFit.cover,
+                            ),
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.image_not_supported_outlined,
+                          size: 44,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No Image Uploaded Yet',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            color: Colors.grey[500],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    categoryName.toUpperCase(),
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF475569),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      '₱$priceText',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: primary,
+                      ),
+                    ),
+                    if (unitName.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        unitName,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                    const Spacer(),
+                    if (_isPreorder)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.amber.shade300),
+                        ),
+                        child: Text(
+                          'PRE-ORDER',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.amber.shade900,
+                          ),
+                        ),
+                      )
+                    else if (qty.isNotEmpty)
+                      Text(
+                        '$qty available',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomStickyActionBar(bool isWidescreen) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isWidescreen ? 32 : 16,
+        vertical: 16,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
+        ],
+        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isWidescreen ? 1240 : 680),
+          child: Row(
+            children: [
+              OutlinedButton(
+                onPressed: () => context.pop(),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Cancel',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF475569),
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (widget.editProduct != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _deleteProduct,
+                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+                    label: Text(
+                      'Delete',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      side: const BorderSide(color: Colors.red, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ElevatedButton.icon(
+                onPressed: _isLoading ? null : _submitForm,
+                icon: _isLoading
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                    : const Icon(Icons.check_circle_outline_rounded, size: 20),
+                label: Text(
+                  widget.editProduct != null
+                      ? 'Save Changes'
+                      : (_isOnline
+                          ? 'Publish Product'
+                          : 'Save Offline & Publish Later'),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primary,
+                  disabledBackgroundColor: primary.withValues(alpha: 0.5),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1276,6 +1607,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     required List<Map<String, dynamic>> items,
     required ValueChanged<String?> onChanged,
   }) {
+    final validValue = items.any((item) => (item['id'] as String?) == value) ? value : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1323,7 +1656,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
               )
             : DropdownButtonFormField<String>(
-                initialValue: value,
+                initialValue: validValue,
                 items: items.map((item) {
                   final displayText =
                       (item['name'] as String?) ??

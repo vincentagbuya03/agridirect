@@ -155,7 +155,7 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
         final isFarmerMode = AuthService().isViewingAsFarmer;
         final navItems = isFarmerMode
             ? const ['Dashboard', 'Products', 'Orders', 'Community']
-            : const ['Home', 'Shop', 'Community'];
+            : const ['Home', 'Shop', 'Community', 'Find Farmer'];
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -197,49 +197,80 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                   ),
                   if (!isMobile) ...[
                     SizedBox(width: compact ? 12 : 48),
-                    ...List.generate(navItems.length, (i) {
-                      final isActive = i == widget.currentIndex;
-                      final isHovered = _hoveredNav == i;
+                    Builder(builder: (context) {
+                      final currentPath = GoRouterState.of(context).uri.path;
+                      // Map each consumer nav item to its matching route prefix
+                      final consumerRoutes = [
+                        AppRoutes.marketplace, // 0 - Home
+                        AppRoutes.shop,        // 1 - Shop
+                        AppRoutes.community,   // 2 - Community
+                        AppRoutes.farmersMap,  // 3 - Find Farmer
+                      ];
 
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          onEnter: (_) => setState(() => _hoveredNav = i),
-                          onExit: (_) => setState(() => _hoveredNav = -1),
-                          child: GestureDetector(
-                            onTap: () => widget.onNavigate(i),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              padding: EdgeInsets.symmetric(
-                                horizontal: compact ? 10 : 16,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10),
-                                color: isActive
-                                    ? _primary.withValues(alpha: 0.1)
-                                    : isHovered
-                                    ? _border.withValues(alpha: 0.55)
-                                    : Colors.transparent,
-                              ),
-                              child: Text(
-                                navItems[i],
-                                style: GoogleFonts.inter(
-                                  fontSize: compact ? 12 : 14,
-                                  fontWeight: isActive
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: isActive
-                                      ? _primary
-                                      : isHovered
-                                      ? _dark
-                                      : _muted,
+                      return Row(
+                        children: List.generate(navItems.length, (i) {
+                          final bool isActive;
+                          if (!isFarmerMode && i < consumerRoutes.length) {
+                            // For Home (index 0) match '/' or '/marketplace'
+                            if (i == 0) {
+                              isActive = currentPath == '/' ||
+                                  currentPath.startsWith(AppRoutes.marketplace);
+                            } else {
+                              isActive = currentPath.startsWith(consumerRoutes[i]);
+                            }
+                          } else {
+                            // Farmer mode: fall back to currentIndex
+                            isActive = i == widget.currentIndex;
+                          }
+                          final isHovered = _hoveredNav == i;
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            child: MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              onEnter: (_) => setState(() => _hoveredNav = i),
+                              onExit: (_) => setState(() => _hoveredNav = -1),
+                              child: GestureDetector(
+                                onTap: () {
+                                  if (!isFarmerMode && i == 3) {
+                                    context.go(AppRoutes.farmersMap);
+                                  } else {
+                                    widget.onNavigate(i);
+                                  }
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: compact ? 10 : 16,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    color: isActive
+                                        ? _primary.withValues(alpha: 0.1)
+                                        : isHovered
+                                        ? _border.withValues(alpha: 0.55)
+                                        : Colors.transparent,
+                                  ),
+                                  child: Text(
+                                    navItems[i],
+                                    style: GoogleFonts.inter(
+                                      fontSize: compact ? 12 : 14,
+                                      fontWeight: isActive
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: isActive
+                                          ? _primary
+                                          : isHovered
+                                          ? _dark
+                                          : _muted,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ),
+                          );
+                        }),
                       );
                     }),
                   ],
@@ -332,7 +363,13 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                     MouseRegion(
                       cursor: SystemMouseCursors.click,
                       child: GestureDetector(
-                        onTap: () => widget.onNavigate(isFarmerMode ? 4 : 3),
+                        onTap: () {
+                          if (isFarmerMode) {
+                            widget.onNavigate(4);
+                          } else {
+                            context.go(AppRoutes.profile);
+                          }
+                        },
                         child: Container(
                           width: compact ? 36 : 44,
                           height: compact ? 36 : 44,

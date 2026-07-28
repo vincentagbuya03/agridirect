@@ -172,9 +172,9 @@ class _ClaimedVouchersScreenState extends State<ClaimedVouchersScreen>
             if (tabIndex == 0) ...[
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: () => context.go(AppRoutes.home),
-                icon: const Icon(Icons.shopping_bag_outlined, size: 18),
-                label: const Text('Explore Marketplace'),
+                onPressed: () => context.push(AppRoutes.farmersMap),
+                icon: const Icon(Icons.map_outlined, size: 18),
+                label: const Text('Explore Farmers Map'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,

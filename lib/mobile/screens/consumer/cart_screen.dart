@@ -7,13 +7,15 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/services/user/user_service.dart';
 import '../../../shared/models/auth/user_address_model.dart';
-import 'orders_screen.dart';
 import 'marketplace_screen.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/models/farmer/farmer_profile_model.dart';
 import '../../../shared/services/farmer/farmer_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/commerce/voucher_service.dart';
+import 'package:go_router/go_router.dart';
+import '../../../shared/router/app_router.dart';
+import '../../../shared/services/core/supabase_data_service.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -1081,7 +1083,6 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Confirm Button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -1089,9 +1090,11 @@ class _CartScreenState extends State<CartScreen> {
                           (_paymentMethod == 'COD' && _address == null ||
                               _isOrdering)
                           ? null
-                          : () {
-                              Navigator.pop(sheetContext);
-                              _handleOrderNow();
+                          : () async {
+                              setSheetState(() {
+                                _isOrdering = true;
+                              });
+                              await _handleOrderNow();
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
@@ -1100,13 +1103,35 @@ class _CartScreenState extends State<CartScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: Text(
-                        _isOrdering ? 'Ordering...' : 'Confirm Order',
-                        style: AppTextStyles.headline3.copyWith(
-                          color: Colors.white,
-                          fontSize: 18,
-                        ),
-                      ),
+                      child: _isOrdering
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Placing Order...',
+                                  style: AppTextStyles.headline3.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Text(
+                              'Confirm Order',
+                              style: AppTextStyles.headline3.copyWith(
+                                color: Colors.white,
+                                fontSize: 18,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -1169,6 +1194,8 @@ class _CartScreenState extends State<CartScreen> {
     setState(() => _isOrdering = true);
 
     try {
+      // Simulate/allow loading state transition
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
       final orderService = OrderService();
 
       // Group items by farmer
@@ -1257,6 +1284,14 @@ class _CartScreenState extends State<CartScreen> {
         }
       }
 
+      String? firstCategory;
+      if (cartItems.isNotEmpty) {
+        try {
+          final firstProduct = await SupabaseDataService().getProductById(cartItems.first.productId);
+          firstCategory = firstProduct?.categoryName;
+        } catch (_) {}
+      }
+
       _selectedVouchersByFarmer.clear();
 
       // Remove selected items from the cart
@@ -1269,10 +1304,12 @@ class _CartScreenState extends State<CartScreen> {
           backgroundColor: Colors.green,
         ),
       );
-      // Navigate to orders screen
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const OrdersScreen()),
-      );
+      
+      // Close checkout confirmation sheet
+      Navigator.of(context).pop();
+      
+      // Route to our beautiful animated success page
+      context.go(AppRoutes.orderSuccess, extra: firstCategory);
     } catch (e) {
       if (!mounted) return;
       final rawMessage = e.toString().replaceFirst('Exception: ', '');

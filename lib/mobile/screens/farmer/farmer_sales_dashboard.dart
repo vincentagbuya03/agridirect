@@ -753,7 +753,12 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Good Morning,',
+                              () {
+                                final hour = DateTime.now().hour;
+                                if (hour < 12) return 'Good Morning,';
+                                if (hour < 18) return 'Good Afternoon,';
+                                return 'Good Evening,';
+                              }(),
                               style: AppTextStyles.bodySmall.copyWith(
                                 color: AppColors.textSubtle,
                                 fontWeight: FontWeight.w600,

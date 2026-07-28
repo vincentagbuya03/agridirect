@@ -293,8 +293,14 @@ class OrderService {
         throw Exception('Order was updated but could not be reloaded');
       }
 
-      // If transitioning to completed, deduct stock
-      if (currentStatus != 'completed' && targetStatus == 'completed') {
+      bool isDeductedStatus(String s) =>
+          s == 'confirmed' ||
+          s == 'processing' ||
+          s == 'shipped' ||
+          s == 'completed';
+
+      // If transitioning from PENDING to CONFIRMED (or processing/shipped/completed), deduct stock
+      if (!isDeductedStatus(currentStatus) && isDeductedStatus(targetStatus)) {
         final items = await getOrderItems(orderId);
         for (final item in items) {
           final inv = await _supabase
@@ -312,35 +318,29 @@ class OrderService {
             final isPreorder = prod?['is_preorder'] == true;
 
             if (isPreorder) {
-              final reserved =
-                  (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
+              final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
+              final reserved = (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
               await _supabase
                   .from('product_inventory')
                   .update({
-                    'reserved_quantity': (reserved - item.quantity).clamp(
-                      0.0,
-                      double.infinity,
-                    ),
+                    'available_quantity': (available - item.quantity).clamp(0.0, double.infinity),
+                    'reserved_quantity': reserved + item.quantity,
                   })
                   .eq('product_id', item.productId);
             } else {
-              final available =
-                  (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
+              final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
               await _supabase
                   .from('product_inventory')
                   .update({
-                    'available_quantity': (available - item.quantity).clamp(
-                      0.0,
-                      double.infinity,
-                    ),
+                    'available_quantity': (available - item.quantity).clamp(0.0, double.infinity),
                   })
                   .eq('product_id', item.productId);
             }
           }
         }
       }
-      // If transitioning away from completed, restore stock
-      else if (currentStatus == 'completed' && targetStatus != 'completed') {
+      // If transitioning to CANCELLED from a confirmed/deducted state, restore stock
+      else if (targetStatus == 'cancelled' && isDeductedStatus(currentStatus)) {
         final items = await getOrderItems(orderId);
         for (final item in items) {
           final inv = await _supabase
@@ -358,15 +358,17 @@ class OrderService {
             final isPreorder = prod?['is_preorder'] == true;
 
             if (isPreorder) {
-              final reserved =
-                  (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
+              final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
+              final reserved = (inv['reserved_quantity'] as num?)?.toDouble() ?? 0.0;
               await _supabase
                   .from('product_inventory')
-                  .update({'reserved_quantity': reserved + item.quantity})
+                  .update({
+                    'available_quantity': available + item.quantity,
+                    'reserved_quantity': (reserved - item.quantity).clamp(0.0, double.infinity),
+                  })
                   .eq('product_id', item.productId);
             } else {
-              final available =
-                  (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
+              final available = (inv['available_quantity'] as num?)?.toDouble() ?? 0.0;
               await _supabase
                   .from('product_inventory')
                   .update({'available_quantity': available + item.quantity})
