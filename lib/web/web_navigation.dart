@@ -17,12 +17,14 @@ class WebNavigation extends StatefulWidget {
   final VoidCallback onLogout;
   final int initialIndex;
   final bool showPreOrdersInShop;
+  final String? initialPostId;
 
   const WebNavigation({
     super.key,
     required this.onLogout,
     this.initialIndex = 0,
     this.showPreOrdersInShop = false,
+    this.initialPostId,
   });
 
   @override
@@ -96,7 +98,7 @@ class _WebNavigationState extends State<WebNavigation> {
         WebSalesDashboard(onNavigate: _navigateTo, currentIndex: _currentIndex),
         WebFarmerProducts(onNavigate: _navigateTo, currentIndex: _currentIndex),
         WebFarmerOrders(onNavigate: _navigateTo, currentIndex: _currentIndex),
-        WebCommunityHub(onNavigate: _navigateTo, currentIndex: _currentIndex),
+        WebCommunityHub(onNavigate: _navigateTo, currentIndex: _currentIndex, initialPostId: widget.initialPostId),
         WebFarmerPreordersTab(onNavigate: _navigateTo, currentIndex: _currentIndex),
         WebProfileScreen(
           onModeChanged: () => setState(() => _currentIndex = 0),
@@ -114,7 +116,7 @@ class _WebNavigationState extends State<WebNavigation> {
         initialShowPreOrders: widget.showPreOrdersInShop,
         initialCategory: _selectedCategoryFilter,
       ),
-      WebCommunityHub(onNavigate: _navigateTo, currentIndex: _currentIndex),
+      WebCommunityHub(onNavigate: _navigateTo, currentIndex: _currentIndex, initialPostId: widget.initialPostId),
       WebProfileScreen(
         onModeChanged: () => setState(() => _currentIndex = 0),
         onLogout: _handleLogout,

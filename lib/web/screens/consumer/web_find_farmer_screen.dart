@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
@@ -68,10 +69,14 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
 
   Future<List<Map<String, dynamic>>> _loadFarmers() async {
     try {
-      final response = await SupabaseConfig.client
-          .from('v_farmer_profiles')
-          .select()
-          .order('farm_name', ascending: true);
+      final auth = AuthService();
+      var query = SupabaseConfig.client.from('v_farmer_profiles').select();
+      
+      if (auth.isLoggedIn && auth.userId.isNotEmpty) {
+        query = query.neq('user_id', auth.userId);
+      }
+
+      final response = await query.order('farm_name', ascending: true);
 
       final list = (response as List<dynamic>)
           .map((item) => Map<String, dynamic>.from(item as Map))

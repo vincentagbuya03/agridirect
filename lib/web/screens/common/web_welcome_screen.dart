@@ -218,14 +218,15 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   // FLOATING NAV BAR with glassmorphism
   // ═══════════════════════════════════════════════════════════════
   Widget _buildNavBar() {
-    final navItems = ['Home', 'Shop', 'Community'];
+    final navItems = ['Home', 'Shop', 'Community', 'Find Farmer'];
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 650;
 
     final navRoutes = [
-      '/shop',
+      '/',
       '/shop',
       '/community',
+      '/farmers-map',
     ];
 
     return FadeTransition(
@@ -2018,9 +2019,55 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
             ),
           ),
           const SizedBox(height: 24),
-          _PulseDownloadButton(
-            onTap: _downloadAndroidApk,
-            fullWidth: true,
+          Builder(
+            builder: (context) {
+              final sw = MediaQuery.of(context).size.width;
+              final isDesktop = sw > 600;
+
+              if (isDesktop) {
+                final apkUrl = ApkDownloader.apkUrl;
+                final qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${Uri.encodeComponent(apkUrl)}';
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          qrUrl,
+                          width: 160,
+                          height: 160,
+                          errorBuilder: (context, error, stackTrace) => const Icon(
+                            Icons.qr_code_2_rounded,
+                            size: 160,
+                            color: Colors.white24,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Scan to install on your phone',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return _PulseDownloadButton(
+                onTap: _downloadAndroidApk,
+                fullWidth: true,
+              );
+            },
           ),
           const SizedBox(height: 8),
           Row(
@@ -2064,8 +2111,6 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
             height: 1.5,
           ),
         ),
-        const SizedBox(height: 24),
-        _PulseDownloadButton(onTap: _downloadAndroidApk),
       ],
     );
 

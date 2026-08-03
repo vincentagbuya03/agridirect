@@ -73,8 +73,23 @@ final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 GoRouter createAppRouter() {
   final auth = AuthService();
 
+  // On web, start from the actual browser URL so deep links (e.g. /community?post=xxx)
+  // are preserved instead of being redirected away on first load.
+  String? initialLocation;
+  if (kIsWeb) {
+    final uri = Uri.base;
+    final path = uri.path.isEmpty ? '/' : uri.path;
+    final query = uri.query.isNotEmpty ? '?${uri.query}' : '';
+    final candidate = '$path$query';
+    // Only use it as initial location if it looks like an app route
+    if (candidate != '/' && candidate.isNotEmpty) {
+      initialLocation = candidate;
+    }
+  }
+
   return GoRouter(
     navigatorKey: appNavigatorKey,
+    initialLocation: initialLocation,
     refreshListenable: auth,
     redirect: (BuildContext context, GoRouterState state) async {
       // 0. Hold redirection until auth is initialized (restored from Supabase)
@@ -113,7 +128,7 @@ GoRouter createAppRouter() {
       // Use View.of for a more stable width check that doesn't trigger loops
       final view = View.of(context);
       final width = view.physicalSize.width / view.devicePixelRatio;
-      final isMobile = (width <= 800);
+      final isMobile = !kIsWeb && (width <= 800);
 
       // debugPrint('🔀 Router Redirect: [${isMobile ? "MOBILE" : "WEB"}] location=$location isLoggedIn=$isLoggedIn admin=$isAdmin needsProfile=${auth.needsProfileCompletion}');
 
@@ -228,9 +243,11 @@ GoRouter createAppRouter() {
         path: AppRoutes.home,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               final tabParam = state.uri.queryParameters['tab'];
-              final tabIndex = tabParam != null ? int.tryParse(tabParam) ?? 0 : 0;
+              final tabIndex = tabParam != null
+                  ? int.tryParse(tabParam) ?? 0
+                  : 0;
               return WebNavigation(
                 initialIndex: tabIndex,
                 onLogout: () async {
@@ -254,7 +271,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.marketplace,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return WebNavigation(
                 initialIndex: 0,
                 onLogout: () async {
@@ -279,58 +296,63 @@ GoRouter createAppRouter() {
           final showPreOrders =
               state.uri.queryParameters['mode'] == 'preorders';
           return LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
-              return WebNavigation(
-                initialIndex: 1,
-                showPreOrdersInShop: showPreOrders,
+            builder: (context, constraints) {
+              if (kIsWeb || constraints.maxWidth > 800) {
+                return WebNavigation(
+                  initialIndex: 1,
+                  showPreOrdersInShop: showPreOrders,
+                  onLogout: () async {
+                    await AuthService().logout();
+                    if (context.mounted) context.go(AppRoutes.login);
+                  },
+                );
+              }
+              return MobileNavigation(
+                initialIndex: 1, // Shop maps to Marketplace on mobile
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
                 },
               );
-            }
-            return MobileNavigation(
-              initialIndex: 1, // Shop maps to Marketplace on mobile
-              onLogout: () async {
-                await AuthService().logout();
-                if (context.mounted) context.go(AppRoutes.login);
-              },
-            );
-          },
-        );
+            },
+          );
         },
       ),
       GoRoute(
         path: AppRoutes.community,
-        builder: (context, state) => LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
-              return WebNavigation(
-                initialIndex: AuthService().isViewingAsFarmer ? 3 : 2,
+        builder: (context, state) {
+          // Preserve ?post query parameter so WebCommunityHub can deep-link to it
+          final postId = state.uri.queryParameters['post'];
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              if (kIsWeb || constraints.maxWidth > 800) {
+                return WebNavigation(
+                  initialIndex: AuthService().isViewingAsFarmer ? 3 : 2,
+                  initialPostId: postId,
+                  onLogout: () async {
+                    await AuthService().logout();
+                    if (context.mounted) context.go(AppRoutes.login);
+                  },
+                );
+              }
+              return MobileNavigation(
+                initialIndex: 0,
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
                 },
               );
-            }
-            return MobileNavigation(
-              initialIndex: 0, // Community maps to Home/News on mobile
-              onLogout: () async {
-                await AuthService().logout();
-                if (context.mounted) context.go(AppRoutes.login);
-              },
-            );
-          },
-        ),
+            },
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.profile,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return WebNavigation(
-                initialIndex: AuthService().isViewingAsFarmer ? 4 : 3,
+                initialIndex: AuthService().isViewingAsFarmer ? 5 : 3,
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
@@ -351,7 +373,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.cart,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return const WebCartScreen();
             }
             return const CartScreen();
@@ -362,7 +384,7 @@ GoRouter createAppRouter() {
         path: AppRoutes.preorders,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               return WebPreOrderHub(
                 currentIndex: 1,
                 onNavigate: (index) => context.go(AppRoutes.webTabRoute(index)),
@@ -376,9 +398,11 @@ GoRouter createAppRouter() {
         path: AppRoutes.farmerDashboard,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
+            if (kIsWeb || constraints.maxWidth > 800) {
               final tabParam = state.uri.queryParameters['tab'];
-              final tabIndex = tabParam != null ? int.tryParse(tabParam) ?? 0 : 0;
+              final tabIndex = tabParam != null
+                  ? int.tryParse(tabParam) ?? 0
+                  : 0;
               return WebNavigation(
                 initialIndex: tabIndex,
                 onLogout: () async {
@@ -401,14 +425,16 @@ GoRouter createAppRouter() {
         path: '${AppRoutes.farmerProfileBase}/:farmerId',
         builder: (context, state) {
           final farmerId = state.pathParameters['farmerId'] ?? '';
-          
+
           final view = View.of(context);
           final width = view.physicalSize.width / view.devicePixelRatio;
           final isMobile = (width <= 800);
 
           if (isMobile) {
             return FutureBuilder<Map<String, dynamic>?>(
-              future: SupabaseDataService().getFarmerProfileByFarmerId(farmerId),
+              future: SupabaseDataService().getFarmerProfileByFarmerId(
+                farmerId,
+              ),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Scaffold(
@@ -418,21 +444,28 @@ GoRouter createAppRouter() {
                 if (snapshot.hasError || snapshot.data == null) {
                   return Scaffold(
                     appBar: AppBar(title: const Text('Farmer Profile')),
-                    body: const Center(child: Text('Farmer not found or offline.')),
+                    body: const Center(
+                      child: Text('Farmer not found or offline.'),
+                    ),
                   );
                 }
-                
+
                 final dbProfile = snapshot.data!;
                 final mappedProfile = <String, dynamic>{
                   ...dbProfile,
                   'farmerId': dbProfile['farmer_id'],
                   'farmerUserId': dbProfile['user_id'],
-                  'name': dbProfile['farm_name'] ?? dbProfile['full_name'] ?? 'Farm',
+                  'name':
+                      dbProfile['farm_name'] ??
+                      dbProfile['full_name'] ??
+                      'Farm',
                   'specialty': dbProfile['specialty'],
                   'location': dbProfile['location'],
                   'imageUrl': dbProfile['image_url'],
                   'avatarUrl': dbProfile['avatar_url'],
-                  'badge': dbProfile['badge'] ?? (dbProfile['is_verified'] == true ? 'VERIFIED' : null),
+                  'badge':
+                      dbProfile['badge'] ??
+                      (dbProfile['is_verified'] == true ? 'VERIFIED' : null),
                   'farmingHistory': dbProfile['farming_history'],
                   'isVerified': dbProfile['is_verified'],
                   'yearsOfExperience': dbProfile['years_of_experience'],
@@ -471,7 +504,8 @@ GoRouter createAppRouter() {
       ),
       GoRoute(
         path: AppRoutes.farmersMap,
-        builder: (context, state) => kIsWeb ? const WebFindFarmerScreen() : const FarmersMapScreen(),
+        builder: (context, state) =>
+            kIsWeb ? const WebFindFarmerScreen() : const FarmersMapScreen(),
       ),
       GoRoute(
         path: AppRoutes.notifications,
@@ -566,9 +600,7 @@ GoRouter createAppRouter() {
               });
               return const Scaffold(
                 body: Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF16A34A),
-                  ),
+                  child: CircularProgressIndicator(color: Color(0xFF16A34A)),
                 ),
               );
             }
@@ -738,9 +770,7 @@ GoRouter createAppRouter() {
             });
             return const Scaffold(
               body: Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFF16A34A),
-                ),
+                child: CircularProgressIndicator(color: Color(0xFF16A34A)),
               ),
             );
           }
@@ -760,11 +790,11 @@ GoRouter createAppRouter() {
         path: AppRoutes.orderSuccess,
         builder: (context, state) {
           final categoryName = state.extra as String?;
-          
+
           final view = View.of(context);
           final width = view.physicalSize.width / view.devicePixelRatio;
           final isMobile = !kIsWeb && (width <= 800);
-          
+
           if (isMobile) {
             return MobileOrderSuccessScreen(categoryName: categoryName);
           }
@@ -799,12 +829,8 @@ GoRouter createAppRouter() {
               final order = snapshot.data;
               if (order == null) {
                 return Scaffold(
-                  appBar: AppBar(
-                    title: const Text('Order Details'),
-                  ),
-                  body: const Center(
-                    child: Text('Order not found'),
-                  ),
+                  appBar: AppBar(title: const Text('Order Details')),
+                  body: const Center(child: Text('Order not found')),
                 );
               }
               return FarmerOrderDetailsScreen(order: order);

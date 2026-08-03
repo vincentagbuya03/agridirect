@@ -2377,7 +2377,7 @@ class _WebShopScreenState extends State<WebShopScreen>
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: 20,
             mainAxisSpacing: 20,
-            mainAxisExtent: _showPreOrders ? 440 : 392,
+            mainAxisExtent: _showPreOrders ? 460 : 425,
           ),
           itemCount: 8,
           itemBuilder: (context, index) => const AppShimmerCard(),

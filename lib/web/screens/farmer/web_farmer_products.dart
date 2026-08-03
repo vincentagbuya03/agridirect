@@ -33,20 +33,25 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
   String _searchQuery = '';
   String _selectedCategoryFilter = 'All';
   String _selectedStockFilter = 'All';
+  String _sortBy = 'Default';
+  bool _isGridView = true;
+
   final TextEditingController _searchController = TextEditingController();
   Future<List<Map<String, dynamic>>>? _productsFuture;
 
   static const Color _primary = Color(0xFF16A34A);
-  static const Color _dark = Color(0xFF111827);
-  static const Color _muted = Color(0xFF6B7280);
-  static const Color _border = Color(0xFFE5E7EB);
-  static const Color _surface = Color(0xFFFAFAFA);
+  static const Color _primaryDark = Color(0xFF15803D);
+  static const Color _primaryLight = Color(0xFFDCFCE7);
+  static const Color _dark = Color(0xFF0F172A);
+  static const Color _muted = Color(0xFF64748B);
+  static const Color _border = Color(0xFFE2E8F0);
+  static const Color _surface = Color(0xFFF8FAFC);
 
   @override
   void initState() {
     super.initState();
     _fadeInController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     )..forward();
     _productsFuture = SupabaseDataService().getFarmerProducts();
@@ -89,18 +94,18 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
       backgroundColor: _surface,
       body: Stack(
         children: [
-          // Background accents
+          // Subtle background pattern
           Positioned.fill(
             child: CustomPaint(
               painter: DotPatternPainter(
-                opacity: 0.03,
+                opacity: 0.02,
                 color: const Color(0xFF10B981),
               ),
             ),
           ),
           const Positioned.fill(
             child: FloatingParticles(
-              count: 15,
+              count: 12,
               maxSize: 2.0,
               color: Color(0xFF10B981),
             ),
@@ -112,19 +117,24 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                     isMobile ? 16 : 40,
-                    0,
+                    12,
                     isMobile ? 16 : 40,
-                    40,
+                    48,
                   ),
                   child: FadeTransition(
                     opacity: _fadeInController,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildHeader(),
-                        SizedBox(height: isMobile ? 20 : 32),
-                        _buildProductGrid(),
-                      ],
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1400),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildHeader(),
+                            const SizedBox(height: 24),
+                            _buildMainContent(),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -147,8 +157,8 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
         onNavigate: widget.onNavigate,
         onCartTap: () => context.go(AppRoutes.cart),
         margin: isMobile
-            ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-            : const EdgeInsets.fromLTRB(32, 24, 32, 12),
+            ? const EdgeInsets.fromLTRB(16, 12, 16, 8)
+            : const EdgeInsets.fromLTRB(32, 16, 32, 12),
       );
     }
 
@@ -161,23 +171,23 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
     ];
     return Container(
       margin: isMobile
-          ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
+          ? const EdgeInsets.fromLTRB(16, 12, 16, 8)
           : (isCompact
-              ? const EdgeInsets.fromLTRB(20, 16, 20, 8)
-              : const EdgeInsets.fromLTRB(32, 24, 32, 12)),
+              ? const EdgeInsets.fromLTRB(20, 14, 20, 8)
+              : const EdgeInsets.fromLTRB(32, 16, 32, 12)),
       padding: EdgeInsets.symmetric(
         horizontal: isMobile ? 16 : (isCompact ? 16 : 28),
-        vertical: isMobile ? 12 : (isCompact ? 10 : 14),
+        vertical: isMobile ? 10 : (isCompact ? 10 : 12),
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _border.withValues(alpha: 0.5)),
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border),
         boxShadow: [
           BoxShadow(
             color: _dark.withValues(alpha: 0.03),
-            blurRadius: 30,
-            offset: const Offset(0, 10),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -188,12 +198,14 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
             child: GestureDetector(
               onTap: () => widget.onNavigate(0),
               child: BrandLogo(
-                size: (isMobile || isCompact) ? BrandLogoSize.small : BrandLogoSize.medium,
+                size: (isMobile || isCompact)
+                    ? BrandLogoSize.small
+                    : BrandLogoSize.medium,
               ),
             ),
           ),
           if (!isMobile) ...[
-            SizedBox(width: isCompact ? 16 : 48),
+            SizedBox(width: isCompact ? 16 : 40),
             ...List.generate(navItems.length, (i) {
               final isActive = i == widget.currentIndex;
               final isHovered = _hoveredNav == i;
@@ -206,32 +218,26 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                   child: GestureDetector(
                     onTap: () => widget.onNavigate(i),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
+                      duration: const Duration(milliseconds: 200),
                       padding: EdgeInsets.symmetric(
-                        horizontal: isCompact ? 12 : 20,
-                        vertical: isCompact ? 10 : 12,
+                        horizontal: isCompact ? 12 : 18,
+                        vertical: isCompact ? 8 : 10,
                       ),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                         color: isActive
-                            ? _primary.withValues(alpha: 0.1)
+                            ? _primaryLight
                             : isHovered
-                            ? _border.withValues(alpha: 0.35)
-                            : Colors.transparent,
+                                ? const Color(0xFFF1F5F9)
+                                : Colors.transparent,
                       ),
                       child: Text(
                         navItems[i],
                         style: GoogleFonts.inter(
-                          fontSize: isCompact ? 13 : 15,
-                          fontWeight: isActive
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: isActive
-                              ? _primary
-                              : isHovered
-                              ? _dark
-                              : _muted,
-                          letterSpacing: 0.2,
+                          fontSize: isCompact ? 13 : 14,
+                          fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                          color: isActive ? _primaryDark : (isHovered ? _dark : _muted),
+                          letterSpacing: 0.1,
                         ),
                       ),
                     ),
@@ -246,25 +252,27 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
             child: GestureDetector(
               onTap: () => widget.onNavigate(5),
               child: Container(
-                width: (isMobile || isCompact) ? 38 : 46,
-                height: (isMobile || isCompact) ? 38 : 46,
+                width: (isMobile || isCompact) ? 38 : 42,
+                height: (isMobile || isCompact) ? 38 : 42,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [_primary, Color(0xFF059669)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: _primary.withValues(alpha: 0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+                      color: _primary.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
                   ],
                 ),
                 child: Icon(
                   Icons.person_outline_rounded,
                   color: Colors.white,
-                  size: (isMobile || isCompact) ? 20 : 24,
+                  size: (isMobile || isCompact) ? 20 : 22,
                 ),
               ),
             ),
@@ -283,139 +291,82 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
 
   Widget _buildHeader() {
     final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 650;
+    final isMobile = sw < 768;
 
-    final headerText = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment:
+          isMobile ? CrossAxisAlignment.start : CrossAxisAlignment.center,
       children: [
-        Text(
-          'Product Management',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: isMobile ? 24 : 32,
-            fontWeight: FontWeight.w800,
-            color: _dark,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Manage your inventory, prices, and listings.',
-          style: GoogleFonts.inter(fontSize: isMobile ? 14 : 16, color: _muted),
-        ),
-      ],
-    );
-
-    if (isMobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          headerText,
-          const SizedBox(height: 20),
-          Row(
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _border),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (val) => setState(() => _searchQuery = val),
-                    decoration: InputDecoration(
-                      hintText: 'Search...',
-                      hintStyle: GoogleFonts.inter(color: _muted, fontSize: 14),
-                      prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        color: _muted,
-                        size: 20,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  Text(
+                    'Inventory & Products',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: isMobile ? 22 : 28,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                      letterSpacing: -0.5,
                     ),
                   ),
-                ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _primaryLight,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      'Live Catalog',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: _primaryDark,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () => context.push(AppRoutes.addProduct),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: Text(
-                  'Add',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
+              const SizedBox(height: 4),
+              Text(
+                'Monitor stock levels, set prices, and publish fresh farm offerings.',
+                style: GoogleFonts.inter(
+                  fontSize: isMobile ? 13 : 14,
+                  color: _muted,
                 ),
               ),
             ],
           ),
-        ],
-      );
-    }
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        headerText,
-        Row(
-          children: [
-            Container(
-              width: 300,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _border),
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (val) => setState(() => _searchQuery = val),
-                decoration: InputDecoration(
-                  hintText: 'Search products...',
-                  hintStyle: GoogleFonts.inter(color: _muted, fontSize: 14),
-                  prefixIcon: const Icon(
-                    Icons.search_rounded,
-                    color: _muted,
-                    size: 20,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            ElevatedButton.icon(
-              onPressed: () => context.push(AppRoutes.addProduct),
-              icon: const Icon(Icons.add_rounded, size: 20),
-              label: Text(
-                'Add New Product',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-            ),
-          ],
         ),
+        if (!isMobile)
+          ElevatedButton.icon(
+            onPressed: () => context.push(AppRoutes.addProduct),
+            icon: const Icon(Icons.add_rounded, size: 20),
+            label: Text(
+              'Add New Product',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              shadowColor: _primary.withValues(alpha: 0.4),
+            ),
+          ),
       ],
     );
   }
@@ -444,21 +395,22 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
     Widget buildKpiCard({
       required String title,
       required String value,
-      required String badge,
+      required String badgeText,
       required IconData icon,
       required Color color,
+      required Color bgColor,
     }) {
       return Expanded(
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(color: _border),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 15,
+                blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -468,32 +420,49 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
+                  color: bgColor,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: color, size: 24),
+                child: Icon(icon, color: color, size: 22),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _muted,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _muted,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
                       value,
-                      style: GoogleFonts.inter(
-                        fontSize: 20,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
                         fontWeight: FontWeight.w800,
                         color: _dark,
+                        letterSpacing: -0.3,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      badgeText,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: color,
                       ),
                     ),
                   ],
@@ -513,17 +482,19 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
               buildKpiCard(
                 title: 'Total Items',
                 value: '$totalProducts',
-                badge: 'Active',
-                icon: Icons.inventory_2_outlined,
+                badgeText: 'Active Listings',
+                icon: Icons.inventory_2_rounded,
                 color: _primary,
+                bgColor: _primaryLight,
               ),
               const SizedBox(width: 12),
               buildKpiCard(
                 title: 'Total Value',
                 value: '₱${totalValuation.toStringAsFixed(0)}',
-                badge: 'Valuation',
-                icon: Icons.payments_outlined,
-                color: Colors.blue,
+                badgeText: 'Estimated Revenue',
+                icon: Icons.account_balance_wallet_rounded,
+                color: const Color(0xFF2563EB),
+                bgColor: const Color(0xFFDBEAFE),
               ),
             ],
           ),
@@ -532,18 +503,20 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
             children: [
               buildKpiCard(
                 title: 'Low Stock',
-                value: '$lowStockCount',
-                badge: 'Alert',
+                value: '$lowStockCount items',
+                badgeText: lowStockCount > 0 ? 'Needs Restock' : 'Healthy Stock',
                 icon: Icons.warning_amber_rounded,
-                color: Colors.amber.shade700,
+                color: const Color(0xFFD97706),
+                bgColor: const Color(0xFFFEF3C7),
               ),
               const SizedBox(width: 12),
               buildKpiCard(
                 title: 'Pre-Orders',
-                value: '$preorderCount',
-                badge: 'Harvest',
-                icon: Icons.eco_outlined,
-                color: Colors.purple,
+                value: '$preorderCount items',
+                badgeText: 'Upcoming Harvest',
+                icon: Icons.eco_rounded,
+                color: const Color(0xFF9333EA),
+                bgColor: const Color(0xFFF3E8FF),
               ),
             ],
           ),
@@ -556,134 +529,285 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
         buildKpiCard(
           title: 'Total Products',
           value: '$totalProducts',
-          badge: 'Active Listings',
-          icon: Icons.inventory_2_outlined,
+          badgeText: 'Active Listings',
+          icon: Icons.inventory_2_rounded,
           color: _primary,
+          bgColor: _primaryLight,
         ),
         const SizedBox(width: 16),
         buildKpiCard(
           title: 'Stock Valuation',
           value: '₱${totalValuation.toStringAsFixed(2)}',
-          badge: 'Est. Revenue',
-          icon: Icons.payments_outlined,
-          color: Colors.blue,
+          badgeText: 'Estimated Revenue',
+          icon: Icons.account_balance_wallet_rounded,
+          color: const Color(0xFF2563EB),
+          bgColor: const Color(0xFFDBEAFE),
         ),
         const SizedBox(width: 16),
         buildKpiCard(
           title: 'Low Stock Alerts',
           value: '$lowStockCount items',
-          badge: 'Needs Restock',
+          badgeText: lowStockCount > 0 ? 'Needs Restock' : 'Healthy Inventory',
           icon: Icons.warning_amber_rounded,
-          color: Colors.amber.shade800,
+          color: const Color(0xFFD97706),
+          bgColor: const Color(0xFFFEF3C7),
         ),
         const SizedBox(width: 16),
         buildKpiCard(
           title: 'Active Pre-Orders',
           value: '$preorderCount items',
-          badge: 'Upcoming Harvest',
-          icon: Icons.eco_outlined,
-          color: Colors.purple,
+          badgeText: 'Upcoming Harvest',
+          icon: Icons.eco_rounded,
+          color: const Color(0xFF9333EA),
+          bgColor: const Color(0xFFF3E8FF),
         ),
       ],
     );
   }
 
-  Widget _buildFilterBar() {
+  Widget _buildControlToolbar() {
     final categories = ['All', 'Vegetables', 'Fruits', 'Grains', 'Poultry', 'Pre-Orders'];
     final stockOptions = ['All', 'In Stock', 'Low Stock', 'Out of Stock'];
+    final sortOptions = ['Default', 'Name', 'Price: Low to High', 'Price: High to Low', 'Stock Level'];
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Wrap(
-        spacing: 24,
-        runSpacing: 12,
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          // Search & Primary Actions row
+          Row(
             children: [
-              Text(
-                'Category:',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _muted,
+              Expanded(
+                child: Container(
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _border),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (val) => setState(() => _searchQuery = val),
+                    style: GoogleFonts.inter(fontSize: 14, color: _dark),
+                    decoration: InputDecoration(
+                      hintText: 'Search products by name...',
+                      hintStyle: GoogleFonts.inter(color: _muted, fontSize: 14),
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: _muted,
+                        size: 20,
+                      ),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 18, color: _muted),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                    ),
+                  ),
                 ),
               ),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: categories.map((cat) {
-                  final isSelected = _selectedCategoryFilter == cat;
-                  return ChoiceChip(
-                    label: Text(
-                      cat,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                        color: isSelected ? Colors.white : _dark,
+              if (isMobile) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: () => context.push(AppRoutes.addProduct),
+                  icon: const Icon(Icons.add_rounded, color: Colors.white),
+                  style: IconButton.styleFrom(
+                    backgroundColor: _primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 12),
+              // View Switcher (Grid vs Table)
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(3),
+                child: Row(
+                  children: [
+                    InkWell(
+                      onTap: () => setState(() => _isGridView = true),
+                      borderRadius: BorderRadius.circular(9),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _isGridView ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(9),
+                          boxShadow: _isGridView
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.06),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ]
+                              : [],
+                        ),
+                        child: Icon(
+                          Icons.grid_view_rounded,
+                          size: 18,
+                          color: _isGridView ? _primary : _muted,
+                        ),
                       ),
                     ),
-                    selected: isSelected,
-                    selectedColor: _primary,
-                    backgroundColor: const Color(0xFFF3F4F6),
-                    onSelected: (val) {
-                      if (val) setState(() => _selectedCategoryFilter = cat);
-                    },
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                    InkWell(
+                      onTap: () => setState(() => _isGridView = false),
+                      borderRadius: BorderRadius.circular(9),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: !_isGridView ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(9),
+                          boxShadow: !_isGridView
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.06),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ]
+                              : [],
+                        ),
+                        child: Icon(
+                          Icons.format_list_bulleted_rounded,
+                          size: 18,
+                          color: !_isGridView ? _primary : _muted,
+                        ),
+                      ),
                     ),
-                    side: BorderSide.none,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                  );
-                }).toList(),
+                  ],
+                ),
               ),
             ],
           ),
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 14),
+
+          // Filters and Sorting Row
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 16,
+            runSpacing: 12,
+            alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text(
-                'Stock Filter:',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _muted,
+              // Category filter pills
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: categories.map((cat) {
+                    final isSelected = _selectedCategoryFilter == cat;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        label: Text(
+                          cat,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected ? Colors.white : _dark,
+                          ),
+                        ),
+                        selected: isSelected,
+                        selectedColor: _primary,
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        onSelected: (val) {
+                          if (val) setState(() => _selectedCategoryFilter = cat);
+                        },
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        side: BorderSide.none,
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedStockFilter,
-                    icon: const Icon(Icons.arrow_drop_down_rounded),
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: _dark,
+
+              // Dropdowns: Stock Filter & Sort By
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  // Stock filter
+                  Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    onChanged: (val) {
-                      if (val != null) setState(() => _selectedStockFilter = val);
-                    },
-                    items: stockOptions.map((opt) {
-                      return DropdownMenuItem(value: opt, child: Text(opt));
-                    }).toList(),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedStockFilter,
+                        icon: const Icon(Icons.arrow_drop_down_rounded, color: _muted),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _dark,
+                        ),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _selectedStockFilter = val);
+                        },
+                        items: stockOptions.map((opt) {
+                          return DropdownMenuItem(value: opt, child: Text('Stock: $opt'));
+                        }).toList(),
+                      ),
+                    ),
                   ),
-                ),
+
+                  // Sort dropdown
+                  Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _sortBy,
+                        icon: const Icon(Icons.sort_rounded, size: 16, color: _muted),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _dark,
+                        ),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _sortBy = val);
+                        },
+                        items: sortOptions.map((opt) {
+                          return DropdownMenuItem(value: opt, child: Text('Sort: $opt'));
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -692,21 +816,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
     );
   }
 
-  Widget _buildProductGrid() {
-    final sw = MediaQuery.of(context).size.width;
-    int crossAxisCount = 4;
-    double childAspectRatio = 0.80;
-    if (sw < 600) {
-      crossAxisCount = 1;
-      childAspectRatio = 1.1;
-    } else if (sw < 900) {
-      crossAxisCount = 2;
-      childAspectRatio = 0.82;
-    } else if (sw < 1200) {
-      crossAxisCount = 3;
-      childAspectRatio = 0.82;
-    }
-
+  Widget _buildMainContent() {
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _productsFuture,
       builder: (context, snapshot) {
@@ -716,7 +826,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
 
         final allProducts = snapshot.data ?? [];
 
-        final filteredProducts = allProducts.where((p) {
+        var filteredProducts = allProducts.where((p) {
           final name = p['name']?.toString().toLowerCase() ?? '';
           final matchesSearch = name.contains(_searchQuery.toLowerCase());
 
@@ -724,12 +834,18 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
           if (_selectedCategoryFilter == 'Pre-Orders') {
             matchesCategory = p['is_preorder'] == true;
           } else if (_selectedCategoryFilter != 'All') {
-            final catName = p['category_name']?.toString() ?? p['category']?.toString() ?? '';
-            matchesCategory = catName.toLowerCase().contains(_selectedCategoryFilter.toLowerCase());
+            final catName =
+                p['category_name']?.toString() ?? p['category']?.toString() ?? '';
+            matchesCategory = catName
+                .toLowerCase()
+                .contains(_selectedCategoryFilter.toLowerCase());
           }
 
           bool matchesStock = true;
-          final qty = double.tryParse((p['available_quantity'] ?? p['available'] ?? 0).toString()) ?? 0;
+          final qty = double.tryParse(
+                (p['available_quantity'] ?? p['available'] ?? 0).toString(),
+              ) ??
+              0;
           if (_selectedStockFilter == 'In Stock') {
             matchesStock = qty > 10;
           } else if (_selectedStockFilter == 'Low Stock') {
@@ -741,60 +857,173 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
           return matchesSearch && matchesCategory && matchesStock;
         }).toList();
 
+        // Sort items
+        if (_sortBy == 'Name') {
+          filteredProducts.sort(
+            (a, b) => (a['name'] ?? '').toString().compareTo((b['name'] ?? '').toString()),
+          );
+        } else if (_sortBy == 'Price: Low to High') {
+          filteredProducts.sort((a, b) {
+            final pa = double.tryParse(a['price']?.toString() ?? '0') ?? 0;
+            final pb = double.tryParse(b['price']?.toString() ?? '0') ?? 0;
+            return pa.compareTo(pb);
+          });
+        } else if (_sortBy == 'Price: High to Low') {
+          filteredProducts.sort((a, b) {
+            final pa = double.tryParse(a['price']?.toString() ?? '0') ?? 0;
+            final pb = double.tryParse(b['price']?.toString() ?? '0') ?? 0;
+            return pb.compareTo(pa);
+          });
+        } else if (_sortBy == 'Stock Level') {
+          filteredProducts.sort((a, b) {
+            final qa = double.tryParse((a['available_quantity'] ?? 0).toString()) ?? 0;
+            final qb = double.tryParse((b['available_quantity'] ?? 0).toString()) ?? 0;
+            return qb.compareTo(qa);
+          });
+        }
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildKpiMetricsSummary(allProducts),
-            const SizedBox(height: 24),
-            _buildFilterBar(),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+            _buildControlToolbar(),
+            const SizedBox(height: 20),
             if (filteredProducts.isEmpty)
-              Center(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 60),
-                    Icon(
-                      Icons.inventory_2_outlined,
-                      size: 64,
-                      color: _muted.withValues(alpha: 0.3),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No products found matching filter criteria',
-                      style: GoogleFonts.inter(fontSize: 16, color: _muted),
-                    ),
-                  ],
-                ),
-              )
+              _buildEmptyState()
+            else if (_isGridView)
+              _buildProductGridView(filteredProducts)
             else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  childAspectRatio: childAspectRatio,
-                  crossAxisSpacing: 24,
-                  mainAxisSpacing: 24,
-                ),
-                itemCount: filteredProducts.length,
-                itemBuilder: (context, index) => ScrollReveal(
-                  delay: Duration(milliseconds: index * 40),
-                  duration: const Duration(milliseconds: 500),
-                  child: _buildProductCard(filteredProducts[index]),
-                ),
-              ),
+              _buildProductTableView(filteredProducts),
           ],
         );
       },
     );
   }
 
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: _primaryLight,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.search_off_rounded,
+              size: 40,
+              color: _primary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No matching products found',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: _dark,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Try clearing your search query or selecting a different stock filter.',
+            style: GoogleFonts.inter(fontSize: 14, color: _muted),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          OutlinedButton.icon(
+            onPressed: () {
+              _searchController.clear();
+              setState(() {
+                _searchQuery = '';
+                _selectedCategoryFilter = 'All';
+                _selectedStockFilter = 'All';
+              });
+            },
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: Text(
+              'Reset Filters',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _primary,
+              side: const BorderSide(color: _primary),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductGridView(List<Map<String, dynamic>> products) {
+    final sw = MediaQuery.of(context).size.width;
+    int crossAxisCount = 4;
+    double childAspectRatio = 1.35;
+    if (sw < 600) {
+      crossAxisCount = 1;
+      childAspectRatio = 1.6;
+    } else if (sw < 900) {
+      crossAxisCount = 2;
+      childAspectRatio = 1.35;
+    } else if (sw < 1250) {
+      crossAxisCount = 3;
+      childAspectRatio = 1.30;
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: childAspectRatio,
+        crossAxisSpacing: 18,
+        mainAxisSpacing: 18,
+      ),
+      itemCount: products.length,
+      itemBuilder: (context, index) => ScrollReveal(
+        delay: Duration(milliseconds: index * 30),
+        duration: const Duration(milliseconds: 400),
+        child: _buildProductCard(products[index]),
+      ),
+    );
+  }
+
   Widget _buildProductCard(Map<String, dynamic> product) {
     final name = product['name'] ?? 'Product';
     final price = '₱${product['price'] ?? 0}';
-    final stock = product['available_quantity'] ?? 0;
+    final stock = double.tryParse((product['available_quantity'] ?? 0).toString()) ?? 0;
     final imageUrl = product['image_url'] ?? product['image'];
     final unit = product['unit'] ?? 'kg';
+    final isPreorder = product['is_preorder'] == true;
+
+    Color statusColor;
+    String statusLabel;
+    if (isPreorder) {
+      statusColor = const Color(0xFF9333EA);
+      statusLabel = 'Pre-Order';
+    } else if (stock > 10) {
+      statusColor = _primary;
+      statusLabel = 'In Stock';
+    } else if (stock > 0) {
+      statusColor = const Color(0xFFD97706);
+      statusLabel = 'Low Stock';
+    } else {
+      statusColor = Colors.red;
+      statusLabel = 'Out of Stock';
+    }
 
     return GestureDetector(
       onTap: () => _openProduct(product),
@@ -802,33 +1031,32 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: _border),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Image area
-              Expanded(
-                flex: 5,
+              // Compact Image Header Container
+              SizedBox(
+                height: 125,
                 child: Stack(
                   children: [
                     ClipRRect(
                       borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(20),
+                        top: Radius.circular(14),
                       ),
                       child: SizedBox(
                         width: double.infinity,
                         height: double.infinity,
-                        child:
-                            imageUrl != null && imageUrl.toString().isNotEmpty
+                        child: imageUrl != null && imageUrl.toString().isNotEmpty
                             ? SafeNetworkImage(
                                 imageUrl: imageUrl.toString(),
                                 defaultBucket: 'uploads',
@@ -843,84 +1071,134 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                                 ),
                               )
                             : Container(
-                                color: _surface,
+                                color: const Color(0xFFF1F5F9),
                                 child: const Icon(
                                   Icons.image_outlined,
                                   color: _muted,
+                                  size: 28,
                                 ),
                               ),
                       ),
                     ),
+
+                    // Status pill overlay
                     Positioned(
-                      top: 12,
-                      right: 12,
+                      top: 8,
+                      right: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
+                          horizontal: 8,
+                          vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.black.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(
-                          stock > 0 ? 'In Stock' : 'Out of Stock',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: statusColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              statusLabel,
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              // Content
+
+              // Compact Content Area
               Expanded(
-                flex: 4,
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        name,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: _dark,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: _dark,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Text(
+                                'Stock: ',
+                                style: GoogleFonts.inter(fontSize: 11, color: _muted),
+                              ),
+                              Text(
+                                '${stock.toStringAsFixed(stock % 1 == 0 ? 0 : 1)} $unit',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: _dark,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Available: $stock $unit',
-                        style: GoogleFonts.inter(fontSize: 12, color: _muted),
-                      ),
-                      const Spacer(),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             price,
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 20,
+                              fontSize: 16,
                               fontWeight: FontWeight.w800,
                               color: _primary,
                             ),
                           ),
-                          IconButton(
-                            onPressed: () => _openProduct(product),
-                            icon: const Icon(
-                              Icons.edit_note_rounded,
-                              color: _muted,
-                            ),
-                            style: IconButton.styleFrom(
-                              backgroundColor: _surface,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                          InkWell(
+                            onTap: () => _openProduct(product),
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.edit_outlined,
+                                    size: 13,
+                                    color: _dark,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'Edit',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: _dark,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -931,6 +1209,222 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductTableView(List<Map<String, dynamic>> products) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 900),
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+              dataRowMaxHeight: 68,
+              horizontalMargin: 20,
+              columnSpacing: 24,
+              columns: [
+                DataColumn(
+                  label: Text(
+                    'Product',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w700,
+                      color: _dark,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Stock Available',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w700,
+                      color: _dark,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Unit Price',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w700,
+                      color: _dark,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Status',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w700,
+                      color: _dark,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Action',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w700,
+                      color: _dark,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+              rows: products.map((product) {
+                final name = product['name'] ?? 'Product';
+                final price = '₱${product['price'] ?? 0}';
+                final stock = double.tryParse(
+                      (product['available_quantity'] ?? 0).toString(),
+                    ) ??
+                    0;
+                final imageUrl = product['image_url'] ?? product['image'];
+                final unit = product['unit'] ?? 'kg';
+                final isPreorder = product['is_preorder'] == true;
+
+                Color statusBg;
+                Color statusFg;
+                String statusLabel;
+                if (isPreorder) {
+                  statusBg = const Color(0xFFF3E8FF);
+                  statusFg = const Color(0xFF9333EA);
+                  statusLabel = 'Pre-Order';
+                } else if (stock > 10) {
+                  statusBg = _primaryLight;
+                  statusFg = _primaryDark;
+                  statusLabel = 'In Stock';
+                } else if (stock > 0) {
+                  statusBg = const Color(0xFFFEF3C7);
+                  statusFg = const Color(0xFFD97706);
+                  statusLabel = 'Low Stock';
+                } else {
+                  statusBg = const Color(0xFFFEE2E2);
+                  statusFg = Colors.red;
+                  statusLabel = 'Out of Stock';
+                }
+
+                return DataRow(
+                  onSelectChanged: (_) => _openProduct(product),
+                  cells: [
+                    DataCell(
+                      Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: imageUrl != null && imageUrl.toString().isNotEmpty
+                                  ? SafeNetworkImage(
+                                      imageUrl: imageUrl.toString(),
+                                      defaultBucket: 'uploads',
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Container(
+                                      color: const Color(0xFFF1F5F9),
+                                      child: const Icon(
+                                        Icons.image_outlined,
+                                        size: 20,
+                                        color: _muted,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            name,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w700,
+                              color: _dark,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        '${stock.toStringAsFixed(stock % 1 == 0 ? 0 : 1)} $unit',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w600,
+                          color: _dark,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        price,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w800,
+                          color: _primary,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusBg,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          statusLabel,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: statusFg,
+                          ),
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      OutlinedButton.icon(
+                        onPressed: () => _openProduct(product),
+                        icon: const Icon(Icons.edit_note_rounded, size: 16),
+                        label: Text(
+                          'Manage',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _dark,
+                          side: const BorderSide(color: _border),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
           ),
         ),
       ),
@@ -947,15 +1441,15 @@ class GridShimmer extends StatelessWidget {
       shrinkWrap: true,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 4,
-        childAspectRatio: 0.8,
-        crossAxisSpacing: 24,
-        mainAxisSpacing: 24,
+        childAspectRatio: 1.05,
+        crossAxisSpacing: 20,
+        mainAxisSpacing: 20,
       ),
       itemCount: 8,
       itemBuilder: (context, index) => Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.grey[200]!),
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../styles/app_theme.dart';
@@ -7,6 +8,7 @@ import '../services/community/forum_service.dart';
 import '../services/core/supabase_data_service.dart';
 import '../models/forum/forum_comment_model.dart';
 import '../widgets/image_widgets.dart';
+import 'forum_video_player.dart';
 import '../services/auth/auth_service.dart';
 import '../router/app_routes.dart';
 import 'report_content_dialog.dart';
@@ -25,6 +27,7 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
   final _forumService = ForumService();
   final _commentController = TextEditingController();
   final _scrollController = ScrollController();
+  final _commentFocusNode = FocusNode();
   
   late ForumPostItem _currentPost;
   List<ForumComment> _comments = [];
@@ -285,13 +288,16 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
   void dispose() {
     _commentController.dispose();
     _scrollController.dispose();
+    _commentFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final isDesktop = size.width > 900 && _currentPost.imageUrl != null && _currentPost.imageUrl!.isNotEmpty;
+    final hasMedia = (_currentPost.imageUrl != null && _currentPost.imageUrl!.isNotEmpty) ||
+                     (_currentPost.videoUrl != null && _currentPost.videoUrl!.isNotEmpty);
+    final isDesktop = size.width > 900 && hasMedia;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -323,41 +329,50 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
 
   // ─── Split Layout (Desktop Style Lightbox) ───
   Widget _buildSplitLayout(BuildContext context) {
+    final hasVideo = _currentPost.videoUrl != null && _currentPost.videoUrl!.isNotEmpty;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Left Side: Immersive Image Viewer
+        // Left Side: Immersive Image/Video Viewer
         Expanded(
           flex: 6,
-          child: GestureDetector(
-            onTap: () => _viewFullScreenImage(context),
-            child: Container(
-              color: const Color(0xFF0F172A), // Sleek Facebook dark bg
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Center(
-                    child: SafeNetworkImage(
-                      imageUrl: _currentPost.imageUrl,
-                      defaultBucket: 'uploads',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  // Hover indication / zoom button
-                  Positioned(
-                    bottom: 20,
-                    right: 20,
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: const BoxDecoration(
-                        color: Colors.black54,
-                        shape: BoxShape.circle,
+          child: Container(
+            color: const Color(0xFF0F172A), // Sleek Facebook dark bg
+            child: Center(
+              child: hasVideo
+                  ? Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: ForumVideoPlayer(videoUrl: _currentPost.videoUrl!),
+                    )
+                  : GestureDetector(
+                      onTap: () => _viewFullScreenImage(context),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Center(
+                            child: SafeNetworkImage(
+                              imageUrl: _currentPost.imageUrl,
+                              defaultBucket: 'uploads',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          // Hover indication / zoom button
+                          Positioned(
+                            bottom: 20,
+                            right: 20,
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.fullscreen_rounded, color: Colors.white, size: 24),
+                            ),
+                          ),
+                        ],
                       ),
-                      child: const Icon(Icons.fullscreen_rounded, color: Colors.white, size: 24),
                     ),
-                  ),
-                ],
-              ),
             ),
           ),
         ),
@@ -479,6 +494,7 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
                   ),
                   child: TextField(
                     controller: _commentController,
+                    focusNode: _commentFocusNode,
                     style: GoogleFonts.inter(fontSize: 14),
                     maxLines: null,
                     decoration: InputDecoration(
@@ -581,7 +597,7 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
         const SizedBox(height: 14),
 
         // Title and body
-        if (_currentPost.title.isNotEmpty) ...[
+        if (_currentPost.title.isNotEmpty && _currentPost.title.trim().toLowerCase() != _currentPost.body.trim().toLowerCase()) ...[
           Text(
             _currentPost.title,
             style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
@@ -593,12 +609,11 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
           style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF334155), height: 1.5),
         ),
 
-        // Inline image (For single column mode)
-        if (showImageInline && _currentPost.imageUrl != null && _currentPost.imageUrl!.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          GestureDetector(
-            onTap: () => _viewFullScreenImage(context),
-            child: Container(
+        // Inline Image or Video (For single column mode)
+        if (showImageInline) ...[
+          if (_currentPost.videoUrl != null && _currentPost.videoUrl!.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
@@ -609,16 +624,37 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 280),
-                    child: SafeNetworkImage(
-                      imageUrl: _currentPost.imageUrl,
-                      defaultBucket: 'uploads',
-                      fit: BoxFit.contain,
+                    child: ForumVideoPlayer(videoUrl: _currentPost.videoUrl!),
+                  ),
+                ),
+              ),
+            ),
+          ] else if (_currentPost.imageUrl != null && _currentPost.imageUrl!.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            GestureDetector(
+              onTap: () => _viewFullScreenImage(context),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  color: const Color(0xFFF8FAFC),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(11),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 280),
+                      child: SafeNetworkImage(
+                        imageUrl: _currentPost.imageUrl,
+                        defaultBucket: 'uploads',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
         const SizedBox(height: 16),
 
@@ -669,10 +705,33 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
             ),
             Expanded(
               child: TextButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                  _commentFocusNode.requestFocus();
+                },
                 icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Color(0xFF64748B)),
                 label: Text(
                   'Comment',
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+              ),
+            ),
+            Expanded(
+              child: TextButton.icon(
+                onPressed: () async {
+                  final shareUrl = '${Uri.base.origin}${AppRoutes.community}?post=${_currentPost.id}';
+                  final messenger = ScaffoldMessenger.of(context);
+                  await Clipboard.setData(ClipboardData(text: shareUrl));
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Link copied to clipboard!')),
+                  );
+                },
+                icon: const Icon(Icons.share_outlined, size: 18, color: Color(0xFF64748B)),
+                label: Text(
+                  'Share',
                   style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
                 ),
                 style: TextButton.styleFrom(

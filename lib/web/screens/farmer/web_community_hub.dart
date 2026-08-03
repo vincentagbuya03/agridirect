@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -9,6 +10,7 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../widgets/animated_components.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/widgets/create_post_dialog.dart';
+import '../../../shared/widgets/report_content_dialog.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/integration/weather_service.dart';
@@ -18,6 +20,7 @@ import '../../widgets/web_hamburger_menu_button.dart';
 import '../../../shared/widgets/image_widgets.dart';
 
 import '../../../shared/screens/article_detail_screen.dart';
+import '../../../shared/screens/post_detail_screen.dart';
 import '../../../shared/widgets/post_detail_dialog.dart';
 import '../../../shared/widgets/forum_video_player.dart';
 
@@ -26,11 +29,13 @@ import '../../../shared/widgets/forum_video_player.dart';
 class WebCommunityHub extends StatefulWidget {
   final Function(int) onNavigate;
   final int currentIndex;
+  final String? initialPostId;
 
   const WebCommunityHub({
     super.key,
     required this.onNavigate,
     required this.currentIndex,
+    this.initialPostId,
   });
 
   @override
@@ -69,6 +74,22 @@ class _WebCommunityHubState extends State<WebCommunityHub>
     _forumPostsFuture = SupabaseDataService().getForumPosts();
     _weatherFuture = WeatherService().getWeatherByCity('Manila');
     _marketPricesFuture = _loadMarketPrices();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Prefer the explicitly passed initialPostId (from GoRouter query param),
+      // fall back to Uri.base as a safety net.
+      final postId = widget.initialPostId ?? Uri.base.queryParameters['post'];
+      if (postId != null && postId.isNotEmpty) {
+        try {
+          final post = await SupabaseDataService().getForumPostById(postId);
+          if (post != null && mounted) {
+            _showPostDetailFlow(post);
+          }
+        } catch (e) {
+          debugPrint('Error loading deep linked post: $e');
+        }
+      }
+    });
   }
 
   Future<List<Map<String, dynamic>>> _loadMarketPrices() async {
@@ -817,14 +838,117 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                 ),
               ),
               const Spacer(),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: _surface,
-                  borderRadius: BorderRadius.circular(8),
+              Theme(
+                data: Theme.of(context).copyWith(
+                  cardColor: Colors.white,
                 ),
-                child: Icon(Icons.more_horiz_rounded, size: 18, color: _muted),
+                child: PopupMenuButton<String>(
+                  icon: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: _surface,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.more_horiz_rounded, size: 18, color: _muted),
+                  ),
+                  tooltip: 'Options',
+                  padding: EdgeInsets.zero,
+                  onSelected: (val) async {
+                    if (val == 'report') {
+                      final submitted = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => ReportContentDialog(
+                          contentLabel: 'post',
+                          contentTitle: post.title,
+                          onSubmit: (reason, details) {
+                            return SupabaseDataService().reportForumPost(
+                              postId: post.id,
+                              reason: reason,
+                              description: details,
+                            );
+                          },
+                        ),
+                      );
+
+                      if (submitted == true && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Report submitted. Our team will review it soon.'),
+                          ),
+                        );
+                      }
+                    } else if (val == 'delete') {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Delete Post'),
+                          content: const Text('Are you sure you want to delete this post?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: TextButton.styleFrom(foregroundColor: Colors.red),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm == true && mounted) {
+                        try {
+                          await Supabase.instance.client
+                              .from('forum_posts')
+                              .delete()
+                              .eq('id', post.id);
+                          _refreshForumPosts();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Post deleted successfully')),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error deleting post: $e')),
+                            );
+                          }
+                        }
+                      }
+                    }
+                  },
+                  itemBuilder: (context) {
+                    final currentUserId = AuthService().userId;
+                    final isAuthor = post.userId == currentUserId;
+                    return [
+                      if (isAuthor)
+                        const PopupMenuItem<String>(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+                              SizedBox(width: 8),
+                              Text('Delete Post', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        )
+                      else
+                        const PopupMenuItem<String>(
+                          value: 'report',
+                          child: Row(
+                            children: [
+                              Icon(Icons.report_gmailerrorred_rounded, size: 18),
+                              SizedBox(width: 8),
+                              Text('Report Post'),
+                            ],
+                          ),
+                        ),
+                    ];
+                  },
+                ),
               ),
             ],
           ),
@@ -989,18 +1113,22 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                   },
                 ),
               ),
-              Expanded(
-                child: _buildFacebookActionBtn(
-                  icon: Icons.share_outlined,
-                  label: 'Share',
-                  color: _muted,
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Link copied to clipboard!')),
-                    );
-                  },
-                ),
-              ),
+               Expanded(
+                 child: _buildFacebookActionBtn(
+                   icon: Icons.share_outlined,
+                   label: 'Share',
+                   color: _muted,
+                   onTap: () async {
+                     final shareUrl = '${Uri.base.origin}${AppRoutes.community}?post=${post.id}';
+                     await Clipboard.setData(ClipboardData(text: shareUrl));
+                     if (mounted) {
+                       ScaffoldMessenger.of(context).showSnackBar(
+                         const SnackBar(content: Text('Link copied to clipboard!')),
+                       );
+                     }
+                   },
+                 ),
+               ),
             ],
           ),
         ],
@@ -1188,33 +1316,55 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Future<void> _showPostDetailFlow(ForumPostItem post) async {
-    final result = await showDialog<dynamic>(
-      context: context,
-      builder: (context) => PostDetailDialog(
-        post: post,
-        onPostUpdated: (updatedPost) {
-          if (mounted) {
-            setState(() {
-              if (_postsList != null) {
-                final index = _postsList!.indexWhere((p) => p.id == updatedPost.id);
-                if (index != -1) {
-                  _postsList![index] = updatedPost;
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+
+    if (isMobile) {
+      final result = await Navigator.push<dynamic>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PostDetailScreen(post: post),
+        ),
+      );
+      if (result is ForumPostItem && mounted) {
+        setState(() {
+          if (_postsList != null) {
+            final index = _postsList!.indexWhere((p) => p.id == result.id);
+            if (index != -1) {
+              _postsList![index] = result;
+            }
+          }
+        });
+      }
+    } else {
+      final result = await showDialog<dynamic>(
+        context: context,
+        builder: (context) => PostDetailDialog(
+          post: post,
+          onPostUpdated: (updatedPost) {
+            if (mounted) {
+              setState(() {
+                if (_postsList != null) {
+                  final index = _postsList!.indexWhere((p) => p.id == updatedPost.id);
+                  if (index != -1) {
+                    _postsList![index] = updatedPost;
+                  }
                 }
-              }
-            });
+              });
+            }
+          },
+        ),
+      );
+      if (result is ForumPostItem && mounted) {
+        setState(() {
+          if (_postsList != null) {
+            final index = _postsList!.indexWhere((p) => p.id == result.id);
+            if (index != -1) {
+              _postsList![index] = result;
+            }
           }
-        },
-      ),
-    );
-    if (result is ForumPostItem && mounted) {
-      setState(() {
-        if (_postsList != null) {
-          final index = _postsList!.indexWhere((p) => p.id == result.id);
-          if (index != -1) {
-            _postsList![index] = result;
-          }
-        }
-      });
+        });
+      }
     }
   }
 

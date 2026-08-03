@@ -365,7 +365,7 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                       child: GestureDetector(
                         onTap: () {
                           if (isFarmerMode) {
-                            widget.onNavigate(4);
+                            widget.onNavigate(5);
                           } else {
                             context.go(AppRoutes.profile);
                           }

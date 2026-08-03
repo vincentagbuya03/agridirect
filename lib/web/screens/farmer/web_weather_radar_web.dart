@@ -106,27 +106,34 @@ class _WebWeatherRadarScreenState extends State<WebWeatherRadarScreen> {
             ),
             child: Row(
               children: [
-                OutlinedButton.icon(
-                  onPressed: widget.onBack,
-                  icon: const Icon(Icons.arrow_back_rounded, size: 18, color: Colors.white),
-                  label: Text(
-                    'Back to Dashboard',
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      fontSize: 13,
+                if (isMobile)
+                  IconButton(
+                    onPressed: widget.onBack,
+                    icon: const Icon(Icons.arrow_back_rounded, size: 20, color: Colors.white),
+                    tooltip: 'Back to Dashboard',
+                  )
+                else
+                  OutlinedButton.icon(
+                    onPressed: widget.onBack,
+                    icon: const Icon(Icons.arrow_back_rounded, size: 18, color: Colors.white),
+                    label: Text(
+                      'Back to Dashboard',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        fontSize: 13,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      side: const BorderSide(color: _borderDark),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor: Colors.white.withValues(alpha: 0.05),
                     ),
                   ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    side: const BorderSide(color: _borderDark),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    backgroundColor: Colors.white.withValues(alpha: 0.05),
-                  ),
-                ),
-                const SizedBox(width: 20),
+                SizedBox(width: isMobile ? 8 : 20),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -145,7 +152,9 @@ class _WebWeatherRadarScreenState extends State<WebWeatherRadarScreen> {
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
-                              'Live Weather Radar & Agronomic Field Intelligence',
+                              isMobile
+                                  ? 'Live Weather Radar'
+                                  : 'Live Weather Radar & Agronomic Field Intelligence',
                               style: GoogleFonts.plusJakartaSans(
                                 color: Colors.white,
                                 fontSize: isMobile ? 14 : 18,
@@ -158,7 +167,9 @@ class _WebWeatherRadarScreenState extends State<WebWeatherRadarScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '$locationLabel · $desc · $temp°C (Feels like $feelsLike°C)',
+                        isMobile
+                            ? '$locationLabel · $temp°C'
+                            : '$locationLabel · $desc · $temp°C (Feels like $feelsLike°C)',
                         style: GoogleFonts.inter(
                           color: Colors.white60,
                           fontSize: 12,
@@ -210,26 +221,59 @@ class _WebWeatherRadarScreenState extends State<WebWeatherRadarScreen> {
                     child: HtmlElementView(viewType: _viewType),
                   ),
 
-                  // ── Cover: Windy.com logo (center-top) — AgriDirect badge ─
+                  // ── Cover: Windy.com logo — AgriDirect badge ─────────────────
                   Positioned(
                     top: 8,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: IgnorePointer(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A).withValues(alpha: 0.92),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.5),
-                                blurRadius: 10,
+                    left: isMobile ? 12 : 0,
+                    right: isMobile ? null : 0,
+                    child: isMobile
+                        ? IgnorePointer(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F172A).withValues(alpha: 0.92),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
                               ),
-                            ],
-                          ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF22C55E),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'AgriDirect Radar',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: IgnorePointer(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0F172A).withValues(alpha: 0.92),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.5),
+                                      blurRadius: 10,
+                                    ),
+                                  ],
+                                ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [

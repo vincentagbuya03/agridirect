@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/router/app_routes.dart';
 import 'package:agridirect/shared/widgets/image_widgets.dart';
@@ -58,11 +59,18 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
         return _readCachedFarmers(prefs);
       }
 
-      final rows = await SupabaseConfig.client
+      final auth = AuthService();
+      var query = SupabaseConfig.client
           .from('v_farmer_profiles')
           .select(
             'farmer_id, user_id, farm_name, full_name, specialty, location, farm_latitude, farm_longitude, image_url, avatar_url, badge, years_of_experience, farmer_phone, farming_history, is_verified, free_delivery_min_amount',
-          )
+          );
+      
+      if (auth.isLoggedIn && auth.userId.isNotEmpty) {
+        query = query.neq('user_id', auth.userId);
+      }
+
+      final rows = await query
           .not('farm_latitude', 'is', null)
           .not('farm_longitude', 'is', null)
           .eq('is_active', true);

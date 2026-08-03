@@ -217,11 +217,12 @@ class AppShimmerCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Image skeleton with match border radius
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            child: AspectRatio(
-              aspectRatio: 16 / 10,
+          Expanded(
+            flex: 3,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               child: Container(
+                width: double.infinity,
                 color: const Color(0xFFF1F5F9),
                 child: const AppShimmerLoader(
                   borderRadius: 0,

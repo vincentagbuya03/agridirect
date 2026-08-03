@@ -166,42 +166,89 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 ),
               ),
               const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: GestureDetector(
-                    onTap: () async {
-                      Navigator.of(ctx).pop();
-                      await ApkDownloader.download();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [_accent, primary],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: primary.withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+              Builder(
+                builder: (context) {
+                  final sw = MediaQuery.of(context).size.width;
+                  final isDesktop = sw > 600;
+
+                  if (isDesktop) {
+                    final apkUrl = ApkDownloader.apkUrl;
+                    final qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${Uri.encodeComponent(apkUrl)}';
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey[200]!),
                           ),
-                        ],
-                      ),
-                      child: Text(
-                        'Download AgriDirect App',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              qrUrl,
+                              width: 160,
+                              height: 160,
+                              errorBuilder: (context, error, stackTrace) => const Icon(
+                                Icons.qr_code_2_rounded,
+                                size: 160,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Scan with your phone to install',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _muted,
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return SizedBox(
+                    width: double.infinity,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () async {
+                          Navigator.of(ctx).pop();
+                          await ApkDownloader.download();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [_accent, primary],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: primary.withValues(alpha: 0.3),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            'Download AgriDirect App',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
               const SizedBox(height: 12),
               TextButton(
@@ -308,8 +355,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                 Expanded(flex: 4, child: _buildSellerCard(auth)),
                               ],
                             ),
-                      const SizedBox(height: 24),
-                      _buildShopPerformanceMetrics(auth),
+                      if (auth.isViewingAsFarmer) ...[
+                        const SizedBox(height: 24),
+                        _buildShopPerformanceMetrics(auth),
+                      ],
                       const SizedBox(height: 24),
 
                       // Settings grid

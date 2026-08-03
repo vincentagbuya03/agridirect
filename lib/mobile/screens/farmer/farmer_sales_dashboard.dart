@@ -359,7 +359,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
           longitude: position.longitude,
         );
         debugPrint(
-          'Weather data received: ${weatherData?.temperature}�C at ${weatherData?.location}',
+          'Weather data received: ${weatherData?.temperature}\u00B0C at ${weatherData?.location}',
         );
 
         // Also fetch 5-day forecast
@@ -373,7 +373,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         debugPrint('No position available, fetching weather by city...');
         weatherData = await WeatherService().getWeatherByCity('Farm Location');
         forecast = await WeatherService().getForecastByCity('Farm Location');
-        debugPrint('Fallback weather data: ${weatherData?.temperature}�C');
+        debugPrint('Fallback weather data: ${weatherData?.temperature}\u00B0C');
       }
 
       if (mounted) {
