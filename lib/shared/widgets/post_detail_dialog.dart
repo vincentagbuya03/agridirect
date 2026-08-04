@@ -12,6 +12,7 @@ import 'forum_video_player.dart';
 import '../services/auth/auth_service.dart';
 import '../router/app_routes.dart';
 import 'report_content_dialog.dart';
+import '../utils/share_util.dart';
 
 class PostDetailDialog extends StatefulWidget {
   final ForumPostItem post;
@@ -722,7 +723,7 @@ class _PostDetailDialogState extends State<PostDetailDialog> {
             Expanded(
               child: TextButton.icon(
                 onPressed: () async {
-                  final shareUrl = '${Uri.base.origin}${AppRoutes.community}?post=${_currentPost.id}';
+                  final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.community}?post=${_currentPost.id}';
                   final messenger = ScaffoldMessenger.of(context);
                   await Clipboard.setData(ClipboardData(text: shareUrl));
                   messenger.showSnackBar(

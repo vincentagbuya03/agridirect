@@ -18,6 +18,7 @@ class AppRoutes {
   static const String call = '/call';
   static const String loading = '/loading';
   static const String productDetails = '/product-details';
+  static const String articleDetails = '/article-details';
 
   // Mobile-specific
   static const String farmerRegister = '/farmer-register';

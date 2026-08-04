@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/data/app_data.dart';
@@ -11,6 +12,8 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../../shared/services/commerce/voucher_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/utils/share_util.dart';
+import '../../../shared/widgets/app_open_banner.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class WebProductDetails extends StatefulWidget {
@@ -44,6 +47,11 @@ class _WebProductDetailsState extends State<WebProductDetails> {
   void initState() {
     super.initState();
     _loadPage();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppOpenBanner.showOpenAppDialog(context);
+      }
+    });
   }
 
   @override
@@ -198,7 +206,8 @@ class _WebProductDetailsState extends State<WebProductDetails> {
 
     return Scaffold(
       backgroundColor: _surface,
-      body: Column(
+      body: AppOpenBanner(
+        child: Column(
         children: [
           _buildTopBar(),
           Expanded(
@@ -243,7 +252,8 @@ class _WebProductDetailsState extends State<WebProductDetails> {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildTopBar() {
@@ -646,7 +656,32 @@ class _WebProductDetailsState extends State<WebProductDetails> {
   }
 
   Widget _buildActionsRow() {
-    return _buildActionButtonsSection();
+    return Row(
+      children: [
+        Expanded(child: _buildActionButtonsSection()),
+        const SizedBox(width: 12),
+        IconButton.outlined(
+          onPressed: () async {
+            if (_product?.productId == null) return;
+            final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.productDetails}?id=${_product!.productId}';
+            final messenger = ScaffoldMessenger.of(context);
+            await Clipboard.setData(ClipboardData(text: shareUrl));
+            messenger.showSnackBar(
+              const SnackBar(content: Text('Product link copied to clipboard!')),
+            );
+          },
+          icon: const Icon(Icons.ios_share_rounded, color: _primary),
+          style: IconButton.styleFrom(
+            padding: const EdgeInsets.all(16),
+            side: BorderSide(color: _primary.withValues(alpha: 0.35)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+          ),
+          tooltip: 'Share Product',
+        ),
+      ],
+    );
   }
 
   Widget _qtyButton(IconData icon, VoidCallback onTap) {

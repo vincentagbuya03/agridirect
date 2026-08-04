@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.example.agridirect",
+    "sha256_cert_fingerprints": [
+      "A1:17:4D:61:5A:09:BE:45:10:38:BE:82:9F:3E:2C:D0:C5:1E:41:6E:56:95:49:68:DB:C6:26:4C:3A:D1:7E:88"
+    ]
+  }
+}]

@@ -20,6 +20,7 @@ import 'shared/services/core/auto_update_service.dart';
 import 'shared/services/core/bootstrap_cache_service.dart';
 import 'shared/services/core/database_sync_service.dart';
 import 'shared/services/commerce/product_service.dart';
+import 'package:app_links/app_links.dart';
 import 'shared/services/offline/offline_product_service.dart';
 import 'shared/services/offline/offline_queue_service.dart';
 import 'shared/services/community/notification_service.dart';
@@ -143,7 +144,8 @@ void main() async {
 
   if (!kIsWeb) {
     try {
-      final activeCalls = await FlutterCallkitIncoming.activeCalls();
+      final activeCalls = await FlutterCallkitIncoming.activeCalls()
+          .timeout(const Duration(seconds: 2));
       if (activeCalls.isNotEmpty) {
         final call = activeCalls.first;
         final extra = call.extra ?? {};
@@ -169,11 +171,33 @@ void main() async {
     }
   }
 
-  runApp(const _BootstrapApp());
+  // Capture the initial deep link via AppLinks for reliable scheme & web link handling
+  String? initialRoute;
+  try {
+    final initialUri = await AppLinks().getInitialLink();
+    if (initialUri != null) {
+      String routePath;
+      if (initialUri.scheme == 'http' || initialUri.scheme == 'https') {
+        routePath = initialUri.path.isEmpty ? '/' : initialUri.path;
+      } else {
+        routePath = initialUri.path.isEmpty ? (initialUri.host.isNotEmpty ? '/${initialUri.host}' : '/') : initialUri.path;
+      }
+      final query = initialUri.query.isNotEmpty ? '?${initialUri.query}' : '';
+      initialRoute = '$routePath$query';
+      debugPrint('🔗 AppLinks getInitialLink captured: $initialRoute');
+    }
+  } catch (e) {
+    debugPrint('⚠️ Could not capture initial link: $e');
+  }
+
+  initialRoute ??= WidgetsBinding.instance.platformDispatcher.defaultRouteName;
+
+  runApp(_BootstrapApp(initialRoute: initialRoute));
 }
 
 class _BootstrapApp extends StatefulWidget {
-  const _BootstrapApp();
+  final String? initialRoute;
+  const _BootstrapApp({super.key, this.initialRoute});
 
   @override
   State<_BootstrapApp> createState() => _BootstrapAppState();
@@ -313,8 +337,9 @@ class _BootstrapAppState extends State<_BootstrapApp> {
       }
     }();
 
-    // Wait for Stage 1 concurrent tasks to complete
-    await Future.wait([envLoadFuture, hiveInitFuture, firebaseInitFuture]);
+    // Wait for Stage 1 concurrent tasks to complete (with timeout)
+    await Future.wait([envLoadFuture, hiveInitFuture, firebaseInitFuture])
+        .timeout(const Duration(seconds: 5), onTimeout: () => []);
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -338,7 +363,8 @@ class _BootstrapAppState extends State<_BootstrapApp> {
       }
     }();
 
-    await Future.wait([cacheInitFuture, supabaseInitFuture]);
+    await Future.wait([cacheInitFuture, supabaseInitFuture])
+        .timeout(const Duration(seconds: 5), onTimeout: () => []);
 
     // Stage 3: Prime cache (needs Supabase) and initialize AuthService on mobile concurrently
     final Future<void> primeCacheFuture = () async {
@@ -363,7 +389,8 @@ class _BootstrapAppState extends State<_BootstrapApp> {
       }
     }();
 
-    await Future.wait([primeCacheFuture, authInitFuture]);
+    await Future.wait([primeCacheFuture, authInitFuture])
+        .timeout(const Duration(seconds: 5), onTimeout: () => []);
 
     // Check if app was launched by tapping an incoming CallKit notification
     if (!kIsWeb) {
@@ -372,7 +399,8 @@ class _BootstrapAppState extends State<_BootstrapApp> {
         _globalPendingAcceptedCall = null;
       } else {
         try {
-          final activeCalls = await FlutterCallkitIncoming.activeCalls();
+          final activeCalls = await FlutterCallkitIncoming.activeCalls()
+              .timeout(const Duration(seconds: 2));
           if (activeCalls.isNotEmpty) {
             final call = activeCalls.first;
             final extra = call.extra ?? {};
@@ -438,7 +466,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
 
     if (_callScreenLaunched) {
       // Call screen was shown; after popping it falls to AgriDirectApp
-      return const AgriDirectApp();
+      return AgriDirectApp(initialRoute: widget.initialRoute);
     }
 
     return FutureBuilder<void>(
@@ -463,7 +491,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
 
           if (kIsWeb || !auth.isLoggedIn || _isAnimationDone || isOAuthCallback) {
             debugPrint('   → Launching AgriDirectApp()');
-            return const AgriDirectApp();
+            return AgriDirectApp(initialRoute: widget.initialRoute);
           }
 
           // If logged in, show the premium loading screen
@@ -575,19 +603,22 @@ class _StartupErrorScreen extends StatelessWidget {
 }
 
 class AgriDirectApp extends StatefulWidget {
-  const AgriDirectApp({super.key});
+  final String? initialRoute;
+  
+  const AgriDirectApp({super.key, this.initialRoute});
 
   @override
   State<AgriDirectApp> createState() => _AgriDirectAppState();
 }
 
 class _AgriDirectAppState extends State<AgriDirectApp> {
-  late final _router = createAppRouter();
+  late final _router = createAppRouter(initialRoute: widget.initialRoute);
   final AuthService _auth = AuthService();
   final AnalyticsService _analyticsService = AnalyticsService();
   OfflineProductService? _offlineProductService;
   late final _AppLifecycleObserver _lifecycleObserver;
   StreamSubscription<AuthState>? _authStateSubscription;
+  StreamSubscription<Uri>? _appLinksSubscription;
   bool _sessionStartedByLifecycle = false;
   bool _isDatabaseSyncRunning = false;
 
@@ -604,6 +635,29 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
     _initializeDatabaseSync();
     _initializeOfflineProductSync();
     _initializeAppSession();
+    
+    // Explicitly handle deep links during warm start & cold start runtime (when app is running)
+    _appLinksSubscription = AppLinks().uriLinkStream.listen((uri) {
+      debugPrint('🔗 Deep link stream intercepted: $uri');
+      String routePath;
+      if (uri.scheme == 'http' || uri.scheme == 'https') {
+        routePath = uri.path.isEmpty ? '/' : uri.path;
+      } else if (uri.host.isNotEmpty) {
+        routePath = '/${uri.host}';
+      } else {
+        routePath = uri.path.isEmpty ? '/' : uri.path;
+      }
+      final query = uri.query.isNotEmpty ? '?${uri.query}' : '';
+      final fullRoute = '$routePath$query';
+      
+      if (fullRoute != '/' && fullRoute.isNotEmpty) {
+        debugPrint('🚀 Navigating to deep link: $fullRoute');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _router.go(fullRoute);
+        });
+      }
+    });
+
     _authStateSubscription = SupabaseConfig.client.auth.onAuthStateChange
         .listen((data) async {
           final event = data.event;
@@ -718,6 +772,9 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
 
   @override
   void dispose() {
+    _appLinksSubscription?.cancel();
+    _authStateSubscription?.cancel();
+    WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     // Stop database sync when app closes
     _auth.removeListener(_handleAuthSyncState);
     DatabaseSyncService().stopAutoSync();

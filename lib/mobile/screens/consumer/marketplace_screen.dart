@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -25,6 +26,7 @@ import '../../../shared/services/farmer/farmer_service.dart';
 import '../../../shared/services/integration/reverse_geocoding_service.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_router.dart';
+import '../../../shared/utils/share_util.dart';
 import '../../../shared/widgets/report_content_dialog.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -1413,13 +1415,51 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   bool _isSaved = false;
   final List<OverlayEntry> _flyingOverlayEntries = [];
 
+  late ProductItem _product;
+  bool _isLoadingProduct = false;
+
   @override
   void initState() {
     super.initState();
+    _product = widget.product;
+    if (_product.name.isEmpty && _product.productId != null && _product.productId!.isNotEmpty) {
+      _loadProductDetails();
+    }
     _ensureCacheServiceReady();
     _loadAddress();
     _cacheProductForOffline();
     _refreshSavedState();
+  }
+
+  Future<void> _loadProductDetails() async {
+    setState(() => _isLoadingProduct = true);
+    try {
+      final fetched = await SupabaseDataService().getProductById(_product.productId!);
+      if (mounted) {
+        if (fetched != null) {
+          setState(() {
+            _product = fetched;
+            _isLoadingProduct = false;
+          });
+        } else {
+          setState(() => _isLoadingProduct = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Product not found or is no longer available.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading deep linked product: $e');
+      if (mounted) setState(() => _isLoadingProduct = false);
+    }
   }
 
   @override
@@ -1472,23 +1512,23 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   CachedProduct _buildCachedProduct() {
     final price =
         double.tryParse(
-          widget.product.price.replaceAll(RegExp(r'[^0-9.]'), ''),
+          _product.price.replaceAll(RegExp(r'[^0-9.]'), ''),
         ) ??
         0.0;
     return CachedProduct(
-      id: widget.product.productId ?? 'unknown',
-      farmerId: widget.product.farmerId ?? 'unknown',
-      name: widget.product.name,
+      id: _product.productId ?? 'unknown',
+      farmerId: _product.farmerId ?? 'unknown',
+      name: _product.name,
       price: price,
-      description: widget.product.description,
-      imageUrl: widget.product.imageUrl,
-      availableQuantity: widget.product.targetQuantity?.toInt(),
-      isPreorder: widget.product.targetQuantity != null,
-      harvestDays: int.tryParse(widget.product.harvestDays ?? '0') ?? 0,
-      farmName: widget.product.farm,
-      unit: widget.product.unit,
-      rating: double.tryParse(widget.product.rating ?? '0'),
-      farmerAvatarUrl: widget.product.farmerAvatarUrl,
+      description: _product.description,
+      imageUrl: _product.imageUrl,
+      availableQuantity: _product.targetQuantity?.toInt(),
+      isPreorder: _product.targetQuantity != null,
+      harvestDays: int.tryParse(_product.harvestDays ?? '0') ?? 0,
+      farmName: _product.farm,
+      unit: _product.unit,
+      rating: double.tryParse(_product.rating ?? '0'),
+      farmerAvatarUrl: _product.farmerAvatarUrl,
     );
   }
 
@@ -1526,16 +1566,16 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     );
   }
 
-  double? _getRating() => widget.product.rating != null
-      ? double.tryParse(widget.product.rating!)
+  double? _getRating() => _product.rating != null
+      ? double.tryParse(_product.rating!)
       : null;
-  int _getReviewCount() => widget.product.reviews != null
-      ? int.tryParse(widget.product.reviews!) ?? 0
+  int _getReviewCount() => _product.reviews != null
+      ? int.tryParse(_product.reviews!) ?? 0
       : 0;
   String _getDescription() =>
-      (widget.product.description != null &&
-          widget.product.description!.isNotEmpty)
-      ? widget.product.description!
+      (_product.description != null &&
+          _product.description!.isNotEmpty)
+      ? _product.description!
       : 'No product description available.';
 
   void _showCheckoutSheet() async {
@@ -2071,10 +2111,18 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingProduct) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
     final rating = _getRating();
     final reviewCount = _getReviewCount();
     final farmerAvatarUrl =
-        (widget.product.farmerImageUrl ?? widget.product.farmerAvatarUrl ?? '')
+        (_product.farmerImageUrl ?? _product.farmerAvatarUrl ?? '')
             .trim();
 
     return Scaffold(
@@ -2084,7 +2132,13 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         elevation: 0,
         leading: _buildAppBarBtn(
           Icons.arrow_back_ios_new_rounded,
-          () => Navigator.pop(context),
+          () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              context.go(AppRoutes.home);
+            }
+          },
         ),
         actions: [
           _buildAppBarBtn(Icons.flag_outlined, _openProductReportDialog),
@@ -2092,6 +2146,18 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
             _isSaved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
             _toggleFavorite,
             iconColor: _isSaved ? Colors.redAccent : AppColors.textHeadline,
+          ),
+          _buildAppBarBtn(
+            Icons.share_outlined,
+            () async {
+              if (widget.product.productId == null) return;
+              final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.productDetails}?id=${widget.product.productId}';
+              final messenger = ScaffoldMessenger.of(context);
+              await Clipboard.setData(ClipboardData(text: shareUrl));
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Product link copied to clipboard!')),
+              );
+            },
           ),
           _buildHeaderCart(),
           const SizedBox(width: 8),

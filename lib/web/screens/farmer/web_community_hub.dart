@@ -13,6 +13,7 @@ import '../../../shared/widgets/create_post_dialog.dart';
 import '../../../shared/widgets/report_content_dialog.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/router/app_routes.dart';
+import '../../../shared/utils/share_util.dart';
 import '../../../shared/services/integration/weather_service.dart';
 import '../../../shared/models/weather_model.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
@@ -1119,7 +1120,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
                    label: 'Share',
                    color: _muted,
                    onTap: () async {
-                     final shareUrl = '${Uri.base.origin}${AppRoutes.community}?post=${post.id}';
+                     final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.community}?post=${post.id}';
                      await Clipboard.setData(ClipboardData(text: shareUrl));
                      if (mounted) {
                        ScaffoldMessenger.of(context).showSnackBar(

@@ -60,6 +60,7 @@ import '../../mobile/screens/support/kiko_ai_chat_screen.dart';
 import '../models/order/order_model.dart';
 import '../services/commerce/order_service.dart';
 import '../services/core/supabase_data_service.dart';
+import '../screens/article_detail_screen.dart';
 import '../styles/app_theme.dart';
 
 import '../data/app_data.dart';
@@ -70,13 +71,13 @@ export 'app_routes.dart';
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Creates and configures the GoRouter instance for the app.
-GoRouter createAppRouter() {
+GoRouter createAppRouter({String? initialRoute}) {
   final auth = AuthService();
 
   // On web, start from the actual browser URL so deep links (e.g. /community?post=xxx)
   // are preserved instead of being redirected away on first load.
-  String? initialLocation;
-  if (kIsWeb) {
+  String? initialLocation = initialRoute;
+  if (kIsWeb && initialLocation == null) {
     final uri = Uri.base;
     final path = uri.path.isEmpty ? '/' : uri.path;
     final query = uri.query.isNotEmpty ? '?${uri.query}' : '';
@@ -337,6 +338,7 @@ GoRouter createAppRouter() {
               }
               return MobileNavigation(
                 initialIndex: 0,
+                initialPostId: postId,
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
@@ -617,6 +619,15 @@ GoRouter createAppRouter() {
                   return;
                 }
 
+                // Do not override if user opened a specific deep link route
+                final location = GoRouterState.of(context).matchedLocation;
+                if (location != AppRoutes.home &&
+                    location != AppRoutes.loading &&
+                    location != AppRoutes.login &&
+                    location != AppRoutes.onboarding) {
+                  return;
+                }
+
                 context.go(AppRoutes.home);
               },
             );
@@ -740,9 +751,20 @@ GoRouter createAppRouter() {
         path: AppRoutes.productDetails,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
-            final product = state.extra is ProductItem
+            final productId = state.uri.queryParameters['id'];
+            ProductItem? product = state.extra is ProductItem
                 ? state.extra as ProductItem
                 : null;
+            if (product == null && productId != null && productId.isNotEmpty) {
+              product = ProductItem(
+                productId: productId,
+                name: '',
+                farm: '',
+                price: '0.0',
+                unit: '',
+                imageUrl: '',
+              );
+            }
 
             if (!kIsWeb && constraints.maxWidth <= 800) {
               if (product == null) {
@@ -756,6 +778,43 @@ GoRouter createAppRouter() {
             return WebProductDetails(initialProduct: product);
           },
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.articleDetails,
+        builder: (context, state) {
+          final articleId = state.uri.queryParameters['id'];
+          final articleExtra = state.extra is ArticleItem ? state.extra as ArticleItem : null;
+
+          if (articleExtra != null) {
+            return ArticleDetailScreen(article: articleExtra);
+          }
+
+          if (articleId != null && articleId.isNotEmpty) {
+            return FutureBuilder<ArticleItem?>(
+              future: SupabaseDataService().getArticleById(articleId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                final article = snapshot.data;
+                if (article == null) {
+                  return Scaffold(
+                    appBar: AppBar(title: const Text('Article')),
+                    body: const Center(child: Text('Article not found.')),
+                  );
+                }
+                return ArticleDetailScreen(article: article);
+              },
+            );
+          }
+
+          return Scaffold(
+            appBar: AppBar(title: const Text('Article')),
+            body: const Center(child: Text('Invalid article link.')),
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.checkout,

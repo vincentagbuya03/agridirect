@@ -113,13 +113,27 @@ class SupabaseDataService {
   /// Get a single product by ID
   Future<ProductItem?> getProductById(String productId) async {
     try {
-      final response = await _client
+      dynamic response = await _client
           .from('v_products')
           .select()
           .eq('product_id', productId)
           .maybeSingle();
 
-      if (response == null) return null;
+      if (response == null) {
+        // Fallback: fetch from raw products table if view returns null
+        // (e.g., if inner joins on inventory or farmer profile fail)
+        debugPrint('Product not found in v_products, falling back to raw products table for ID: $productId');
+        response = await _client
+            .from('products')
+            .select()
+            .eq('product_id', productId)
+            .maybeSingle();
+            
+        if (response == null) {
+          debugPrint('Product really not found for ID: $productId');
+          return null;
+        }
+      }
 
       final item = Map<String, dynamic>.from(response as Map);
 
@@ -1356,6 +1370,23 @@ class SupabaseDataService {
           .where((article) => article.title.isNotEmpty)
           .toList();
     }
+  }
+
+  /// Get a single article by ID
+  Future<ArticleItem?> getArticleById(String id) async {
+    try {
+      final response = await _client
+          .from('v_articles')
+          .select()
+          .eq('id', id)
+          .maybeSingle();
+      if (response != null) {
+        return _mapToArticleItem(response);
+      }
+    } catch (e) {
+      debugPrint('Error fetching article by id $id: $e');
+    }
+    return null;
   }
 
   Future<void> reportArticle({

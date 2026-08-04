@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../shared/styles/app_theme.dart';
 import '../../shared/data/app_data.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/report_content_dialog.dart';
 import '../services/core/supabase_data_service.dart';
+import '../router/app_routes.dart';
+import '../utils/share_util.dart';
+import '../widgets/app_open_banner.dart';
 
 class ArticleDetailScreen extends StatelessWidget {
   final ArticleItem article;
@@ -60,26 +64,27 @@ class ArticleDetailScreen extends StatelessWidget {
         ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _buildShareButton(),
+      floatingActionButton: _buildShareButton(context),
     );
 
     if (isWeb) {
-      content = Container(
-        color: const Color(0xFFF8FAFC),
-        alignment: Alignment.center,
+      content = AppOpenBanner(
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 800),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
+          color: const Color(0xFFF8FAFC),
+          alignment: Alignment.center,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 800),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 20,
+                ),
+              ],
+            ),
+            child: content,
           ),
-          child: content,
         ),
       );
     }
@@ -472,7 +477,7 @@ class ArticleDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildShareButton() {
+  Widget _buildShareButton(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(left: 24, right: 24, bottom: 16),
       constraints: const BoxConstraints(maxWidth: 400),
@@ -489,10 +494,17 @@ class ArticleDetailScreen extends StatelessWidget {
         ],
       ),
       child: ElevatedButton.icon(
-        onPressed: () {},
+        onPressed: () async {
+          final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.articleDetails}?id=${article.id}';
+          final messenger = ScaffoldMessenger.of(context);
+          await Clipboard.setData(ClipboardData(text: shareUrl));
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Article link copied to clipboard!')),
+          );
+        },
         icon: const Icon(Icons.ios_share_rounded, size: 20),
         label: Text(
-          'Share with Farmers',
+          'Share Article',
           style: GoogleFonts.plusJakartaSans(
             fontWeight: FontWeight.w800,
             fontSize: 16,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +15,7 @@ import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/social/follow_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../../shared/services/commerce/voucher_service.dart';
+import '../../../shared/utils/share_util.dart';
 import '../../../shared/widgets/flying_icon_animation.dart';
 
 /// Full-screen public profile for a farmer, with Products & Posts tabs.
@@ -353,6 +355,34 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
                   ),
                 );
               },
+            ),
+          ),
+        ),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              onPressed: () async {
+                final farmerId = f['farmerId']?.toString();
+                if (farmerId != null) {
+                  final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.farmerProfile(farmerId)}';
+                  final messenger = ScaffoldMessenger.of(context);
+                  await Clipboard.setData(ClipboardData(text: shareUrl));
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Farm profile link copied to clipboard!')),
+                  );
+                }
+              },
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.share_outlined,
+                    size: 18, color: Colors.white),
+              ),
+              tooltip: 'Share Farm',
             ),
           ),
         ),

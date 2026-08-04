@@ -16,11 +16,13 @@ import 'screens/consumer/customer_profile_screen.dart';
 class MobileNavigation extends StatefulWidget {
   final VoidCallback onLogout;
   final int initialIndex;
+  final String? initialPostId;
 
   const MobileNavigation({
     super.key,
     required this.onLogout,
     this.initialIndex = 0,
+    this.initialPostId,
   });
 
   @override
@@ -37,8 +39,9 @@ class _MobileNavigationState extends State<MobileNavigation> {
     _currentIndex = widget.initialIndex;
     _auth.addListener(_onAuthChanged);
     SupabaseDataService.navigationTabNotifier.addListener(_onExternalTabChange);
-    // Sync initial state
-    _currentIndex = SupabaseDataService.navigationTabNotifier.value;
+    if (widget.initialIndex == 0) {
+      _currentIndex = SupabaseDataService.navigationTabNotifier.value;
+    }
   }
 
   void _onExternalTabChange() {
@@ -68,7 +71,7 @@ class _MobileNavigationState extends State<MobileNavigation> {
         const FarmerSalesDashboard(),
         const FarmerProductsScreen(),
         const FarmerOrdersScreen(),
-        const FarmerCommunityHub(),
+        FarmerCommunityHub(initialPostId: widget.initialPostId),
         FarmerProfileScreen(
           onModeChanged: () => setState(
             () =>

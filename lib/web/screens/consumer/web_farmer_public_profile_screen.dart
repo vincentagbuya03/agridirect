@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/data/app_data.dart';
@@ -10,6 +11,7 @@ import '../../../shared/services/social/follow_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 import '../../../shared/services/commerce/voucher_service.dart';
+import '../../../shared/utils/share_util.dart';
 
 class WebFarmerPublicProfileScreen extends StatefulWidget {
   final String farmerId;
@@ -250,43 +252,67 @@ class _WebFarmerPublicProfileScreenState
                         ],
                       ),
                     ),
-                    if (!ownProfile)
-                      FilledButton.icon(
-                        onPressed: _isFollowBusy
-                            ? null
-                            : () => _toggleFollow(farmer),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _isFollowing
-                              ? Colors.white
-                              : const Color(0xFF0F766E),
-                          foregroundColor: _isFollowing ? _dark : _white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 22,
-                            vertical: 18,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        icon: _isFollowBusy
-                            ? SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: _isFollowing ? _dark : _white,
-                                ),
-                              )
-                            : Icon(
-                                _isFollowing
-                                    ? Icons.check_rounded
-                                    : Icons.person_add_alt_1_rounded,
+                    Row(
+                      children: [
+                        if (!ownProfile)
+                          FilledButton.icon(
+                            onPressed: _isFollowBusy
+                                ? null
+                                : () => _toggleFollow(farmer),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _isFollowing
+                                  ? Colors.white
+                                  : const Color(0xFF0F766E),
+                              foregroundColor: _isFollowing ? _dark : _white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 22,
+                                vertical: 18,
                               ),
-                        label: Text(
-                          _isFollowing ? 'Following' : 'Follow Farm',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: _isFollowBusy
+                                ? SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: _isFollowing ? _dark : _white,
+                                    ),
+                                  )
+                                : Icon(
+                                    _isFollowing
+                                        ? Icons.check_rounded
+                                        : Icons.person_add_alt_1_rounded,
+                                  ),
+                            label: Text(
+                              _isFollowing ? 'Following' : 'Follow Farm',
+                              style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        const SizedBox(width: 10),
+                        IconButton(
+                          onPressed: () async {
+                            final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.farmerProfile(widget.farmerId)}';
+                            final messenger = ScaffoldMessenger.of(context);
+                            await Clipboard.setData(ClipboardData(text: shareUrl));
+                            messenger.showSnackBar(
+                              const SnackBar(content: Text('Farm profile link copied to clipboard!')),
+                            );
+                          },
+                          icon: const Icon(Icons.ios_share_rounded, color: Colors.white),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white.withValues(alpha: 0.2),
+                            padding: const EdgeInsets.all(14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          tooltip: 'Share Farm Profile',
                         ),
-                      ),
+                      ],
+                    ),
                   ],
                 ),
               ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/styles/app_theme.dart';
@@ -9,6 +10,7 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/screens/post_detail_screen.dart';
 import '../../../shared/screens/article_detail_screen.dart';
 import '../../../shared/router/app_routes.dart';
+import '../../../shared/utils/share_util.dart';
 
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/community/notification_service.dart';
@@ -16,7 +18,8 @@ import '../../../shared/widgets/forum_video_player.dart';
 
 /// Farmer Community Hub - Professional Social Interface
 class FarmerCommunityHub extends StatefulWidget {
-  const FarmerCommunityHub({super.key});
+  final String? initialPostId;
+  const FarmerCommunityHub({super.key, this.initialPostId});
 
   @override
   State<FarmerCommunityHub> createState() => _FarmerCommunityHubState();
@@ -34,6 +37,16 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _forumStream = SupabaseDataService().watchForumPosts();
+    if (widget.initialPostId != null && widget.initialPostId!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          showDialog<bool>(
+            context: context,
+            builder: (context) => CommentsDialog(postId: widget.initialPostId!),
+          );
+        }
+      });
+    }
   }
 
   @override
@@ -526,7 +539,19 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                   },
                 ),
                 const Spacer(),
-                const Icon(Icons.share_outlined, size: 20, color: AppColors.textSubtle),
+                IconButton(
+                  onPressed: () async {
+                    final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.community}?post=${post.id}';
+                    final messenger = ScaffoldMessenger.of(context);
+                    await Clipboard.setData(ClipboardData(text: shareUrl));
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('Post link copied to clipboard!')),
+                    );
+                  },
+                  icon: const Icon(Icons.share_outlined, size: 20, color: AppColors.textSubtle),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
               ],
             ),
           ),

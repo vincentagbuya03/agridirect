@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../shared/services/auth/auth_service.dart';
 import '../shared/router/app_routes.dart';
+import '../shared/widgets/app_open_banner.dart';
 import 'screens/consumer/web_marketplace_home.dart';
 import 'screens/consumer/web_shop_screen.dart';
 import 'screens/farmer/web_sales_dashboard.dart';
@@ -41,6 +42,13 @@ class _WebNavigationState extends State<WebNavigation> {
     super.initState();
     _currentIndex = widget.initialIndex;
     _auth.addListener(_onAuthChanged);
+    if (widget.initialPostId != null || Uri.base.queryParameters.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          AppOpenBanner.showOpenAppDialog(context);
+        }
+      });
+    }
   }
 
   @override
@@ -140,7 +148,7 @@ class _WebNavigationState extends State<WebNavigation> {
       if (_currentIndex >= screens.length) {
         _currentIndex = 0;
       }
-      return Scaffold(body: screens[_currentIndex]);
+      return Scaffold(body: AppOpenBanner(child: screens[_currentIndex]));
     }
 
     // If user is admin, show admin dashboard
@@ -156,6 +164,6 @@ class _WebNavigationState extends State<WebNavigation> {
       _currentIndex = 0;
     }
 
-    return Scaffold(body: screens[_currentIndex]);
+    return Scaffold(body: AppOpenBanner(child: screens[_currentIndex]));
   }
 }
