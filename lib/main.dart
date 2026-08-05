@@ -143,48 +143,45 @@ void main() async {
   } catch (_) {}
 
   if (!kIsWeb) {
-    try {
-      final activeCalls = await FlutterCallkitIncoming.activeCalls()
-          .timeout(const Duration(seconds: 2));
-      if (activeCalls.isNotEmpty) {
-        final call = activeCalls.first;
-        final extra = call.extra ?? {};
-        final callId = extra['callId']?.toString() ?? call.id;
-        final channelName = extra['channelName']?.toString() ?? '';
-        final isVideo = extra['isVideo'] == true || extra['isVideo'] == 'true';
-        final callerName = call.nameCaller ?? 'AgriDirect User';
-        final avatarUrl = call.avatar;
-
-        if (callId.isNotEmpty && channelName.isNotEmpty) {
-          _globalPendingAcceptedCall = (
-            callId: callId,
-            channelName: channelName,
-            isVideo: isVideo,
-            callerName: callerName,
-            avatarUrl: avatarUrl,
-          );
-          debugPrint('📞 Synchronous cold-start CallKit check found call: $callId');
-        }
-      }
-    } catch (e) {
-      debugPrint('⚠️ Could not check active CallKit calls in main(): $e');
-    }
+    // We removed the synchronous FlutterCallkitIncoming.activeCalls() check here
+    // because it is known to deadlock the Android engine on cold start when
+    // opened via an Intent (deep link). Events are queued by the plugin and
+    // will be handled by the listener in _BootstrapAppState anyway.
   }
 
   // Capture the initial deep link via AppLinks for reliable scheme & web link handling
   String? initialRoute;
+  bool isDeepLink = false;
   try {
     final initialUri = await AppLinks().getInitialLink();
     if (initialUri != null) {
+      debugPrint('🔗 Raw AppLinks URI: scheme=${initialUri.scheme}, host=${initialUri.host}, path=${initialUri.path}, query=${initialUri.query}');
       String routePath;
       if (initialUri.scheme == 'http' || initialUri.scheme == 'https') {
+        // Web URL: path is in initialUri.path
         routePath = initialUri.path.isEmpty ? '/' : initialUri.path;
       } else {
-        routePath = initialUri.path.isEmpty ? (initialUri.host.isNotEmpty ? '/${initialUri.host}' : '/') : initialUri.path;
+        // Custom scheme (agridirect://product-details?id=xxx):
+        // For agridirect://product-details?id=xxx, Uri parses it as:
+        //   scheme=agridirect, host=product-details, path='', query=id=xxx
+        // So the route is the host (not the path).
+        // For agridirect://product-details/sub-path?id=xxx:
+        //   scheme=agridirect, host=product-details, path=/sub-path, query=id=xxx
+        if (initialUri.path.isNotEmpty && initialUri.path != '/') {
+          routePath = '/${initialUri.host}${initialUri.path}';
+        } else if (initialUri.host.isNotEmpty) {
+          routePath = '/${initialUri.host}';
+        } else {
+          routePath = '/';
+        }
       }
       final query = initialUri.query.isNotEmpty ? '?${initialUri.query}' : '';
       initialRoute = '$routePath$query';
-      debugPrint('🔗 AppLinks getInitialLink captured: $initialRoute');
+      // Mark as deep link if we landed on a product or other content page
+      isDeepLink = routePath.contains('product-details') ||
+          routePath.contains('farmer-profile') ||
+          routePath.contains('article');
+      debugPrint('🔗 AppLinks getInitialLink captured: $initialRoute (isDeepLink=$isDeepLink)');
     }
   } catch (e) {
     debugPrint('⚠️ Could not capture initial link: $e');
@@ -192,12 +189,13 @@ void main() async {
 
   initialRoute ??= WidgetsBinding.instance.platformDispatcher.defaultRouteName;
 
-  runApp(_BootstrapApp(initialRoute: initialRoute));
+  runApp(_BootstrapApp(initialRoute: initialRoute, isDeepLink: isDeepLink));
 }
 
 class _BootstrapApp extends StatefulWidget {
   final String? initialRoute;
-  const _BootstrapApp({super.key, this.initialRoute});
+  final bool isDeepLink;
+  const _BootstrapApp({super.key, this.initialRoute, this.isDeepLink = false});
 
   @override
   State<_BootstrapApp> createState() => _BootstrapAppState();
@@ -390,40 +388,16 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     }();
 
     await Future.wait([primeCacheFuture, authInitFuture])
-        .timeout(const Duration(seconds: 5), onTimeout: () => []);
+        .timeout(const Duration(seconds: 10), onTimeout: () {
+      debugPrint('⚠️ Stage 3 init timed out, proceeding anyway');
+      return [];
+    });
 
     // Check if app was launched by tapping an incoming CallKit notification
     if (!kIsWeb) {
       if (_globalPendingAcceptedCall != null) {
         _pendingCall = _globalPendingAcceptedCall;
         _globalPendingAcceptedCall = null;
-      } else {
-        try {
-          final activeCalls = await FlutterCallkitIncoming.activeCalls()
-              .timeout(const Duration(seconds: 2));
-          if (activeCalls.isNotEmpty) {
-            final call = activeCalls.first;
-            final extra = call.extra ?? {};
-            final callId = extra['callId']?.toString() ?? call.id;
-            final channelName = extra['channelName']?.toString() ?? '';
-            final isVideo = extra['isVideo'] == true || extra['isVideo'] == 'true';
-            final callerName = call.nameCaller ?? 'AgriDirect User';
-            final avatarUrl = call.avatar;
-
-            if (callId.isNotEmpty && channelName.isNotEmpty) {
-              _pendingCall = (
-                callId: callId,
-                channelName: channelName,
-                isVideo: isVideo,
-                callerName: callerName,
-                avatarUrl: avatarUrl,
-              );
-              debugPrint('📞 Pending CallKit call detected: $callId');
-            }
-          }
-        } catch (e) {
-          debugPrint('⚠️ Could not check active CallKit calls: $e');
-        }
       }
     }
   }
@@ -480,21 +454,22 @@ class _BootstrapAppState extends State<_BootstrapApp> {
         if (snapshot.connectionState == ConnectionState.done) {
           _isFullyInitialized = true;
           final auth = AuthService();
-          debugPrint('   auth.isLoggedIn=${auth.isLoggedIn}, _isAnimationDone=$_isAnimationDone');
+          debugPrint('   auth.isLoggedIn=${auth.isLoggedIn}, _isAnimationDone=$_isAnimationDone, isDeepLink=${widget.isDeepLink}');
 
           // Skip the loading animation if:
           // - Running on Web (go straight to web apps/dashboards)
           // - Not logged in (go straight to login/welcome)
           // - Animation already done
           // - Coming from OAuth callback (the callback screen handles its own transition)
+          // - Opened via a deep link (user wants to see content ASAP, no branding delay)
           final isOAuthCallback = kIsWeb && Uri.base.path.contains('/auth/callback');
 
-          if (kIsWeb || !auth.isLoggedIn || _isAnimationDone || isOAuthCallback) {
+          if (kIsWeb || !auth.isLoggedIn || _isAnimationDone || isOAuthCallback || widget.isDeepLink) {
             debugPrint('   → Launching AgriDirectApp()');
             return AgriDirectApp(initialRoute: widget.initialRoute);
           }
 
-          // If logged in, show the premium loading screen
+          // If logged in (and not a deep link), show the premium loading screen
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             onGenerateRoute: (_) => _startupRoute(
@@ -636,22 +611,36 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
     _initializeOfflineProductSync();
     _initializeAppSession();
     
+    // If app started with a deep link, force navigate to it after first frame to ensure GoRouter initializes fully
+    if (widget.initialRoute != null && widget.initialRoute != '/' && widget.initialRoute!.contains('product-details')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        debugPrint('🚀 PostFrameCallback: Navigating to initial deep link ${widget.initialRoute}');
+        _router.go(widget.initialRoute!);
+      });
+    }
+
     // Explicitly handle deep links during warm start & cold start runtime (when app is running)
     _appLinksSubscription = AppLinks().uriLinkStream.listen((uri) {
-      debugPrint('🔗 Deep link stream intercepted: $uri');
+      debugPrint('🔗 Deep link stream intercepted: scheme=${uri.scheme}, host=${uri.host}, path=${uri.path}, query=${uri.query}');
       String routePath;
       if (uri.scheme == 'http' || uri.scheme == 'https') {
         routePath = uri.path.isEmpty ? '/' : uri.path;
-      } else if (uri.host.isNotEmpty) {
-        routePath = '/${uri.host}';
       } else {
-        routePath = uri.path.isEmpty ? '/' : uri.path;
+        // Custom scheme (agridirect://product-details?id=xxx):
+        // URI parses this as: scheme=agridirect, host=product-details, path='', query=id=xxx
+        if (uri.path.isNotEmpty && uri.path != '/') {
+          routePath = '/${uri.host}${uri.path}';
+        } else if (uri.host.isNotEmpty) {
+          routePath = '/${uri.host}';
+        } else {
+          routePath = '/';
+        }
       }
       final query = uri.query.isNotEmpty ? '?${uri.query}' : '';
       final fullRoute = '$routePath$query';
       
       if (fullRoute != '/' && fullRoute.isNotEmpty) {
-        debugPrint('🚀 Navigating to deep link: $fullRoute');
+        debugPrint('🚀 Navigating to deep link stream: $fullRoute');
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _router.go(fullRoute);
         });

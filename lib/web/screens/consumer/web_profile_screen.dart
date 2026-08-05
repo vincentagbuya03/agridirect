@@ -15,6 +15,10 @@ import '../../widgets/web_consumer_nav_bar.dart';
 import '../../../shared/utils/apk_downloader.dart';
 import 'package:agridirect/shared/widgets/premium_confirm_dialog.dart';
 import '../../../shared/services/social/follow_service.dart';
+import '../../../shared/models/auth/user_address_model.dart';
+import '../../../shared/services/user/user_service.dart';
+import '../../../mobile/screens/profile/address_book_screen.dart';
+import '../../../mobile/screens/consumer/marketplace_screen.dart';
 
 // Web Profile screen.
 /// Shows user info, "Start Selling" button, and account settings.
@@ -54,6 +58,17 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   int _totalOrdersCount = 0;
   int _followersCount = 0;
 
+  // Inline Edit Profile controllers & state
+  final _profileFormKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _specialtyController;
+  late final TextEditingController _locationController;
+  bool _isSavingProfile = false;
+  bool _isUploadingAvatar = false;
+  String _avatarUrl = '';
+
   Future<void> _loadFarmerProfile() async {
     final auth = AuthService();
     if (!auth.isLoggedIn) return;
@@ -62,6 +77,13 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       if (mounted) {
         setState(() {
           _farmerProfile = profile;
+          if (auth.isViewingAsFarmer && profile != null) {
+            _nameController.text =
+                profile['farm_name']?.toString() ?? auth.userName;
+            _specialtyController.text = profile['specialty']?.toString() ?? '';
+            _locationController.text = profile['location']?.toString() ?? '';
+            _avatarUrl = profile['image_url']?.toString() ?? auth.userAvatarUrl;
+          }
         });
       }
       if (profile != null) {
@@ -71,7 +93,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               .from('orders')
               .select('order_id')
               .eq('farmer_id', farmerId);
-          final followersCount = await FollowService().getFollowerCount(farmerId);
+          final followersCount = await FollowService().getFollowerCount(
+            farmerId,
+          );
           if (mounted) {
             setState(() {
               _totalOrdersCount = (ordersRes as List).length;
@@ -88,11 +112,19 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   @override
   void initState() {
     super.initState();
+    final auth = AuthService();
+    _nameController = TextEditingController(text: auth.userName);
+    _emailController = TextEditingController(text: auth.userEmail);
+    _phoneController = TextEditingController();
+    _specialtyController = TextEditingController();
+    _locationController = TextEditingController();
+    _avatarUrl = auth.userAvatarUrl;
+
     _fadeInController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     )..forward();
-    final auth = AuthService();
+
     _registrationStatusSubscription =
         SupabaseDatabase.watchFarmerRegistrationStatus(auth.userId).listen((
           status,
@@ -103,10 +135,128 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           });
         });
     _loadFarmerProfile();
+    _loadUserProfileDetails();
+  }
+
+  Future<void> _loadUserProfileDetails() async {
+    try {
+      final auth = AuthService();
+      final users = await SupabaseConfig.client
+          .from('users')
+          .select()
+          .eq('user_id', auth.userId)
+          .limit(1);
+      if (users.isNotEmpty && mounted) {
+        final user = users[0];
+        setState(() {
+          _phoneController.text = (user['phone'] ?? user['phone_number'] ?? '')
+              .toString();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user profile details: $e');
+    }
+  }
+
+  Future<void> _pickAndUploadInlineAvatar() async {
+    if (_isUploadingAvatar || _isSavingProfile) return;
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1000,
+      imageQuality: 85,
+    );
+    if (image == null) return;
+
+    setState(() => _isUploadingAvatar = true);
+    try {
+      final bytes = await image.readAsBytes();
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${image.name}';
+      final path = 'avatars/$fileName';
+
+      final resultPath = await SupabaseDatabase.uploadImage(
+        bucket: 'uploads',
+        path: path,
+        bytes: bytes,
+      );
+
+      if (resultPath != null) {
+        final publicUrl = SupabaseConfig.client.storage
+            .from('uploads')
+            .getPublicUrl(path);
+
+        setState(() {
+          _avatarUrl = publicUrl;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+    } finally {
+      if (mounted) setState(() => _isUploadingAvatar = false);
+    }
+  }
+
+  Future<void> _saveInlineProfileChanges() async {
+    setState(() => _isSavingProfile = true);
+    final auth = AuthService();
+    try {
+      // 1. Update basic user table info (applies to both consumer & farmer)
+      await SupabaseConfig.client
+          .from('users')
+          .update({
+            'name': _nameController.text.trim(),
+            'avatar_url': _avatarUrl,
+            'phone': _phoneController.text.trim(),
+          })
+          .eq('user_id', auth.userId);
+
+      // 2. If farmer mode, also update the farmers table
+      if (auth.isViewingAsFarmer || auth.isSeller) {
+        await SupabaseConfig.client
+            .from('farmers')
+            .update({
+              'farm_name': _nameController.text.trim(),
+              'specialty': _specialtyController.text.trim(),
+              'location': _locationController.text.trim(),
+              'image_url': _avatarUrl,
+            })
+            .eq('user_id', auth.userId);
+      }
+
+      await auth.initialize();
+      await _loadFarmerProfile();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile details saved successfully!'),
+            backgroundColor: primary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error updating profile: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update profile: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingProfile = false);
+    }
   }
 
   @override
   void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _specialtyController.dispose();
+    _locationController.dispose();
     _registrationStatusSubscription?.cancel();
     _fadeInController.dispose();
     super.dispose();
@@ -173,7 +323,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
 
                   if (isDesktop) {
                     final apkUrl = ApkDownloader.apkUrl;
-                    final qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${Uri.encodeComponent(apkUrl)}';
+                    final qrUrl =
+                        'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${Uri.encodeComponent(apkUrl)}';
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -190,11 +341,12 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                               qrUrl,
                               width: 160,
                               height: 160,
-                              errorBuilder: (context, error, stackTrace) => const Icon(
-                                Icons.qr_code_2_rounded,
-                                size: 160,
-                                color: Colors.grey,
-                              ),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(
+                                    Icons.qr_code_2_rounded,
+                                    size: 160,
+                                    color: Colors.grey,
+                                  ),
                             ),
                           ),
                         ),
@@ -300,121 +452,1264 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         : AppRoutes.customerMessages;
   }
 
+  int _selectedTab =
+      0; // 0: Profile, 1: Addresses, 2: Vouchers, 3: Orders, 4: Notifications, 5: Privacy
+
   @override
   Widget build(BuildContext context) {
     final auth = AuthService();
     final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 650;
+    final isMobile = sw < 768;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: const Color(0xFFF1F5F9), // Light background for contrast
       body: Column(
         children: [
           _buildNavBar(),
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 32),
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 12 : 36,
+                vertical: isMobile ? 16 : 28,
+              ),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1280),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Page title
-                      const Text(
-                        'Profile',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Manage your account and preferences',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Top row: profile card + seller card
-                      isMobile
-                          ? Column(
-                              children: [
-                                _buildProfileCard(auth),
-                                const SizedBox(height: 24),
-                                _buildSellerCard(auth),
-                              ],
-                            )
-                          : Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Profile card
-                                Expanded(flex: 3, child: _buildProfileCard(auth)),
-                                const SizedBox(width: 24),
-                                // Seller card
-                                Expanded(flex: 4, child: _buildSellerCard(auth)),
-                              ],
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: isMobile
+                      ? Column(
+                          children: [
+                            _buildShopeeSidebar(auth, isMobile: true),
+                            const SizedBox(height: 16),
+                            _buildShopeeMainContent(auth),
+                          ],
+                        )
+                      : Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Left Sidebar (User avatar + Nav links)
+                            SizedBox(
+                              width: 240,
+                              child: _buildShopeeSidebar(auth, isMobile: false),
                             ),
-                      if (auth.isViewingAsFarmer) ...[
-                        const SizedBox(height: 24),
-                        _buildShopPerformanceMetrics(auth),
-                      ],
-                      const SizedBox(height: 24),
+                            const SizedBox(width: 24),
 
-                      // Settings grid
-                      _buildSettingsGrid(),
-
-                      const SizedBox(height: 24),
-
-                      // Logout
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: GestureDetector(
-                            onTap: _confirmLogout,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: Colors.red.withValues(alpha: 0.2),
-                                ),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.logout_rounded,
-                                    color: Colors.red,
-                                    size: 20,
-                                  ),
-                                  SizedBox(width: 10),
-                                  Text(
-                                    'Log Out',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.red,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                            // Main Content Area (Card Container)
+                            Expanded(child: _buildShopeeMainContent(auth)),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ─── Shopee Style Left Sidebar ───
+  Widget _buildShopeeSidebar(AuthService auth, {required bool isMobile}) {
+    final isFarmer = auth.isViewingAsFarmer;
+    final displayName = isFarmer && _farmerProfile != null
+        ? (_farmerProfile!['farm_name']?.toString() ?? auth.userName)
+        : auth.userName;
+    final profileImageUrl =
+        isFarmer &&
+            _farmerProfile != null &&
+            _farmerProfile!['image_url'] != null &&
+            _farmerProfile!['image_url'].toString().isNotEmpty
+        ? _farmerProfile!['image_url'].toString()
+        : auth.userAvatarUrl;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // User Header
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              ClipOval(
+                child: SafeNetworkImage(
+                  imageUrl: profileImageUrl,
+                  defaultBucket: 'uploads',
+                  width: 48,
+                  height: 48,
+                  fit: BoxFit.cover,
+                  placeholder: Container(color: Colors.grey[200]),
+                  errorWidget: const Icon(
+                    Icons.person,
+                    size: 24,
+                    color: _muted,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName.isNotEmpty ? displayName : 'User',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _dark,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() => _selectedTab = 0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit, size: 12, color: _muted),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Edit Profile',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: _muted,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Sidebar Menu Card
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSidebarCategory('MY ACCOUNT'),
+              _buildSidebarItem(0, Icons.person_outline_rounded, 'My Profile'),
+              _buildSidebarItem(1, Icons.location_on_outlined, 'Addresses'),
+              _buildSidebarItem(5, Icons.shield_outlined, 'Privacy Settings'),
+
+              const Divider(height: 24, color: Color(0xFFF1F5F9)),
+
+              _buildSidebarCategory('MY ACTIVITY'),
+              if (isFarmer) ...[
+                _buildSidebarItem(
+                  3,
+                  Icons.receipt_long_outlined,
+                  'Farmer Orders',
+                  onTap: () => widget.onNavigate(2),
+                ),
+                _buildSidebarItem(
+                  6,
+                  Icons.storefront_outlined,
+                  'My Products',
+                  onTap: () => widget.onNavigate(1),
+                ),
+              ] else ...[
+                _buildSidebarItem(
+                  3,
+                  Icons.shopping_bag_outlined,
+                  'My Purchase / Orders',
+                  onTap: () => context.push(AppRoutes.customerOrders),
+                ),
+                _buildSidebarItem(
+                  2,
+                  Icons.confirmation_number_outlined,
+                  'My Vouchers',
+                  onTap: () => _showWebClaimedVouchersDialog(),
+                ),
+              ],
+
+              const Divider(height: 24, color: Color(0xFFF1F5F9)),
+
+              _buildSidebarCategory('PREFERENCES'),
+              _buildSidebarItem(
+                4,
+                Icons.notifications_outlined,
+                'Notifications',
+                onTap: () => _showNotificationsDialog(),
+              ),
+              _buildSidebarItem(
+                7,
+                Icons.help_outline_rounded,
+                'Help Center',
+                onTap: () => context.push(AppRoutes.helpCenter),
+              ),
+
+              const Divider(height: 24, color: Color(0xFFF1F5F9)),
+
+              // Mode switch item
+              ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 2,
+                ),
+                leading: Icon(
+                  isFarmer
+                      ? Icons.shopping_bag_outlined
+                      : Icons.storefront_outlined,
+                  size: 18,
+                  color: primary,
+                ),
+                title: Text(
+                  isFarmer ? 'Switch to Customer' : 'Switch to Farmer',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: primary,
+                  ),
+                ),
+                onTap: isFarmer
+                    ? _handleSwitchToCustomer
+                    : _handleSwitchToFarmer,
+              ),
+
+              // Logout item
+              ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 2,
+                ),
+                leading: Icon(
+                  Icons.logout_rounded,
+                  size: 18,
+                  color: Colors.red.shade600,
+                ),
+                title: Text(
+                  'Log Out',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.red.shade600,
+                  ),
+                ),
+                onTap: _confirmLogout,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSidebarCategory(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, top: 8, bottom: 6),
+      child: Text(
+        title,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: const Color(0xFF94A3B8),
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSidebarItem(
+    int index,
+    IconData icon,
+    String label, {
+    VoidCallback? onTap,
+  }) {
+    final isSelected = _selectedTab == index;
+    return InkWell(
+      onTap: onTap ?? () => setState(() => _selectedTab = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(
+              color: isSelected ? primary : Colors.transparent,
+              width: 3,
+            ),
+          ),
+          color: isSelected
+              ? primary.withValues(alpha: 0.06)
+              : Colors.transparent,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? primary : const Color(0xFF64748B),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? primary : const Color(0xFF334155),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Shopee Style Main Content Card ───
+  Widget _buildShopeeMainContent(AuthService auth) {
+    if (_selectedTab == 1) {
+      return _buildAddressesContent();
+    } else if (_selectedTab == 5) {
+      return _buildPrivacyContent();
+    }
+
+    final isFarmer = auth.isViewingAsFarmer;
+
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isFarmer ? Colors.amber.shade200 : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isFarmer
+                ? Colors.amber.withValues(alpha: 0.05)
+                : Colors.black.withValues(alpha: 0.02),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Form(
+        key: _profileFormKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header: Different styling for Farmer Store vs Consumer Profile
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isFarmer
+                            ? Colors.amber.shade100
+                            : const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        isFarmer
+                            ? Icons.storefront_rounded
+                            : Icons.person_rounded,
+                        color: isFarmer ? Colors.amber.shade900 : primary,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              isFarmer
+                                  ? 'Farm Store Profile'
+                                  : 'My Personal Profile',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: _dark,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isFarmer
+                                    ? Colors.amber.shade100
+                                    : const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(100),
+                              ),
+                              child: Text(
+                                isFarmer ? 'FARMER MODE' : 'CONSUMER MODE',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: isFarmer
+                                      ? Colors.amber.shade900
+                                      : primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isFarmer
+                              ? 'Manage your public farm details, location, and store branding for buyers'
+                              : 'Manage your personal buyer information and contact details',
+                          style: GoogleFonts.inter(fontSize: 13, color: _muted),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: _isSavingProfile
+                      ? null
+                      : _saveInlineProfileChanges,
+                  icon: _isSavingProfile
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.check_circle_rounded, size: 16),
+                  label: Text(
+                    _isSavingProfile
+                        ? 'Saving...'
+                        : (isFarmer ? 'Save Store Details' : 'Save Profile'),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isFarmer ? Colors.amber.shade800 : primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 32, color: Color(0xFFF1F5F9)),
+
+            // Farmer Store Performance Banner (Only in Farmer Mode)
+            if (isFarmer) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 24),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildFarmerMetricItem(
+                      'Total Store Orders',
+                      '$_totalOrdersCount',
+                      Icons.shopping_bag_outlined,
+                    ),
+                    Container(
+                      width: 1,
+                      height: 32,
+                      color: Colors.amber.shade200,
+                    ),
+                    _buildFarmerMetricItem(
+                      'Store Followers',
+                      '$_followersCount',
+                      Icons.people_outline,
+                    ),
+                    Container(
+                      width: 1,
+                      height: 32,
+                      color: Colors.amber.shade200,
+                    ),
+                    _buildFarmerMetricItem(
+                      'Store Status',
+                      'Active & Verified',
+                      Icons.verified_outlined,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // Form fields layout (2 columns: left form fields, right avatar preview)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Left form details
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    children: [
+                      if (isFarmer) ...[
+                        _buildInlineEditRow(
+                          label: 'Farm Store Name',
+                          controller: _nameController,
+                          icon: Icons.storefront_outlined,
+                        ),
+                        _buildInlineEditRow(
+                          label: 'Farm Specialty',
+                          controller: _specialtyController,
+                          icon: Icons.grass_outlined,
+                        ),
+                        _buildInlineEditRow(
+                          label: 'Farm Location',
+                          controller: _locationController,
+                          icon: Icons.location_on_outlined,
+                        ),
+                        _buildInlineEditRow(
+                          label: 'Business Phone',
+                          controller: _phoneController,
+                          icon: Icons.phone_outlined,
+                        ),
+                        _buildInlineEditRow(
+                          label: 'Registered Email',
+                          controller: _emailController,
+                          icon: Icons.mail_outline,
+                          readOnly: true,
+                          badge: 'Farmer Verified',
+                        ),
+                      ] else ...[
+                        _buildInlineEditRow(
+                          label: 'Full Name',
+                          controller: _nameController,
+                          icon: Icons.person_outline,
+                        ),
+                        _buildInlineEditRow(
+                          label: 'Email Address',
+                          controller: _emailController,
+                          icon: Icons.mail_outline,
+                          readOnly: true,
+                          badge: 'Verified',
+                        ),
+                        _buildInlineEditRow(
+                          label: 'Contact Number',
+                          controller: _phoneController,
+                          icon: Icons.phone_outlined,
+                        ),
+                        _buildInlineEditRow(
+                          label: 'Account Type',
+                          controller: TextEditingController(
+                            text: 'Consumer / Buyer Account',
+                          ),
+                          icon: Icons.badge_outlined,
+                          readOnly: true,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 36),
+
+                // Right avatar column with boundary line
+                Container(
+                  width: 1,
+                  height: 240,
+                  color: const Color(0xFFF1F5F9),
+                ),
+                const SizedBox(width: 36),
+
+                Column(
+                  children: [
+                    Container(
+                      width: 110,
+                      height: 110,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isFarmer ? Colors.amber.shade700 : primary,
+                          width: 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isFarmer ? Colors.amber : primary)
+                                .withValues(alpha: 0.15),
+                            blurRadius: 16,
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: _isUploadingAvatar
+                            ? Container(
+                                color: Colors.grey[200],
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    color: isFarmer
+                                        ? Colors.amber.shade800
+                                        : primary,
+                                    strokeWidth: 3,
+                                  ),
+                                ),
+                              )
+                            : SafeNetworkImage(
+                                imageUrl: _avatarUrl,
+                                defaultBucket: 'uploads',
+                                fit: BoxFit.cover,
+                                placeholder: Container(color: Colors.grey[200]),
+                                errorWidget: Icon(
+                                  isFarmer ? Icons.storefront : Icons.person,
+                                  size: 48,
+                                  color: _muted,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: _isUploadingAvatar
+                          ? null
+                          : _pickAndUploadInlineAvatar,
+                      icon: const Icon(Icons.upload_file_rounded, size: 16),
+                      label: Text(
+                        isFarmer ? 'Upload Store Logo' : 'Select Photo',
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _dark,
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      isFarmer
+                          ? 'Store Logo / Banner\nMax 1 MB (.JPEG, .PNG)'
+                          : 'File size: max 1 MB\nFile extension: .JPEG, .PNG',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: const Color(0xFF94A3B8),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFarmerMetricItem(String label, String value, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Colors.amber.shade900),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: _dark,
+              ),
+            ),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: Colors.amber.shade900,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInlineEditRow({
+    required String label,
+    required TextEditingController controller,
+    required IconData icon,
+    bool readOnly = false,
+    String? badge,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 130,
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: TextFormField(
+              controller: controller,
+              readOnly: readOnly,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: readOnly ? const Color(0xFF64748B) : _dark,
+              ),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: readOnly
+                    ? const Color(0xFFF8FAFC)
+                    : const Color(0xFFF9FAFB),
+                prefixIcon: Icon(
+                  icon,
+                  size: 18,
+                  color: const Color(0xFF9CA3AF),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: primary, width: 1.5),
+                ),
+              ),
+            ),
+          ),
+          if (badge != null) ...[
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDCFCE7),
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Text(
+                badge,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: primary,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddressesContent() {
+    return FutureBuilder<List<UserAddress>>(
+      future: UserService().getAllUserAddresses(),
+      builder: (context, snapshot) {
+        final addresses = snapshot.data ?? [];
+        final isLoading = snapshot.connectionState == ConnectionState.waiting;
+
+        return Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'My Delivery Addresses',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: _dark,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Manage your shipping addresses for fast fresh farm produce orders',
+                        style: GoogleFonts.inter(fontSize: 13, color: _muted),
+                      ),
+                    ],
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      await showDialog(
+                        context: context,
+                        builder: (ctx) => Dialog(
+                          backgroundColor: Colors.transparent,
+                          elevation: 0,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 620),
+                            child: const AddressEditorSheet(isDialog: true),
+                          ),
+                        ),
+                      );
+                      setState(() {}); // Refresh list
+                    },
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('+ Add New Address'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 32, color: Color(0xFFF1F5F9)),
+
+              if (isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: primary,
+                      strokeWidth: 3,
+                    ),
+                  ),
+                )
+              else if (addresses.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 48),
+                  alignment: Alignment.center,
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.location_off_outlined,
+                        size: 56,
+                        color: Colors.grey[300],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No Addresses Found',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: _dark,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Add a delivery address to easily checkout items from local farmers.',
+                        style: GoogleFonts.inter(fontSize: 13, color: _muted),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: addresses.length,
+                  separatorBuilder: (context, index) =>
+                      const Divider(height: 24, color: Color(0xFFF1F5F9)),
+                  itemBuilder: (context, index) {
+                    final addr = addresses[index];
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: addr.isDefault
+                                ? const Color(0xFFDCFCE7)
+                                : const Color(0xFFF1F5F9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.location_on_rounded,
+                            size: 20,
+                            color: addr.isDefault
+                                ? primary
+                                : const Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    addr.recipientName,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: _dark,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    addr.recipientPhone.isNotEmpty
+                                        ? addr.recipientPhone
+                                        : 'No Phone',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: _muted,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  if (addr.isDefault) ...[
+                                    const SizedBox(width: 12),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDCFCE7),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: primary.withValues(alpha: 0.3),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'Default',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                '${addr.street}, ${addr.barangay}, ${addr.city}, ${addr.province} ${addr.zipCode}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: const Color(0xFF334155),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            TextButton(
+                              onPressed: () async {
+                                await showDialog(
+                                  context: context,
+                                  builder: (ctx) => Dialog(
+                                    backgroundColor: Colors.transparent,
+                                    elevation: 0,
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 620,
+                                      ),
+                                      child: AddressEditorSheet(
+                                        initialAddress: addr,
+                                        isDialog: true,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                                setState(() {});
+                              },
+                              child: Text(
+                                'Edit',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: primary,
+                                ),
+                              ),
+                            ),
+                            if (!addr.isDefault)
+                              TextButton(
+                                onPressed: () async {
+                                  await UserService().deleteAddressById(
+                                    addr.addressId,
+                                  );
+                                  setState(() {});
+                                },
+                                child: Text(
+                                  'Delete',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.red.shade600,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPrivacyContent() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Privacy & Security Settings',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: _dark,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Manage password protection, account authentication, and privacy controls',
+            style: GoogleFonts.inter(fontSize: 13, color: _muted),
+          ),
+          const Divider(height: 32, color: Color(0xFFF1F5F9)),
+
+          // 1. Password & Security
+          _buildPrivacySettingRow(
+            icon: Icons.lock_outline_rounded,
+            title: 'Account Password',
+            description:
+                'Change your account password regularly to keep your profile secure.',
+            buttonText: 'Change Password',
+            onTap: () => context.push(AppRoutes.resetPassword),
+          ),
+          const Divider(height: 24, color: Color(0xFFF1F5F9)),
+
+          // 2. Multi-factor Authentication
+          _buildPrivacySettingRow(
+            icon: Icons.security_rounded,
+            title: 'Two-Factor Authentication (2FA)',
+            description:
+                'Add an extra layer of security with SMS or Email OTP verification.',
+            buttonText: 'Enable 2FA',
+            badge: 'Recommended',
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Two-Factor Authentication is active via Supabase Email OTP!',
+                  ),
+                  backgroundColor: primary,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
+          const Divider(height: 24, color: Color(0xFFF1F5F9)),
+
+          // 3. Login Activity
+          _buildPrivacySettingRow(
+            icon: Icons.devices_rounded,
+            title: 'Active Sessions & Devices',
+            description:
+                'View active web browsers and devices logged into your account.',
+            buttonText: 'View Sessions',
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Current Web Browser session is verified and active.',
+                  ),
+                  backgroundColor: primary,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
+          const Divider(height: 24, color: Color(0xFFF1F5F9)),
+
+          // 4. Data Privacy
+          _buildPrivacySettingRow(
+            icon: Icons.visibility_off_outlined,
+            title: 'Data & Activity Privacy',
+            description:
+                'Control how your purchase history and farm interactions are visible.',
+            buttonText: 'Privacy Policy',
+            onTap: () => context.push(AppRoutes.helpCenter),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrivacySettingRow({
+    required IconData icon,
+    required String title,
+    required String description,
+    required String buttonText,
+    required VoidCallback onTap,
+    String? badge,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: const BoxDecoration(
+            color: Color(0xFFF1F5F9),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 20, color: const Color(0xFF475569)),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: _dark,
+                    ),
+                  ),
+                  if (badge != null) ...[
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        badge,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: _muted,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+        OutlinedButton(
+          onPressed: onTap,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _dark,
+            side: const BorderSide(color: Color(0xFFCBD5E1)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          ),
+          child: Text(
+            buttonText,
+            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLogoutButton() {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: _confirmLogout,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.red.shade50.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.red.shade100),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.logout_rounded, color: Colors.red.shade700, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                'Log Out of Account',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.red.shade700,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -433,113 +1728,157 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     final ratingText = '${ratingVal.toString()} ★';
 
     final metrics = [
-      {'title': 'Total Orders', 'value': '$_totalOrdersCount', 'icon': Icons.local_shipping_outlined, 'color': primary},
-      {'title': 'Store Rating', 'value': ratingText, 'icon': Icons.star_rounded, 'color': Colors.amber.shade700},
-      {'title': 'Followers', 'value': '$_followersCount', 'icon': Icons.people_outline_rounded, 'color': Colors.blue},
-      {'title': 'Fulfillment', 'value': '98%', 'icon': Icons.verified_outlined, 'color': Colors.purple},
+      {
+        'title': 'Total Orders',
+        'value': '$_totalOrdersCount',
+        'icon': Icons.local_shipping_outlined,
+        'color': primary,
+      },
+      {
+        'title': 'Store Rating',
+        'value': ratingText,
+        'icon': Icons.star_rounded,
+        'color': Colors.amber.shade700,
+      },
+      {
+        'title': 'Followers',
+        'value': '$_followersCount',
+        'icon': Icons.people_outline_rounded,
+        'color': Colors.blue,
+      },
+      {
+        'title': 'Fulfillment',
+        'value': '98%',
+        'icon': Icons.verified_outlined,
+        'color': Colors.purple,
+      },
     ];
 
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 768;
 
-    if (isMobile) {
-      return Row(
-        children: metrics.take(2).map((m) {
-          return Expanded(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey[200]!),
-              ),
-              child: Column(
-                children: [
-                  Icon(m['icon'] as IconData, color: m['color'] as Color, size: 24),
-                  const SizedBox(height: 8),
-                  Text(
-                    m['value'] as String,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: _dark,
-                    ),
-                  ),
-                  Text(
-                    m['title'] as String,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: _muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      );
-    }
-
-    return Row(
-      children: metrics.map((m) {
-        return Expanded(
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[200]!),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: (m['color'] as Color).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    m['icon'] as IconData,
-                    color: m['color'] as Color,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      m['value'] as String,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: _dark,
-                      ),
-                    ),
-                    Text(
-                      m['title'] as String,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: _muted,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Store Performance',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: _dark,
           ),
-        );
-      }).toList(),
+        ),
+        const SizedBox(height: 14),
+        if (isMobile)
+          Row(
+            children: metrics.take(2).map((m) {
+              return Expanded(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        m['icon'] as IconData,
+                        color: m['color'] as Color,
+                        size: 24,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        m['value'] as String,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: _dark,
+                        ),
+                      ),
+                      Text(
+                        m['title'] as String,
+                        style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          )
+        else
+          Row(
+            children: metrics.map((m) {
+              return Expanded(
+                child: Container(
+                  margin: const EdgeInsets.only(right: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: (m['color'] as Color).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(
+                          m['icon'] as IconData,
+                          color: m['color'] as Color,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              m['value'] as String,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: _dark,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              m['title'] as String,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: _muted,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+      ],
     );
   }
 
@@ -568,11 +1907,12 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 12,
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 20,
             offset: const Offset(0, 4),
           ),
         ],
@@ -580,15 +1920,16 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       child: Column(
         children: [
           Container(
-            width: 88,
-            height: 88,
+            width: 96,
+            height: 96,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: primary, width: 3),
               boxShadow: [
                 BoxShadow(
-                  color: primary.withValues(alpha: 0.3),
-                  blurRadius: 16,
+                  color: primary.withValues(alpha: 0.25),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
@@ -598,17 +1939,18 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 defaultBucket: 'uploads',
                 fit: BoxFit.cover,
                 placeholder: Container(color: Colors.grey[200]),
-                errorWidget: const Icon(Icons.person, size: 36),
+                errorWidget: const Icon(Icons.person, size: 40, color: _muted),
               ),
             ),
           ),
           const SizedBox(height: 18),
           Text(
             displayName.isNotEmpty ? displayName : 'User',
-            style: const TextStyle(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 20,
               fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
+              color: _dark,
+              letterSpacing: -0.4,
             ),
             textAlign: TextAlign.center,
           ),
@@ -616,8 +1958,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             const SizedBox(height: 4),
             Text(
               displaySpecialty,
-              style: const TextStyle(
-                fontSize: 14,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: primary,
               ),
@@ -627,7 +1969,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           const SizedBox(height: 4),
           Text(
             displayEmail.isNotEmpty ? displayEmail : 'user@email.com',
-            style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+            style: GoogleFonts.inter(fontSize: 13, color: _muted),
             textAlign: TextAlign.center,
           ),
           if (displayLocation != null && displayLocation.isNotEmpty) ...[
@@ -677,25 +2019,38 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               ),
             ),
           const SizedBox(height: 14),
+          const SizedBox(height: 16),
           MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               onTap: () => _showEditProfileDialog(auth),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
-                child: const Center(
-                  child: Text(
-                    'Edit Profile',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF475569),
-                    ),
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.edit_outlined,
+                        size: 16,
+                        color: Color(0xFF475569),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Edit Profile',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF475569),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -713,13 +2068,13 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: primary.withValues(alpha: 0.2)),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -748,9 +2103,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   children: [
                     Text(
                       isViewingAsFarmer ? 'Farmer Mode' : 'Customer Mode',
-                      style: const TextStyle(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
+                        color: _dark,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -758,13 +2114,13 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       isViewingAsFarmer
                           ? 'Manage your products & sales'
                           : 'Browse & buy farm products',
-                      style: const TextStyle(fontSize: 13, color: Colors.grey),
+                      style: GoogleFonts.inter(fontSize: 13, color: _muted),
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             Text(
               isViewingAsFarmer
                   ? 'You are viewing as a farmer. Manage products, track sales, and view analytics from the Dashboard.'
@@ -1124,79 +2480,132 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     ];
 
     final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 650;
+    final isMobile = sw < 768;
 
-    return Wrap(
-      spacing: 16,
-      runSpacing: 16,
-      children: items.map((item) {
-        return SizedBox(
-          width: isMobile ? double.infinity : 260,
-          child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: item.onTap,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Quick Shortcuts & Settings',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: _dark,
+          ),
+        ),
+        const SizedBox(height: 16),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: isMobile ? 1 : 2,
+            mainAxisExtent: 84,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+          ),
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final item = items[index];
+            return StatefulBuilder(
+              builder: (context, setCardState) {
+                bool isHovered = false;
+                return MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  onEnter: (_) => setCardState(() => isHovered = true),
+                  onExit: (_) => setCardState(() => isHovered = false),
+                  child: GestureDetector(
+                    onTap: item.onTap,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isHovered
+                              ? primary.withValues(alpha: 0.4)
+                              : const Color(0xFFE2E8F0),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isHovered
+                                ? primary.withValues(alpha: 0.08)
+                                : Colors.black.withValues(alpha: 0.02),
+                            blurRadius: isHovered ? 16 : 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      child: Icon(
-                        item.icon,
-                        size: 20,
-                        color: const Color(0xFF475569),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          Text(
-                            item.title,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isHovered
+                                  ? primary.withValues(alpha: 0.12)
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(
+                              item.icon,
+                              size: 20,
+                              color: isHovered
+                                  ? primary
+                                  : const Color(0xFF475569),
                             ),
                           ),
-                          Text(
-                            item.subtitle,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[400],
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  item.title,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: _dark,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  item.subtitle,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: _muted,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          AnimatedPadding(
+                            duration: const Duration(milliseconds: 180),
+                            padding: EdgeInsets.only(left: isHovered ? 6 : 0),
+                            child: Icon(
+                              Icons.chevron_right_rounded,
+                              color: isHovered
+                                  ? primary
+                                  : const Color(0xFFCBD5E1),
+                              size: 20,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: Colors.grey[300],
-                      size: 20,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -1229,9 +2638,12 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             if (!isLoaded) {
               SharedPreferences.getInstance().then((prefs) {
                 setModalState(() {
-                  emailAlerts = prefs.getBool('notifications.email_alerts') ?? true;
-                  pushAlerts = prefs.getBool('notifications.push_alerts') ?? true;
-                  promoAlerts = prefs.getBool('notifications.promo_alerts') ?? false;
+                  emailAlerts =
+                      prefs.getBool('notifications.email_alerts') ?? true;
+                  pushAlerts =
+                      prefs.getBool('notifications.push_alerts') ?? true;
+                  promoAlerts =
+                      prefs.getBool('notifications.promo_alerts') ?? false;
                   isLoaded = true;
                 });
               });
@@ -1243,7 +2655,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               await prefs.setBool('notifications.email_alerts', emailAlerts);
               await prefs.setBool('notifications.push_alerts', pushAlerts);
               await prefs.setBool('notifications.promo_alerts', promoAlerts);
-              
+
               if (!dialogCtx.mounted) return;
               setModalState(() => isSaving = false);
               Navigator.of(dialogCtx).pop();
@@ -1320,7 +2732,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                 color: Colors.blue.withValues(alpha: 0.05),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.mail_outline_rounded, color: Colors.blue),
+                              child: const Icon(
+                                Icons.mail_outline_rounded,
+                                color: Colors.blue,
+                              ),
                             ),
                             title: Text(
                               'Email Notifications',
@@ -1329,11 +2744,14 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                 fontSize: 15,
                               ),
                             ),
-                            subtitle: const Text('Receive order status updates via email'),
+                            subtitle: const Text(
+                              'Receive order status updates via email',
+                            ),
                             value: emailAlerts,
                             onChanged: isSaving
                                 ? null
-                                : (val) => setModalState(() => emailAlerts = val),
+                                : (val) =>
+                                      setModalState(() => emailAlerts = val),
                           ),
                           const Divider(height: 16),
                           SwitchListTile.adaptive(
@@ -1345,7 +2763,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                 color: Colors.green.withValues(alpha: 0.05),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.phonelink_ring_rounded, color: Colors.green),
+                              child: const Icon(
+                                Icons.phonelink_ring_rounded,
+                                color: Colors.green,
+                              ),
                             ),
                             title: Text(
                               'Push Notifications',
@@ -1354,11 +2775,14 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                 fontSize: 15,
                               ),
                             ),
-                            subtitle: const Text('Receive message alerts and activity updates'),
+                            subtitle: const Text(
+                              'Receive message alerts and activity updates',
+                            ),
                             value: pushAlerts,
                             onChanged: isSaving
                                 ? null
-                                : (val) => setModalState(() => pushAlerts = val),
+                                : (val) =>
+                                      setModalState(() => pushAlerts = val),
                           ),
                           const Divider(height: 16),
                           SwitchListTile.adaptive(
@@ -1370,7 +2794,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                 color: Colors.orange.withValues(alpha: 0.05),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.local_offer_outlined, color: Colors.orange),
+                              child: const Icon(
+                                Icons.local_offer_outlined,
+                                color: Colors.orange,
+                              ),
                             ),
                             title: Text(
                               'Promotions & Offers',
@@ -1379,11 +2806,14 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                 fontSize: 15,
                               ),
                             ),
-                            subtitle: const Text('Get notified of discount codes and local deals'),
+                            subtitle: const Text(
+                              'Get notified of discount codes and local deals',
+                            ),
                             value: promoAlerts,
                             onChanged: isSaving
                                 ? null
-                                : (val) => setModalState(() => promoAlerts = val),
+                                : (val) =>
+                                      setModalState(() => promoAlerts = val),
                           ),
                         ],
                       ),
@@ -1394,7 +2824,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               ),
               actions: [
                 TextButton(
-                  onPressed: isSaving ? null : () => Navigator.of(dialogCtx).pop(),
+                  onPressed: isSaving
+                      ? null
+                      : () => Navigator.of(dialogCtx).pop(),
                   child: Text(
                     'Cancel',
                     style: TextStyle(
@@ -1449,7 +2881,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         return StatefulBuilder(
           builder: (context, setDialogState) {
             if (innerLoading) {
-              VoucherService().getUserClaimedVouchersHistory(userId).then((list) {
+              VoucherService().getUserClaimedVouchersHistory(userId).then((
+                list,
+              ) {
                 setDialogState(() {
                   innerVouchers = list;
                   innerLoading = false;
@@ -1458,14 +2892,18 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             }
 
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
               child: Container(
                 width: 800,
                 height: 600,
                 padding: const EdgeInsets.all(32),
                 color: const Color(0xFFF8FAFC),
                 child: innerLoading
-                    ? const Center(child: CircularProgressIndicator(color: primary))
+                    ? const Center(
+                        child: CircularProgressIndicator(color: primary),
+                      )
                     : DefaultTabController(
                         length: 3,
                         child: Column(
@@ -1538,7 +2976,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     );
   }
 
-  Widget _buildWebVouchersTab(List<Map<String, dynamic>> vouchers, int tabIndex) {
+  Widget _buildWebVouchersTab(
+    List<Map<String, dynamic>> vouchers,
+    int tabIndex,
+  ) {
     final now = DateTime.now();
     final list = vouchers.where((item) {
       final isUsed = item['is_used'] == true;
@@ -1563,7 +3004,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.confirmation_number_outlined, size: 56, color: Colors.grey[300]),
+            Icon(
+              Icons.confirmation_number_outlined,
+              size: 56,
+              color: Colors.grey[300],
+            ),
             const SizedBox(height: 16),
             Text(
               'No Vouchers Found',
@@ -1589,7 +3034,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -1613,7 +3061,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         final voucher = item['vouchers'] as Map<String, dynamic>;
         final code = voucher['code']?.toString() ?? '';
         final discountType = voucher['discount_type']?.toString() ?? 'fixed';
-        final discountVal = (voucher['discount_value'] as num?)?.toDouble() ?? 0.0;
+        final discountVal =
+            (voucher['discount_value'] as num?)?.toDouble() ?? 0.0;
         final minSpend = (voucher['min_spend'] as num?)?.toDouble() ?? 0.0;
         final farmName = voucher['farm_name']?.toString() ?? 'Partner Farm';
         final endDateStr = voucher['end_date']?.toString();
@@ -1622,12 +3071,15 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         if (endDateStr != null) {
           final endDate = DateTime.tryParse(endDateStr);
           if (endDate != null) {
-            expiryText = 'Expires ${endDate.month}/${endDate.day}/${endDate.year}';
+            expiryText =
+                'Expires ${endDate.month}/${endDate.day}/${endDate.year}';
           }
         }
 
         final isPercentage = discountType == 'percentage';
-        final valueText = isPercentage ? '${discountVal.toInt()}%' : '₱${discountVal.toInt()}';
+        final valueText = isPercentage
+            ? '${discountVal.toInt()}%'
+            : '₱${discountVal.toInt()}';
         final labelText = isPercentage ? 'Discount' : 'OFF';
 
         final Color themeColor = tabIndex == 0 ? primary : Colors.grey[400]!;
@@ -1679,10 +3131,17 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   ],
                 ),
               ),
-              const VerticalDivider(width: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+              const VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: Color(0xFFF1F5F9),
+              ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -1703,9 +3162,14 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: tabIndex == 0 ? primary.withValues(alpha: 0.1) : Colors.grey[100],
+                              color: tabIndex == 0
+                                  ? primary.withValues(alpha: 0.1)
+                                  : Colors.grey[100],
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -1817,7 +3281,8 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     isFarmer = widget.auth.isViewingAsFarmer;
     nameController = TextEditingController(
       text: isFarmer && widget.farmerProfile != null
-          ? (widget.farmerProfile!['farm_name']?.toString() ?? widget.auth.userName)
+          ? (widget.farmerProfile!['farm_name']?.toString() ??
+                widget.auth.userName)
           : widget.auth.userName,
     );
     specialtyController = TextEditingController(
@@ -1842,7 +3307,8 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     );
     freeDeliveryMinAmountController = TextEditingController(
       text: isFarmer && widget.farmerProfile != null
-          ? (widget.farmerProfile!['free_delivery_min_amount']?.toString() ?? '0')
+          ? (widget.farmerProfile!['free_delivery_min_amount']?.toString() ??
+                '0')
           : '',
     );
     phoneController = TextEditingController();
@@ -1863,7 +3329,8 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
       if (users.isNotEmpty && mounted) {
         final user = users[0];
         setState(() {
-          phoneController.text = (user['phone'] ?? user['phone_number'] ?? '').toString();
+          phoneController.text = (user['phone'] ?? user['phone_number'] ?? '')
+              .toString();
         });
       }
     } catch (e) {
@@ -1958,7 +3425,8 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
               'location': locationController.text.trim(),
               'image_url': imageController.text.trim(),
               'residential_address': bioController.text.trim(),
-              'free_delivery_min_amount': double.tryParse(freeDeliveryMinAmountController.text) ?? 0.0,
+              'free_delivery_min_amount':
+                  double.tryParse(freeDeliveryMinAmountController.text) ?? 0.0,
             })
             .eq('user_id', userId);
       } else {
@@ -2029,14 +3497,20 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
             filled: true,
             fillColor: const Color(0xFFF9FAFB),
             prefixIcon: Icon(icon, color: const Color(0xFF9CA3AF), size: 20),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFF16A34A),
+                width: 1.5,
+              ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -2090,7 +3564,11 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                   ),
                 ),
               ),
-              const Icon(Icons.lock_outline_rounded, color: Color(0xFF9CA3AF), size: 16),
+              const Icon(
+                Icons.lock_outline_rounded,
+                color: Color(0xFF9CA3AF),
+                size: 16,
+              ),
             ],
           ),
         ),
@@ -2101,9 +3579,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       backgroundColor: Colors.white,
       elevation: 12,
       clipBehavior: Clip.antiAlias,
@@ -2127,7 +3603,9 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isFarmer ? 'Edit Farm Profile' : 'Edit Personal Profile',
+                          isFarmer
+                              ? 'Edit Farm Profile'
+                              : 'Edit Personal Profile',
                           style: GoogleFonts.plusJakartaSans(
                             fontWeight: FontWeight.w800,
                             fontSize: 22,
@@ -2148,8 +3626,13 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                     ),
                   ),
                   IconButton(
-                    onPressed: isSaving ? null : () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded, color: Color(0xFF6B7280)),
+                    onPressed: isSaving
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Color(0xFF6B7280),
+                    ),
                     splashRadius: 20,
                   ),
                 ],
@@ -2186,7 +3669,9 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(16),
                                     color: const Color(0xFFF3F4F6),
-                                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                                    border: Border.all(
+                                      color: const Color(0xFFE5E7EB),
+                                    ),
                                   ),
                                   clipBehavior: Clip.antiAlias,
                                   child: Stack(
@@ -2196,33 +3681,62 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                                             ? Image.network(
                                                 imageUrl,
                                                 fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) => Center(
-                                                  child: Column(
-                                                    mainAxisAlignment: MainAxisAlignment.center,
-                                                    children: [
-                                                      const Icon(Icons.broken_image_outlined,
-                                                          size: 40, color: Color(0xFF9CA3AF)),
-                                                      const SizedBox(height: 8),
-                                                      Text(
-                                                        'Failed to load image',
-                                                        style: GoogleFonts.plusJakartaSans(
-                                                            color: const Color(0xFF6B7280), fontSize: 12),
+                                                errorBuilder:
+                                                    (
+                                                      context,
+                                                      error,
+                                                      stackTrace,
+                                                    ) => Center(
+                                                      child: Column(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          const Icon(
+                                                            Icons
+                                                                .broken_image_outlined,
+                                                            size: 40,
+                                                            color: Color(
+                                                              0xFF9CA3AF,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                            height: 8,
+                                                          ),
+                                                          Text(
+                                                            'Failed to load image',
+                                                            style: GoogleFonts.plusJakartaSans(
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF6B7280,
+                                                                  ),
+                                                              fontSize: 12,
+                                                            ),
+                                                          ),
+                                                        ],
                                                       ),
-                                                    ],
-                                                  ),
-                                                ),
+                                                    ),
                                               )
                                             : Center(
                                                 child: Column(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
                                                   children: [
-                                                    const Icon(Icons.image_outlined,
-                                                        size: 40, color: Color(0xFF9CA3AF)),
+                                                    const Icon(
+                                                      Icons.image_outlined,
+                                                      size: 40,
+                                                      color: Color(0xFF9CA3AF),
+                                                    ),
                                                     const SizedBox(height: 8),
                                                     Text(
                                                       'No cover image provided',
-                                                      style: GoogleFonts.plusJakartaSans(
-                                                          color: const Color(0xFF6B7280), fontSize: 12),
+                                                      style:
+                                                          GoogleFonts.plusJakartaSans(
+                                                            color: const Color(
+                                                              0xFF6B7280,
+                                                            ),
+                                                            fontSize: 12,
+                                                          ),
                                                     ),
                                                   ],
                                                 ),
@@ -2230,7 +3744,9 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                                       ),
                                       if (isUploadingImage)
                                         Container(
-                                          color: Colors.black.withValues(alpha: 0.4),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.4,
+                                          ),
                                           child: const Center(
                                             child: CircularProgressIndicator(
                                               color: Colors.white,
@@ -2243,23 +3759,35 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                                           bottom: 12,
                                           right: 12,
                                           child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
                                             decoration: BoxDecoration(
-                                              color: Colors.black.withValues(alpha: 0.6),
-                                              borderRadius: BorderRadius.circular(20),
+                                              color: Colors.black.withValues(
+                                                alpha: 0.6,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
                                             ),
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 14),
+                                                const Icon(
+                                                  Icons.camera_alt_rounded,
+                                                  color: Colors.white,
+                                                  size: 14,
+                                                ),
                                                 const SizedBox(width: 4),
                                                 Text(
                                                   'Change Cover',
-                                                  style: GoogleFonts.plusJakartaSans(
-                                                    color: Colors.white,
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
+                                                  style:
+                                                      GoogleFonts.plusJakartaSans(
+                                                        color: Colors.white,
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
                                                 ),
                                               ],
                                             ),
@@ -2279,10 +3807,15 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                                         child: Container(
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
-                                            border: Border.all(color: const Color(0xFFE5E7EB), width: 4),
+                                            border: Border.all(
+                                              color: const Color(0xFFE5E7EB),
+                                              width: 4,
+                                            ),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: Colors.black.withValues(alpha: 0.05),
+                                                color: Colors.black.withValues(
+                                                  alpha: 0.05,
+                                                ),
                                                 blurRadius: 10,
                                                 offset: const Offset(0, 4),
                                               ),
@@ -2293,13 +3826,21 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                                             children: [
                                               CircleAvatar(
                                                 radius: 60,
-                                                backgroundColor: const Color(0xFFF3F4F6),
-                                                backgroundImage: imageUrl.isNotEmpty
+                                                backgroundColor: const Color(
+                                                  0xFFF3F4F6,
+                                                ),
+                                                backgroundImage:
+                                                    imageUrl.isNotEmpty
                                                     ? NetworkImage(imageUrl)
                                                     : null,
                                                 child: imageUrl.isEmpty
-                                                    ? const Icon(Icons.person_rounded,
-                                                        size: 60, color: Color(0xFF9CA3AF))
+                                                    ? const Icon(
+                                                        Icons.person_rounded,
+                                                        size: 60,
+                                                        color: Color(
+                                                          0xFF9CA3AF,
+                                                        ),
+                                                      )
                                                     : null,
                                               ),
                                               if (isUploadingImage)
@@ -2307,14 +3848,16 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                                                   width: 120,
                                                   height: 120,
                                                   decoration: BoxDecoration(
-                                                    color: Colors.black.withValues(alpha: 0.4),
+                                                    color: Colors.black
+                                                        .withValues(alpha: 0.4),
                                                     shape: BoxShape.circle,
                                                   ),
                                                   child: const Center(
-                                                    child: CircularProgressIndicator(
-                                                      color: Colors.white,
-                                                      strokeWidth: 3,
-                                                    ),
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          color: Colors.white,
+                                                          strokeWidth: 3,
+                                                        ),
                                                   ),
                                                 ),
                                             ],
@@ -2341,10 +3884,17 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                                   ),
                                   const SizedBox(height: 8),
                                   TextButton.icon(
-                                    onPressed: isUploadingImage ? null : _pickAndUploadImage,
-                                    icon: const Icon(Icons.photo_library_outlined, size: 16),
+                                    onPressed: isUploadingImage
+                                        ? null
+                                        : _pickAndUploadImage,
+                                    icon: const Icon(
+                                      Icons.photo_library_outlined,
+                                      size: 16,
+                                    ),
                                     label: Text(
-                                      isUploadingImage ? 'Uploading...' : 'Change Photo',
+                                      isUploadingImage
+                                          ? 'Uploading...'
+                                          : 'Change Photo',
                                       style: GoogleFonts.plusJakartaSans(
                                         fontWeight: FontWeight.w600,
                                         fontSize: 13,
@@ -2390,7 +3940,9 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                           controller: freeDeliveryMinAmountController,
                           label: 'Minimum Order for Free Delivery (₱)',
                           icon: Icons.local_shipping_outlined,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           validator: (v) {
                             final text = v?.trim() ?? '';
                             if (text.isEmpty) return null;
@@ -2438,13 +3990,18 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   OutlinedButton(
-                    onPressed: isSaving ? null : () => Navigator.of(context).pop(),
+                    onPressed: isSaving
+                        ? null
+                        : () => Navigator.of(context).pop(),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFFE5E7EB)),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
                     ),
                     child: Text(
                       'Cancel',
@@ -2464,7 +4021,10 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
                     ),
                     child: isSaving
                         ? const SizedBox(

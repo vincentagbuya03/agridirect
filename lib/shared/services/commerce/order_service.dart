@@ -22,16 +22,52 @@ class OrderService {
     try {
       final customerId = await _getCurrentCustomerId();
 
-      final response = await _supabase
-          .from('v_orders')
-          .select()
-          .eq('customer_id', customerId)
-          .limit(limit)
-          .order('created_at', ascending: false);
+      List<dynamic> response;
+      try {
+        response = await _supabase
+            .from('v_orders')
+            .select()
+            .eq('customer_id', customerId)
+            .limit(limit)
+            .order('created_at', ascending: false);
+        return (response as List<dynamic>)
+            .map((json) => Order.fromJson(json as Map<String, dynamic>))
+            .toList();
+      } catch (e) {
+        debugPrint('Failed to query v_orders view for my orders, falling back: $e');
+        response = await _supabase
+            .from('orders')
+            .select('''
+              *,
+              order_statuses(code),
+              farmers(
+                farm_name,
+                image_url,
+                users(avatar_url)
+              ),
+              order_items(order_item_id)
+            ''')
+            .eq('customer_id', customerId)
+            .limit(limit)
+            .order('created_at', ascending: false);
 
-      return (response as List<dynamic>)
-          .map((json) => Order.fromJson(json as Map<String, dynamic>))
-          .toList();
+        return (response as List<dynamic>).map((json) {
+          final map = Map<String, dynamic>.from(json as Map);
+          final statusMap = map['order_statuses'] as Map<String, dynamic>?;
+          map['status_code'] = statusMap?['code'] ?? 'PENDING';
+          
+          final farmerMap = map['farmers'] as Map<String, dynamic>?;
+          map['farm_name'] = farmerMap?['farm_name'] ?? 'AgriDirect Farm';
+          
+          final farmerUserMap = farmerMap?['users'] as Map<String, dynamic>?;
+          map['farmer_avatar_url'] = farmerMap?['image_url'] ?? farmerUserMap?['avatar_url'] ?? '';
+          
+          final itemsList = map['order_items'] as List<dynamic>?;
+          map['item_count'] = itemsList?.length ?? 0;
+          
+          return Order.fromJson(map);
+        }).toList();
+      }
     } catch (e) {
       throw Exception('Failed to fetch my orders: $e');
     }
@@ -39,16 +75,29 @@ class OrderService {
 
   /// Watch user's orders in real-time
   Stream<List<Order>> watchMyOrders({int limit = 20}) async* {
-    yield await getMyOrders(limit: limit);
+    try {
+      yield await getMyOrders(limit: limit);
+    } catch (e) {
+      debugPrint('Error yielding initial orders in watchMyOrders: $e');
+      yield [];
+    }
 
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
 
-    // Trigger re-fetch when orders for this user change
-    final stream = _supabase.from('orders').stream(primaryKey: ['order_id']);
+    try {
+      // Trigger re-fetch when orders for this user change
+      final stream = _supabase.from('orders').stream(primaryKey: ['order_id']);
 
-    await for (final _ in stream) {
-      yield await getMyOrders(limit: limit);
+      await for (final _ in stream) {
+        try {
+          yield await getMyOrders(limit: limit);
+        } catch (e) {
+          debugPrint('Error yielding stream update in watchMyOrders: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Real-time order subscription failed: $e');
     }
   }
 
@@ -57,16 +106,52 @@ class OrderService {
     try {
       final farmerId = await _getCurrentFarmerId();
 
-      final response = await _supabase
-          .from('v_orders')
-          .select()
-          .eq('farmer_id', farmerId)
-          .limit(limit)
-          .order('created_at', ascending: false);
+      List<dynamic> response;
+      try {
+        response = await _supabase
+            .from('v_orders')
+            .select()
+            .eq('farmer_id', farmerId)
+            .limit(limit)
+            .order('created_at', ascending: false);
+        return (response as List<dynamic>)
+            .map((json) => Order.fromJson(json as Map<String, dynamic>))
+            .toList();
+      } catch (e) {
+        debugPrint('Failed to query v_orders view for farmer orders, falling back: $e');
+        response = await _supabase
+            .from('orders')
+            .select('''
+              *,
+              order_statuses(code),
+              farmers(
+                farm_name,
+                image_url,
+                users(avatar_url)
+              ),
+              order_items(order_item_id)
+            ''')
+            .eq('farmer_id', farmerId)
+            .limit(limit)
+            .order('created_at', ascending: false);
 
-      return (response as List<dynamic>)
-          .map((json) => Order.fromJson(json as Map<String, dynamic>))
-          .toList();
+        return (response as List<dynamic>).map((json) {
+          final map = Map<String, dynamic>.from(json as Map);
+          final statusMap = map['order_statuses'] as Map<String, dynamic>?;
+          map['status_code'] = statusMap?['code'] ?? 'PENDING';
+          
+          final farmerMap = map['farmers'] as Map<String, dynamic>?;
+          map['farm_name'] = farmerMap?['farm_name'] ?? 'AgriDirect Farm';
+          
+          final farmerUserMap = farmerMap?['users'] as Map<String, dynamic>?;
+          map['farmer_avatar_url'] = farmerMap?['image_url'] ?? farmerUserMap?['avatar_url'] ?? '';
+          
+          final itemsList = map['order_items'] as List<dynamic>?;
+          map['item_count'] = itemsList?.length ?? 0;
+          
+          return Order.fromJson(map);
+        }).toList();
+      }
     } catch (e) {
       throw Exception('Failed to fetch farmer orders: $e');
     }
@@ -75,14 +160,48 @@ class OrderService {
   /// Get order by ID
   Future<Order?> getOrderById(String orderId) async {
     try {
-      final response = await _supabase
-          .from('v_orders')
-          .select()
-          .eq('order_id', orderId)
-          .single();
+      try {
+        final response = await _supabase
+            .from('v_orders')
+            .select()
+            .eq('order_id', orderId)
+            .single();
 
-      return Order.fromJson(response);
+        return Order.fromJson(response);
+      } catch (e) {
+        debugPrint('Failed to query v_orders view for order $orderId, falling back: $e');
+        final response = await _supabase
+            .from('orders')
+            .select('''
+              *,
+              order_statuses(code),
+              farmers(
+                farm_name,
+                image_url,
+                users(avatar_url)
+              ),
+              order_items(order_item_id)
+            ''')
+            .eq('order_id', orderId)
+            .single();
+
+        final map = Map<String, dynamic>.from(response as Map);
+        final statusMap = map['order_statuses'] as Map<String, dynamic>?;
+        map['status_code'] = statusMap?['code'] ?? 'PENDING';
+        
+        final farmerMap = map['farmers'] as Map<String, dynamic>?;
+        map['farm_name'] = farmerMap?['farm_name'] ?? 'AgriDirect Farm';
+        
+        final farmerUserMap = farmerMap?['users'] as Map<String, dynamic>?;
+        map['farmer_avatar_url'] = farmerMap?['image_url'] ?? farmerUserMap?['avatar_url'] ?? '';
+        
+        final itemsList = map['order_items'] as List<dynamic>?;
+        map['item_count'] = itemsList?.length ?? 0;
+        
+        return Order.fromJson(map);
+      }
     } catch (e) {
+      debugPrint('Failed to get order by ID $orderId: $e');
       return null;
     }
   }

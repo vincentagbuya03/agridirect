@@ -150,11 +150,11 @@ class AppOpenBanner extends StatefulWidget {
 }
 
 class _AppOpenBannerState extends State<AppOpenBanner> {
-  bool _dismissed = false;
+  static bool _sessionDismissed = false;
 
   @override
   Widget build(BuildContext context) {
-    if (!kIsWeb || _dismissed || (defaultTargetPlatform != TargetPlatform.android && defaultTargetPlatform != TargetPlatform.iOS)) {
+    if (!kIsWeb || _sessionDismissed || (defaultTargetPlatform != TargetPlatform.android && defaultTargetPlatform != TargetPlatform.iOS)) {
       return widget.child;
     }
 
@@ -222,7 +222,7 @@ class _AppOpenBannerState extends State<AppOpenBanner> {
                         await ApkDownloader.download();
                       }
                     } catch (_) {
-                        await ApkDownloader.download();
+                      await ApkDownloader.download();
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -245,7 +245,11 @@ class _AppOpenBannerState extends State<AppOpenBanner> {
                 ),
                 const SizedBox(width: 4),
                 IconButton(
-                  onPressed: () => setState(() => _dismissed = true),
+                  onPressed: () {
+                    setState(() {
+                      _sessionDismissed = true;
+                    });
+                  },
                   icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8), size: 18),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),

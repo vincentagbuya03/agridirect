@@ -631,7 +631,13 @@ class _WebLoginScreenState extends State<WebLoginScreen>
                     top: 24,
                     left: 24,
                     child: TextButton.icon(
-                      onPressed: () => context.go(AppRoutes.home),
+                      onPressed: () {
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        } else {
+                          context.go(AppRoutes.home);
+                        }
+                      },
                       icon: const Icon(Icons.arrow_back, size: 20),
                       label: Text(
                         'Back to Home',

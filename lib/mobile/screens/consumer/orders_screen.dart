@@ -431,6 +431,49 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return StreamBuilder<List<Order>>(
       stream: _ordersStream,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading orders',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textHeadline,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    snapshot.error.toString(),
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _ordersStream = OrderService().watchMyOrders();
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Center(
             child: Padding(
