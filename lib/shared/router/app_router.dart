@@ -752,30 +752,62 @@ GoRouter createAppRouter({String? initialRoute}) {
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
             final productId = state.uri.queryParameters['id'];
-            ProductItem? product = state.extra is ProductItem
+            final ProductItem? productFromExtra = state.extra is ProductItem
                 ? state.extra as ProductItem
                 : null;
-            if (product == null && productId != null && productId.isNotEmpty) {
-              product = ProductItem(
-                productId: productId,
-                name: '',
-                farm: '',
-                price: '0.0',
-                unit: '',
-                imageUrl: '',
-              );
+
+            // If we have a fully populated product from navigation, use it directly
+            if (productFromExtra != null && productFromExtra.name.isNotEmpty) {
+              if (!kIsWeb && constraints.maxWidth <= 800) {
+                return ProductViewScreen(product: productFromExtra);
+              }
+              return WebProductDetails(initialProduct: productFromExtra);
             }
 
-            if (!kIsWeb && constraints.maxWidth <= 800) {
-              if (product == null) {
+            // Otherwise fetch by ID (deep link case)
+            if (productId == null || productId.isEmpty) {
+              if (!kIsWeb && constraints.maxWidth <= 800) {
                 return const Scaffold(
                   body: Center(child: Text('Product not found')),
                 );
               }
-              return ProductViewScreen(product: product);
+              return WebProductDetails(initialProduct: null);
             }
 
-            return WebProductDetails(initialProduct: product);
+            return FutureBuilder<ProductItem?>(
+              future: SupabaseDataService().getProductById(productId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                final product = snapshot.data;
+                if (!kIsWeb && constraints.maxWidth <= 800) {
+                  if (product == null) {
+                    return Scaffold(
+                      body: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.search_off_rounded, size: 64, color: Colors.grey),
+                            const SizedBox(height: 16),
+                            const Text('Product not found or no longer available.'),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () => GoRouter.of(context).go(AppRoutes.home),
+                              child: const Text('Go to Marketplace'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  return ProductViewScreen(product: product);
+                }
+                return WebProductDetails(initialProduct: product);
+              },
+            );
           },
         ),
       ),

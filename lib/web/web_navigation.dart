@@ -42,13 +42,6 @@ class _WebNavigationState extends State<WebNavigation> {
     super.initState();
     _currentIndex = widget.initialIndex;
     _auth.addListener(_onAuthChanged);
-    if (widget.initialPostId != null || Uri.base.queryParameters.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          AppOpenBanner.showOpenAppDialog(context);
-        }
-      });
-    }
   }
 
   @override

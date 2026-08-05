@@ -18,9 +18,16 @@ class ShareUtil {
         if (origin.isNotEmpty && origin.startsWith('http')) {
           return origin;
         }
-      } catch (_) {}
+      } catch (_) {
+        return webDomain;
+      }
     }
     return webDomain;
+  }
+
+  /// Generates a rich share link for a product using the Vercel Serverless Function
+  static String generateProductShareLink(String productId) {
+    return '$webDomain/api/share?id=$productId';
   }
 
   /// Builds a link specifically designed to launch the installed APK directly.

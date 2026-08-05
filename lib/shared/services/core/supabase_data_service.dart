@@ -113,29 +113,59 @@ class SupabaseDataService {
   /// Get a single product by ID
   Future<ProductItem?> getProductById(String productId) async {
     try {
-      dynamic response = await _client
+      dynamic viewResponse = await _client
           .from('v_products')
           .select()
           .eq('product_id', productId)
           .maybeSingle();
 
-      if (response == null) {
-        // Fallback: fetch from raw products table if view returns null
-        // (e.g., if inner joins on inventory or farmer profile fail)
-        debugPrint('Product not found in v_products, falling back to raw products table for ID: $productId');
-        response = await _client
-            .from('products')
-            .select()
-            .eq('product_id', productId)
-            .maybeSingle();
-            
-        if (response == null) {
-          debugPrint('Product really not found for ID: $productId');
-          return null;
-        }
+      // Always also fetch from the raw products table as a reliable baseline
+      // This handles cases where v_products INNER JOINs cause missing fields
+      final rawResponse = await _client
+          .from('products')
+          .select()
+          .eq('product_id', productId)
+          .maybeSingle();
+
+      if (viewResponse == null && rawResponse == null) {
+        debugPrint('Product not found anywhere for ID: $productId');
+        return null;
       }
 
-      final item = Map<String, dynamic>.from(response as Map);
+      // Start with raw products data as base (always has name, price, description)
+      final item = rawResponse != null
+          ? Map<String, dynamic>.from(rawResponse as Map)
+          : Map<String, dynamic>.from(viewResponse as Map);
+
+      // Overlay v_products data on top — it has enriched fields (farmer info, ratings, etc.)
+      // but only overwrite if the value is non-null and non-empty
+      if (viewResponse != null) {
+        final viewMap = Map<String, dynamic>.from(viewResponse as Map);
+        viewMap.forEach((key, value) {
+          if (value != null && value.toString().isNotEmpty) {
+            item[key] = value;
+          }
+        });
+
+        // If v_products returned a zero/null price but raw products has a real price, keep raw price
+        final viewPrice = (viewMap['price'] as num?)?.toDouble() ?? 0.0;
+        final rawPrice = (rawResponse != null)
+            ? ((rawResponse as Map)['price'] as num?)?.toDouble() ?? 0.0
+            : 0.0;
+        if (viewPrice == 0.0 && rawPrice > 0.0) {
+          item['price'] = rawPrice;
+          debugPrint('Price was 0 in v_products, using raw price: $rawPrice for ID: $productId');
+        }
+
+        // Same logic for name
+        final viewName = viewMap['name']?.toString() ?? '';
+        final rawName = rawResponse != null
+            ? ((rawResponse as Map)['name']?.toString() ?? '')
+            : '';
+        if (viewName.isEmpty && rawName.isNotEmpty) {
+          item['name'] = rawName;
+        }
+      }
 
       // Enrich with images
       final imagesResponse = await _client

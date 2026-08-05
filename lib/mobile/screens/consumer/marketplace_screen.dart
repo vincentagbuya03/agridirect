@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -2151,11 +2153,70 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
             Icons.share_outlined,
             () async {
               if (widget.product.productId == null) return;
-              final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.productDetails}?id=${widget.product.productId}';
-              final messenger = ScaffoldMessenger.of(context);
-              await Clipboard.setData(ClipboardData(text: shareUrl));
-              messenger.showSnackBar(
-                const SnackBar(content: Text('Product link copied to clipboard!')),
+              final shareUrl = ShareUtil.generateProductShareLink(widget.product.productId!);
+              await Share.share(shareUrl, subject: 'Check out ${widget.product.name} on AgriDirect!');
+            },
+          ),
+          _buildAppBarBtn(
+            Icons.qr_code_2_rounded,
+            () {
+              if (widget.product.productId == null) return;
+              final shareUrl = ShareUtil.generateProductShareLink(widget.product.productId!);
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text(
+                    'Product QR Code',
+                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+                    textAlign: TextAlign.center,
+                  ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Scan to view this product',
+                        style: GoogleFonts.inter(color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: QrImageView(
+                          data: shareUrl,
+                          version: QrVersions.auto,
+                          size: 200.0,
+                          eyeStyle: const QrEyeStyle(
+                            eyeShape: QrEyeShape.square,
+                            color: Color(0xFF0F172A),
+                          ),
+                          dataModuleStyle: const QrDataModuleStyle(
+                            dataModuleShape: QrDataModuleShape.square,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'Close',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF16A34A),
+                        ),
+                      ),
+                    ),
+                  ],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
               );
             },
           ),

@@ -46,103 +46,6 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
     await ApkDownloader.download();
   }
 
-  Widget _buildGlobalMobileAppBanner() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF042F2E), Color(0xFF064E3B)],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF16A34A).withValues(alpha: 0.15),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.android_rounded,
-              color: Color(0xFF4ADE80),
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Get the AgriDirect App',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  'Enjoy faster load times and push notifications.',
-                  style: GoogleFonts.inter(
-                    fontSize: 9.5,
-                    color: Colors.white.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: _downloadAndroidApk,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF16A34A),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'Get APK',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          IconButton(
-            onPressed: () {
-              setState(() {
-                _dismissedMobileBanner = true;
-              });
-            },
-            icon: const Icon(
-              Icons.close_rounded,
-              color: Colors.white60,
-              size: 14,
-            ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            splashRadius: 12,
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -160,8 +63,6 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isMobile && !_dismissedMobileBanner)
-              _buildGlobalMobileAppBanner(),
             Container(
               margin: widget.margin,
               padding: EdgeInsets.symmetric(

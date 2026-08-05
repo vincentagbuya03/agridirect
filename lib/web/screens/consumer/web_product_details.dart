@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/data/app_data.dart';
@@ -47,11 +49,6 @@ class _WebProductDetailsState extends State<WebProductDetails> {
   void initState() {
     super.initState();
     _loadPage();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        AppOpenBanner.showOpenAppDialog(context);
-      }
-    });
   }
 
   @override
@@ -663,12 +660,8 @@ class _WebProductDetailsState extends State<WebProductDetails> {
         IconButton.outlined(
           onPressed: () async {
             if (_product?.productId == null) return;
-            final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.productDetails}?id=${_product!.productId}';
-            final messenger = ScaffoldMessenger.of(context);
-            await Clipboard.setData(ClipboardData(text: shareUrl));
-            messenger.showSnackBar(
-              const SnackBar(content: Text('Product link copied to clipboard!')),
-            );
+            final shareUrl = ShareUtil.generateProductShareLink(_product!.productId!);
+            await Share.share(shareUrl, subject: 'Check out ${_product!.name} on AgriDirect!');
           },
           icon: const Icon(Icons.ios_share_rounded, color: _primary),
           style: IconButton.styleFrom(
@@ -679,6 +672,78 @@ class _WebProductDetailsState extends State<WebProductDetails> {
             ),
           ),
           tooltip: 'Share Product',
+        ),
+        const SizedBox(width: 8),
+        IconButton.outlined(
+          onPressed: () {
+            if (_product?.productId == null) return;
+            final shareUrl = ShareUtil.generateProductShareLink(_product!.productId!);
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text(
+                  'Product QR Code',
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+                  textAlign: TextAlign.center,
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Scan to view this product',
+                      style: GoogleFonts.inter(color: Colors.grey[600]),
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: QrImageView(
+                        data: shareUrl,
+                        version: QrVersions.auto,
+                        size: 200.0,
+                        eyeStyle: const QrEyeStyle(
+                          eyeShape: QrEyeShape.square,
+                          color: Color(0xFF0F172A),
+                        ),
+                        dataModuleStyle: const QrDataModuleStyle(
+                          dataModuleShape: QrDataModuleShape.square,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      'Close',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF16A34A),
+                      ),
+                    ),
+                  ),
+                ],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            );
+          },
+          icon: const Icon(Icons.qr_code_2_rounded, color: _primary),
+          style: IconButton.styleFrom(
+            padding: const EdgeInsets.all(16),
+            side: BorderSide(color: _primary.withValues(alpha: 0.35)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+          ),
+          tooltip: 'QR Code',
         ),
       ],
     );
