@@ -202,55 +202,61 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     final isCompact = MediaQuery.of(context).size.width < 980;
 
     return Scaffold(
-      backgroundColor: _surface,
+      backgroundColor: Colors.white,
       body: AppOpenBanner(
         child: Column(
-        children: [
-          _buildTopBar(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                isCompact ? 16 : 32,
-                20,
-                isCompact ? 16 : 32,
-                32,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildBreadcrumbs(),
-                  const SizedBox(height: 20),
-                  isCompact
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildImageGallery(),
-                            const SizedBox(height: 20),
-                            _buildDetailsCard(),
-                          ],
-                        )
-                      : Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(flex: 3, child: _buildImageGallery()),
-                            const SizedBox(width: 24),
-                            Expanded(flex: 5, child: _buildDetailsCard()),
-                          ],
-                        ),
-                  const SizedBox(height: 28),
-                  _buildSellerSection(),
-                  const SizedBox(height: 28),
-                  _buildReviewsSection(),
-                  const SizedBox(height: 28),
-                  _buildMoreFromFarmerSection(),
-                ],
+          children: [
+            _buildTopBar(),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  isCompact ? 16 : 32,
+                  16,
+                  isCompact ? 16 : 32,
+                  64,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildBreadcrumbs(),
+                        const SizedBox(height: 32),
+                        isCompact
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildImageGallery(),
+                                  const SizedBox(height: 32),
+                                  _buildDetailsCard(),
+                                ],
+                              )
+                            : Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(flex: 4, child: _buildImageGallery()),
+                                  const SizedBox(width: 48),
+                                  Expanded(flex: 5, child: _buildDetailsCard()),
+                                ],
+                              ),
+                        const SizedBox(height: 64),
+                        _buildSellerSection(),
+                        const SizedBox(height: 48),
+                        _buildReviewsSection(),
+                        const SizedBox(height: 64),
+                        _buildMoreFromFarmerSection(),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
   }
 
   Widget _buildTopBar() {
@@ -259,20 +265,20 @@ class _WebProductDetailsState extends State<WebProductDetails> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         decoration: BoxDecoration(
-          color: _white,
-          border: Border(bottom: BorderSide(color: _border)),
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: _border.withValues(alpha: 0.5))),
         ),
         child: Row(
           children: [
             IconButton(
               onPressed: () => context.canPop() ? context.pop() : context.go(AppRoutes.shop),
-              icon: const Icon(Icons.arrow_back_rounded, color: _dark),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _dark, size: 20),
             ),
-            const SizedBox(width: 8),
-            const Text(
+            const SizedBox(width: 12),
+            Text(
               'Product Details',
-              style: TextStyle(
-                fontSize: 20,
+              style: GoogleFonts.nunitoSans(
+                fontSize: 18,
                 fontWeight: FontWeight.w800,
                 color: _dark,
               ),
@@ -281,9 +287,9 @@ class _WebProductDetailsState extends State<WebProductDetails> {
             TextButton.icon(
               onPressed: () => context.go(AppRoutes.cart),
               icon: const Icon(Icons.shopping_cart_outlined, color: _primary),
-              label: const Text(
+              label: Text(
                 'Cart',
-                style: TextStyle(color: _primary, fontWeight: FontWeight.w700),
+                style: GoogleFonts.nunitoSans(color: _primary, fontWeight: FontWeight.w800),
               ),
             ),
           ],
@@ -334,22 +340,20 @@ class _WebProductDetailsState extends State<WebProductDetails> {
   Widget _buildImageGallery() {
     final productImage = (_product?.imageUrl ?? '').trim();
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _border),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: AspectRatio(
-          aspectRatio: 1.0,
+    return AspectRatio(
+      aspectRatio: 1.0,
+      child: Container(
+        decoration: BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.circular(32),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(32),
           child: productImage.isNotEmpty
               ? SafeNetworkImage(
                   imageUrl: productImage,
                   fit: BoxFit.cover,
-                  placeholder: Container(color: Colors.grey[100]),
+                  placeholder: Container(color: _surface),
                   errorWidget: _buildImageFallback(),
                 )
               : _buildImageFallback(),
@@ -360,9 +364,9 @@ class _WebProductDetailsState extends State<WebProductDetails> {
 
   Widget _buildImageFallback() {
     return Container(
-      color: Colors.grey[100],
+      color: _surface,
       child: const Center(
-        child: Icon(Icons.image_outlined, size: 42, color: _muted),
+        child: Icon(Icons.image_outlined, size: 64, color: _muted),
       ),
     );
   }
@@ -373,119 +377,132 @@ class _WebProductDetailsState extends State<WebProductDetails> {
         ? _reviews.length
         : int.tryParse(_product!.reviews ?? '0') ?? 0;
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: _white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              _product!.categoryName ?? 'Product',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: _primary,
-              ),
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: _primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(999),
           ),
-          const SizedBox(height: 16),
-          Text(
-            _product!.name,
-            style: const TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-              color: _dark,
-              height: 1.15,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 18,
-            runSpacing: 8,
-            children: [
-              _metaRow(Icons.storefront_rounded, _farmName(), _primary),
-              _metaRow(
-                Icons.star_rounded,
-                averageRating.toStringAsFixed(1),
-                const Color(0xFFF59E0B),
-              ),
-              _metaRow(Icons.reviews_rounded, '$reviewCount reviews', _dark),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text(
-            _currencyLabel(_product!.price),
-            style: const TextStyle(
-              fontSize: 34,
-              fontWeight: FontWeight.w800,
+          child: Text(
+            (_product!.categoryName ?? 'Product').toUpperCase(),
+            style: GoogleFonts.nunitoSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.0,
               color: _primary,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            _product!.unit.isNotEmpty ? 'per ${_product!.unit}' : 'per unit',
-            style: const TextStyle(fontSize: 14, color: _muted),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          _product!.name,
+          style: GoogleFonts.nunitoSans(
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            color: _dark,
+            height: 1.2,
+            letterSpacing: -0.5,
           ),
-          const SizedBox(height: 18),
-          Text(
-            _product!.description?.trim().isNotEmpty == true
-                ? _product!.description!
-                : 'Fresh produce from local farmers.',
-            style: const TextStyle(fontSize: 14, color: _dark, height: 1.7),
-          ),
-          const SizedBox(height: 22),
-          Row(
-            children: [
-              Expanded(
-                child: _infoTile(
-                  Icons.schedule_rounded,
-                  'Availability',
-                  _product!.targetQuantity != null ? 'Pre-order' : 'Available now',
-                ),
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 24,
+          runSpacing: 12,
+          children: [
+            _metaRow(Icons.storefront_rounded, _farmName(), _primary),
+            _metaRow(
+              Icons.star_rounded,
+              averageRating.toStringAsFixed(1),
+              const Color(0xFFF59E0B),
+            ),
+            _metaRow(Icons.reviews_rounded, '$reviewCount reviews', _dark),
+          ],
+        ),
+        const SizedBox(height: 32),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              _currencyLabel(_product!.price),
+              style: GoogleFonts.nunitoSans(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: _primary,
+                letterSpacing: -0.5,
+                height: 1.0,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _infoTile(
-                  Icons.inventory_2_rounded,
-                  'Stock',
-                  _product!.targetQuantity != null
-                      ? '${_product!.targetQuantity!.toStringAsFixed(0)} target'
-                      : (_product!.stockQuantity != null && _product!.stockQuantity! > 0
-                          ? '${_product!.stockQuantity!.toStringAsFixed(0)} available'
-                          : 'Out of stock'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 22),
-          _buildProductVouchersSection(),
-          const SizedBox(height: 22),
-          Row(
-            children: [
-              const Text(
-                'Quantity',
-                style: TextStyle(
-                  fontSize: 14,
+            ),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                _product!.unit.isNotEmpty ? 'per ${_product!.unit}' : 'per unit',
+                style: GoogleFonts.nunitoSans(
+                  fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: _dark,
+                  color: _muted,
                 ),
               ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 32),
+        Text(
+          _product!.description?.trim().isNotEmpty == true
+              ? _product!.description!
+              : 'Fresh produce from local farmers. High quality and organically grown.',
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            color: _dark.withValues(alpha: 0.8),
+            height: 1.7,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        const SizedBox(height: 40),
+        Row(
+          children: [
+            Expanded(
+              child: _infoTile(
+                Icons.schedule_rounded,
+                'Availability',
+                _product!.targetQuantity != null ? 'Pre-order' : 'Available now',
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _infoTile(
+                Icons.inventory_2_rounded,
+                'Stock Level',
+                _product!.targetQuantity != null
+                    ? '${_product!.targetQuantity!.toStringAsFixed(0)} target'
+                    : (_product!.stockQuantity != null && _product!.stockQuantity! > 0
+                        ? '${_product!.stockQuantity!.toStringAsFixed(0)} items'
+                        : 'Out of stock'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 32),
+        _buildProductVouchersSection(),
+        const SizedBox(height: 32),
+        Row(
+          children: [
+            Text(
+              'Quantity',
+              style: GoogleFonts.nunitoSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: _dark,
+              ),
+            ),
               const Spacer(),
               Container(
                 decoration: BoxDecoration(
                   color: _surface,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: _border),
+                  borderRadius: BorderRadius.circular(999),
                 ),
                 child: Row(
                   children: [
@@ -493,13 +510,13 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                       if (_quantity > 1) setState(() => _quantity--);
                     }),
                     Container(
-                      constraints: const BoxConstraints(minWidth: 44),
+                      constraints: const BoxConstraints(minWidth: 48),
                       alignment: Alignment.center,
                       child: Text(
                         '$_quantity',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
+                        style: GoogleFonts.nunitoSans(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
                           color: _dark,
                         ),
                       ),
@@ -514,36 +531,35 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Text(
                 _unitLabel(),
-                style: const TextStyle(fontSize: 13, color: _muted),
+                style: GoogleFonts.nunitoSans(fontSize: 15, fontWeight: FontWeight.w700, color: _muted),
               ),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 48),
           if (_product?.farmerId != null && _product?.farmerId == SupabaseConfig.currentUser?.id)
             Row(
               children: [
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    padding: const EdgeInsets.symmetric(vertical: 20),
                     decoration: BoxDecoration(
                       color: Colors.amber.shade50.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: Colors.amber.shade200),
+                      borderRadius: BorderRadius.circular(24),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.info_outline_rounded, color: Colors.amber),
-                        const SizedBox(width: 8),
+                        const Icon(Icons.info_rounded, color: Colors.amber),
+                        const SizedBox(width: 12),
                         Text(
                           'This is your product.',
-                          style: TextStyle(
+                          style: GoogleFonts.nunitoSans(
                             color: Colors.amber.shade900,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
                           ),
                         ),
                       ],
@@ -555,8 +571,7 @@ class _WebProductDetailsState extends State<WebProductDetails> {
           else
             _buildActionsRow(),
         ],
-      ),
-    );
+      );
   }
 
   bool _isHarvested(ProductItem? product) {
@@ -582,22 +597,20 @@ class _WebProductDetailsState extends State<WebProductDetails> {
           Expanded(
             child: FilledButton(
               onPressed: () {
-                context.push(
-                  AppRoutes.preorderDetails,
-                  extra: _product,
-                );
+                final farmerId = _farmerProfile!['farmer_id']?.toString();
+                if (farmerId == null || farmerId.isEmpty) return;
+                context.go(AppRoutes.farmerProfile(farmerId));
               },
               style: FilledButton.styleFrom(
-                backgroundColor: _primary,
-                foregroundColor: _white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
+                backgroundColor: _dark,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              child: const Text(
+              child: Text(
                 'Pre-Order Now',
-                style: TextStyle(fontWeight: FontWeight.w700),
+                style: GoogleFonts.nunitoSans(fontSize: 16, fontWeight: FontWeight.w900),
               ),
             ),
           ),
@@ -619,9 +632,9 @@ class _WebProductDetailsState extends State<WebProductDetails> {
               ),
             ),
             icon: const Icon(Icons.shopping_cart_outlined),
-            label: const Text(
+            label: Text(
               'Add to Cart',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              style: GoogleFonts.nunitoSans(fontSize: 16, fontWeight: FontWeight.w900),
             ),
           ),
         ),
@@ -637,14 +650,14 @@ class _WebProductDetailsState extends State<WebProductDetails> {
             style: FilledButton.styleFrom(
               backgroundColor: _primary,
               foregroundColor: _white,
-              padding: const EdgeInsets.symmetric(vertical: 18),
+              padding: const EdgeInsets.symmetric(vertical: 22),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(999),
               ),
             ),
-            child: const Text(
-              'Buy Now',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              child: Text(
+                'Buy Now',
+                style: GoogleFonts.nunitoSans(fontSize: 16, fontWeight: FontWeight.w900),
             ),
           ),
         ),
@@ -657,93 +670,105 @@ class _WebProductDetailsState extends State<WebProductDetails> {
       children: [
         Expanded(child: _buildActionButtonsSection()),
         const SizedBox(width: 12),
-        IconButton.outlined(
-          onPressed: () async {
-            if (_product?.productId == null) return;
-            final shareUrl = ShareUtil.generateProductShareLink(_product!.productId!);
-            await Share.share(shareUrl, subject: 'Check out ${_product!.name} on AgriDirect!');
-          },
-          icon: const Icon(Icons.ios_share_rounded, color: _primary),
-          style: IconButton.styleFrom(
-            padding: const EdgeInsets.all(16),
-            side: BorderSide(color: _primary.withValues(alpha: 0.35)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
+        MenuAnchor(
+          style: MenuStyle(
+            shape: WidgetStateProperty.all(
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
-          tooltip: 'Share Product',
-        ),
-        const SizedBox(width: 8),
-        IconButton.outlined(
-          onPressed: () {
-            if (_product?.productId == null) return;
-            final shareUrl = ShareUtil.generateProductShareLink(_product!.productId!);
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: Text(
-                  'Product QR Code',
-                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
-                  textAlign: TextAlign.center,
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Scan to view this product',
-                      style: GoogleFonts.inter(color: Colors.grey[600]),
-                    ),
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey[300]!),
-                      ),
-                      child: QrImageView(
-                        data: shareUrl,
-                        version: QrVersions.auto,
-                        size: 200.0,
-                        eyeStyle: const QrEyeStyle(
-                          eyeShape: QrEyeShape.square,
-                          color: Color(0xFF0F172A),
-                        ),
-                        dataModuleStyle: const QrDataModuleStyle(
-                          dataModuleShape: QrDataModuleShape.square,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(
-                      'Close',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF16A34A),
-                      ),
-                    ),
-                  ),
-                ],
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
+          builder: (context, controller, child) {
+            return IconButton.outlined(
+              onPressed: () {
+                if (controller.isOpen) {
+                  controller.close();
+                } else {
+                  controller.open();
+                }
+              },
+              icon: const Icon(Icons.ios_share_rounded, color: _primary),
+              style: IconButton.styleFrom(
+                padding: const EdgeInsets.all(22),
+                backgroundColor: _surface,
+                shape: const CircleBorder(),
               ),
+              tooltip: 'Share Product',
             );
           },
-          icon: const Icon(Icons.qr_code_2_rounded, color: _primary),
-          style: IconButton.styleFrom(
-            padding: const EdgeInsets.all(16),
-            side: BorderSide(color: _primary.withValues(alpha: 0.35)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
+          menuChildren: [
+            MenuItemButton(
+              leadingIcon: const Icon(Icons.share_rounded, size: 20, color: _primary),
+              onPressed: () async {
+                if (_product?.productId == null) return;
+                final shareUrl = ShareUtil.generateProductShareLink(_product!.productId!);
+                await Share.share(shareUrl, subject: 'Check out ${_product!.name} on AgriDirect!');
+              },
+              child: Text('Share Link', style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
             ),
-          ),
-          tooltip: 'QR Code',
+            MenuItemButton(
+              leadingIcon: const Icon(Icons.qr_code_2_rounded, size: 20, color: _primary),
+              onPressed: () {
+                if (_product?.productId == null) return;
+                final shareUrl = ShareUtil.generateProductShareLink(_product!.productId!);
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(
+                      'Product QR Code',
+                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+                      textAlign: TextAlign.center,
+                    ),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Scan to view this product',
+                          style: GoogleFonts.inter(color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 24),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: QrImageView(
+                            data: shareUrl,
+                            version: QrVersions.auto,
+                            size: 200.0,
+                            eyeStyle: const QrEyeStyle(
+                              eyeShape: QrEyeShape.square,
+                              color: Color(0xFF0F172A),
+                            ),
+                            dataModuleStyle: const QrDataModuleStyle(
+                              dataModuleShape: QrDataModuleShape.square,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'Close',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF16A34A),
+                          ),
+                        ),
+                      ),
+                    ],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                );
+              },
+              child: Text('Show QR Code', style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+            ),
+          ],
         ),
       ],
     );
@@ -758,11 +783,10 @@ class _WebProductDetailsState extends State<WebProductDetails> {
 
   Widget _infoTile(IconData icon, String label, String value) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: _surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _border),
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -773,20 +797,20 @@ class _WebProductDetailsState extends State<WebProductDetails> {
               const SizedBox(width: 8),
               Text(
                 label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
                   color: _muted,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
+            style: GoogleFonts.nunitoSans(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
               color: _dark,
             ),
           ),
@@ -804,13 +828,13 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 6),
+        Icon(icon, size: 20, color: color),
+        const SizedBox(width: 8),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
+          style: GoogleFonts.inter(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
             color: _dark,
           ),
         ),
@@ -830,11 +854,10 @@ class _WebProductDetailsState extends State<WebProductDetails> {
         '';
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: _white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _border),
+        color: _surface,
+        borderRadius: BorderRadius.circular(32),
       ),
       child: Row(
         children: [
@@ -851,16 +874,16 @@ class _WebProductDetailsState extends State<WebProductDetails> {
               children: [
                 Text(
                   _farmName(),
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
+                  style: GoogleFonts.nunitoSans(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
                     color: _dark,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   _specialty(),
-                  style: const TextStyle(fontSize: 14, color: _muted),
+                  style: GoogleFonts.inter(fontSize: 15, color: _muted),
                 ),
               ],
             ),
@@ -888,11 +911,10 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     final reviews = _reviews.take(4).toList();
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: _white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _border),
+        color: _surface,
+        borderRadius: BorderRadius.circular(32),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -900,11 +922,11 @@ class _WebProductDetailsState extends State<WebProductDetails> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Reviews & Ratings',
-                style: TextStyle(
+                style: GoogleFonts.nunitoSans(
                   fontSize: 22,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w900,
                   color: _dark,
                 ),
               ),
@@ -920,9 +942,9 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                     ),
                   ),
                   icon: const Icon(Icons.edit_note_rounded, size: 18),
-                  label: const Text(
+                  label: Text(
                     'Write a Review',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                    style: GoogleFonts.nunitoSans(fontWeight: FontWeight.w800),
                   ),
                 ),
             ],
@@ -931,11 +953,10 @@ class _WebProductDetailsState extends State<WebProductDetails> {
           if (!_canReviewProduct)
             Container(
               margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: _surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _border),
+                color: _white,
+                borderRadius: BorderRadius.circular(16),
               ),
               child: const Row(
                 children: [
@@ -1112,11 +1133,10 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: _surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _border),
+          color: _white,
+          borderRadius: BorderRadius.circular(24),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1139,18 +1159,19 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                     review.userName?.trim().isNotEmpty == true
                         ? review.userName!
                         : 'Customer',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
                       color: _dark,
                     ),
                   ),
                 ),
                 Text(
                   review.rating.toStringAsFixed(1),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: _primary,
+                  style: GoogleFonts.nunitoSans(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    color: const Color(0xFFF59E0B),
                   ),
                 ),
               ],
@@ -1159,9 +1180,9 @@ class _WebProductDetailsState extends State<WebProductDetails> {
               const SizedBox(height: 10),
               Text(
                 review.reviewText!,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: _muted,
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  color: _dark.withValues(alpha: 0.8),
                   height: 1.6,
                 ),
               ),
@@ -1182,11 +1203,11 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'More From This Farm',
-          style: TextStyle(
+          style: GoogleFonts.nunitoSans(
             fontSize: 22,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w900,
             color: _dark,
           ),
         ),
@@ -1239,18 +1260,18 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                               item.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
                                 color: _dark,
                               ),
                             ),
                             const SizedBox(height: 6),
                             Text(
                               _currencyLabel(item.price),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
+                              style: GoogleFonts.nunitoSans(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
                                 color: _primary,
                               ),
                             ),

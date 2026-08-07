@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../shared/services/auth/auth_service.dart';
 
 class KikoAiChatScreen extends StatefulWidget {
   final bool embedMode;
@@ -18,13 +19,24 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen> {
   late final List<Map<String, dynamic>> _messages;
   bool _isTyping = false;
 
-  final List<String> _quickPrompts = [
-    '🌾 How to list new crops?',
-    '🌧️ How does weather alert work?',
-    '🎟️ How to claim shop vouchers?',
-    '🚚 How do pre-orders work?',
-    '💳 Supported payment methods?',
-  ];
+  final AuthService _auth = AuthService();
+
+  List<String> get _quickPrompts {
+    final isFarmer = _auth.isViewingAsFarmer;
+    if (isFarmer) {
+      return [
+        '🌾 How to list new crops?',
+        '🌧️ How does weather alert work?',
+        '📊 How to view my sales?',
+      ];
+    } else {
+      return [
+        '🎟️ How to claim shop vouchers?',
+        '🚚 How do pre-orders work?',
+        '💳 Supported payment methods?',
+      ];
+    }
+  }
 
   @override
   void initState() {
@@ -89,13 +101,13 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen> {
     final lower = userQuery.toLowerCase();
 
     // 1. Greetings & Personal Questions
-    if (lower.contains('hello') || lower.contains('hi') || lower.contains('kumusta') || lower.contains('kamusta') || lower.contains('gandang') || lower.contains('sino ka')) {
+    if (lower.contains('hello') || lower.contains('hi') || lower.contains('kumusta') || lower.contains('kamusta') || lower.contains('gandang') || lower.contains('sino ka') || lower.contains('hey') || lower.contains('oy') || lower.contains('uy') || lower.contains('musta') || lower.contains('morning') || lower.contains('afternoon') || lower.contains('evening')) {
       return 'Moo! 🐮 Magandang araw po! Ako si Kiko, ang inyong opisyal na AgriDirect Carabao AI Assistant 🌾.\n\n'
           'Handa akong tumulong sa inyo—mula sa pag-order ng sariwang gulay at prutas, pag-preorder ng ani, hanggang sa pagbebenta at pag-track ng inyong orders. Anong maipaglilingkod ko ngayon?';
     }
 
     // 2. Listing Crops & Selling (Farmer Support)
-    if (lower.contains('paano magbenta') || lower.contains('list') || lower.contains('crop') || lower.contains('sell') || lower.contains('magbenta') || lower.contains('product') || lower.contains('tindahan')) {
+    if (lower.contains('paano magbenta') || lower.contains('list') || lower.contains('crop') || lower.contains('sell') || lower.contains('magbenta') || lower.contains('product') || lower.contains('tindahan') || lower.contains('benta') || lower.contains('upload') || lower.contains('paninda') || lower.contains('tindero') || lower.contains('pano mag sell') || lower.contains('paano po magbenta') || lower.contains('gulay') || lower.contains('prutas')) {
       return 'Moo! 🌱 Para mag-list at magbenta ng ani bilang magsasaka:\n\n'
           '1️⃣ Pumunta sa Profile o gamitin ang top toggle para mag-switch sa **Farmer Mode**.\n'
           '2️⃣ I-tap ang **"+ Add Product"** button sa inyong dashboard.\n'
@@ -105,7 +117,7 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen> {
     }
 
     // 3. Buying & How to Order (Consumer Support)
-    if (lower.contains('paano bumili') || lower.contains('order') || lower.contains('buy') || lower.contains('bumili') || lower.contains('cart') || lower.contains('checkout')) {
+    if (lower.contains('paano bumili') || lower.contains('order') || lower.contains('buy') || lower.contains('bumili') || lower.contains('cart') || lower.contains('checkout') || lower.contains('bili') || lower.contains('pabili') || lower.contains('pano bumili') || lower.contains('paorder') || lower.contains('purchase') || lower.contains('paano po bumili') || lower.contains('add to cart')) {
       return 'Moo! 🛒 Madali lang bumili ng sariwang ani sa AgriDirect:\n\n'
           '• Pumunta sa **Marketplace** tab para mag-browse ng fresh produce mula sa ating local farmers.\n'
           '• I-tap ang item na gusto mo at piliin ang **Add to Cart** o **Buy Now**.\n'
@@ -114,7 +126,7 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen> {
     }
 
     // 4. Pre-Orders & Harvest Schedules
-    if (lower.contains('pre-order') || lower.contains('preorder') || lower.contains('reserve') || lower.contains('ani') || lower.contains('harvest')) {
+    if (lower.contains('pre-order') || lower.contains('preorder') || lower.contains('reserve') || lower.contains('ani') || lower.contains('harvest') || lower.contains('advance') || lower.contains('paano mag pre order') || lower.contains('paparating') || lower.contains('padating') || lower.contains('pareserve')) {
       return 'Moo! 🌾 Ang **Pre-Orders** ay paraan para ma-reserve mo ang ani habang tinatanim pa lang ng magsasaka!\n\n'
           '• Siguradong sariwa dahil diretsong ihaharvest para sa order mo.\n'
           '• Maaari mong i-track ang growth milestones ng tanim under **Orders -> Track Order**.\n'
@@ -122,7 +134,7 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen> {
     }
 
     // 5. Vouchers & Discounts
-    if (lower.contains('voucher') || lower.contains('discount') || lower.contains('tipid') || lower.contains('code') || lower.contains('claim')) {
+    if (lower.contains('voucher') || lower.contains('discount') || lower.contains('tipid') || lower.contains('code') || lower.contains('claim') || lower.contains('promo') || lower.contains('sale') || lower.contains('bawas') || lower.contains('free delivery') || lower.contains('free shipping') || lower.contains('coupon') || lower.contains('less')) {
       return 'Moo! 🎟️ Gusto mo ba ng karagdagang bawas sa presyo?\n\n'
           '• Bisitahin ang pampublikong profile ng inyong paboritong magsasaka para mag-claim ng exclusive shop vouchers.\n'
           '• Tingnan ang inyong claimed codes sa **Profile -> My Vouchers**.\n'
@@ -130,14 +142,14 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen> {
     }
 
     // 6. Weather Alerts & Climate Analytics
-    if (lower.contains('weather') || lower.contains('rain') || lower.contains('radar') || lower.contains('ulan') || lower.contains('bagyo') || lower.contains('panahon')) {
+    if (lower.contains('weather') || lower.contains('rain') || lower.contains('radar') || lower.contains('ulan') || lower.contains('bagyo') || lower.contains('panahon') || lower.contains('baha') || lower.contains('init') || lower.contains('forecast') || lower.contains('typhoon') || lower.contains('lingo') || lower.contains('araw')) {
       return 'Moo! 🌧️ May live rain radar at weather alerts ang AgriDirect!\n\n'
           '• Makikita sa inyong Home Dashboard ang kasalukuyang panahon at rain probability sa inyong barangay.\n'
           '• Awtomatikong nagbibigay ng heads-up alert si Kiko kapag inaasahang uulan ngayon para ma-protektahan ang inyong ani at delivery schedule.';
     }
 
     // 7. Payment Methods & Shipping
-    if (lower.contains('payment') || lower.contains('cod') || lower.contains('cop') || lower.contains('pay') || lower.contains('bayad') || lower.contains('deliver')) {
+    if (lower.contains('payment') || lower.contains('cod') || lower.contains('cop') || lower.contains('pay') || lower.contains('bayad') || lower.contains('deliver') || lower.contains('shipping') || lower.contains('gcash') || lower.contains('maya') || lower.contains('bank') || lower.contains('card') || lower.contains('credit') || lower.contains('cash') || lower.contains('pera') || lower.contains('padala')) {
       return 'Moo! 💳 Suportado ng AgriDirect ang dalawang ligtas na paraan ng pagbabayad:\n\n'
           '1️⃣ **Cash on Delivery (COD)** – Magbayad pagkarating ng sariwang gulay at prutas sa inyong pintuan.\n'
           '2️⃣ **Cash on Pickup (COP)** – Magbayad kapag kinuha ang order sa mismong farm hub ng magsasaka.\n\n'
@@ -145,11 +157,19 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen> {
     }
 
     // 8. Support Escalation & Contact
-    if (lower.contains('tulong') || lower.contains('help') || lower.contains('support') || lower.contains('tawag') || lower.contains('contact') || lower.contains('reklamo') || lower.contains('report')) {
+    if (lower.contains('tulong') || lower.contains('help') || lower.contains('support') || lower.contains('tawag') || lower.contains('contact') || lower.contains('reklamo') || lower.contains('report') || lower.contains('problem') || lower.contains('issue') || lower.contains('sira') || lower.contains('refund') || lower.contains('return') || lower.contains('mali') || lower.contains('kulang') || lower.contains('customer service') || lower.contains('hotline')) {
       return 'Moo! 🎧 Kung kailangan mo ng direktang kausap o may problema sa order:\n\n'
           '• Maaari kang mag-submit ng support ticket sa **Contact Support**.\n'
           '• Mag-email sa support@agridirect.ph o tumawag sa ating hotline.\n'
           '• O gamitin ang **Report an Issue** kung may na-encounter na bug o delivery glitch.';
+    }
+
+    // 9. Sales & Analytics (Farmer Support)
+    if (lower.contains('sales') || lower.contains('benta') || lower.contains('kita') || lower.contains('analytics') || lower.contains('tubo') || lower.contains('dashboard') || lower.contains('history') || lower.contains('magkano kinita') || lower.contains('pera ko') || lower.contains('balance') || lower.contains('wallet') || lower.contains('earnings') || lower.contains('revenue')) {
+      return 'Moo! 📊 Para makita ang inyong sales at kita:\n\n'
+          '• Pumunta sa **Farmer Dashboard** at i-tap ang **Analytics** tab.\n'
+          '• Makikita mo rito ang inyong total revenue, top selling crops, at sales history.\n'
+          '• Makakatulong ito sa inyo para magplano ng susunod na itatanim!';
     }
 
     // Default Friendly Intelligent Response

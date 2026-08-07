@@ -22,21 +22,24 @@ import 'package:agridirect/shared/services/core/supabase_config.dart';
 /// Orders Screen - Professional Order Management (Responsive Web & Mobile)
 class OrdersScreen extends StatefulWidget {
   final String? initialOrderId;
-  const OrdersScreen({super.key, this.initialOrderId});
+  final int initialTab;
+  final bool isWebEmbedded;
+  const OrdersScreen({super.key, this.initialOrderId, this.initialTab = 0, this.isWebEmbedded = false});
 
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
-  int _selectedTab = 0;
-  final _tabs = ['Active', 'Completed', 'Cancelled'];
+  late int _selectedTab;
+  final _tabs = ['Pending', 'To Ship', 'To Receive', 'Completed', 'Cancelled'];
   late Stream<List<Order>> _ordersStream;
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _selectedTab = widget.initialTab;
     _ordersStream = OrderService().watchMyOrders();
     _searchController.addListener(() {
       if (mounted) setState(() {});
@@ -68,6 +71,29 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final isWeb = MediaQuery.of(context).size.width > 800;
+
+    if (widget.isWebEmbedded) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            _buildWebTabs(),
+            _buildOrdersListContent(isWeb: true),
+          ],
+        ),
+      );
+    }
 
     if (isWeb) {
       return Scaffold(
@@ -214,90 +240,38 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Widget _buildPremiumHeader() {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0xFF0F172A),
-            blurRadius: 20,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
+      color: Colors.white,
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () {
-                          if (context.canPop()) {
-                            context.pop();
-                          } else {
-                            context.go(AppRoutes.home);
-                          }
-                        },
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textHeadline, size: 20),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.receipt_long_rounded,
-                        color: AppColors.primary,
-                        size: 28,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Orders',
-                        style: AppTextStyles.headline1.copyWith(fontSize: 22),
-                      ),
-                    ],
+                  IconButton(
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go(AppRoutes.home);
+                      }
+                    },
+                    icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textHeadline, size: 24),
                   ),
-                  _buildHeaderNotification(),
+                  const SizedBox(width: 4),
+                  Text(
+                    'My Purchases',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textHeadline,
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 24),
-              Container(
-                height: 52,
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.textHeadline.withValues(alpha: 0.1),
-                  ),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search your orders...',
-                    hintStyle: AppTextStyles.bodyMedium.copyWith(
-                      color: AppColors.textSubtle,
-                    ),
-                    prefixIcon: const Icon(
-                      Icons.search_rounded,
-                      color: AppColors.textSubtle,
-                      size: 22,
-                    ),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, color: AppColors.textSubtle, size: 20),
-                            onPressed: () => _searchController.clear(),
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                ),
-              ),
+              _buildHeaderNotification(),
             ],
           ),
         ),
@@ -353,42 +327,40 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _buildSleekTabs() {
     return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-      child: Row(
-        children: List.generate(_tabs.length, (i) {
-          final isSelected = _selectedTab == i;
-          return Expanded(
-            child: GestureDetector(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          children: List.generate(_tabs.length, (i) {
+            final isSelected = _selectedTab == i;
+            return GestureDetector(
               onTap: () => setState(() => _selectedTab = i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                margin: const EdgeInsets.symmetric(horizontal: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : [],
+                  border: Border(
+                    bottom: BorderSide(
+                      color: isSelected ? AppColors.primary : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
                 ),
-                alignment: Alignment.center,
                 child: Text(
                   _tabs[i],
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: isSelected ? Colors.white : AppColors.textSubtle,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: isSelected ? AppColors.primary : const Color(0xFF64748B),
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   ),
                 ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -490,11 +462,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
         }
 
         List<Order> filteredOrders;
-        if (_selectedTab == 0) {
-          filteredOrders = orders.where((o) => o.isPending || o.isConfirmed || o.isShipped).toList();
-        } else if (_selectedTab == 1) {
+        if (_selectedTab == 0) { // Pending
+          filteredOrders = orders.where((o) => o.isPending).toList();
+        } else if (_selectedTab == 1) { // To Ship
+          filteredOrders = orders.where((o) => o.isConfirmed).toList();
+        } else if (_selectedTab == 2) { // To Receive
+          filteredOrders = orders.where((o) => o.isShipped).toList();
+        } else if (_selectedTab == 3) { // Completed (Delivered)
           filteredOrders = orders.where((o) => o.isDelivered).toList();
-        } else {
+        } else { // Cancelled
           filteredOrders = orders.where((o) => o.isCancelled).toList();
         }
 

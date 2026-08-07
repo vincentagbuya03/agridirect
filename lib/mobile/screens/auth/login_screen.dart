@@ -113,12 +113,15 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
     }
 
     setState(() => _isLoading = true);
-    final success = await AuthService().login(email: email, password: password);
+    final auth = AuthService();
+    final success = await auth.login(email: email, password: password);
 
     if (mounted) {
       setState(() => _isLoading = false);
       if (success) {
-        if (AuthService().needsProfileCompletion) {
+        if (auth.requiresMfa) {
+          context.push(AppRoutes.mfaChallenge);
+        } else if (auth.needsProfileCompletion) {
           context.push(AppRoutes.completeProfile);
         } else {
           widget.onLoginSuccess();
@@ -126,7 +129,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
       } else {
         _showErrorModal(
           'Login Failed',
-          AuthService().errorMessage ?? 'Invalid credentials',
+          auth.errorMessage ?? 'Invalid credentials',
         );
       }
     }

@@ -2,13 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
-import '../../../shared/router/app_router.dart';
-import '../../../shared/styles/app_theme.dart';
-import 'package:agridirect/shared/widgets/premium_confirm_dialog.dart';
+import '../../../shared/router/app_routes.dart';
 
-/// Mobile Profile screen specifically for Customers (Buyers).
 class CustomerProfileScreen extends StatefulWidget {
   final VoidCallback onModeChanged;
   final VoidCallback onLogout;
@@ -26,6 +24,9 @@ class CustomerProfileScreen extends StatefulWidget {
 class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   String? _customerImageUrl;
 
+  static const Color _primary = Color(0xFF059669);
+  static const Color _muted = Color(0xFF64748B);
+
   @override
   void initState() {
     super.initState();
@@ -36,7 +37,6 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     final auth = AuthService();
     final userId = (SupabaseConfig.currentUser?.id ?? auth.userId).trim();
     if (userId.isEmpty) {
-      // Auth state can still be initializing when this screen mounts.
       if (attempt < 5) {
         await Future<void>.delayed(const Duration(milliseconds: 250));
         if (!mounted) return;
@@ -69,35 +69,19 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     }
   }
 
-  Future<void> _confirmLogout() async {
-    final shouldLogout = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => const PremiumConfirmDialog(
-        title: 'Confirm Logout',
-        content: 'Are you sure you want to log out of AgriDirect?',
-      ),
-    );
-
-    if (shouldLogout == true) {
-      widget.onLogout();
-    }
-  }
-
   void _handleSwitchToFarmer() {
     final auth = AuthService();
     if (auth.isSeller) {
       auth.switchToFarmerMode();
       widget.onModeChanged();
-    } else if (auth.registrationStatus == 'pending' || auth.registrationStatus == 'under_review') {
+    } else if (auth.registrationStatus == 'pending' ||
+        auth.registrationStatus == 'under_review') {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Your registration is pending admin review.'),
-          backgroundColor: AppColors.primary,
+          backgroundColor: _primary,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
     } else {
@@ -109,345 +93,307 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   Widget build(BuildContext context) {
     final auth = AuthService();
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF1F5F9), // Light grey background
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildCustomerHeader(auth),
-            const SizedBox(height: 16),
-            _buildCustomerMenu(context),
+            _buildHeroHeader(auth),
+            const SizedBox(height: 12),
+            _buildMyPurchases(),
+            const SizedBox(height: 12),
+            _buildExploreMore(),
+            const SizedBox(height: 12),
+            _buildAdditionalServices(),
             const SizedBox(height: 32),
-            _buildLogoutButton(),
-            const SizedBox(height: 24),
-            Text(
-              'Version 2.4.2 (AgriDirect)',
-              style: AppTextStyles.labelSmall.copyWith(color: Colors.grey[400]),
-            ),
-            const SizedBox(height: 48),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCustomerHeader(AuthService auth) {
-    final canPop = Navigator.canPop(context);
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (canPop)
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                    onPressed: () => context.pop(),
-                  )
-                else
-                  const SizedBox(width: 48),
-                Text('Profile', style: AppTextStyles.headline3.copyWith(fontSize: 20)),
-                const SizedBox(width: 48),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: AppDecorations.cardDecoration.copyWith(
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: Column(
+  // ─── Hero Header ───
+  Widget _buildHeroHeader(AuthService auth) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF059669), Color(0xFF10B981)], // AgriDirect Green
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Row(
-                    children: [
-                      _buildProfileImage(),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              auth.userName.isNotEmpty ? auth.userName : 'User',
-                              style: AppTextStyles.headline3.copyWith(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                  IconButton(
+                    icon: const Icon(Icons.settings_outlined, size: 24, color: Colors.white),
+                    onPressed: () => context.push(AppRoutes.appSettings),
+                  ),
+                ],
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Avatar
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: ClipOval(
+                      child: (_customerImageUrl != null &&
+                              _customerImageUrl!.isNotEmpty)
+                          ? CachedNetworkImage(
+                              key: ValueKey(_customerImageUrl),
+                              imageUrl: _customerImageUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (_, _) =>
+                                  Container(color: Colors.white24),
+                              errorWidget: (_, _, _) => const Icon(
+                                  Icons.person,
+                                  size: 32,
+                                  color: Colors.white54),
+                            )
+                          : Container(
+                              color: Colors.white24,
+                              child: const Icon(Icons.person,
+                                  size: 32, color: Colors.white54),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              auth.userEmail,
-                              style: AppTextStyles.bodySmall.copyWith(
-                                color: AppColors.textSubtle,
-                                fontSize: 12,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                'Premium Buyer',
-                                style: AppTextStyles.labelSmall.copyWith(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          auth.userName.isNotEmpty ? auth.userName : 'User',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        GestureDetector(
+                          onTap: () => context.push(AppRoutes.myDetails),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Edit Profile',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                            ),
-                          ],
+                              const Icon(Icons.chevron_right_rounded, size: 16, color: Colors.white70),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 20),
-                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                  const SizedBox(height: 16),
-                  InkWell(
+                  GestureDetector(
                     onTap: _handleSwitchToFarmer,
-                    borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      width: double.infinity,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: AppColors.accent.withValues(alpha: 0.15),
-                        ),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            auth.isSeller
-                                ? Icons.agriculture_rounded
-                                : (auth.registrationStatus == 'pending' || auth.registrationStatus == 'under_review'
-                                    ? Icons.hourglass_empty_rounded
-                                    : Icons.agriculture_rounded),
-                            size: 18,
-                            color: AppColors.accent,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            auth.isSeller
-                                ? 'Switch to Selling Mode'
-                                : (auth.registrationStatus == 'pending' || auth.registrationStatus == 'under_review'
-                                    ? 'Pending Admin Review'
-                                    : 'Start Selling on AgriDirect'),
-                            style: AppTextStyles.labelSmall.copyWith(
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        auth.isSeller
+                            ? 'Farmer Mode'
+                            : (auth.registrationStatus == 'pending'
+                                ? 'Pending Review'
+                                : 'Become a Seller'),
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _primary,
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildProfileImage() {
+  // ─── My Purchases ───
+  Widget _buildMyPurchases() {
     return Container(
-      width: 80,
-      height: 80,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.primary, width: 3),
-      ),
-      child: ClipOval(
-        child: (_customerImageUrl != null && _customerImageUrl!.isNotEmpty)
-            ? CachedNetworkImage(
-                key: ValueKey(
-                  _customerImageUrl,
-                ), // 🟢 Force refresh when URL changes
-                imageUrl: _customerImageUrl!,
-                fit: BoxFit.cover,
-                placeholder: (_, _) => Container(color: Colors.grey[100]),
-                errorWidget: (_, _, _) =>
-                    const Icon(Icons.person, size: 36, color: Colors.grey),
-              )
-            : Container(
-                color: Colors.grey[100],
-                child: const Icon(Icons.person, size: 36, color: Colors.grey),
-              ),
-      ),
-    );
-  }
-
-  Widget _buildCustomerMenu(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.only(left: 8, bottom: 8),
-            child: Text(
-              'Account',
-              style: AppTextStyles.labelSmall.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[500],
-                fontSize: 13,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'My Purchases',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1E293B),
+                ),
               ),
-            ),
-          ),
-          Container(
-            decoration: AppDecorations.cardDecoration.copyWith(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              children: [
-                _buildMenuItem(
-                  icon: Icons.person_outline_rounded,
-                  title: 'My Details',
-                  color: AppColors.textBody,
-                  onTap: () async {
-                    await context.push(AppRoutes.myDetails);
-                    _loadCustomerData();
-                  },
+              GestureDetector(
+                onTap: () => context.push(AppRoutes.customerOrders),
+                child: Row(
+                  children: [
+                    Text(
+                      'View Purchase History',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: _muted,
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded, size: 16, color: _muted),
+                  ],
                 ),
-                _buildDivider(),
-                _buildMenuItem(
-                  icon: Icons.location_on_outlined,
-                  title: 'Address Book',
-                  color: AppColors.textBody,
-                  onTap: () => context.push(AppRoutes.addressBook),
-                ),
-                _buildDivider(),
-                _buildMenuItem(
-                  icon: Icons.favorite_outline_rounded,
-                  title: 'Favorites',
-                  color: AppColors.textBody,
-                  onTap: () => context.push(AppRoutes.favorites),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.only(left: 8, bottom: 8),
-            child: Text(
-              'Preferences',
-              style: AppTextStyles.labelSmall.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[500],
-                fontSize: 13,
-              ),
-            ),
-          ),
-          Container(
-            decoration: AppDecorations.cardDecoration.copyWith(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              children: [
-                _buildMenuItem(
-                  icon: Icons.confirmation_number_outlined,
-                  title: 'My Vouchers',
-                  color: AppColors.textBody,
-                  onTap: () => context.push(AppRoutes.claimedVouchers),
-                ),
-                _buildDivider(),
-                _buildMenuItem(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  title: 'Messages',
-                  color: AppColors.textBody,
-                  onTap: () => context.push(AppRoutes.customerMessages),
-                ),
-                _buildDivider(),
-                _buildMenuItem(
-                  icon: Icons.settings_outlined,
-                  title: 'App Settings',
-                  color: AppColors.textBody,
-                  onTap: () => context.push(AppRoutes.appSettings),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.only(left: 8, bottom: 8),
-            child: Text(
-              'Security & Support',
-              style: AppTextStyles.labelSmall.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[500],
-                fontSize: 13,
-              ),
-            ),
-          ),
-          Container(
-            decoration: AppDecorations.cardDecoration.copyWith(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              children: [
-                _buildMenuItem(
-                  icon: Icons.help_center_outlined,
-                  title: 'Help Center',
-                  color: AppColors.textBody,
-                  onTap: () => context.push(AppRoutes.helpCenter),
-                ),
-              ],
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildIconAction(Icons.account_balance_wallet_outlined, 'Pending', () => context.push('${AppRoutes.customerOrders}?tab=0')),
+              _buildIconAction(Icons.inventory_2_outlined, 'To Ship', () => context.push('${AppRoutes.customerOrders}?tab=1')),
+              _buildIconAction(Icons.local_shipping_outlined, 'To Receive', () => context.push('${AppRoutes.customerOrders}?tab=2')),
+              _buildIconAction(Icons.star_outline_rounded, 'To Rate', () => context.push('${AppRoutes.customerOrders}?tab=3')),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String title,
-    required Color color,
-    VoidCallback? onTap,
-  }) {
+  // ─── Explore More (Grid) ───
+  Widget _buildExploreMore() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Explore More',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 20),
+          GridView.count(
+            crossAxisCount: 4,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 8,
+            children: [
+              _buildGridAction(Icons.favorite_outline_rounded, 'Favorites', Colors.red, () => context.push(AppRoutes.favorites)),
+              _buildGridAction(Icons.confirmation_number_outlined, 'Vouchers', Colors.orange, () => context.push(AppRoutes.claimedVouchers)),
+              _buildGridAction(Icons.location_on_outlined, 'Addresses', Colors.blue, () => context.push(AppRoutes.addressBook)),
+              _buildGridAction(Icons.chat_bubble_outline_rounded, 'Messages', Colors.green, () => context.push(AppRoutes.customerMessages)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdditionalServices() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Support & Legal',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildListAction(Icons.help_outline_rounded, 'Help Center', () => context.push(AppRoutes.helpCenter)),
+          _buildListAction(Icons.description_outlined, 'Terms of Service', () {}),
+          _buildListAction(Icons.privacy_tip_outlined, 'Privacy Policy', () {}),
+          _buildListAction(Icons.policy_outlined, 'Community Rules', () {}),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListAction(IconData icon, String label, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: Colors.grey[600]),
+            Icon(icon, size: 24, color: const Color(0xFF475569)),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
-                title,
-                style: AppTextStyles.bodyLarge.copyWith(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textHeadline,
+                  color: const Color(0xFF334155),
                 ),
               ),
             ),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 14,
-              color: Colors.grey[400],
+            const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIconAction(IconData icon, String label, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 26, color: const Color(0xFF475569)),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF334155),
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -455,24 +401,33 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     );
   }
 
-  Widget _buildDivider() =>
-      Divider(height: 1, indent: 58, endIndent: 20, color: Colors.grey[100]);
-
-  Widget _buildLogoutButton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: OutlinedButton.icon(
-        onPressed: _confirmLogout,
-        icon: const Icon(Icons.logout_rounded, size: 18),
-        label: const Text('Log Out'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.error,
-          side: BorderSide(color: AppColors.error.withValues(alpha: 0.3)),
-          minimumSize: const Size(double.infinity, 56),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+  Widget _buildGridAction(IconData icon, String label, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 24, color: color),
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF334155),
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

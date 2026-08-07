@@ -19,6 +19,7 @@ class AppRoutes {
   static const String loading = '/loading';
   static const String productDetails = '/product-details';
   static const String articleDetails = '/article-details';
+  static const String mfaChallenge = '/mfa-challenge';
 
   // Mobile-specific
   static const String farmerRegister = '/farmer-register';
@@ -33,6 +34,7 @@ class AppRoutes {
   static const String farmerFollowers = '/farmer-followers';
   static const String helpCenter = '/help-center';
   static const String appSettings = '/app-settings';
+  static const String changePassword = '/change-password';
   static const String farmerVouchers = '/farmer-vouchers';
   static const String claimedVouchers = '/claimed-vouchers';
   static const String appTour = '/app-tour';
@@ -40,6 +42,8 @@ class AppRoutes {
   static const String contactSupport = '/contact-support';
   static const String reportIssue = '/report-issue';
   static const String farmerGuides = '/farmer-guides';
+  static const String accountActivity = '/account-activity';
+  static const String manageDevice = '/manage-device';
   static const String kikoAiChat = '/kiko-ai-chat';
   // Web-specific
   static const String webWelcome = '/web-welcome';
@@ -54,6 +58,7 @@ class AppRoutes {
   static const String orderSuccess = '/order-success';
   static const String farmerProfileBase = '/farm';
   static const String farmerDashboard = '/farmer-dashboard';
+  static const String weatherRadar = '/weather-radar';
   static const String webFarmerRegister = '/web-farmer-register';
   static const String farmerPreorderDetail = '/farmer-preorder-detail';
 

@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../shared/styles/app_theme.dart';
 import '../../shared/data/app_data.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/report_content_dialog.dart';
 import '../services/core/supabase_data_service.dart';
-import '../router/app_routes.dart';
 import '../utils/share_util.dart';
+import 'package:share_plus/share_plus.dart';
 import '../widgets/app_open_banner.dart';
 
 class ArticleDetailScreen extends StatelessWidget {
@@ -495,12 +494,10 @@ class ArticleDetailScreen extends StatelessWidget {
       ),
       child: ElevatedButton.icon(
         onPressed: () async {
-          final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.articleDetails}?id=${article.id}';
-          final messenger = ScaffoldMessenger.of(context);
-          await Clipboard.setData(ClipboardData(text: shareUrl));
-          messenger.showSnackBar(
-            const SnackBar(content: Text('Article link copied to clipboard!')),
-          );
+          if (article.id == null) return;
+          final shareUrl = ShareUtil.generatePostShareLink(article.id!);
+          final shareSubject = 'Check out this article on AgriDirect: ${article.title}';
+          await Share.share('$shareSubject\n\n$shareUrl', subject: shareSubject);
         },
         icon: const Icon(Icons.ios_share_rounded, size: 20),
         label: Text(

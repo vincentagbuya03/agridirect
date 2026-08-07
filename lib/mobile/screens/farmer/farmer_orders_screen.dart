@@ -19,6 +19,8 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
   int _selectedTab = 0;
   final _tabs = ['Active', 'Completed', 'Cancelled'];
 
+  final Map<String, bool> _updatingOrders = {};
+
   @override
   void initState() {
     super.initState();
@@ -141,6 +143,112 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
     );
   }
 
+  Widget _buildShimmerOrdersList() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        if (_selectedTab == 0)
+          Container(
+            margin: const EdgeInsets.only(bottom: 24, top: 2),
+            padding: const EdgeInsets.all(24),
+            height: 180,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppShimmerLoader.rectangle(width: 120, height: 16, borderRadius: 4),
+                const SizedBox(height: 12),
+                AppShimmerLoader.rectangle(width: 180, height: 32, borderRadius: 6),
+                const Spacer(),
+                Row(
+                  children: [
+                    AppShimmerLoader.rectangle(width: 80, height: 28, borderRadius: 8),
+                    const SizedBox(width: 12),
+                    AppShimmerLoader.rectangle(width: 80, height: 28, borderRadius: 8),
+                  ],
+                )
+              ],
+            ),
+          ),
+        ...List.generate(3, (index) => Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        AppShimmerLoader.circle(size: 44),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AppShimmerLoader.rectangle(width: 120, height: 14, borderRadius: 4),
+                              const SizedBox(height: 6),
+                              AppShimmerLoader.rectangle(width: 80, height: 11, borderRadius: 3),
+                            ],
+                          ),
+                        ),
+                        AppShimmerLoader.rectangle(width: 60, height: 20, borderRadius: 6),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.background.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          AppShimmerLoader.rectangle(width: 100, height: 12, borderRadius: 3),
+                          AppShimmerLoader.rectangle(width: 60, height: 14, borderRadius: 4),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.textHeadline.withValues(alpha: 0.02),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: AppShimmerLoader.rectangle(height: 36, borderRadius: 12),
+                    ),
+                    const SizedBox(width: 12),
+                    AppShimmerLoader.rectangle(width: 40, height: 36, borderRadius: 12),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        )),
+      ],
+    );
+  }
+
   Widget _buildOrdersList() {
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: SupabaseDataService().getFarmerOrders(
@@ -148,7 +256,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
       ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: AppShimmerLoader());
+          return _buildShimmerOrdersList();
         }
 
         final orders = snapshot.data ?? [];
@@ -612,6 +720,7 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                           ? null
                           : () => _showStatusUpdateSheet(order),
                       isPrimary: true,
+                      isLoading: _updatingOrders[order['rawOrderId'].toString()] ?? false,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -643,22 +752,25 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
     String label,
     VoidCallback? onTap, {
     bool isPrimary = false,
+    bool isLoading = false,
   }) {
     final bool isDisabled = onTap == null;
     return Material(
-      color: isDisabled
+      color: isLoading 
+          ? (isPrimary ? AppColors.primary.withValues(alpha: 0.7) : Colors.grey.shade200)
+          : isDisabled
           ? Colors.grey.shade300
           : isPrimary
           ? AppColors.primary
           : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        onTap: onTap,
+        onTap: (isDisabled || isLoading) ? null : onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            border: isPrimary || isDisabled
+            border: isPrimary || isDisabled || isLoading
                 ? null
                 : Border.all(
                     color: AppColors.textHeadline.withValues(alpha: 0.3),
@@ -668,20 +780,34 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 16,
-                color: isDisabled
-                    ? Colors.grey.shade600
-                    : isPrimary
-                    ? Colors.white
-                    : AppColors.textHeadline,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: AppTextStyles.labelSmall.copyWith(
+              if (isLoading)
+                SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(isPrimary ? Colors.white : AppColors.primary),
+                  ),
+                )
+              else ...[
+                Icon(
+                  icon,
+                  size: 16,
                   color: isDisabled
+                      ? Colors.grey.shade600
+                      : isPrimary
+                      ? Colors.white
+                      : AppColors.textHeadline,
+                ),
+                const SizedBox(width: 8),
+              ],
+              if (isLoading) const SizedBox(width: 8),
+              Text(
+                isLoading ? 'Updating...' : label,
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: isLoading
+                      ? (isPrimary ? Colors.white : AppColors.primary)
+                      : isDisabled
                       ? Colors.grey.shade600
                       : isPrimary
                       ? Colors.white
@@ -844,13 +970,16 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
           await _showCancellationReasonSheet(order);
         } else {
           Navigator.pop(context);
+          final orderIdStr = order['rawOrderId'].toString();
+          setState(() {
+            _updatingOrders[orderIdStr] = true;
+          });
           try {
             await OrderService().updateOrderStatus(
-              order['rawOrderId'].toString(),
+              orderIdStr,
               status,
             );
             if (mounted) {
-              setState(() {}); // Refresh list
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Order status updated to $status'),
@@ -866,6 +995,11 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                   backgroundColor: Colors.red,
                 ),
               );
+            }
+          } finally {
+            _updatingOrders[orderIdStr] = false;
+            if (mounted) {
+              setState(() {}); // Refresh list
             }
           }
         }
@@ -1149,14 +1283,17 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                                   return;
                                 }
                                 Navigator.pop(ctx);
+                                final orderIdStr = order['rawOrderId'].toString();
+                                setState(() {
+                                  _updatingOrders[orderIdStr] = true;
+                                });
                                 try {
                                   await OrderService().updateOrderStatus(
-                                    order['rawOrderId'].toString(),
+                                    orderIdStr,
                                     'CANCELLED',
                                     cancellationReason: reason,
                                   );
                                   if (mounted) {
-                                    setState(() {});
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content:
@@ -1175,6 +1312,11 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
                                         backgroundColor: Colors.red,
                                       ),
                                     );
+                                  }
+                                } finally {
+                                  _updatingOrders[orderIdStr] = false;
+                                  if (mounted) {
+                                    setState(() {});
                                   }
                                 }
                               },

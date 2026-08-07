@@ -30,6 +30,16 @@ class ShareUtil {
     return '$webDomain/api/share?id=$productId';
   }
 
+  /// Generates a share link for a farmer profile
+  static String generateFarmerShareLink(String farmerId) {
+    return '$webDomain/farmer/$farmerId';
+  }
+
+  /// Generates a share link for a community post or article
+  static String generatePostShareLink(String postId) {
+    return '$webDomain/article/$postId';
+  }
+
   /// Builds a link specifically designed to launch the installed APK directly.
   static String buildAppLink(String routeWithParams) {
     // Remove leading slash if present for clean scheme formatting (agridirect://path)

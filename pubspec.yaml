@@ -58,7 +58,7 @@ dependencies:
   json_annotation: ^4.11.0
   google_sign_in: ^6.2.1
   url_launcher: ^6.3.0
-  agora_rtc_engine: ^6.3.0
+  agora_rtc_engine: ^6.5.4
   permission_handler: ^11.3.0
   flutter_dotenv: ^6.0.0
   mailer: ^6.1.0

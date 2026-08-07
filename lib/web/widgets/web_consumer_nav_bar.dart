@@ -6,7 +6,6 @@ import '../../shared/services/auth/auth_service.dart';
 import '../../shared/services/commerce/cart_service.dart';
 import '../../shared/widgets/brand_logo.dart';
 import 'web_hamburger_menu_button.dart';
-import '../../shared/utils/apk_downloader.dart';
 import '../../shared/services/community/notification_service.dart';
 import '../../shared/services/community/message_service.dart';
 import '../../shared/router/app_routes.dart';
@@ -38,13 +37,8 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
   static const Color _muted = Color(0xFF6B7280);
   static const Color _border = Color(0xFFE5E7EB);
 
-  static bool _dismissedMobileBanner = false;
-
   int _hoveredNav = -1;
 
-  Future<void> _downloadAndroidApk() async {
-    await ApkDownloader.download();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +52,7 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
         final isFarmerMode = AuthService().isViewingAsFarmer;
         final navItems = isFarmerMode
             ? const ['Dashboard', 'Products', 'Orders', 'Community']
-            : const ['Home', 'Shop', 'Community', 'Find Farmer'];
+            : const ['Home', 'Shop', 'Community', 'Find Farmer', 'Weather'];
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -100,12 +94,12 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                     SizedBox(width: compact ? 12 : 48),
                     Builder(builder: (context) {
                       final currentPath = GoRouterState.of(context).uri.path;
-                      // Map each consumer nav item to its matching route prefix
                       final consumerRoutes = [
                         AppRoutes.marketplace, // 0 - Home
                         AppRoutes.shop,        // 1 - Shop
                         AppRoutes.community,   // 2 - Community
                         AppRoutes.farmersMap,  // 3 - Find Farmer
+                        AppRoutes.weatherRadar, // 4 - Weather
                       ];
 
                       return Row(
@@ -135,6 +129,8 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                                 onTap: () {
                                   if (!isFarmerMode && i == 3) {
                                     context.go(AppRoutes.farmersMap);
+                                  } else if (!isFarmerMode && i == 4) {
+                                    context.go(AppRoutes.weatherRadar);
                                   } else {
                                     widget.onNavigate(i);
                                   }

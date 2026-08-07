@@ -292,22 +292,22 @@ class _AddProductScreenState extends State<AddProductScreen> {
         // 1. Update product table
         await client.from('products').update({
           'name': _nameController.text.trim(),
-          'price': double.parse(_priceController.text.trim()),
+          'price': double.tryParse(_priceController.text.trim()) ?? 0.0,
           'description': _descriptionController.text.trim(),
           'category_id': _selectedCategory,
           'unit_id': _selectedUnit,
           'harvest_days': _harvestDaysController.text.isNotEmpty
-              ? int.parse(_harvestDaysController.text.trim())
+              ? (double.tryParse(_harvestDaysController.text.trim())?.toInt() ?? 0)
               : 0,
           'is_preorder': _isPreorder,
         }).eq('product_id', productId);
 
         // 2. Update inventory table
-        final qty = int.parse(
+        final qty = double.tryParse(
           _quantityController.text.trim().isEmpty
               ? '0'
               : _quantityController.text.trim(),
-        );
+        )?.toInt() ?? 0;
         await client.from('product_inventory').upsert({
           'product_id': productId,
           'available_quantity': qty,
@@ -378,19 +378,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
       await _offlineService.createProduct(
         farmerId: userId,
         name: _nameController.text.trim(),
-        price: double.parse(_priceController.text.trim()),
+        price: double.tryParse(_priceController.text.trim()) ?? 0.0,
         description: _descriptionController.text.trim(),
         categoryId: _selectedCategory ?? '',
         unitId: _selectedUnit ?? '',
         harvestDays: _harvestDaysController.text.isNotEmpty
-            ? int.parse(_harvestDaysController.text.trim())
+            ? (double.tryParse(_harvestDaysController.text.trim())?.toInt() ?? 0)
             : 0,
         isPreorder: _isPreorder,
-        availableQuantity: int.parse(
+        availableQuantity: double.tryParse(
           _quantityController.text.trim().isEmpty
               ? '0'
               : _quantityController.text.trim(),
-        ),
+        )?.toInt() ?? 0,
         localImagePaths: localImagePaths,
         webImageBytes: webImageBytes,
         webImageNames: webImageNames,
@@ -996,7 +996,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     if (_selectedCategory != null) {
       final cat = _categories.firstWhere(
         (c) => c['id']?.toString() == _selectedCategory,
-        orElse: () => {},
+        orElse: () => <String, dynamic>{},
       );
       if (cat['name'] != null) categoryName = cat['name'].toString();
     }
@@ -1005,7 +1005,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     if (_selectedUnit != null) {
       final u = _units.firstWhere(
         (un) => un['id']?.toString() == _selectedUnit,
-        orElse: () => {},
+        orElse: () => <String, dynamic>{},
       );
       if (u['name'] != null) unitName = '/ ${u['name']}';
     }

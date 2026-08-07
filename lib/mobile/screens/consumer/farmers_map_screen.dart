@@ -523,11 +523,15 @@ class _FarmersMapScreenState extends State<FarmersMapScreen> {
         children: [
           Icon(icon, size: 16, color: AppColors.primary),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: AppTextStyles.labelSmall.copyWith(
-              color: AppColors.textHeadline,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textHeadline,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

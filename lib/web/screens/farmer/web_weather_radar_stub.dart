@@ -7,6 +7,7 @@ class WebWeatherRadarScreen extends StatefulWidget {
   final double? farmLongitude;
   final String? farmLocationName;
   final VoidCallback onBack;
+  final bool isConsumerMode;
 
   const WebWeatherRadarScreen({
     super.key,
@@ -15,6 +16,7 @@ class WebWeatherRadarScreen extends StatefulWidget {
     this.farmLongitude,
     this.farmLocationName,
     required this.onBack,
+    this.isConsumerMode = false,
   });
 
   @override

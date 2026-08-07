@@ -195,7 +195,7 @@ void main() async {
 class _BootstrapApp extends StatefulWidget {
   final String? initialRoute;
   final bool isDeepLink;
-  const _BootstrapApp({super.key, this.initialRoute, this.isDeepLink = false});
+  const _BootstrapApp({this.initialRoute, this.isDeepLink = false});
 
   @override
   State<_BootstrapApp> createState() => _BootstrapAppState();

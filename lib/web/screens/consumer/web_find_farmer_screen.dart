@@ -150,6 +150,12 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
         case 3:
           // Already on Find Farmer
           break;
+        case 4:
+          context.go(AppRoutes.cart);
+          break;
+        case 5:
+          context.go(AppRoutes.profile);
+          break;
       }
     }
   }
@@ -167,6 +173,7 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
             currentIndex: widget.currentIndex,
             onNavigate: _handleNavClick,
             onCartTap: () => context.go(AppRoutes.cart),
+            margin: EdgeInsets.symmetric(horizontal: sw < 600 ? 12 : 32, vertical: 16),
           ),
           Expanded(
             child: SingleChildScrollView(
@@ -217,30 +224,33 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
   }
 
   Widget _buildHeaderHero(bool isMobile) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 20 : 40,
-        vertical: isMobile ? 24 : 36,
-      ),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            primary.withValues(alpha: 0.08),
-            primary.withValues(alpha: 0.02),
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        border: const Border(bottom: BorderSide(color: border)),
-      ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1340),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double maxWidth = constraints.maxWidth < 1340 ? constraints.maxWidth : 1340;
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 20 : 40,
+            vertical: isMobile ? 24 : 36,
+          ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                primary.withValues(alpha: 0.08),
+                primary.withValues(alpha: 0.02),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            border: const Border(bottom: BorderSide(color: border)),
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -251,26 +261,28 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
                     child: const Icon(Icons.travel_explore_rounded, color: primary, size: 28),
                   ),
                   const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Find Local Farmers',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: isMobile ? 22 : 28,
-                          fontWeight: FontWeight.w800,
-                          color: dark,
-                          letterSpacing: -0.5,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Find Local Farmers',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: isMobile ? 22 : 28,
+                            fontWeight: FontWeight.w800,
+                            color: dark,
+                            letterSpacing: -0.5,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Connect directly with verified agricultural growers across the Philippines',
-                        style: GoogleFonts.inter(
-                          fontSize: isMobile ? 12 : 14,
-                          color: muted,
+                        Text(
+                          'Connect directly with verified agricultural growers across the Philippines',
+                          style: GoogleFonts.inter(
+                            fontSize: isMobile ? 12 : 14,
+                            color: muted,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -297,7 +309,7 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
                       child: TextField(
                         controller: _searchController,
                         decoration: InputDecoration(
-                          hintText: 'Search farm name, location, or crop specialty...',
+                          hintText: isMobile ? 'Search farms...' : 'Search farm name, location, or crop specialty...',
                           hintStyle: GoogleFonts.inter(color: muted, fontSize: 14),
                           icon: const Icon(Icons.search_rounded, color: primary),
                           border: InputBorder.none,
@@ -356,7 +368,9 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
         ),
       ),
     );
-  }
+  },
+);
+}
 
   Widget _buildFarmersList(bool isMobile) {
     return FutureBuilder<List<Map<String, dynamic>>>(

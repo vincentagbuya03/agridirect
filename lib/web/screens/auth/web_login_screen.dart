@@ -9,6 +9,7 @@ import '../../../shared/services/auth/otp_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/widgets/brand_logo.dart';
+import '../../widgets/web_mfa_challenge_dialog.dart';
 import 'web_otp_verification_screen.dart';
 
 /// Web Login / Register screen.
@@ -90,16 +91,27 @@ class _WebLoginScreenState extends State<WebLoginScreen>
       return;
     }
     setState(() => _loginLoading = true);
-    final success = await AuthService().login(email: email, password: password);
+    final auth = AuthService();
+    final success = await auth.login(email: email, password: password);
     if (mounted) setState(() => _loginLoading = false);
+    
     if (success && mounted) {
-      if (AuthService().needsProfileCompletion) {
+      if (auth.requiresMfa) {
+        final verified = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const WebMfaChallengeDialog(),
+        );
+        if (verified == true) {
+          widget.onLoginSuccess();
+        }
+      } else if (auth.needsProfileCompletion) {
         context.go(AppRoutes.completeProfile);
       } else {
         widget.onLoginSuccess();
       }
     } else if (!success) {
-      _showLoginErrorDialog(AuthService().errorMessage ?? 'Login failed');
+      _showLoginErrorDialog(auth.errorMessage ?? 'Login failed');
     }
   }
 

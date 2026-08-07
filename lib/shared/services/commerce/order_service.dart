@@ -30,7 +30,7 @@ class OrderService {
             .eq('customer_id', customerId)
             .limit(limit)
             .order('created_at', ascending: false);
-        return (response as List<dynamic>)
+        return response
             .map((json) => Order.fromJson(json as Map<String, dynamic>))
             .toList();
       } catch (e) {
@@ -51,7 +51,7 @@ class OrderService {
             .limit(limit)
             .order('created_at', ascending: false);
 
-        return (response as List<dynamic>).map((json) {
+        return response.map((json) {
           final map = Map<String, dynamic>.from(json as Map);
           final statusMap = map['order_statuses'] as Map<String, dynamic>?;
           map['status_code'] = statusMap?['code'] ?? 'PENDING';
@@ -114,7 +114,7 @@ class OrderService {
             .eq('farmer_id', farmerId)
             .limit(limit)
             .order('created_at', ascending: false);
-        return (response as List<dynamic>)
+        return response
             .map((json) => Order.fromJson(json as Map<String, dynamic>))
             .toList();
       } catch (e) {
@@ -135,7 +135,7 @@ class OrderService {
             .limit(limit)
             .order('created_at', ascending: false);
 
-        return (response as List<dynamic>).map((json) {
+        return response.map((json) {
           final map = Map<String, dynamic>.from(json as Map);
           final statusMap = map['order_statuses'] as Map<String, dynamic>?;
           map['status_code'] = statusMap?['code'] ?? 'PENDING';
@@ -212,12 +212,12 @@ class OrderService {
       // Joining with products to get name and image
       final response = await _supabase
           .from('order_items')
-          .select('*, products(name, products:product_images(image_url))')
+          .select('*, products(name, product_images(image_url))')
           .eq('order_id', orderId);
 
       return (response as List<dynamic>).map((item) {
         final product = item['products'] as Map<String, dynamic>?;
-        final images = product?['products'] as List<dynamic>?;
+        final images = product?['product_images'] as List<dynamic>?;
         final imageUrl = images != null && images.isNotEmpty
             ? images.first['image_url'] as String?
             : null;

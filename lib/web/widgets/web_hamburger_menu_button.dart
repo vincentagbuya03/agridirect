@@ -84,8 +84,12 @@ class _WebHamburgerMenuButtonState extends State<WebHamburgerMenuButton> {
             _handleLogout();
           } else if (index == 101) {
             context.go(AppRoutes.login);
+          } else if (index == 102) {
+            context.go(AppRoutes.farmersMap);
           } else if ((isFarmerMode && index == 6) || (!isFarmerMode && index == 5)) {
             context.go(AppRoutes.messages, extra: {'asFarmer': isFarmerMode});
+          } else if (!isFarmerMode && index == 3) {
+            context.go(AppRoutes.profile);
           } else if (!isFarmerMode && index == 4) {
             if (widget.onCartTap != null) widget.onCartTap!();
           } else {
@@ -184,14 +188,28 @@ class _WebHamburgerMenuButtonState extends State<WebHamburgerMenuButton> {
               (1, Icons.shopping_bag_rounded, 'Shop'),
               (2, Icons.people_rounded, 'Community'),
               (3, Icons.person_rounded, 'Profile'),
+              (102, Icons.map_rounded, 'Find Farmer'),
               (4, Icons.shopping_cart_rounded, 'Cart'),
               (5, Icons.chat_bubble_rounded, 'Messages'),
             ];
 
+            final currentPath = GoRouterState.of(context).uri.path;
             items.addAll(customerMenuItems.map((item) {
-              final isActive = item.$1 == 4
-                  ? widget.isCartActive
-                  : widget.currentIndex == item.$1;
+              final isActive = item.$1 == 102
+                  ? currentPath == AppRoutes.farmersMap
+                  : item.$1 == 0
+                      ? (currentPath == '/' || currentPath.startsWith(AppRoutes.marketplace))
+                      : item.$1 == 1
+                          ? currentPath.startsWith(AppRoutes.shop)
+                          : item.$1 == 2
+                              ? currentPath.startsWith(AppRoutes.community)
+                              : item.$1 == 3
+                                  ? currentPath.startsWith(AppRoutes.profile)
+                                  : item.$1 == 4
+                                      ? (widget.isCartActive || currentPath.startsWith(AppRoutes.cart))
+                                      : item.$1 == 5
+                                          ? currentPath.startsWith(AppRoutes.messages)
+                                          : widget.currentIndex == item.$1;
               return PopupMenuItem<int>(
                 value: item.$1,
                 child: AnimatedContainer(

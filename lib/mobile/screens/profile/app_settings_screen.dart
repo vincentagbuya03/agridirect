@@ -1,3 +1,4 @@
+// app settings
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -607,6 +608,28 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 subtitle: 'Update the password used for your account.',
                 onTap: _openChangePasswordDialog,
               ),
+              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              _SettingsTile(
+                icon: Icons.security_rounded,
+                title: 'Two-Factor Authentication (2FA)',
+                subtitle: 'Add an extra layer of security with an Authenticator App.',
+                trailing: const Text('Active', style: TextStyle(color: Color(0xFF64748B))),
+                onTap: () {},
+              ),
+              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              _SettingsTile(
+                icon: Icons.history_rounded,
+                title: 'Check Account Activity',
+                subtitle: 'Check your login and account changes in the last 30 days',
+                onTap: () => context.push(AppRoutes.accountActivity),
+              ),
+              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              _SettingsTile(
+                icon: Icons.devices_rounded,
+                title: 'Manage Login Device',
+                subtitle: 'Review the devices that you have logged in Shopee account.',
+                onTap: () => context.push(AppRoutes.manageDevice),
+              ),
             ]),
           ] else if (_activeTabIndex == 1) ...[
             _buildWebHeader('Privacy', 'Configure your data and visibility preferences.'),
@@ -741,6 +764,28 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             title: 'Change Password',
             subtitle: 'Update the password used for your account.',
             onTap: _openChangePasswordDialog,
+          ),
+          const SizedBox(height: 12),
+          _SettingsTile(
+            icon: Icons.security_rounded,
+            title: 'Two-Factor Authentication (2FA)',
+            subtitle: 'Add an extra layer of security with an Authenticator App.',
+            trailing: const Text('Active', style: TextStyle(color: Color(0xFF64748B))),
+            onTap: () {},
+          ),
+          const SizedBox(height: 12),
+          _SettingsTile(
+            icon: Icons.history_rounded,
+            title: 'Check Account Activity',
+            subtitle: 'Check your login and account changes in the last 30 days',
+            onTap: () => context.push(AppRoutes.accountActivity),
+          ),
+          const SizedBox(height: 12),
+          _SettingsTile(
+            icon: Icons.devices_rounded,
+            title: 'Manage Login Device',
+            subtitle: 'Review the devices that you have logged in Shopee account.',
+            onTap: () => context.push(AppRoutes.manageDevice),
           ),
           const SizedBox(height: 24),
 

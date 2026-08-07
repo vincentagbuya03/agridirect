@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:go_router/go_router.dart';
+import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/integration/email_service.dart';
 
@@ -38,11 +40,12 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
   }
 
   Future<void> _checkSession() async {
-    // Check if we have an active session (from the email link)
+    // Check if we have an active session (from logged in user or email link)
     final session = SupabaseConfig.client.auth.currentSession;
+    final currentUser = SupabaseConfig.client.auth.currentUser;
     setState(() {
-      _hasValidSession = session != null;
-      if (session == null) {
+      _hasValidSession = session != null || currentUser != null;
+      if (!_hasValidSession) {
         _errorMessage =
             'Invalid or expired reset link. Please request a new one.';
       }
@@ -94,10 +97,14 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
 
       _showSnackBar('Password reset successfully!', isError: false);
 
-      // Navigate to login after 2 seconds
+      // Navigate back after 2 seconds
       await Future.delayed(const Duration(seconds: 2));
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/login');
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go(AppRoutes.login);
+        }
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -328,10 +335,15 @@ class _WebPasswordResetScreenState extends State<WebPasswordResetScreen> {
         // Back to Login
         Center(
           child: TextButton(
-            onPressed: () =>
-                Navigator.of(context).pushReplacementNamed('/login'),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go(AppRoutes.login);
+              }
+            },
             child: Text(
-              'Back to Login',
+              'Back to Account Settings',
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,

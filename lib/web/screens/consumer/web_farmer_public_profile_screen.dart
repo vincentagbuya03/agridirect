@@ -12,6 +12,7 @@ import '../../../shared/widgets/image_widgets.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 import '../../../shared/services/commerce/voucher_service.dart';
 import '../../../shared/utils/share_util.dart';
+import 'package:share_plus/share_plus.dart';
 
 class WebFarmerPublicProfileScreen extends StatefulWidget {
   final String farmerId;
@@ -294,12 +295,10 @@ class _WebFarmerPublicProfileScreenState
                         const SizedBox(width: 10),
                         IconButton(
                           onPressed: () async {
-                            final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.farmerProfile(widget.farmerId)}';
-                            final messenger = ScaffoldMessenger.of(context);
-                            await Clipboard.setData(ClipboardData(text: shareUrl));
-                            messenger.showSnackBar(
-                              const SnackBar(content: Text('Farm profile link copied to clipboard!')),
-                            );
+                            final shareUrl = ShareUtil.generateFarmerShareLink(widget.farmerId);
+                            final farmName = farmer['farm_name']?.toString() ?? 'Farm';
+                            final shareSubject = 'Check out $farmName on AgriDirect!';
+                            await Share.share('$shareSubject\n\n$shareUrl', subject: shareSubject);
                           },
                           icon: const Icon(Icons.ios_share_rounded, color: Colors.white),
                           style: IconButton.styleFrom(

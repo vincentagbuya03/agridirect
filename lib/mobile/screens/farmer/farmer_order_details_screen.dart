@@ -40,6 +40,7 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
   FarmerProfile? _farmerProfile;
   bool _isLoading = true;
   late String _currentStatus;
+  bool _isUpdating = false;
 
   List<Map<String, dynamic>> get _steps {
     final isCop = widget.order.paymentMethod?.toUpperCase() == 'COP';
@@ -953,12 +954,23 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
             child: SizedBox(
               width: MediaQuery.of(context).size.width - 40,
               child: ElevatedButton.icon(
-                onPressed: isFinished ? null : () => _showStatusUpdateSheet(),
-                icon: const Icon(Icons.edit_note_rounded),
-                label: const Text('Update Status'),
+                onPressed: (isFinished || _isUpdating) ? null : () => _showStatusUpdateSheet(),
+                icon: _isUpdating 
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.edit_note_rounded),
+                label: Text(_isUpdating ? 'Updating...' : 'Update Status'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isFinished ? Colors.grey.shade400 : AppColors.primary,
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: isFinished ? Colors.grey.shade400 : AppColors.primary.withValues(alpha: 0.7),
+                  disabledForegroundColor: Colors.white,
                   elevation: isFinished ? 0 : 6,
                   shadowColor: isFinished ? Colors.transparent : AppColors.primary.withValues(alpha: 0.4),
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1034,6 +1046,9 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 onTap: () async {
                   Navigator.pop(ctx);
+                  setState(() {
+                    _isUpdating = true;
+                  });
                   try {
                     await OrderService().updateOrderStatus(widget.order.orderId, s['label'] as String);
                     if (mounted) {
@@ -1072,6 +1087,12 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
                       );
+                    }
+                  } finally {
+                    if (mounted) {
+                      setState(() {
+                        _isUpdating = false;
+                      });
                     }
                   }
                 },

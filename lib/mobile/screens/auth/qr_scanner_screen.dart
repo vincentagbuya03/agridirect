@@ -3,7 +3,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class QRScannerScreen extends StatefulWidget {
-  const QRScannerScreen({super.key});
+  final String title;
+  final String instruction;
+
+  const QRScannerScreen({
+    super.key, 
+    this.title = 'Scan PhilSys QR',
+    this.instruction = 'Align the QR code within the frame',
+  });
 
   @override
   State<QRScannerScreen> createState() => _QRScannerScreenState();
@@ -52,7 +59,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Scan PhilSys QR',
+          widget.title,
           style: GoogleFonts.plusJakartaSans(
             color: Colors.white,
             fontWeight: FontWeight.w700,
@@ -91,7 +98,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Align the QR code within the frame',
+                  widget.instruction,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.plusJakartaSans(
                     color: Colors.white,

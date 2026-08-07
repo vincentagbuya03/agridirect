@@ -769,16 +769,37 @@ class _WebShopScreenState extends State<WebShopScreen>
           ),
         ),
         const SizedBox(height: 24),
-        // Featured grid (4 items)
+        // Featured grid/scroll
         LayoutBuilder(
           builder: (context, constraints) {
+            final isMobileView = constraints.maxWidth < 600;
+            if (isMobileView) {
+              // On mobile: horizontal scroll strip
+              return SizedBox(
+                height: 260,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: featuredProducts.take(4).length,
+                  itemBuilder: (context, index) {
+                    return SizedBox(
+                      width: constraints.maxWidth * 0.72,
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          right: 14,
+                          left: index == 0 ? 0 : 0,
+                        ),
+                        child: _buildFeaturedCard(featuredProducts[index]),
+                      ),
+                    );
+                  },
+                ),
+              );
+            }
             final crossAxisCount = constraints.maxWidth > 1200
                 ? 4
                 : constraints.maxWidth > 900
                 ? 3
-                : constraints.maxWidth > 600
-                ? 2
-                : 1;
+                : 2;
             return GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -786,7 +807,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                 crossAxisCount: crossAxisCount,
                 crossAxisSpacing: 20,
                 mainAxisSpacing: 20,
-                mainAxisExtent: 425,
+                mainAxisExtent: 330,
               ),
               itemCount: featuredProducts
                   .take(
@@ -819,7 +840,7 @@ class _WebShopScreenState extends State<WebShopScreen>
         onTap: () => _openProduct(product),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 350),
-          transform: Matrix4.translationValues(0, isHovered ? -8 : 0, 0),
+          transform: Matrix4.translationValues(0, isHovered ? -6 : 0, 0),
           decoration: BoxDecoration(
             color: _white,
             borderRadius: BorderRadius.circular(18),
@@ -841,281 +862,155 @@ class _WebShopScreenState extends State<WebShopScreen>
               ),
             ],
           ),
-          child: Stack(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Image with featured badge
-                  Expanded(
-                    flex: 3,
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(18),
-                            ),
-                            color: _surface,
-                          ),
-                          child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(18),
-                            ),
-                            child: product.imageUrl.isNotEmpty
-                                ? SafeNetworkImage(
-                                    imageUrl: product.imageUrl,
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                    placeholder: _buildImagePlaceholder(),
-                                    errorWidget: _buildImagePlaceholder(),
-                                  )
-                                : _buildImagePlaceholder(),
-                          ),
-                        ),
-                        // Featured badge
-                        Positioned(
-                          top: 12,
-                          left: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  const Color(0xFFF59E0B),
-                                  const Color(
-                                    0xFFF59E0B,
-                                  ).withValues(alpha: 0.7),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(9),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFFF59E0B,
-                                  ).withValues(alpha: 0.3),
-                                  blurRadius: 12,
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              '✨ Featured',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+              // Image
+              Expanded(
+                flex: 3,
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(18),
+                      ),
+                      child: Container(
+                        width: double.infinity,
+                        color: _surface,
+                        child: product.imageUrl.isNotEmpty
+                            ? SafeNetworkImage(
+                                imageUrl: product.imageUrl,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                placeholder: _buildImagePlaceholder(),
+                                errorWidget: _buildImagePlaceholder(),
+                              )
+                            : _buildImagePlaceholder(),
+                      ),
                     ),
-                  ),
-                  // Details section
-                  Expanded(
-                    flex: 3,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                product.name,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  color: _dark,
-                                  height: 1.3,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 5),
-                              // Farm badge
-                              GestureDetector(
-                                onTap: () =>
-                                    _openFarmerProfile(product.farmerId),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        _primaryLight,
-                                        _primaryLight.withValues(alpha: 0.7),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(7),
-                                    border: Border.all(
-                                      color: _primary.withValues(alpha: 0.2),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.store_rounded,
-                                        size: 12,
-                                        color: _primary,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        product.farm,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: _primary,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFF59E0B),
+                              const Color(0xFFF59E0B).withValues(alpha: 0.7),
                             ],
                           ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '✨ Featured',
+                          style: GoogleFonts.inter(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Details
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.name,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: _dark,
+                              height: 1.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Row(
-                                children: [
-                                  ...List.generate(5, (s) {
-                                    final rating =
-                                        double.tryParse(
-                                          product.rating ?? '0',
-                                        ) ??
-                                        0;
-                                    return Icon(
-                                      s < rating.floor()
-                                          ? Icons.star_rounded
-                                          : Icons.star_outline_rounded,
-                                      size: 13,
-                                      color: s < rating.floor()
-                                          ? const Color(0xFFFCA5A5)
-                                          : _border,
-                                    );
-                                  }),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    product.rating ?? '0',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: _dark,
-                                    ),
+                              Icon(Icons.store_rounded, size: 10, color: _primary),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text(
+                                  product.farm,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: _primary,
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                product.price,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w900,
-                                  color: _primary,
-                                  letterSpacing: -0.3,
-                                ),
-                              ),
-                              const SizedBox(height: 11),
-                              // Add to cart button
-                              SizedBox(
-                                width: double.infinity,
-                                child: MouseRegion(
-                                  cursor: SystemMouseCursors.click,
-                                  child: GestureDetector(
-                                    onTap: () => _addToCart(product),
-                                    child: AnimatedContainer(
-                                      duration: const Duration(
-                                        milliseconds: 250,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 10,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        gradient: isHovered
-                                            ? LinearGradient(
-                                                colors: [
-                                                  _primary,
-                                                  _primary.withValues(
-                                                    alpha: 0.7,
-                                                  ),
-                                                ],
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                              )
-                                            : LinearGradient(
-                                                colors: [
-                                                  _primaryLight,
-                                                  _primaryLight,
-                                                ],
-                                              ),
-                                        borderRadius: BorderRadius.circular(11),
-                                        border: Border.all(
-                                          color: isHovered
-                                              ? _primary
-                                              : _primary.withValues(alpha: 0.2),
-                                          width: 1.5,
-                                        ),
-                                        boxShadow: isHovered
-                                            ? [
-                                                BoxShadow(
-                                                  color: _primary.withValues(
-                                                    alpha: 0.1,
-                                                  ),
-                                                  blurRadius: 16,
-                                                  offset: const Offset(0, 6),
-                                                ),
-                                              ]
-                                            : [],
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.shopping_bag,
-                                            size: 16,
-                                            color: isHovered
-                                                ? _white
-                                                : _primary,
-                                          ),
-                                          const SizedBox(width: 7),
-                                          Text(
-                                            'Add to Cart',
-                                            style: GoogleFonts.inter(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w800,
-                                              color: isHovered
-                                                  ? _white
-                                                  : _primary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
                         ],
                       ),
-                    ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            product.price,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              color: _primary,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => _addToCart(product),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isHovered ? _primary : _primaryLight,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _primary.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.shopping_bag,
+                                    size: 12,
+                                    color: isHovered ? _white : _primary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Add',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: isHovered ? _white : _primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -1416,17 +1311,17 @@ class _WebShopScreenState extends State<WebShopScreen>
             ? 4
             : constraints.maxWidth > 900
             ? 3
-            : constraints.maxWidth > 600
+            : constraints.maxWidth > 500
             ? 2
-            : 1;
+            : 2;
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 20,
-            mainAxisSpacing: 20,
-            mainAxisExtent: _showPreOrders ? 460 : 425,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            mainAxisExtent: _showPreOrders ? 390 : 350,
           ),
           itemCount: products.length,
           itemBuilder: (context, index) {
@@ -1870,7 +1765,7 @@ class _WebShopScreenState extends State<WebShopScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                flex: _showPreOrders ? 2 : 3,
+                flex: 2,
                 child: Stack(
                   children: [
                     Container(

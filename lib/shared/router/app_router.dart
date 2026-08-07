@@ -5,6 +5,7 @@ import '../services/auth/auth_service.dart';
 import '../services/auth/onboarding_service.dart';
 import '../../mobile/mobile_navigation.dart';
 import '../../mobile/screens/auth/login_screen.dart';
+import '../../mobile/screens/auth/mfa_challenge_screen.dart';
 import '../../mobile/screens/auth/registration_screen.dart';
 import '../../mobile/screens/auth/farmer_registration_screen.dart';
 import '../../mobile/screens/auth/complete_profile_screen.dart';
@@ -25,6 +26,9 @@ import '../../mobile/screens/profile/address_book_screen.dart';
 import '../../mobile/screens/profile/favorites_screen.dart';
 import '../../mobile/screens/profile/help_center_screen.dart';
 import '../../mobile/screens/profile/app_settings_screen.dart';
+import '../../mobile/screens/profile/change_password_screen.dart';
+import '../../mobile/screens/profile/account_activity_screen.dart';
+import '../../mobile/screens/profile/manage_device_screen.dart';
 import '../../web/web_navigation.dart';
 import '../../web/screens/auth/web_login_screen.dart';
 import '../../web/screens/auth/web_registration_screen.dart';
@@ -42,6 +46,7 @@ import '../../web/screens/consumer/web_preorder_hub.dart';
 import '../../web/screens/consumer/web_checkout_screen.dart';
 import '../../web/screens/consumer/web_cart_checkout_screen.dart';
 import '../../web/screens/consumer/web_order_success_screen.dart';
+import '../../web/screens/consumer/web_consumer_weather_radar_screen.dart';
 import '../../web/screens/admin/admin_dashboard_redesigned.dart';
 import '../../web/screens/common/web_welcome_screen.dart';
 import '../screens/messages/messages_screen.dart';
@@ -149,6 +154,17 @@ GoRouter createAppRouter({String? initialRoute}) {
           location == AppRoutes.resetPasswordWithCode ||
           location == AppRoutes.authCallback) {
         return null;
+      }
+
+      if (auth.requiresMfa) {
+        if (location == AppRoutes.login) {
+          return null;
+        }
+        return auth.canVerifyMfa ? AppRoutes.mfaChallenge : AppRoutes.login;
+      }
+
+      if (location == AppRoutes.mfaChallenge && !auth.canVerifyMfa) {
+        return AppRoutes.login;
       }
 
       // 3. Authenticated Users logic
@@ -381,6 +397,10 @@ GoRouter createAppRouter({String? initialRoute}) {
             return const CartScreen();
           },
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.weatherRadar,
+        builder: (context, state) => const WebConsumerWeatherRadarScreen(),
       ),
       GoRoute(
         path: AppRoutes.preorders,
@@ -790,12 +810,19 @@ GoRouter createAppRouter({String? initialRoute}) {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.search_off_rounded, size: 64, color: Colors.grey),
+                            const Icon(
+                              Icons.search_off_rounded,
+                              size: 64,
+                              color: Colors.grey,
+                            ),
                             const SizedBox(height: 16),
-                            const Text('Product not found or no longer available.'),
+                            const Text(
+                              'Product not found or no longer available.',
+                            ),
                             const SizedBox(height: 16),
                             ElevatedButton(
-                              onPressed: () => GoRouter.of(context).go(AppRoutes.home),
+                              onPressed: () =>
+                                  GoRouter.of(context).go(AppRoutes.home),
                               child: const Text('Go to Marketplace'),
                             ),
                           ],
@@ -815,7 +842,9 @@ GoRouter createAppRouter({String? initialRoute}) {
         path: AppRoutes.articleDetails,
         builder: (context, state) {
           final articleId = state.uri.queryParameters['id'];
-          final articleExtra = state.extra is ArticleItem ? state.extra as ArticleItem : null;
+          final articleExtra = state.extra is ArticleItem
+              ? state.extra as ArticleItem
+              : null;
 
           if (articleExtra != null) {
             return ArticleDetailScreen(article: articleExtra);
@@ -894,7 +923,11 @@ GoRouter createAppRouter({String? initialRoute}) {
       ),
       GoRoute(
         path: AppRoutes.customerOrders,
-        builder: (context, state) => const OrdersScreen(),
+        builder: (context, state) {
+          final tabStr = state.uri.queryParameters['tab'];
+          final int tab = int.tryParse(tabStr ?? '0') ?? 0;
+          return OrdersScreen(initialTab: tab);
+        },
       ),
       GoRoute(
         path: '/orders/:orderId',
@@ -973,6 +1006,18 @@ GoRouter createAppRouter({String? initialRoute}) {
         builder: (context, state) => const AppSettingsScreen(),
       ),
       GoRoute(
+        path: AppRoutes.accountActivity,
+        builder: (context, state) => const AccountActivityScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.manageDevice,
+        builder: (context, state) => const ManageDeviceScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.changePassword,
+        builder: (context, state) => const ChangePasswordScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.appTour,
         builder: (context, state) => const AppTourScreen(),
       ),
@@ -1013,6 +1058,12 @@ GoRouter createAppRouter({String? initialRoute}) {
       GoRoute(
         path: AppRoutes.resetPasswordWithCode,
         builder: (context, state) => const WebPasswordResetWithCodeScreen(),
+      ),
+
+      // ── 2FA MFA Challenge ───────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.mfaChallenge,
+        builder: (context, state) => const MfaChallengeScreen(),
       ),
     ],
 

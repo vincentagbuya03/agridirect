@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -34,6 +32,9 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/widgets/share_bottom_sheet.dart';
+import '../auth/qr_scanner_screen.dart';
+import 'search_screen.dart';
 
 import '../../../shared/services/community/notification_service.dart';
 
@@ -157,6 +158,102 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       }
     } catch (e) {
       debugPrint('Failed to get user position: $e');
+    }
+  }
+
+  Future<void> _openQRScanner() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const QRScannerScreen(
+          title: 'Scan Product QR',
+          instruction: 'Scan a product QR code to view details',
+        ),
+      ),
+    );
+
+    if (result != null && result is String) {
+      String? productId;
+      try {
+        final uri = Uri.parse(result);
+        if (uri.queryParameters.containsKey('id')) {
+          productId = uri.queryParameters['id'];
+        } else {
+          productId = result; 
+        }
+      } catch (e) {
+        productId = result;
+      }
+      
+      if (productId != null && productId.isNotEmpty) {
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductViewScreen(
+              product: ProductItem(
+                productId: productId,
+                name: '',
+                farm: '',
+                price: '',
+                unit: '',
+                imageUrl: '',
+              ),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openSearchScreen() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SearchScreen(initialQuery: _searchController.text),
+      ),
+    );
+
+    if (result != null) {
+      if (result is Map && result.containsKey('qr')) {
+        _handleScannedQRResult(result['qr']);
+      } else if (result is String) {
+        setState(() {
+          _searchController.text = result;
+        });
+      }
+    }
+  }
+
+  void _handleScannedQRResult(String result) {
+    String? productId;
+    try {
+      final uri = Uri.parse(result);
+      if (uri.queryParameters.containsKey('id')) {
+        productId = uri.queryParameters['id'];
+      } else {
+        productId = result; 
+      }
+    } catch (e) {
+      productId = result;
+    }
+    
+    if (productId != null && productId.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProductViewScreen(
+            product: ProductItem(
+              productId: productId,
+              name: '',
+              farm: '',
+              price: '',
+              unit: '',
+              imageUrl: '',
+            ),
+          ),
+        ),
+      );
     }
   }
 
@@ -449,41 +546,72 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: Container(
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: AppColors.textHeadline.withValues(alpha: 0.1),
+                    child: GestureDetector(
+                      onTap: _openSearchScreen,
+                      child: Container(
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(26),
+                          border: Border.all(
+                            color: AppColors.primary,
+                            width: 1.5,
+                          ),
                         ),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Search fresh harvest...',
-                          hintStyle: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSubtle,
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.search_rounded,
-                            color: AppColors.textSubtle,
-                            size: 22,
-                          ),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 16),
+                            GestureDetector(
+                              onTap: _openQRScanner,
+                              child: const Icon(
+                                Icons.qr_code_scanner_rounded,
+                                color: AppColors.primary,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _searchController.text.isNotEmpty ? _searchController.text : 'Search products...',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: _searchController.text.isNotEmpty ? AppColors.textHeadline : AppColors.textSubtle,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (_searchController.text.isNotEmpty)
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _searchController.clear();
+                                  });
+                                },
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 4),
+                                  child: Icon(
                                     Icons.clear_rounded,
                                     color: AppColors.textSubtle,
                                     size: 20,
                                   ),
-                                  onPressed: () => _searchController.clear(),
-                                )
-                              : null,
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 14,
-                          ),
+                                ),
+                              ),
+                            Container(
+                              margin: const EdgeInsets.all(4),
+                              width: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(22),
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.search_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -2150,73 +2278,17 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
             iconColor: _isSaved ? Colors.redAccent : AppColors.textHeadline,
           ),
           _buildAppBarBtn(
-            Icons.share_outlined,
-            () async {
-              if (widget.product.productId == null) return;
-              final shareUrl = ShareUtil.generateProductShareLink(widget.product.productId!);
-              await Share.share(shareUrl, subject: 'Check out ${widget.product.name} on AgriDirect!');
-            },
-          ),
-          _buildAppBarBtn(
-            Icons.qr_code_2_rounded,
+            Icons.ios_share_rounded,
             () {
               if (widget.product.productId == null) return;
               final shareUrl = ShareUtil.generateProductShareLink(widget.product.productId!);
-              showDialog(
+              
+              ShareBottomSheet.show(
                 context: context,
-                builder: (context) => AlertDialog(
-                  title: Text(
-                    'Product QR Code',
-                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
-                    textAlign: TextAlign.center,
-                  ),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Scan to view this product',
-                        style: GoogleFonts.inter(color: Colors.grey[600]),
-                      ),
-                      const SizedBox(height: 24),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: QrImageView(
-                          data: shareUrl,
-                          version: QrVersions.auto,
-                          size: 200.0,
-                          eyeStyle: const QrEyeStyle(
-                            eyeShape: QrEyeShape.square,
-                            color: Color(0xFF0F172A),
-                          ),
-                          dataModuleStyle: const QrDataModuleStyle(
-                            dataModuleShape: QrDataModuleShape.square,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(
-                        'Close',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF16A34A),
-                        ),
-                      ),
-                    ),
-                  ],
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
+                shareUrl: shareUrl,
+                title: 'Share Product',
+                subtitle: 'Let others scan this QR code or share the link to this product.',
+                shareSubject: 'Check out ${widget.product.name} on AgriDirect!',
               );
             },
           ),
@@ -2800,29 +2872,35 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
       }
     }
 
+    final isOutOfStock =
+        !widget.product.isPreorder && (widget.product.stockQuantity ?? 0) <= 0;
+
     return Row(
       children: [
         Expanded(
           child: ElevatedButton.icon(
             key: _addToCartBtnKey,
-            onPressed: () async {
-              _runFlyToCartAnimation(_addToCartBtnKey, widget.product.imageUrl);
-              final errorMsg = await CartService().addItem(
-                widget.product,
-                _quantity,
-              );
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(errorMsg ?? 'Added to cart'),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
-            },
+            onPressed: isOutOfStock
+                ? null
+                : () async {
+                    _runFlyToCartAnimation(_addToCartBtnKey, widget.product.imageUrl);
+                    final errorMsg = await CartService().addItem(
+                      widget.product,
+                      _quantity,
+                    );
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(errorMsg ?? 'Added to cart'),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  },
             icon: const Icon(Icons.shopping_bag_rounded),
-            label: const Text('Add to Cart'),
+            label: Text(isOutOfStock ? 'Out of Stock' : 'Add to Cart'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: isOutOfStock ? Colors.grey : AppColors.primary,
+              disabledBackgroundColor: Colors.grey.shade300,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -2833,11 +2911,12 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: _isOrdering ? null : _showCheckoutSheet,
+            onPressed: (isOutOfStock || _isOrdering) ? null : _showCheckoutSheet,
             icon: const Icon(Icons.flash_on_rounded),
-            label: const Text('Order Now'),
+            label: Text(isOutOfStock ? 'Unavailable' : 'Order Now'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accent,
+              backgroundColor: isOutOfStock ? Colors.grey : AppColors.accent,
+              disabledBackgroundColor: Colors.grey.shade300,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),

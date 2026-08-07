@@ -6,6 +6,7 @@ import 'screens/consumer/home_screen.dart';
 import 'screens/consumer/marketplace_screen.dart';
 import 'screens/consumer/preorder_hub_screen.dart';
 import 'screens/consumer/orders_screen.dart';
+import '../web/screens/consumer/radar/consumer_radar_view.dart';
 import 'screens/farmer/farmer_sales_dashboard.dart';
 import 'screens/farmer/farmer_products_screen.dart';
 import 'screens/farmer/farmer_orders_screen.dart';
@@ -86,7 +87,7 @@ class _MobileNavigationState extends State<MobileNavigation> {
       const HomeScreen(),
       const MarketplaceScreen(),
       const PreOrderHubScreen(),
-      const OrdersScreen(),
+      const ConsumerRadarView(lat: 15.9281, lon: 120.3489),
       CustomerProfileScreen(
         onModeChanged: () => setState(() => _currentIndex = 0),
         onLogout: widget.onLogout,
@@ -108,7 +109,7 @@ class _MobileNavigationState extends State<MobileNavigation> {
       _NavItemData(Icons.home_rounded, 'Home'),
       _NavItemData(Icons.storefront_rounded, 'Marketplace'),
       _NavItemData(Icons.timer_rounded, 'Pre-Orders'),
-      _NavItemData(Icons.receipt_long_rounded, 'Orders'),
+      _NavItemData(Icons.radar_rounded, 'Weather'),
       _NavItemData(Icons.person_rounded, 'Profile'),
     ];
   }

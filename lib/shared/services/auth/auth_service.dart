@@ -21,6 +21,7 @@ class AuthService extends ChangeNotifier {
   bool _isLoggedIn = false;
   bool _isSeller = false;
   bool _isViewingAsFarmer = false;
+  bool _requiresMfa = false;
   bool _isAdmin = false;
   String _userName = '';
   String _userEmail = '';
@@ -34,6 +35,38 @@ class AuthService extends ChangeNotifier {
   bool _isInitialized = false;
 
   bool get isInitialized => _isInitialized;
+  bool get requiresMfa => _requiresMfa;
+  bool get canVerifyMfa => canOpenMfaChallenge(
+    requiresMfa: _requiresMfa,
+    hasAuthSession: _client.auth.currentSession != null,
+  );
+
+  @visibleForTesting
+  static bool isMfaRequiredForAssuranceLevels({
+    required Object? currentLevelName,
+    required Object? nextLevelName,
+  }) {
+    final currentLevel = currentLevelName?.toString().toLowerCase();
+    final nextLevel = nextLevelName?.toString().toLowerCase();
+    return nextLevel?.contains('aal2') == true &&
+        currentLevel?.contains('aal2') != true;
+  }
+
+  @visibleForTesting
+  static bool canOpenMfaChallenge({
+    required bool requiresMfa,
+    required bool hasAuthSession,
+  }) {
+    return requiresMfa && hasAuthSession;
+  }
+
+  bool _sessionRequiresMfa() {
+    final assurance = _client.auth.mfa.getAuthenticatorAssuranceLevel();
+    return isMfaRequiredForAssuranceLevels(
+      currentLevelName: assurance.currentLevel,
+      nextLevelName: assurance.nextLevel,
+    );
+  }
 
   // Brute-force protection
   int _consecutiveFailures = 0;
@@ -165,7 +198,9 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final email = _userEmail.isNotEmpty ? _userEmail : _client.auth.currentUser?.email;
+      final email = _userEmail.isNotEmpty
+          ? _userEmail
+          : _client.auth.currentUser?.email;
       if (email == null || email.isEmpty) {
         _errorMessage = 'No user email found. Please log in again.';
         return false;
@@ -334,6 +369,7 @@ class AuthService extends ChangeNotifier {
     _isSeller = false;
     _isViewingAsFarmer = false;
     _isAdmin = false;
+    _requiresMfa = false;
     _userName = '';
     _userEmail = '';
     _userId = '';
@@ -532,8 +568,21 @@ class AuthService extends ChangeNotifier {
       _userEmail = sessionEmail;
     }
 
+    if (user.emailConfirmedAt != null && _sessionRequiresMfa()) {
+      debugPrint(
+        'ðŸŸ¡ AuthService.initialize: MFA required; keeping session pending',
+      );
+      _isLoggedIn = false;
+      _requiresMfa = true;
+      _isLoading = false;
+      _isInitialized = true;
+      notifyListeners();
+      return;
+    }
+
     // Check if email is confirmed
     if (user.emailConfirmedAt != null) {
+      _requiresMfa = false;
       _isLoggedIn = true;
       _isSeller = false;
       _isViewingAsFarmer = false;
@@ -584,8 +633,9 @@ class AuthService extends ChangeNotifier {
             phoneNumber: metaPhone,
             emailVerified: user.appMetadata['provider'] == 'google',
           );
-          profile = await SupabaseDatabase.getUserProfile(user.id)
-              .timeout(const Duration(seconds: 4), onTimeout: () => null);
+          profile = await SupabaseDatabase.getUserProfile(
+            user.id,
+          ).timeout(const Duration(seconds: 4), onTimeout: () => null);
         } catch (e) {
           debugPrint('Error creating user profile on initialize: $e');
         }
@@ -788,6 +838,7 @@ class AuthService extends ChangeNotifier {
     if (_isLoading) return false;
     _isLoading = true;
     _errorMessage = null;
+    _requiresMfa = false;
     _clearpendingProfileState();
     notifyListeners();
 
@@ -813,7 +864,6 @@ class AuthService extends ChangeNotifier {
       );
 
       if (response.user == null) {
-        debugPrint('❌ AuthService.login: User is null in response');
         _errorMessage = 'Login failed';
         _isLoading = false;
         notifyListeners();
@@ -830,24 +880,86 @@ class AuthService extends ChangeNotifier {
         return false;
       }
 
-      _userId = response.user!.id;
+      // Check if MFA is required
+      if (_sessionRequiresMfa()) {
+        debugPrint('🟡 AuthService.login: MFA required (AAL2)');
+        _requiresMfa = true;
+        _isLoading = false;
+        notifyListeners();
+        return true; // Password correct, but UI must prompt for MFA
+      }
+
+      return await _finalizeSession(response.user!.id, email, response.user!);
+    } catch (e) {
+      _errorMessage = _extractErrorMessage(e);
+      if (_errorMessage!.toLowerCase().contains('invalid') ||
+          _errorMessage!.toLowerCase().contains('credential')) {
+        await _recordFailure();
+      }
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> verifyMfa(String code) async {
+    if (!canVerifyMfa) {
+      _errorMessage = 'Your secure login session expired. Please log in again.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final factors = await _client.auth.mfa.listFactors();
+      if (factors.totp.isEmpty) {
+        throw Exception('No Authenticator App enrolled');
+      }
+
+      final factorId = factors.totp.first.id;
+      final challenge = await _client.auth.mfa.challenge(factorId: factorId);
+
+      await _client.auth.mfa.verify(
+        factorId: factorId,
+        challengeId: challenge.id,
+        code: code,
+      );
+
+      _requiresMfa = false;
+      final user = _client.auth.currentUser;
+      if (user == null) throw Exception('No active session after MFA verify');
+
+      return await _finalizeSession(user.id, user.email!, user);
+    } catch (e) {
+      debugPrint('❌ AuthService.verifyMfa failed: $e');
+      _errorMessage = 'Invalid authentication code';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> _finalizeSession(String uid, String email, User authUser) async {
+    try {
+      _userId = uid;
       _userEmail = email;
       _isLoggedIn = true;
 
-      debugPrint('🔵 AuthService.login: Fetching DB profile for $_userId');
-      // Fetch user profile — if missing, create it from auth metadata
-      var profile = await SupabaseDatabase.getUserProfile(_userId).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          debugPrint('⚠️ AuthService.login: Profile fetch timed out');
-          return null;
-        },
+      debugPrint(
+        '🔵 AuthService._finalizeSession: Fetching DB profile for $_userId',
       );
 
+      // Fetch user profile — if missing, create it from auth metadata
+      var profile = await SupabaseDatabase.getUserProfile(
+        _userId,
+      ).timeout(const Duration(seconds: 10), onTimeout: () => null);
+
       if (profile == null) {
-        debugPrint('🟠 AuthService.login: Profile not found, creating one...');
-        // Profile doesn't exist yet (trigger missing or checkEmailConfirmed failed)
-        final metadata = response.user!.userMetadata;
+        final metadata = authUser.userMetadata;
         final metaName = (metadata?['name'] as String?) ?? '';
         final metaPhone = metadata?['phone_number'] as String?;
         try {
@@ -857,118 +969,62 @@ class AuthService extends ChangeNotifier {
             name: metaName,
             phoneNumber: metaPhone,
             emailVerified:
-                response.user!.appMetadata['provider'] == 'google' ||
-                response.user!.emailConfirmedAt != null,
+                authUser.appMetadata['provider'] == 'google' ||
+                authUser.emailConfirmedAt != null,
           ).timeout(const Duration(seconds: 10));
 
           profile = await SupabaseDatabase.getUserProfile(
             _userId,
           ).timeout(const Duration(seconds: 5), onTimeout: () => null);
-          debugPrint('✅ AuthService.login: Profile created and re-fetched');
         } catch (e) {
-          debugPrint('❌ AuthService.login: Error creating user profile: $e');
+          debugPrint('❌ AuthService.finalize: Error creating profile: $e');
         }
       }
-      // If profile name is empty, fall back to auth metadata name and fix DB
-      String resolvedName = (profile?['name'] as String?) ?? '';
-      if (resolvedName.isEmpty) {
-        final metaName =
-            (response.user!.userMetadata?['name'] as String?) ?? '';
-        if (metaName.isNotEmpty) {
-          resolvedName = metaName;
-          try {
-            await SupabaseDatabase.updateUserName(
-              userId: _userId,
-              name: metaName,
-            );
-          } catch (e) {
-            debugPrint('Error updating user name on login: $e');
-          }
-        }
-      }
+
+      // If profile name is empty, fall back to auth metadata name
+      String resolvedName =
+          (profile?['name'] as String?) ??
+          (authUser.userMetadata?['name'] as String?) ??
+          '';
       _userName = resolvedName;
 
-      // Check if profile is incomplete (missing phone)
+      // Check if profile is incomplete
       final phone = profile?['phone'] as String?;
       final isVerified = (profile?['email_verified'] as bool?) ?? false;
       _isEmailVerified = isVerified;
+      _needsProfileCompletion = (phone == null || phone.isEmpty) && isVerified;
 
-      if ((phone == null || phone.isEmpty) && isVerified) {
-        debugPrint(
-          '🟠 AuthService.login: Profile incomplete and verified, setting flag',
-        );
-        _needsProfileCompletion = true;
-        _pendingUserId = _userId;
-        _pendingEmail = _userEmail;
-        _pendingName = _userName;
-      } else {
-        _clearpendingProfileState();
-      }
+      // Fetch roles
+      final roles = await SupabaseDatabase.getUserRoles(
+        _userId,
+      ).timeout(const Duration(seconds: 10), onTimeout: () => <String>[]);
 
-      // Ensure admin profile exists for known admin emails
-      try {
-        await SupabaseDatabase.ensureAdminProfileExists(
-          userId: _userId,
-          email: email,
-        );
-      } catch (e) {
-        debugPrint('Warning: Could not ensure admin profile: $e');
-      }
-
-      debugPrint('🔵 AuthService.login: Fetching roles...');
-      // Fetch roles from user_roles table
-      final roles = await SupabaseDatabase.getUserRoles(_userId).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          debugPrint('⚠️ AuthService.login: Roles fetch timed out');
-          return <String>[];
-        },
-      );
-
-      debugPrint('🔵 AuthService.login: Finalizing session...');
       final reg = await SupabaseDatabase.getFarmerRegistration(
         _userId,
       ).timeout(const Duration(seconds: 10), onTimeout: () => null);
 
       if (reg != null) {
         _registrationStatus = reg['status'] as String?;
-        // CRITICAL FIX: Only allow seller mode if approved or verified.
-        if (_registrationStatus == 'approved' || reg['is_verified'] == true) {
-          _isSeller = true;
-        } else {
-          _isSeller = false;
-        }
+        _isSeller =
+            _registrationStatus == 'approved' || reg['is_verified'] == true;
       } else {
-        // Fallback to role-based check if no registration found
         _isSeller = roles.contains('seller') || roles.contains('farmer');
       }
 
-      if (!_isSeller) {
-        _isViewingAsFarmer = false;
-      }
+      if (!_isSeller) _isViewingAsFarmer = false;
 
       _startWatchingRegistrationStatus(_userId);
-
       await _persistCachedUserState();
       await AnalyticsService()
           .startSession(userId: _userId)
-          .timeout(const Duration(seconds: 5))
           .catchError((_) => null);
 
-      debugPrint('✅ AuthService.login: SUCCESS');
       await _resetBruteForce();
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = _extractErrorMessage(e);
-
-      // 🛡️ Increment failure count on wrong credentials
-      if (_errorMessage!.toLowerCase().contains('invalid') ||
-          _errorMessage!.toLowerCase().contains('credential')) {
-        await _recordFailure();
-      }
-
+      _errorMessage = 'Failed to finalize session: $e';
       _isLoading = false;
       notifyListeners();
       return false;

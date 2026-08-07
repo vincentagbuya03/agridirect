@@ -16,6 +16,7 @@ import '../../../shared/services/social/follow_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import '../../../shared/services/commerce/voucher_service.dart';
 import '../../../shared/utils/share_util.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../shared/widgets/flying_icon_animation.dart';
 
 /// Full-screen public profile for a farmer, with Products & Posts tabs.
@@ -365,12 +366,10 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
               onPressed: () async {
                 final farmerId = f['farmerId']?.toString();
                 if (farmerId != null) {
-                  final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.farmerProfile(farmerId)}';
-                  final messenger = ScaffoldMessenger.of(context);
-                  await Clipboard.setData(ClipboardData(text: shareUrl));
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('Farm profile link copied to clipboard!')),
-                  );
+                  final shareUrl = ShareUtil.generateFarmerShareLink(farmerId);
+                  final farmName = f['farm_name']?.toString() ?? 'Farm';
+                  final shareSubject = 'Check out $farmName on AgriDirect!';
+                  await Share.share('$shareSubject\n\n$shareUrl', subject: shareSubject);
                 }
               },
               icon: Container(
