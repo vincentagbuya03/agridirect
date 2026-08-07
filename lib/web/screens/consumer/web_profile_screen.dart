@@ -1705,7 +1705,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 icon: Icons.devices_rounded,
                 title: 'Manage Login Device',
                 description:
-                    'Review the devices that you have logged in Shopee account.',
+                    'Review the devices that you have logged in AgriDirect account.',
                 buttonText: 'Manage Device',
                 onTap: () => setState(() => _selectedTab = 8),
               ),

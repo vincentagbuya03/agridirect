@@ -78,6 +78,7 @@ class _ConsumerRadarViewState extends State<ConsumerRadarView> {
           ),
         ),
       ],
+      ),
     );
   }
 }

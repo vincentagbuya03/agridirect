@@ -23,33 +23,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   final OfflineCacheService _cacheService = OfflineCacheService();
   bool _clearingCache = false;
 
-  bool _publicProfile = true;
-  bool _locationPermission = true;
-  bool _diagnosticsEnabled = true;
-
   int _activeTabIndex = 0;
   int _hoveredTab = -1;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPrivacySettings();
-  }
-
-  Future<void> _loadPrivacySettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _publicProfile = prefs.getBool('privacy.public_profile') ?? true;
-      _locationPermission = prefs.getBool('privacy.location_permission') ?? true;
-      _diagnosticsEnabled = prefs.getBool('privacy.diagnostics_enabled') ?? true;
-    });
-  }
-
-  Future<void> _updatePrivacySetting(String key, bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(key, value);
-    _loadPrivacySettings();
-  }
 
   Future<void> _openChangePasswordDialog() async {
     final formKey = GlobalKey<FormState>();
@@ -492,7 +467,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   Widget _buildWebSidebar() {
     final categories = [
       {'title': 'Security', 'icon': Icons.lock_outline_rounded},
-      {'title': 'Privacy', 'icon': Icons.visibility_outlined},
       {'title': 'Storage', 'icon': Icons.cleaning_services_outlined},
       {'title': 'Account Actions', 'icon': Icons.delete_forever_rounded},
     ];
@@ -601,7 +575,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
           if (_activeTabIndex == 0) ...[
             _buildWebHeader('Security', 'Manage the security of your account.'),
             const SizedBox(height: 24),
-            _buildWebTileCard([
+            _buildSectionCard([
               _SettingsTile(
                 icon: Icons.lock_outline_rounded,
                 title: 'Change Password',
@@ -627,42 +601,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
               _SettingsTile(
                 icon: Icons.devices_rounded,
                 title: 'Manage Login Device',
-                subtitle: 'Review the devices that you have logged in Shopee account.',
+                subtitle: 'Review the devices that you have logged in AgriDirect account.',
                 onTap: () => context.push(AppRoutes.manageDevice),
               ),
             ]),
           ] else if (_activeTabIndex == 1) ...[
-            _buildWebHeader('Privacy', 'Configure your data and visibility preferences.'),
-            const SizedBox(height: 24),
-            _buildWebTileCard([
-              _SwitchSettingsTile(
-                icon: Icons.visibility_outlined,
-                title: 'Public Profile',
-                subtitle: 'Allow other users to search or view your profile details.',
-                value: _publicProfile,
-                onChanged: (val) => _updatePrivacySetting('privacy.public_profile', val),
-              ),
-              const Divider(height: 1, color: Color(0xFFF1F5F9)),
-              _SwitchSettingsTile(
-                icon: Icons.location_on_outlined,
-                title: 'Location Services',
-                subtitle: 'Use device location to match and find nearby farms.',
-                value: _locationPermission,
-                onChanged: (val) => _updatePrivacySetting('privacy.location_permission', val),
-              ),
-              const Divider(height: 1, color: Color(0xFFF1F5F9)),
-              _SwitchSettingsTile(
-                icon: Icons.analytics_outlined,
-                title: 'Usage Diagnostics',
-                subtitle: 'Share anonymous usage reports to help improve AgriDirect.',
-                value: _diagnosticsEnabled,
-                onChanged: (val) => _updatePrivacySetting('privacy.diagnostics_enabled', val),
-              ),
-            ]),
-          ] else if (_activeTabIndex == 2) ...[
             _buildWebHeader('Storage', 'Manage local cache settings and offline data.'),
             const SizedBox(height: 24),
-            _buildWebTileCard([
+            _buildSectionCard([
               _SettingsTile(
                 icon: Icons.cleaning_services_outlined,
                 title: 'Clear Auto Cache',
@@ -677,10 +623,10 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 onTap: _clearingCache ? null : _clearAutoCache,
               ),
             ]),
-          ] else if (_activeTabIndex == 3) ...[
+          ] else if (_activeTabIndex == 2) ...[
             _buildWebHeader('Account Actions', 'Crucial account state operations.'),
             const SizedBox(height: 24),
-            _buildWebTileCard([
+            _buildSectionCard([
               _SettingsTile(
                 icon: Icons.delete_forever_rounded,
                 title: 'Delete Account',
@@ -721,7 +667,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     );
   }
 
-  Widget _buildWebTileCard(List<Widget> children) {
+  Widget _buildSectionCard(List<Widget> children) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -747,181 +693,182 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
       return _buildWebLayout();
     }
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF5F5F5), // Light gray background
       appBar: AppBar(
-        title: const Text('App Settings'),
+        title: const Text('Account & Security', style: TextStyle(color: Colors.black87, fontSize: 18)),
         backgroundColor: Colors.white,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black87),
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        padding: EdgeInsets.zero,
         children: [
-          // Security Section
-          Text('Security', style: AppTextStyles.headline3),
-          const SizedBox(height: 12),
-          _SettingsTile(
-            icon: Icons.lock_outline_rounded,
-            title: 'Change Password',
-            subtitle: 'Update the password used for your account.',
-            onTap: _openChangePasswordDialog,
-          ),
-          const SizedBox(height: 12),
-          _SettingsTile(
-            icon: Icons.security_rounded,
-            title: 'Two-Factor Authentication (2FA)',
-            subtitle: 'Add an extra layer of security with an Authenticator App.',
-            trailing: const Text('Active', style: TextStyle(color: Color(0xFF64748B))),
-            onTap: () {},
-          ),
-          const SizedBox(height: 12),
-          _SettingsTile(
-            icon: Icons.history_rounded,
-            title: 'Check Account Activity',
-            subtitle: 'Check your login and account changes in the last 30 days',
-            onTap: () => context.push(AppRoutes.accountActivity),
-          ),
-          const SizedBox(height: 12),
-          _SettingsTile(
-            icon: Icons.devices_rounded,
-            title: 'Manage Login Device',
-            subtitle: 'Review the devices that you have logged in Shopee account.',
-            onTap: () => context.push(AppRoutes.manageDevice),
-          ),
-          const SizedBox(height: 24),
-
-          // Privacy Section
-          Text('Privacy', style: AppTextStyles.headline3),
-          const SizedBox(height: 12),
-          _SwitchSettingsTile(
-            icon: Icons.visibility_outlined,
-            title: 'Public Profile',
-            subtitle: 'Allow other users to search or view your profile details.',
-            value: _publicProfile,
-            onChanged: (val) => _updatePrivacySetting('privacy.public_profile', val),
-          ),
-          const SizedBox(height: 12),
-          _SwitchSettingsTile(
-            icon: Icons.location_on_outlined,
-            title: 'Location Services',
-            subtitle: 'Use device location to match and find nearby farms.',
-            value: _locationPermission,
-            onChanged: (val) => _updatePrivacySetting('privacy.location_permission', val),
-          ),
-          const SizedBox(height: 12),
-          _SwitchSettingsTile(
-            icon: Icons.analytics_outlined,
-            title: 'Usage Diagnostics',
-            subtitle: 'Share anonymous usage reports to help improve AgriDirect.',
-            value: _diagnosticsEnabled,
-            onChanged: (val) => _updatePrivacySetting('privacy.diagnostics_enabled', val),
-          ),
-          const SizedBox(height: 24),
-
-          // Storage Section
-          Text('Storage', style: AppTextStyles.headline3),
-          const SizedBox(height: 12),
-          _SettingsTile(
-            icon: Icons.cleaning_services_outlined,
-            title: 'Clear Auto Cache',
-            subtitle: 'Remove temporary offline product cache.',
-            trailing: _clearingCache
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : null,
-            onTap: _clearingCache ? null : _clearAutoCache,
-          ),
-          const SizedBox(height: 24),
-
-          // Account Actions Section
-          Text('Account Actions', style: AppTextStyles.headline3),
-          const SizedBox(height: 12),
-          InkWell(
-            onTap: _openDeleteAccountDialog,
-            borderRadius: BorderRadius.circular(22),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: AppDecorations.cardDecoration.copyWith(
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.delete_forever_rounded, color: AppColors.error),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Delete Account',
-                          style: AppTextStyles.headline3.copyWith(color: AppColors.error),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Permanently delete your profile and account data.',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSubtle,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 16,
-                    color: Colors.grey,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // System Section
-          Text('System', style: AppTextStyles.headline3),
-          const SizedBox(height: 12),
-          _SettingsTile(
-            icon: Icons.system_update_rounded,
-            title: 'Check for Updates',
-            subtitle: 'Check for new application versions.',
-            onTap: () => AutoUpdateService().checkForUpdates(context, showFeedback: true),
-          ),
-          const SizedBox(height: 24),
-
-          // About Section
-          Text('About', style: AppTextStyles.headline3),
-          const SizedBox(height: 12),
+          _buildSectionTitle('Account'),
           Container(
-            padding: const EdgeInsets.all(18),
-            decoration: AppDecorations.cardDecoration.copyWith(
-              borderRadius: BorderRadius.circular(22),
-            ),
+            color: Colors.white,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('AgriDirect Mobile', style: AppTextStyles.headline3),
-                const SizedBox(height: 8),
-                Text(
-                  'Profile settings now include account security, privacy toggles, cache tools, and account actions in one place.',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSubtle,
-                    height: 1.5,
+                _SettingsTile(
+                  icon: Icons.person_outline,
+                  title: 'My Profile',
+                  subtitle: '',
+                  onTap: () => context.push(AppRoutes.myDetails),
+                ),
+                const Divider(height: 1, thickness: 1, color: Color(0xFFF5F5F5)),
+                _SettingsTile(
+                  icon: Icons.phone_outlined,
+                  title: 'Phone',
+                  subtitle: '',
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('+63 *****38', style: TextStyle(color: Colors.grey)),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+                    ],
                   ),
+                  onTap: () {},
+                ),
+                const Divider(height: 1, thickness: 1, color: Color(0xFFF5F5F5)),
+                _SettingsTile(
+                  icon: Icons.email_outlined,
+                  title: 'Email',
+                  subtitle: '',
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('v****3@gmail.com', style: TextStyle(color: Colors.grey)),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+                    ],
+                  ),
+                  onTap: () {},
+                ),
+                const Divider(height: 1, thickness: 1, color: Color(0xFFF5F5F5)),
+                _SettingsTile(
+                  icon: Icons.lock_outline_rounded,
+                  title: 'Change Password',
+                  subtitle: '',
+                  onTap: () => context.push(AppRoutes.changePassword),
                 ),
               ],
             ),
           ),
+
+          _buildSectionTitle('Security'),
+          Container(
+            color: Colors.white,
+            child: Column(
+              children: [
+                _SettingsTile(
+                  icon: Icons.history_rounded,
+                  title: 'Check Account Activity',
+                  subtitle: 'Check your login and account changes in the last 30 days',
+                  onTap: () => context.push(AppRoutes.accountActivity),
+                ),
+                const Divider(height: 1, thickness: 1, color: Color(0xFFF5F5F5)),
+                _SettingsTile(
+                  icon: Icons.security_rounded,
+                  title: 'Two-Factor Authentication (2FA)',
+                  subtitle: 'Add an extra layer of security with an Authenticator App.',
+                  trailing: const Text('Active', style: TextStyle(color: Color(0xFF64748B))),
+                  onTap: () {},
+                ),
+                const Divider(height: 1, thickness: 1, color: Color(0xFFF5F5F5)),
+                _SettingsTile(
+                  icon: Icons.devices_rounded,
+                  title: 'Manage Login Device',
+                  subtitle: 'Review the devices that you have logged in AgriDirect account.',
+                  onTap: () => context.push(AppRoutes.manageDevice),
+                ),
+              ],
+            ),
+          ),
+
+          _buildSectionTitle('System & Storage'),
+          Container(
+            color: Colors.white,
+            child: Column(
+              children: [
+                _SettingsTile(
+                  icon: Icons.cleaning_services_outlined,
+                  title: 'Clear Auto Cache',
+                  subtitle: 'Remove temporary offline product cache.',
+                  trailing: _clearingCache
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : null,
+                  onTap: _clearingCache ? null : _clearAutoCache,
+                ),
+                const Divider(height: 1, thickness: 1, color: Color(0xFFF5F5F5)),
+                _SettingsTile(
+                  icon: Icons.system_update_rounded,
+                  title: 'Check for Updates',
+                  subtitle: 'Check for new application versions.',
+                  onTap: () => AutoUpdateService().checkForUpdates(context, showFeedback: true),
+                ),
+                const Divider(height: 1, thickness: 1, color: Color(0xFFF5F5F5)),
+                _SettingsTile(
+                  icon: Icons.delete_outline_rounded,
+                  title: 'Delete Account',
+                  subtitle: 'Permanently delete your profile and account data.',
+                  onTap: _openDeleteAccountDialog,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            child: ElevatedButton(
+              onPressed: () async {
+                await AuthService().logout();
+                if (context.mounted) {
+                  context.go(AppRoutes.login);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.red,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+              ),
+              child: const Text(
+                'Log Out',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.red,
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 48),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 14,
+          color: Colors.grey,
+        ),
       ),
     );
   }
@@ -953,49 +900,47 @@ class _SettingsTile extends StatelessWidget {
     final isWeb = kIsWeb && MediaQuery.of(context).size.width >= 650;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(isWeb ? 16 : 22),
       child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: isWeb
-            ? null
-            : AppDecorations.cardDecoration.copyWith(
-                borderRadius: BorderRadius.circular(22),
-              ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: iconBgColor ?? AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+            if (isWeb) ...[
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: iconBgColor ?? AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor ?? AppColors.primary),
               ),
-              child: Icon(icon, color: iconColor ?? AppColors.primary),
-            ),
-            const SizedBox(width: 14),
+              const SizedBox(width: 14),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: AppTextStyles.headline3.copyWith(
-                      color: titleColor,
-                    ),
+                    style: isWeb
+                        ? AppTextStyles.headline3.copyWith(color: titleColor)
+                        : TextStyle(fontSize: 15, color: titleColor ?? Colors.black87),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSubtle,
+                  if (subtitle.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSubtle,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
             trailing ??
                 const Icon(
                   Icons.arrow_forward_ios_rounded,
-                  size: 16,
+                  size: 14,
                   color: Colors.grey,
                 ),
           ],
@@ -1005,65 +950,3 @@ class _SettingsTile extends StatelessWidget {
   }
 }
 
-class _SwitchSettingsTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  const _SwitchSettingsTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isWeb = kIsWeb && MediaQuery.of(context).size.width >= 650;
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: isWeb
-          ? null
-          : AppDecorations.cardDecoration.copyWith(
-              borderRadius: BorderRadius.circular(22),
-            ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: AppColors.primary),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: AppTextStyles.headline3),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSubtle,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch.adaptive(
-            value: value,
-            activeTrackColor: AppColors.primary.withValues(alpha: 0.5),
-            activeThumbColor: AppColors.primary,
-            onChanged: onChanged,
-          ),
-        ],
-      ),
-    );
-  }
-}

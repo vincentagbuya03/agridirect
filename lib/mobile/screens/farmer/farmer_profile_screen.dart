@@ -371,7 +371,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
           child: Column(
             children: [
               // Top bar
@@ -390,7 +390,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
                       'Farmer Profile',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
                       ),
@@ -403,22 +403,22 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
 
               // Avatar + name row
               Row(
                 children: [
                   // Farm logo avatar
                   Container(
-                    width: 76,
-                    height: 76,
+                    width: 60,
+                    height: 60,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
+                      border: Border.all(color: Colors.white, width: 2),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 12,
+                          blurRadius: 8,
                         ),
                       ],
                     ),
@@ -443,7 +443,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
                             ),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -451,28 +451,28 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
                         Text(
                           displayName.isNotEmpty ? displayName : 'My Farm',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 20,
+                            fontSize: 18,
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           auth.userEmail,
                           style: GoogleFonts.inter(
-                              fontSize: 12,
+                              fontSize: 11,
                               color: Colors.white70,
                               fontWeight: FontWeight.w500),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
                         // Verified farmer badge
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(20),
@@ -483,12 +483,12 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.verified_rounded,
-                                  size: 13, color: Colors.white),
-                              const SizedBox(width: 5),
+                                  size: 11, color: Colors.white),
+                              const SizedBox(width: 4),
                               Text(
                                 'Verified Farmer',
                                 style: GoogleFonts.inter(
-                                  fontSize: 11,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                 ),
@@ -502,14 +502,14 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
                 ],
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
               // Stats banner
               Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                 ),
                 child: Row(
@@ -520,14 +520,14 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
                           'Followers',
                           Icons.groups_rounded),
                     ),
-                    Container(width: 1, height: 32, color: Colors.white30),
+                    Container(width: 1, height: 24, color: Colors.white30),
                     Expanded(
                       child: _buildStatItem(
                           '${_dashboardStats['activeListings'] ?? 0}',
                           'Products',
                           Icons.inventory_2_outlined),
                     ),
-                    Container(width: 1, height: 32, color: Colors.white30),
+                    Container(width: 1, height: 24, color: Colors.white30),
                     Expanded(
                       child: _buildStatItem(
                           '${_dashboardStats['communityPosts'] ?? 0}',
@@ -538,17 +538,17 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
                 ),
               ),
 
-              const SizedBox(height: 14),
+              const SizedBox(height: 8),
 
               // Switch to Customer
               GestureDetector(
                 onTap: _handleSwitchToCustomer,
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                         color: Colors.white.withValues(alpha: 0.35)),
                   ),
@@ -556,11 +556,11 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.shopping_bag_outlined,
-                          size: 16, color: Colors.white),
-                      const SizedBox(width: 8),
+                          size: 14, color: Colors.white),
+                      const SizedBox(width: 6),
                       Text('Switch to Buying Mode',
                           style: GoogleFonts.inter(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
                           )),
@@ -568,7 +568,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 8),
             ],
           ),
         ),
@@ -579,13 +579,13 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
   Widget _buildStatItem(String value, String label, IconData icon) {
     return Column(
       children: [
-        Icon(icon, size: 16, color: Colors.white70),
-        const SizedBox(height: 4),
+        Icon(icon, size: 14, color: Colors.white70),
+        const SizedBox(height: 2),
         Text(value,
             style: GoogleFonts.plusJakartaSans(
-                fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
+                fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
         Text(label,
-            style: GoogleFonts.inter(fontSize: 11, color: Colors.white70)),
+            style: GoogleFonts.inter(fontSize: 10, color: Colors.white70)),
       ],
     );
   }
