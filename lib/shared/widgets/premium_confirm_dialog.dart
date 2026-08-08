@@ -34,9 +34,11 @@ class PremiumConfirmDialog extends StatelessWidget {
         elevation: 10,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               // Circular Icon Container with Soft Background
               Container(
                 width: 64,
@@ -125,6 +127,7 @@ class PremiumConfirmDialog extends StatelessWidget {
                 ],
               ),
             ],
+          ),
           ),
         ),
       ),

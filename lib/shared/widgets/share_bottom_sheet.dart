@@ -89,6 +89,7 @@ class ShareBottomSheet {
                     // Share URL only (no text prefix) so Messenger/WhatsApp
                     // generate a full rich link preview card (like Shopee).
                     // The OG meta tags in api/share.js handle the product image + title.
+                    // ignore: deprecated_member_use
                     await Share.share(shareUrl, subject: shareSubject);
                   },
                   icon: const Icon(Icons.share_rounded, size: 20),

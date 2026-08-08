@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/data/app_data.dart';
@@ -298,7 +298,8 @@ class _WebFarmerPublicProfileScreenState
                             final shareUrl = ShareUtil.generateFarmerShareLink(widget.farmerId);
                             final farmName = farmer['farm_name']?.toString() ?? 'Farm';
                             final shareSubject = 'Check out $farmName on AgriDirect!';
-                            await Share.share('$shareSubject\n\n$shareUrl', subject: shareSubject);
+                            // ignore: deprecated_member_use
+                            await Share.share('Check out $farmName on AgriDirect!\n$shareUrl', subject: shareSubject);
                           },
                           icon: const Icon(Icons.ios_share_rounded, color: Colors.white),
                           style: IconButton.styleFrom(

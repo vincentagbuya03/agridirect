@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
 import 'package:share_plus/share_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:go_router/go_router.dart';
@@ -700,6 +700,7 @@ class _WebProductDetailsState extends State<WebProductDetails> {
               onPressed: () async {
                 if (_product?.productId == null) return;
                 final shareUrl = ShareUtil.generateProductShareLink(_product!.productId!);
+                // ignore: deprecated_member_use
                 await Share.share(shareUrl, subject: 'Check out ${_product!.name} on AgriDirect!');
               },
               child: Text('Share Link', style: GoogleFonts.inter(fontWeight: FontWeight.w500)),

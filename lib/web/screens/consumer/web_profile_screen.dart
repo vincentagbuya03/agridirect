@@ -207,18 +207,24 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     setState(() => _isSavingProfile = true);
     final auth = AuthService();
     try {
-      // 1. Update basic user table info (applies to both consumer & farmer)
+      // 1. Update basic user table info (applies to both consumer & farmer for phone and avatar)
+      final Map<String, dynamic> userUpdates = {
+        'avatar_url': _avatarUrl,
+        'phone': _phoneController.text.trim(),
+      };
+      
+      // Only update user's full name if in consumer mode
+      if (!auth.isViewingAsFarmer) {
+        userUpdates['name'] = _nameController.text.trim();
+      }
+
       await SupabaseConfig.client
           .from('users')
-          .update({
-            'name': _nameController.text.trim(),
-            'avatar_url': _avatarUrl,
-            'phone': _phoneController.text.trim(),
-          })
+          .update(userUpdates)
           .eq('user_id', auth.userId);
 
-      // 2. If farmer mode, also update the farmers table
-      if (auth.isViewingAsFarmer || auth.isSeller) {
+      // 2. If viewing as farmer, update the farmers table
+      if (auth.isViewingAsFarmer) {
         await SupabaseConfig.client
             .from('farmers')
             .update({

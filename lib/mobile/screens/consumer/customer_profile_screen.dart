@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/router/app_routes.dart';
+import '../../../shared/services/commerce/order_service.dart';
+import '../../../shared/widgets/premium_confirm_dialog.dart';
 
 class CustomerProfileScreen extends StatefulWidget {
   final VoidCallback onModeChanged;
@@ -24,6 +26,12 @@ class CustomerProfileScreen extends StatefulWidget {
 class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   String? _customerImageUrl;
 
+  int _pendingCount = 0;
+  int _toShipCount = 0;
+  int _toReceiveCount = 0;
+  int _toRateCount = 0;
+  StreamSubscription? _orderSubscription;
+
   static const Color _primary = Color(0xFF059669);
   static const Color _muted = Color(0xFF64748B);
 
@@ -31,6 +39,52 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   void initState() {
     super.initState();
     _loadCustomerData();
+    _startOrderSubscription();
+  }
+
+  void _startOrderSubscription() {
+    try {
+      _orderSubscription = OrderService().watchMyOrders().listen((orders) {
+        if (!mounted) return;
+        int pending = 0;
+        int toShip = 0;
+        int toReceive = 0;
+        int toRate = 0;
+
+        for (final order in orders) {
+          switch (order.status) {
+            case 'PENDING':
+              pending++;
+              break;
+            case 'CONFIRMED':
+            case 'PROCESSING':
+              toShip++;
+              break;
+            case 'SHIPPED':
+              toReceive++;
+              break;
+            case 'DELIVERED':
+              toRate++; // Assuming delivered orders need rating
+              break;
+          }
+        }
+
+        setState(() {
+          _pendingCount = pending;
+          _toShipCount = toShip;
+          _toReceiveCount = toReceive;
+          _toRateCount = toRate;
+        });
+      });
+    } catch (e) {
+      debugPrint('Error subscribing to orders: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _orderSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadCustomerData({int attempt = 0}) async {
@@ -66,6 +120,21 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
       }
     } catch (e) {
       debugPrint('Error loading customer profile data: $e');
+    }
+  }
+
+  Future<void> _confirmLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => const PremiumConfirmDialog(
+        title: 'Confirm Logout',
+        content: 'Are you sure you want to log out of AgriDirect?',
+      ),
+    );
+
+    if (shouldLogout == true) {
+      widget.onLogout();
     }
   }
 
@@ -126,7 +195,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
           child: Column(
             children: [
               Row(
@@ -278,10 +347,10 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildIconAction(Icons.account_balance_wallet_outlined, 'Pending', () => context.push('${AppRoutes.customerOrders}?tab=0')),
-              _buildIconAction(Icons.inventory_2_outlined, 'To Ship', () => context.push('${AppRoutes.customerOrders}?tab=1')),
-              _buildIconAction(Icons.local_shipping_outlined, 'To Receive', () => context.push('${AppRoutes.customerOrders}?tab=2')),
-              _buildIconAction(Icons.star_outline_rounded, 'To Rate', () => context.push('${AppRoutes.customerOrders}?tab=3')),
+              _buildIconAction(Icons.account_balance_wallet_outlined, 'Pending', () => context.push('${AppRoutes.customerOrders}?tab=0'), badgeCount: _pendingCount),
+              _buildIconAction(Icons.inventory_2_outlined, 'To Ship', () => context.push('${AppRoutes.customerOrders}?tab=1'), badgeCount: _toShipCount),
+              _buildIconAction(Icons.local_shipping_outlined, 'To Receive', () => context.push('${AppRoutes.customerOrders}?tab=2'), badgeCount: _toReceiveCount),
+              _buildIconAction(Icons.star_outline_rounded, 'To Rate', () => context.push('${AppRoutes.customerOrders}?tab=3'), badgeCount: _toRateCount),
             ],
           ),
         ],
@@ -345,19 +414,27 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           _buildListAction(Icons.description_outlined, 'Terms of Service', () {}),
           _buildListAction(Icons.privacy_tip_outlined, 'Privacy Policy', () {}),
           _buildListAction(Icons.policy_outlined, 'Community Rules', () {}),
+          _buildListAction(
+            Icons.logout_rounded, 
+            'Log Out', 
+            _confirmLogout,
+            color: const Color(0xFFEF4444),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildListAction(IconData icon, String label, VoidCallback onTap) {
+  Widget _buildListAction(IconData icon, String label, VoidCallback onTap, {Color? color}) {
+    final effectiveColor = color ?? const Color(0xFF475569);
+    final effectiveTextColor = color ?? const Color(0xFF334155);
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 24, color: const Color(0xFF475569)),
+            Icon(icon, size: 24, color: effectiveColor),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
@@ -365,25 +442,56 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: const Color(0xFF334155),
+                  color: effectiveTextColor,
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF94A3B8)),
+            Icon(Icons.chevron_right_rounded, size: 20, color: color ?? const Color(0xFF94A3B8)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildIconAction(IconData icon, String label, VoidCallback onTap) {
+  Widget _buildIconAction(IconData icon, String label, VoidCallback onTap, {int badgeCount = 0}) {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 26, color: const Color(0xFF475569)),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon, size: 26, color: const Color(0xFF475569)),
+                if (badgeCount > 0)
+                  Positioned(
+                    top: -4,
+                    right: -6,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444), // Red color for badge
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Text(
+                        '$badgeCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 8),
             Text(
               label,

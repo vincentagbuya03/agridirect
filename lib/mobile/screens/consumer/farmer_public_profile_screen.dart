@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
@@ -287,7 +287,7 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
   SliverAppBar _buildSliverAppBar(BuildContext context, bool innerBoxIsScrolled) {
     final imageUrl = f['imageUrl']?.toString();
     return SliverAppBar(
-      expandedHeight: 180,
+      expandedHeight: 120,
       pinned: true,
       stretch: true,
       backgroundColor: AppColors.primary,
@@ -366,10 +366,10 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
               onPressed: () async {
                 final farmerId = f['farmerId']?.toString();
                 if (farmerId != null) {
-                  final shareUrl = ShareUtil.generateFarmerShareLink(farmerId);
-                  final farmName = f['farm_name']?.toString() ?? 'Farm';
-                  final shareSubject = 'Check out $farmName on AgriDirect!';
-                  await Share.share('$shareSubject\n\n$shareUrl', subject: shareSubject);
+                  final url = ShareUtil.generateFarmerShareLink(farmerId);
+                  final farmerName = f['farm_name']?.toString() ?? 'Farm';
+                  // ignore: deprecated_member_use
+                  await Share.share('Check out $farmerName on AgriDirect!\n$url');
                 }
               },
               icon: Container(

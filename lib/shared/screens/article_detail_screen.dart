@@ -497,6 +497,7 @@ class ArticleDetailScreen extends StatelessWidget {
           if (article.id == null) return;
           final shareUrl = ShareUtil.generatePostShareLink(article.id!);
           final shareSubject = 'Check out this article on AgriDirect: ${article.title}';
+          // ignore: deprecated_member_use
           await Share.share('$shareSubject\n\n$shareUrl', subject: shareSubject);
         },
         icon: const Icon(Icons.ios_share_rounded, size: 20),
