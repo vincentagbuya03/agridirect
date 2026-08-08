@@ -1,12 +1,12 @@
 // app settings
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/auto_update_service.dart';
 import '../../../shared/services/offline/offline_cache_service.dart';
+import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../web/widgets/web_consumer_nav_bar.dart';
 import '../../../shared/router/app_routes.dart';
@@ -25,6 +25,71 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 
   int _activeTabIndex = 0;
   int _hoveredTab = -1;
+
+  String _userEmail = '';
+  String _userPhone = '';
+  bool _loadingUserData = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final user = SupabaseConfig.client.auth.currentUser;
+    _userEmail = user?.email ?? '';
+    _userPhone = user?.phone ?? '';
+
+    if (user != null) {
+      try {
+        final profile = await SupabaseConfig.client
+            .from('users')
+            .select('phone, phone_number')
+            .eq('user_id', user.id)
+            .limit(1)
+            .maybeSingle();
+
+        if (profile != null) {
+          final phoneVal = (profile['phone'] ?? profile['phone_number'] ?? '').toString();
+          if (phoneVal.isNotEmpty) {
+            _userPhone = phoneVal;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading user profile details: $e');
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _loadingUserData = false;
+      });
+    }
+  }
+
+  String _obfuscateEmail(String email) {
+    if (email.isEmpty) return 'Not linked';
+    final parts = email.split('@');
+    if (parts.length != 2) return email;
+    final username = parts[0];
+    final domain = parts[1];
+    if (username.length <= 2) {
+      return '${username[0]}***@$domain';
+    }
+    return '${username.substring(0, 2)}***${username.substring(username.length - 1)}@$domain';
+  }
+
+  String _obfuscatePhone(String phone) {
+    if (phone.isEmpty) return 'Not linked';
+    final cleaned = phone.replaceAll(RegExp(r'\s+'), '');
+    if (cleaned.length <= 4) return cleaned;
+    if (cleaned.startsWith('+')) {
+      final prefix = cleaned.substring(0, 3);
+      final suffix = cleaned.substring(cleaned.length - 2);
+      return '$prefix *****$suffix';
+    }
+    return '${cleaned.substring(0, 2)}*****${cleaned.substring(cleaned.length - 2)}';
+  }
 
   Future<void> _openChangePasswordDialog() async {
     final formKey = GlobalKey<FormState>();
@@ -722,7 +787,10 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('+63 *****38', style: TextStyle(color: Colors.grey)),
+                      Text(
+                        _loadingUserData ? 'Loading...' : _obfuscatePhone(_userPhone),
+                        style: const TextStyle(color: Colors.grey),
+                      ),
                       const SizedBox(width: 8),
                       const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
                     ],
@@ -737,7 +805,10 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('v****3@gmail.com', style: TextStyle(color: Colors.grey)),
+                      Text(
+                        _loadingUserData ? 'Loading...' : _obfuscateEmail(_userEmail),
+                        style: const TextStyle(color: Colors.grey),
+                      ),
                       const SizedBox(width: 8),
                       const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
                     ],

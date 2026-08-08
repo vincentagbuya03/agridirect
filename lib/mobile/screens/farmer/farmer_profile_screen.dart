@@ -6,11 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
-import '../../../shared/services/farmer/farmer_service.dart';
-import '../../../shared/router/app_router.dart';
 import '../../../shared/router/app_routes.dart';
 import 'package:agridirect/shared/widgets/premium_confirm_dialog.dart';
-import '../../widgets/auth/mobile_two_factor_sheet.dart';
 
 /// Mobile Profile screen specifically for Farmers.
 class FarmerProfileScreen extends StatefulWidget {
@@ -27,32 +24,64 @@ class FarmerProfileScreen extends StatefulWidget {
   State<FarmerProfileScreen> createState() => _FarmerProfileScreenState();
 }
 
-class _FarmerProfileScreenState extends State<FarmerProfileScreen>
-    with TickerProviderStateMixin {
+class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
   String? _farmerName;
   String? _farmerImageUrl;
-  bool _hasMfaEnabled = false;
-  int _selectedTab = 0; // 0: Profile, 1: Addresses, 2: Privacy & Security
-
-  Map<String, dynamic> _dashboardStats = const {
-    'followers': 0,
-    'activeListings': 0,
-    'communityPosts': 0,
-  };
+  String? _farmerLocation;
+  String? _farmerSpecialty;
+  String? _farmerHistory;
+  int? _yearsExperience;
 
   static const Color _primary = Color(0xFF059669);
-  static const Color _amber = Color(0xFFF59E0B);
-  static const Color _amberDark = Color(0xFF92400E);
-  static const Color _dark = Color(0xFF0F172A);
   static const Color _muted = Color(0xFF64748B);
-  static const Color _border = Color(0xFFE2E8F0);
+  static const Color _dark = Color(0xFF0F172A);
+
+  Map<String, dynamic> _dashboardStats = {};
 
   @override
   void initState() {
     super.initState();
     _loadFarmerData();
     _loadDashboardStats();
-    _checkMfaStatus();
+  }
+
+  Future<void> _loadDashboardStats() async {
+    final userId = SupabaseConfig.currentUser?.id;
+    if (userId == null) return;
+    try {
+      // Products count
+      final products = await SupabaseConfig.client
+          .from('products')
+          .select('id')
+          .eq('farmer_id', userId)
+          .eq('status', 'active');
+          
+      // Followers count (assuming farmer_followers table exists or mock for now)
+      final followers = await SupabaseConfig.client
+          .from('farmer_followers')
+          .select('id')
+          .eq('farmer_id', userId)
+          .count();
+
+      if (mounted) {
+        setState(() {
+          _dashboardStats = {
+            'activeListings': products.length,
+            'followers': followers.count,
+          };
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading dashboard stats: $e');
+      if (mounted) {
+        setState(() {
+          _dashboardStats = {
+            'activeListings': 0,
+            'followers': 0,
+          };
+        });
+      }
+    }
   }
 
   Future<void> _loadFarmerData({int attempt = 0}) async {
@@ -70,13 +99,17 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
     try {
       final farmers = await SupabaseConfig.client
           .from('farmers')
-          .select('farm_name, image_url')
+          .select('farm_name, image_url, location, specialty, farming_history, years_of_experience')
           .eq('user_id', userId)
           .limit(1);
 
       if (farmers.isNotEmpty && mounted) {
         setState(() {
           _farmerName = farmers[0]['farm_name'] as String?;
+          _farmerLocation = farmers[0]['location'] as String?;
+          _farmerSpecialty = farmers[0]['specialty'] as String?;
+          _farmerHistory = farmers[0]['farming_history'] as String?;
+          _yearsExperience = farmers[0]['years_of_experience'] as int?;
         });
         final rawUrl = farmers[0]['image_url'] as String?;
         final safeUrl =
@@ -89,31 +122,6 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
       }
     } catch (e) {
       debugPrint('Error loading farmer header data: $e');
-    }
-  }
-
-  Future<void> _loadDashboardStats() async {
-    try {
-      final stats = await FarmerService().getFarmerStats();
-      if (!mounted) return;
-      setState(() {
-        _dashboardStats = stats;
-      });
-    } catch (e) {
-      debugPrint('Error loading farmer profile stats: $e');
-    }
-  }
-
-  Future<void> _checkMfaStatus() async {
-    try {
-      final res = await SupabaseConfig.client.auth.mfa.listFactors();
-      if (mounted) {
-        setState(() {
-          _hasMfaEnabled = res.totp.isNotEmpty;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error checking MFA status: $e');
     }
   }
 
@@ -136,210 +144,6 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
     widget.onModeChanged();
   }
 
-  Future<void> _openChangePasswordDialog() async {
-    final formKey = GlobalKey<FormState>();
-    final currentController = TextEditingController();
-    final passwordController = TextEditingController();
-    final confirmController = TextEditingController();
-    bool obscureCurrent = true;
-    bool obscurePassword = true;
-    bool obscureConfirm = true;
-    bool isSaving = false;
-    final auth = AuthService();
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            Future<void> submit() async {
-              if (!formKey.currentState!.validate()) return;
-              setModalState(() => isSaving = true);
-              final success = await auth.changePassword(
-                currentPassword: currentController.text.trim(),
-                newPassword: passwordController.text.trim(),
-              );
-              if (!dialogContext.mounted) return;
-              setModalState(() => isSaving = false);
-              if (success) {
-                Navigator.of(dialogContext).pop();
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Password updated successfully.'),
-                    backgroundColor: _primary,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              } else {
-                final message = (auth.errorMessage ?? '').trim();
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        message.isNotEmpty ? message : 'Unable to update password.'),
-                    backgroundColor: Colors.red.shade600,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
-            }
-
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: _amber.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child:
-                        Icon(Icons.shield_outlined, color: _amber, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Text('Change Password',
-                      style: GoogleFonts.plusJakartaSans(
-                          fontSize: 18, fontWeight: FontWeight.w800)),
-                ],
-              ),
-              content: SizedBox(
-                width: 380,
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Confirm your identity by entering your current password first.',
-                        style: GoogleFonts.inter(
-                            fontSize: 13, color: _muted, height: 1.4),
-                      ),
-                      const SizedBox(height: 16),
-                      StatefulBuilder(
-                        builder: (_, ss) => TextFormField(
-                          controller: currentController,
-                          obscureText: obscureCurrent,
-                          decoration: InputDecoration(
-                            labelText: 'Current Password',
-                            prefixIcon: const Icon(
-                                Icons.lock_outline_rounded,
-                                size: 20),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                            suffixIcon: IconButton(
-                              onPressed: () => setModalState(
-                                  () => obscureCurrent = !obscureCurrent),
-                              icon: Icon(
-                                obscureCurrent
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                          validator: (v) =>
-                              (v == null || v.trim().isEmpty)
-                                  ? 'Enter your current password.'
-                                  : null,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      StatefulBuilder(
-                        builder: (_, ss) => TextFormField(
-                          controller: passwordController,
-                          obscureText: obscurePassword,
-                          decoration: InputDecoration(
-                            labelText: 'New Password',
-                            prefixIcon:
-                                const Icon(Icons.lock_rounded, size: 20),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                            suffixIcon: IconButton(
-                              onPressed: () => setModalState(
-                                  () => obscurePassword = !obscurePassword),
-                              icon: Icon(
-                                obscurePassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                          validator: (v) =>
-                              (v == null || v.trim().length < 8)
-                                  ? 'Password must be at least 8 characters.'
-                                  : null,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      StatefulBuilder(
-                        builder: (_, ss) => TextFormField(
-                          controller: confirmController,
-                          obscureText: obscureConfirm,
-                          decoration: InputDecoration(
-                            labelText: 'Confirm New Password',
-                            prefixIcon:
-                                const Icon(Icons.lock_rounded, size: 20),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                            suffixIcon: IconButton(
-                              onPressed: () => setModalState(
-                                  () => obscureConfirm = !obscureConfirm),
-                              icon: Icon(
-                                obscureConfirm
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                          validator: (v) =>
-                              v != passwordController.text
-                                  ? 'Passwords do not match.'
-                                  : null,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: Text('Cancel',
-                      style: GoogleFonts.inter(color: _muted)),
-                ),
-                ElevatedButton(
-                  onPressed: isSaving ? null : submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _amber,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: isSaving
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : Text('Update',
-                          style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w700)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-    currentController.dispose();
-    passwordController.dispose();
-    confirmController.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final auth = AuthService();
@@ -348,102 +152,89 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
       body: Column(
         children: [
           _buildHeroHeader(auth),
-          _buildTabBar(),
-          Expanded(child: _buildTabContent(auth)),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildMySales(),
+                  const SizedBox(height: 24),
+                  _buildShopStats(),
+                  const SizedBox(height: 24),
+                  _buildExploreMore(),
+                  const SizedBox(height: 24),
+                  _buildAboutMyFarm(),
+                  const SizedBox(height: 24),
+                  _buildSupportAndLegal(),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // ─── Hero Header (Amber/Farmer theme) ───
+  // ─── Hero Header (Green Gradient matching Customer Mode) ───
   Widget _buildHeroHeader(AuthService auth) {
-    final canPop = Navigator.canPop(context);
     final displayName = _farmerName ?? auth.userName;
 
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.amber.shade700, Colors.amber.shade500],
+          colors: [Color(0xFF059669), Color(0xFF10B981)],
         ),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           child: Column(
             children: [
-              // Top bar
               Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (canPop)
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                          size: 20, color: Colors.white),
-                      onPressed: () => context.pop(),
-                    )
-                  else
-                    const SizedBox(width: 48),
-                  Expanded(
-                    child: Text(
-                      'Farmer Profile',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
                   IconButton(
-                    icon: const Icon(Icons.settings_outlined,
-                        size: 22, color: Colors.white70),
+                    icon: const Icon(Icons.settings_outlined, size: 24, color: Colors.white),
                     onPressed: () => context.push(AppRoutes.appSettings),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-
-              // Avatar + name row
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // Farm logo avatar
                   Container(
-                    width: 60,
-                    height: 60,
+                    width: 64,
+                    height: 64,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 8,
-                        ),
-                      ],
                     ),
                     child: ClipOval(
-                      child: (_farmerImageUrl != null &&
-                              _farmerImageUrl!.isNotEmpty)
+                      child: (_farmerImageUrl != null && _farmerImageUrl!.isNotEmpty)
                           ? CachedNetworkImage(
                               key: ValueKey(_farmerImageUrl),
                               imageUrl: _farmerImageUrl!,
                               fit: BoxFit.cover,
-                              placeholder: (_, _) =>
-                                  Container(color: Colors.white24),
+                              placeholder: (_, _) => Container(color: Colors.white24),
                               errorWidget: (_, _, _) => const Icon(
                                   Icons.agriculture,
-                                  size: 36,
+                                  size: 32,
                                   color: Colors.white54),
                             )
                           : Container(
                               color: Colors.white24,
-                              child: const Icon(Icons.agriculture,
-                                  size: 36, color: Colors.white54),
+                              child: const Icon(Icons.agriculture, size: 32, color: Colors.white54),
                             ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -451,124 +242,57 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
                         Text(
                           displayName.isNotEmpty ? displayName : 'My Farm',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 18,
+                            fontSize: 20,
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          auth.userEmail,
-                          style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w500),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
                         const SizedBox(height: 4),
-                        // Verified farmer badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.25),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.5)),
-                          ),
+                        GestureDetector(
+                          onTap: () async {
+                            await context.push(AppRoutes.myDetails);
+                            _loadFarmerData();
+                          },
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.verified_rounded,
-                                  size: 11, color: Colors.white),
-                              const SizedBox(width: 4),
                               Text(
-                                'Verified Farmer',
+                                'Edit Farm Details',
                                 style: GoogleFonts.inter(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                                  fontSize: 12,
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
+                              const Icon(Icons.chevron_right_rounded, size: 16, color: Colors.white70),
                             ],
                           ),
                         ),
                       ],
                     ),
                   ),
+                  GestureDetector(
+                    onTap: _handleSwitchToCustomer,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'Buyer Mode',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _primary,
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-
-              const SizedBox(height: 12),
-
-              // Stats banner
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _buildStatItem(
-                          '${_dashboardStats['followers'] ?? 0}',
-                          'Followers',
-                          Icons.groups_rounded),
-                    ),
-                    Container(width: 1, height: 24, color: Colors.white30),
-                    Expanded(
-                      child: _buildStatItem(
-                          '${_dashboardStats['activeListings'] ?? 0}',
-                          'Products',
-                          Icons.inventory_2_outlined),
-                    ),
-                    Container(width: 1, height: 24, color: Colors.white30),
-                    Expanded(
-                      child: _buildStatItem(
-                          '${_dashboardStats['communityPosts'] ?? 0}',
-                          'Posts',
-                          Icons.forum_outlined),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              // Switch to Customer
-              GestureDetector(
-                onTap: _handleSwitchToCustomer,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.35)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.shopping_bag_outlined,
-                          size: 14, color: Colors.white),
-                      const SizedBox(width: 6),
-                      Text('Switch to Buying Mode',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          )),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
             ],
           ),
         ),
@@ -576,672 +300,349 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen>
     );
   }
 
-  Widget _buildStatItem(String value, String label, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon, size: 14, color: Colors.white70),
-        const SizedBox(height: 2),
-        Text(value,
-            style: GoogleFonts.plusJakartaSans(
-                fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
-        Text(label,
-            style: GoogleFonts.inter(fontSize: 10, color: Colors.white70)),
-      ],
-    );
-  }
-
-  // ─── Tab Bar ───
-  Widget _buildTabBar() {
-    final tabs = [
-      (icon: Icons.storefront_outlined, label: 'Farm Profile'),
-      (icon: Icons.location_on_outlined, label: 'Addresses'),
-      (icon: Icons.shield_outlined, label: 'Privacy & Security'),
-    ];
-
+  // ─── Farm Stats Section ───
+  Widget _buildShopStats() {
     return Container(
       color: Colors.white,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: List.generate(tabs.length, (i) {
-            final isSelected = _selectedTab == i;
-            final selectedColor = Colors.amber.shade700;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedTab = i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                margin: const EdgeInsets.only(right: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? selectedColor : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: isSelected ? selectedColor : _border),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: _amber.withValues(alpha: 0.3),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          )
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  children: [
-                    Icon(tabs[i].icon,
-                        size: 14,
-                        color: isSelected ? Colors.white : _muted),
-                    const SizedBox(width: 6),
-                    Text(
-                      tabs[i].label,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color:
-                            isSelected ? Colors.white : const Color(0xFF334155),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: Row(
+        children: [
+          Expanded(child: _buildStatItem('${_dashboardStats['followers'] ?? 0}', 'Followers', Icons.groups_rounded, Colors.blue)),
+          Container(width: 1, height: 30, color: const Color(0xFFF1F5F9)),
+          Expanded(child: _buildStatItem('4.9', 'Rating', Icons.star_rounded, Colors.amber)),
+          Container(width: 1, height: 30, color: const Color(0xFFF1F5F9)),
+          Expanded(child: _buildStatItem('${_dashboardStats['activeListings'] ?? 0}', 'Products', Icons.inventory_2_rounded, Colors.green)),
+        ],
       ),
     );
   }
 
-  // ─── Tab Content ───
-  Widget _buildTabContent(AuthService auth) {
-    switch (_selectedTab) {
-      case 0:
-        return _buildProfileTab(auth);
-      case 1:
-        return _buildAddressesTab();
-      case 2:
-        return _buildPrivacyTab(auth);
-      default:
-        return const SizedBox.shrink();
-    }
+  Widget _buildStatItem(String value, String label, IconData icon, Color color) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(value, style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w800, color: _dark)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: _muted)),
+      ],
+    );
   }
 
-  // ─── Farm Profile Tab ───
-  Widget _buildProfileTab(AuthService auth) {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
+  // ─── My Sales Section ───
+  Widget _buildMySales() {
+    return Container(
+      color: Colors.white,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Farm info card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.amber.shade200),
-              boxShadow: [
-                BoxShadow(
-                    color: _amber.withValues(alpha: 0.06),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4)),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'My Sales',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1E293B),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  SupabaseDataService.navigationTabNotifier.value = 2; // Orders tab
+                  widget.onModeChanged();
+                },
+                child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade100,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(Icons.storefront_rounded,
-                          color: _amberDark, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Farm Store Profile',
-                              style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                  color: _dark)),
-                          Text('Manage your public farm store details',
-                              style: GoogleFonts.inter(
-                                  fontSize: 11, color: _muted)),
-                        ],
+                    Text(
+                      'View Sales History',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: _muted,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade100,
-                        borderRadius: BorderRadius.circular(100),
-                      ),
-                      child: Text('FARMER',
-                          style: GoogleFonts.plusJakartaSans(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              color: _amberDark)),
-                    ),
+                    const Icon(Icons.chevron_right_rounded, size: 16, color: _muted),
                   ],
                 ),
-                const Divider(height: 24, color: Color(0xFFF1F5F9)),
-                _buildInfoRow(
-                    icon: Icons.storefront_outlined,
-                    label: 'Farm Name',
-                    value: _farmerName ?? '—'),
-                _buildInfoRow(
-                    icon: Icons.mail_outline,
-                    label: 'Email Address',
-                    value: auth.userEmail,
-                    badge: 'Verified'),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      await context.push(AppRoutes.myDetails);
-                      _loadFarmerData();
-                    },
-                    icon: const Icon(Icons.edit_outlined, size: 16),
-                    label: const Text('Edit Farm Details'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _dark,
-                      side: BorderSide(color: Colors.amber.shade300),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-
-          // Business Settings
-          _buildSectionTitle('BUSINESS SETTINGS'),
-          const SizedBox(height: 8),
-          _buildMenuCard(isAmber: true, children: [
-            _buildMenuTile(
-              icon: Icons.dashboard_rounded,
-              title: 'Sales Dashboard',
-              subtitle: 'Analytics and revenue overview',
-              onTap: () {
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildIconAction(Icons.dashboard_rounded, 'Dashboard', () {
                 SupabaseDataService.navigationTabNotifier.value = 0;
                 widget.onModeChanged();
-              },
-            ),
-            _buildMenuTile(
-              icon: Icons.inventory_2_outlined,
-              title: 'My Products',
-              subtitle: 'Manage your crop listings',
-              onTap: () {
+              }),
+              _buildIconAction(Icons.inventory_2_outlined, 'My Products', () {
                 SupabaseDataService.navigationTabNotifier.value = 1;
                 widget.onModeChanged();
-              },
-            ),
-            _buildMenuTile(
-              icon: Icons.confirmation_number_outlined,
-              title: 'Manage Vouchers',
-              subtitle: 'Discount codes for your store',
-              onTap: () => context.push(AppRoutes.farmerVouchers),
-              isLast: true,
-            ),
-          ]),
+              }),
+              _buildIconAction(Icons.add_circle_outline_rounded, 'Add Product', () => context.push(AppRoutes.addProduct)),
+              _buildIconAction(Icons.confirmation_number_outlined, 'Vouchers', () => context.push(AppRoutes.farmerVouchers)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-          const SizedBox(height: 16),
-          _buildSectionTitle('COMMUNITY'),
-          const SizedBox(height: 8),
-          _buildMenuCard(isAmber: true, children: [
-            _buildMenuTile(
-              icon: Icons.groups_rounded,
-              title: 'Followers',
-              subtitle: 'Buyers following your farm',
-              onTap: () => context.push(AppRoutes.farmerFollowers),
+  // ─── Explore More ───
+  Widget _buildExploreMore() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Explore More',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1E293B),
             ),
-            _buildMenuTile(
-              icon: Icons.forum_outlined,
-              title: 'Farmer Community',
-              subtitle: 'Posts and discussions',
-              onTap: () {
+          ),
+          const SizedBox(height: 12),
+          GridView.count(
+            crossAxisCount: 4,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 0.9,
+            children: [
+              _buildGridAction(Icons.groups_rounded, 'Followers', Colors.blue, () => context.push(AppRoutes.farmerFollowers)),
+              _buildGridAction(Icons.forum_outlined, 'Community', Colors.green, () {
                 SupabaseDataService.navigationTabNotifier.value = 3;
                 widget.onModeChanged();
-              },
-              isLast: true,
-            ),
-          ]),
-
-          const SizedBox(height: 16),
-          _buildSectionTitle('MORE'),
-          const SizedBox(height: 8),
-          _buildMenuCard(isAmber: true, children: [
-            _buildMenuTile(
-              icon: Icons.help_center_outlined,
-              title: 'Help Center',
-              subtitle: 'Farmer guides and FAQs',
-              onTap: () => context.push(AppRoutes.helpCenter),
-            ),
-            _buildMenuTile(
-              icon: Icons.settings_outlined,
-              title: 'App Settings',
-              subtitle: 'Notifications, cache, updates',
-              onTap: () => context.push(AppRoutes.appSettings),
-              isLast: true,
-            ),
-          ]),
-
-          const SizedBox(height: 24),
-          OutlinedButton.icon(
-            onPressed: _confirmLogout,
-            icon: const Icon(Icons.logout_rounded, size: 18),
-            label: const Text('Log Out'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.red.shade600,
-              side: BorderSide(color: Colors.red.shade200),
-              minimumSize: const Size(double.infinity, 52),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-            ),
+              }),
+              _buildGridAction(Icons.chat_bubble_outline_rounded, 'Messages', Colors.orange, () => context.push(AppRoutes.farmerMessages)),
+              _buildGridAction(Icons.shield_outlined, 'Security', Colors.red, () => context.push(AppRoutes.appSettings)),
+            ],
           ),
-          const SizedBox(height: 16),
-          Center(
-            child: Text('Farmer Edition v2.4.2',
-                style: GoogleFonts.inter(
-                    fontSize: 12, color: Colors.grey[400])),
-          ),
-          const SizedBox(height: 32),
         ],
       ),
     );
   }
 
-  // ─── Addresses Tab ───
-  Widget _buildAddressesTab() {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
+  // ─── About My Farm ───
+  Widget _buildAboutMyFarm() {
+    final hasHistory = _farmerHistory != null && _farmerHistory!.trim().isNotEmpty;
+    final expText = _yearsExperience != null ? '$_yearsExperience years' : 'Not configured';
+
+    return Container(
+      color: Colors.white,
+      width: double.infinity,
       padding: const EdgeInsets.all(16),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.amber.shade200),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade100,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(Icons.location_on_rounded,
-                      color: _amberDark, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('My Delivery Addresses',
-                          style: GoogleFonts.plusJakartaSans(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: _dark)),
-                      Text('Manage addresses for shipments',
-                          style:
-                              GoogleFonts.inter(fontSize: 12, color: _muted)),
-                    ],
-                  ),
-                ),
-              ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'About My Farm',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1E293B),
             ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => context.push(AppRoutes.addressBook),
-              icon: const Icon(Icons.open_in_new_rounded, size: 16),
-              label: const Text('Open Address Book'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amber.shade700,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
+          ),
+          const SizedBox(height: 16),
+          _buildAboutRow(Icons.spa_outlined, 'Specialty', _farmerSpecialty ?? 'Not configured'),
+          _buildAboutRow(Icons.location_on_outlined, 'Location', _farmerLocation ?? 'Not configured'),
+          _buildAboutRow(Icons.timeline_outlined, 'Experience', expText),
+          const Divider(height: 24, color: Color(0xFFF1F5F9)),
+          Text(
+            'Farming History & Bio',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF475569),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            hasHistory ? _farmerHistory! : 'No bio configured yet. Tap Edit Farm Details to describe your farm!',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: const Color(0xFF64748B),
+              height: 1.5,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // ─── Privacy & Security Tab ───
-  Widget _buildPrivacyTab(AuthService auth) {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.amber.shade200),
-          boxShadow: [
-            BoxShadow(
-                color: _amber.withValues(alpha: 0.06),
-                blurRadius: 12,
-                offset: const Offset(0, 4)),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Privacy & Security Settings',
-                style: GoogleFonts.plusJakartaSans(
-                    fontSize: 18, fontWeight: FontWeight.w800, color: _dark)),
-            const SizedBox(height: 4),
-            Text(
-                'Manage password, authentication, and privacy controls',
-                style: GoogleFonts.inter(fontSize: 12, color: _muted)),
-            const Divider(height: 28, color: Color(0xFFF1F5F9)),
-
-            // 1. Account Password
-            _buildPrivacyRow(
-              icon: Icons.lock_outline_rounded,
-              title: 'Account Password',
-              description:
-                  'Change your account password regularly to keep your farm account secure.',
-              buttonText: 'Change Password',
-              onTap: _openChangePasswordDialog,
-            ),
-            const Divider(height: 24, color: Color(0xFFF1F5F9)),
-
-            // 2. 2FA
-            _buildPrivacyRow(
-              icon: Icons.security_rounded,
-              title: 'Two-Factor Authentication (2FA)',
-              description:
-                  'Add an extra layer of security to your farmer account with an Authenticator App.',
-              buttonText: _hasMfaEnabled ? 'Manage 2FA' : 'Enable 2FA',
-              badge: _hasMfaEnabled ? 'Active' : 'Recommended',
-              badgeIsGreen: _hasMfaEnabled,
-              onTap: () async {
-                final result = await MobileTwoFactorSheet.show(
-                  context,
-                  initialIsActive: _hasMfaEnabled,
-                );
-                if (result == true) {
-                  _checkMfaStatus();
-                }
-              },
-            ),
-            const Divider(height: 24, color: Color(0xFFF1F5F9)),
-
-            // 3. Active Sessions
-            _buildPrivacyRow(
-              icon: Icons.devices_rounded,
-              title: 'Active Sessions & Devices',
-              description:
-                  'View active browsers and devices logged into your account.',
-              buttonText: 'View Sessions',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Current session is verified and active.'),
-                    backgroundColor: _primary,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
-            ),
-            const Divider(height: 24, color: Color(0xFFF1F5F9)),
-
-            // 4. Data Privacy
-            _buildPrivacyRow(
-              icon: Icons.visibility_off_outlined,
-              title: 'Data & Activity Privacy',
-              description:
-                  'Control how your farm activity and transactions are visible.',
-              buttonText: 'Privacy Policy',
-              onTap: () => context.push(AppRoutes.helpCenter),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ─── Helper Widgets ───
-  Widget _buildInfoRow({
-    required IconData icon,
-    required String label,
-    required String value,
-    String? badge,
-  }) {
+  Widget _buildAboutRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: const Color(0xFF9CA3AF)),
-          const SizedBox(width: 10),
+          Icon(icon, size: 18, color: const Color(0xFF64748B)),
+          const SizedBox(width: 12),
           SizedBox(
-            width: 90,
-            child: Text(label,
-                style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: _muted,
-                    fontWeight: FontWeight.w500)),
+            width: 80,
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF64748B),
+              ),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: _dark),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-          ),
-          if (badge != null)
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFDCFCE7),
-                borderRadius: BorderRadius.circular(100),
+            child: Text(
+              value,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF334155),
               ),
-              child: Text(badge,
-                  style: GoogleFonts.plusJakartaSans(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                      color: _primary)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Text(title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF94A3B8),
-            letterSpacing: 0.8,
-          )),
-    );
-  }
-
-  Widget _buildMenuCard(
-      {required List<Widget> children, bool isAmber = false}) {
+  // ─── Support & Legal ───
+  Widget _buildSupportAndLegal() {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: isAmber ? Colors.amber.shade100 : _border),
-        boxShadow: [
-          BoxShadow(
-              color: isAmber
-                  ? _amber.withValues(alpha: 0.04)
-                  : Colors.black.withValues(alpha: 0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 2)),
-        ],
-      ),
-      child: Column(children: children),
-    );
-  }
-
-  Widget _buildMenuTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    VoidCallback? onTap,
-    bool isLast = false,
-  }) {
-    return Column(
-      children: [
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _amber.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, size: 18, color: _amber),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title,
-                          style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: _dark)),
-                      Text(subtitle,
-                          style: GoogleFonts.inter(
-                              fontSize: 12, color: _muted)),
-                    ],
-                  ),
-                ),
-                Icon(Icons.arrow_forward_ios_rounded,
-                    size: 14, color: Colors.grey[400]),
-              ],
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Support & Legal',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1E293B),
             ),
           ),
-        ),
-        if (!isLast)
-          Divider(height: 1, indent: 58, endIndent: 18, color: Colors.grey[100]),
-      ],
-    );
-  }
-
-  Widget _buildPrivacyRow({
-    required IconData icon,
-    required String title,
-    required String description,
-    required String buttonText,
-    required VoidCallback onTap,
-    String? badge,
-    bool badgeIsGreen = true,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Color(0xFFF1F5F9),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 18, color: const Color(0xFF475569)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 4,
+          const SizedBox(height: 12),
+          _buildListAction(Icons.help_outline_rounded, 'Help Center', () => context.push(AppRoutes.helpCenter)),
+          _buildListAction(Icons.description_outlined, 'Terms of Service', () {}),
+          _buildListAction(Icons.privacy_tip_outlined, 'Privacy Policy', () {}),
+          _buildListAction(Icons.policy_outlined, 'Community Rules', () {}),
+          const Divider(height: 24, color: Color(0xFFF1F5F9)),
+          InkWell(
+            onTap: _confirmLogout,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(title,
-                      style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: _dark)),
-                  if (badge != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: badgeIsGreen
-                            ? const Color(0xFFDCFCE7)
-                            : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(badge,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: badgeIsGreen ? _primary : _muted,
-                          )),
+                  const Icon(Icons.logout_rounded, color: Colors.red, size: 20),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Log Out',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.red,
                     ),
+                  ),
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListAction(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 24, color: const Color(0xFF475569)),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF334155),
+                ),
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF94A3B8)),
           ],
         ),
-        const SizedBox(height: 8),
-        Text(description,
-            style: GoogleFonts.inter(
-                fontSize: 12, color: _muted, height: 1.4)),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton(
-            onPressed: onTap,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _dark,
-              side: const BorderSide(color: _border),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-              padding: const EdgeInsets.symmetric(vertical: 10),
+      ),
+    );
+  }
+
+  Widget _buildIconAction(IconData icon, String label, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 26, color: const Color(0xFF475569)),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF334155),
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            child: Text(buttonText,
-                style: GoogleFonts.inter(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
-          ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildGridAction(IconData icon, String label, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 24, color: color),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF334155),
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 }

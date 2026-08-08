@@ -305,13 +305,14 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
               color: const Color(0xFF1E293B),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           GridView.count(
             crossAxisCount: 4,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 16,
+            mainAxisSpacing: 8,
             crossAxisSpacing: 8,
+            childAspectRatio: 0.9,
             children: [
               _buildGridAction(Icons.favorite_outline_rounded, 'Favorites', Colors.red, () => context.push(AppRoutes.favorites)),
               _buildGridAction(Icons.confirmation_number_outlined, 'Vouchers', Colors.orange, () => context.push(AppRoutes.claimedVouchers)),

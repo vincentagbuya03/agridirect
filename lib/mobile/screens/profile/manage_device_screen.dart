@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/services/community/analytics_service.dart';
 
 class ManageDeviceScreen extends StatefulWidget {
   final bool isWebEmbedded;
@@ -37,11 +38,18 @@ class _ManageDeviceScreenState extends State<ManageDeviceScreen> {
           .order('start_time', ascending: false)
           .limit(15);
 
+      var currentSessionId = AnalyticsService().currentSessionId;
+      if (currentSessionId == null) {
+        await AnalyticsService().startSession(userId: userId);
+        currentSessionId = AnalyticsService().currentSessionId;
+      }
+
       final Map<String, Map<String, dynamic>> uniqueDevices = {};
       for (var session in response) {
         final deviceName = session['device_info'] ?? 'Unknown Device';
         final platform = (session['platform'] ?? 'unknown').toString();
         final isActive = session['end_time'] == null;
+        final isCurrent = session['session_id'] == currentSessionId;
         final startTime = DateTime.parse(session['start_time']);
 
         if (!uniqueDevices.containsKey(deviceName)) {
@@ -50,7 +58,10 @@ class _ManageDeviceScreenState extends State<ManageDeviceScreen> {
             'name': deviceName,
             'type': platform.toLowerCase() == 'web' ? 'Desktop' : 'Phone',
             'active': isActive,
-            'lastActive': isActive ? 'Active now' : 'Last active ${_formatDateTime(startTime)}',
+            'isCurrent': isCurrent,
+            'lastActive': isCurrent
+                ? 'Active now'
+                : (isActive ? 'Logged in' : 'Last active ${_formatDateTime(startTime)}'),
             'location': platform.toUpperCase(),
           };
         }
@@ -112,6 +123,7 @@ class _ManageDeviceScreenState extends State<ManageDeviceScreen> {
           itemBuilder: (context, index) {
             final device = devices[index];
             final isActive = device['active'] as bool;
+            final isCurrent = device['isCurrent'] as bool? ?? false;
             final isPhone = device['type'] == 'Phone';
 
             return Container(
@@ -121,8 +133,8 @@ class _ManageDeviceScreenState extends State<ManageDeviceScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isActive ? const Color(0xFF10B981).withValues(alpha: 0.3) : const Color(0xFFE2E8F0),
-                  width: isActive ? 1.5 : 1,
+                  color: isCurrent ? const Color(0xFF10B981).withValues(alpha: 0.3) : const Color(0xFFE2E8F0),
+                  width: isCurrent ? 1.5 : 1,
                 ),
               ),
               child: Row(
@@ -154,7 +166,7 @@ class _ManageDeviceScreenState extends State<ManageDeviceScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            if (isActive) ...[
+                            if (isCurrent) ...[
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -179,7 +191,7 @@ class _ManageDeviceScreenState extends State<ManageDeviceScreen> {
                       ],
                     ),
                   ),
-                  if (!isActive && device['session_id'] != null)
+                  if (!isCurrent && isActive && device['session_id'] != null)
                     IconButton(
                       onPressed: () => _logoutDevice(device['session_id']),
                       icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444)),

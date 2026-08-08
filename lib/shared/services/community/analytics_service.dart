@@ -23,6 +23,8 @@ class AnalyticsService {
   String? _cachedDeviceInfo;
 
   // Getters for monitoring
+  String? get currentSessionId => _currentSessionId;
+
   Duration get currentSessionDuration {
     if (_sessionStartTime == null) return Duration.zero;
     return DateTime.now().difference(_sessionStartTime!);

@@ -22,8 +22,8 @@ import '../../../shared/services/community/message_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/widgets/forum_video_player.dart';
+import '../farmer/farmer_community_hub.dart';
 
-/// Home Screen - Premium Customer Interface
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -164,6 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildGlassAIMarketInsight(),
+
                   const SizedBox(height: 32),
                   _buildFollowingUpdatesSection(),
                   _buildSectionHeader('Browse Categories', 'Show all', () {
@@ -180,19 +181,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   _buildFeaturedFarmersList(context),
                   const SizedBox(height: 32),
-                  _buildSectionHeader(
-                    'Community Stories',
-                    'See All',
-                    () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const CommunityStoriesScreen(),
-                        ),
-                      ).then((_) {
-                        if (mounted) setState(() {});
-                      });
-                    },
-                  ),
+                  _buildSectionHeader('Community Stories', 'See All', () {
+                    Navigator.of(context)
+                        .push(
+                          MaterialPageRoute(
+                            builder: (_) => const CommunityStoriesScreen(),
+                          ),
+                        )
+                        .then((_) {
+                          if (mounted) setState(() {});
+                        });
+                  }),
                   _buildCommunityFeed(context),
                   const SizedBox(height: 40),
                 ],
@@ -257,45 +256,54 @@ class _HomeScreenState extends State<HomeScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  GestureDetector(
-                    onTap: () => _showAddressPicker(context),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'DELIVERING TO',
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.location_on_rounded,
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _showAddressPicker(context),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'DELIVERING TO',
+                            style: AppTextStyles.labelSmall.copyWith(
                               color: AppColors.primary,
-                              size: 18,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _displayCity,
-                              style: AppTextStyles.headline3.copyWith(
-                                fontSize: 18,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on_rounded,
+                                color: AppColors.primary,
+                                size: 18,
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              size: 20,
-                              color: AppColors.textHeadline,
-                            ),
-                          ],
-                        ),
-                      ],
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  _displayCity,
+                                  style: AppTextStyles.headline3.copyWith(
+                                    fontSize: 18,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                size: 20,
+                                color: AppColors.textHeadline,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+                  const SizedBox(
+                    width: 12,
+                  ), // Ensure spacing between address and actions
                   Row(
                     children: [
                       StreamBuilder<int>(
@@ -1348,13 +1356,15 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: InkWell(
                 onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const CommunityStoriesScreen(),
-                    ),
-                  ).then((_) {
-                    if (mounted) setState(() {});
-                  });
+                  Navigator.of(context)
+                      .push(
+                        MaterialPageRoute(
+                          builder: (_) => const CommunityStoriesScreen(),
+                        ),
+                      )
+                      .then((_) {
+                        if (mounted) setState(() {});
+                      });
                 },
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
@@ -1597,8 +1607,6 @@ class _HomeScreenState extends State<HomeScreen> {
           if (mounted) setState(() {});
         });
   }
-
-
 
   // ── Address Picker Bottom Sheet ──
   void _showAddressPicker(BuildContext context) async {

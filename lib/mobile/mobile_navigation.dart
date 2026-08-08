@@ -5,7 +5,6 @@ import '../shared/services/core/supabase_data_service.dart';
 import 'screens/consumer/home_screen.dart';
 import 'screens/consumer/marketplace_screen.dart';
 import 'screens/consumer/preorder_hub_screen.dart';
-import 'screens/consumer/orders_screen.dart';
 import '../web/screens/consumer/radar/consumer_radar_view.dart';
 import 'screens/farmer/farmer_sales_dashboard.dart';
 import 'screens/farmer/farmer_products_screen.dart';
