@@ -102,7 +102,7 @@ class _WebNavigationState extends State<WebNavigation> {
         WebCommunityHub(onNavigate: _navigateTo, currentIndex: _currentIndex, initialPostId: widget.initialPostId),
         WebFarmerPreordersTab(onNavigate: _navigateTo, currentIndex: _currentIndex),
         WebProfileScreen(
-          onModeChanged: () => setState(() => _currentIndex = 0),
+          onModeChanged: () => _navigateTo(0),
           onLogout: _handleLogout,
           onNavigate: _navigateTo,
           currentIndex: _currentIndex,
@@ -119,7 +119,7 @@ class _WebNavigationState extends State<WebNavigation> {
       ),
       WebCommunityHub(onNavigate: _navigateTo, currentIndex: _currentIndex, initialPostId: widget.initialPostId),
       WebProfileScreen(
-        onModeChanged: () => setState(() => _currentIndex = 0),
+        onModeChanged: () => _navigateTo(0),
         onLogout: _handleLogout,
         onNavigate: _navigateTo,
         currentIndex: _currentIndex,

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-class WebNotificationsContent extends StatefulWidget {
+import '../../shared/services/core/supabase_config.dart';
+import '../../shared/services/auth/auth_service.dart';class WebNotificationsContent extends StatefulWidget {
   const WebNotificationsContent({super.key});
 
   @override
@@ -28,33 +27,68 @@ class _WebNotificationsContentState extends State<WebNotificationsContent> {
   }
 
   Future<void> _loadPreferences() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        _emailAlerts = prefs.getBool('notifications.email_alerts') ?? true;
-        _pushAlerts = prefs.getBool('notifications.push_alerts') ?? true;
-        _promoAlerts = prefs.getBool('notifications.promo_alerts') ?? false;
-        _isLoaded = true;
-      });
+    final auth = AuthService();
+    if (!auth.isLoggedIn) return;
+
+    try {
+      final res = await SupabaseConfig.client
+          .from('users')
+          .select('email_alerts, push_alerts, promo_alerts')
+          .eq('user_id', auth.userId)
+          .maybeSingle();
+      
+      if (mounted && res != null) {
+        setState(() {
+          _emailAlerts = res['email_alerts'] as bool? ?? true;
+          _pushAlerts = res['push_alerts'] as bool? ?? true;
+          _promoAlerts = res['promo_alerts'] as bool? ?? false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading notification preferences: $e');
+    } finally {
+      if (mounted) setState(() => _isLoaded = true);
     }
   }
 
   Future<void> _savePreferences() async {
-    setState(() => _isSaving = true);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notifications.email_alerts', _emailAlerts);
-    await prefs.setBool('notifications.push_alerts', _pushAlerts);
-    await prefs.setBool('notifications.promo_alerts', _promoAlerts);
+    final auth = AuthService();
+    if (!auth.isLoggedIn) return;
 
-    if (mounted) {
-      setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Notification preferences saved successfully!'),
-          backgroundColor: Color(0xFF10B981),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    setState(() => _isSaving = true);
+    
+    try {
+      await SupabaseConfig.client
+          .from('users')
+          .update({
+            'email_alerts': _emailAlerts,
+            'push_alerts': _pushAlerts,
+            'promo_alerts': _promoAlerts,
+          })
+          .eq('user_id', auth.userId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Notification preferences saved successfully!'),
+            backgroundColor: Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error saving notification preferences: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving preferences: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 

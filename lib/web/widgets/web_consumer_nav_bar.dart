@@ -264,7 +264,7 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                           if (isFarmerMode) {
                             widget.onNavigate(5);
                           } else {
-                            context.go(AppRoutes.profile);
+                            widget.onNavigate(3);
                           }
                         },
                         child: Container(

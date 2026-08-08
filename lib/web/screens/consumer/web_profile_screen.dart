@@ -23,6 +23,11 @@ import '../../../mobile/screens/profile/account_activity_screen.dart';
 import '../../../mobile/screens/consumer/orders_screen.dart';
 import '../../widgets/web_vouchers_content.dart';
 import '../../widgets/web_notifications_content.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
+import '../../../shared/services/integration/reverse_geocoding_service.dart';
+import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 // Web Profile screen.
 /// Shows user info, "Start Selling" button, and account settings.
 class WebProfileScreen extends StatefulWidget {
@@ -64,6 +69,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   late final TextEditingController _phoneController;
   late final TextEditingController _specialtyController;
   late final TextEditingController _locationController;
+  late final TextEditingController _latitudeController;
+  late final TextEditingController _longitudeController;
   bool _isSavingProfile = false;
   bool _isUploadingAvatar = false;
   String _avatarUrl = '';
@@ -96,6 +103,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 profile['farm_name']?.toString() ?? auth.userName;
             _specialtyController.text = profile['specialty']?.toString() ?? '';
             _locationController.text = profile['location']?.toString() ?? '';
+            _latitudeController.text = profile['farm_latitude']?.toString() ?? '';
+            _longitudeController.text = profile['farm_longitude']?.toString() ?? '';
             _avatarUrl = profile['image_url']?.toString() ?? auth.userAvatarUrl;
           }
         });
@@ -132,6 +141,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     _phoneController = TextEditingController();
     _specialtyController = TextEditingController();
     _locationController = TextEditingController();
+    _latitudeController = TextEditingController();
+    _longitudeController = TextEditingController();
     _avatarUrl = auth.userAvatarUrl;
 
     _fadeInController = AnimationController(
@@ -202,6 +213,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       if (mounted) setState(() => _isUploadingAvatar = false);
     }
   }
+  double? _parseCoordinate(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    return double.tryParse(trimmed);
+  }
 
   Future<void> _saveInlineProfileChanges() async {
     setState(() => _isSavingProfile = true);
@@ -231,6 +247,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               'farm_name': _nameController.text.trim(),
               'specialty': _specialtyController.text.trim(),
               'location': _locationController.text.trim(),
+              'farm_latitude': _parseCoordinate(_latitudeController.text),
+              'farm_longitude': _parseCoordinate(_longitudeController.text),
               'image_url': _avatarUrl,
             })
             .eq('user_id', auth.userId);
@@ -421,7 +439,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 child: Row(
                   children: [
                     _buildMobileTab(0, 'Profile', icon: Icons.person_outline),
-                    _buildMobileTab(1, 'Addresses', icon: Icons.location_on_outlined),
+                    if (!isFarmer) _buildMobileTab(1, 'Addresses', icon: Icons.location_on_outlined),
                     _buildMobileTab(5, 'Privacy', icon: Icons.shield_outlined),
                     _buildMobileTab(3, 'Orders', icon: Icons.shopping_bag_outlined),
                     _buildMobileTab(2, 'Vouchers', icon: Icons.confirmation_number_outlined),
@@ -610,7 +628,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             children: [
               _buildSidebarCategory('MY ACCOUNT'),
               _buildSidebarItem(0, Icons.person_outline_rounded, 'My Profile'),
-              _buildSidebarItem(1, Icons.location_on_outlined, 'Addresses'),
+              if (!isFarmer) _buildSidebarItem(1, Icons.location_on_outlined, 'Addresses'),
               _buildSidebarItem(5, Icons.shield_outlined, 'Privacy Settings'),
 
               const Divider(height: 24, color: Color(0xFFF1F5F9)),
@@ -1042,6 +1060,177 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       ),
     ];
   }
+  LatLng _getInitialPin() {
+    final lat = _parseCoordinate(_latitudeController.text);
+    final lng = _parseCoordinate(_longitudeController.text);
+    if (lat != null && lng != null) {
+      return LatLng(lat, lng);
+    }
+    return const LatLng(10.3157, 123.8854);
+  }
+
+  Future<void> _openFarmPinPicker() async {
+    final mapController = MapController();
+    var selectedPin = _getInitialPin();
+    var isLocating = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> useCurrentLocation() async {
+              setModalState(() => isLocating = true);
+              try {
+                final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+                if (!serviceEnabled) throw Exception('Location services are disabled.');
+
+                var permission = await Geolocator.checkPermission();
+                if (permission == LocationPermission.denied) {
+                  permission = await Geolocator.requestPermission();
+                }
+
+                if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+                  throw Exception('Location permission denied.');
+                }
+
+                final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+                selectedPin = LatLng(position.latitude, position.longitude);
+                mapController.move(selectedPin, 15);
+                setModalState(() {});
+              } catch (e) {
+                if (!mounted) return;
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text('Unable to get current location: $e'), backgroundColor: Colors.red));
+                }
+              } finally {
+                setModalState(() => isLocating = false);
+              }
+            }
+
+            return Dialog(
+              insetPadding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: 700,
+                height: 560,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Pin Farm Location',
+                              style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: _dark),
+                            ),
+                          ),
+                          IconButton(onPressed: () => Navigator.of(dialogContext).pop(), icon: const Icon(Icons.close)),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('Tap anywhere on the map to place your farm pin.', style: GoogleFonts.inter(fontSize: 14, color: _muted)),
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: FlutterMap(
+                            mapController: mapController,
+                            options: MapOptions(
+                              initialCenter: selectedPin,
+                              initialZoom: 17,
+                              minZoom: 5,
+                              maxZoom: 19,
+                              onTap: (_, point) => setModalState(() => selectedPin = point),
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                                subdomains: const ['a', 'b', 'c', 'd'],
+                                userAgentPackageName: 'com.agridirect.app',
+                                retinaMode: RetinaMode.isHighDensity(context),
+                              ),
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    width: 48,
+                                    height: 48,
+                                    point: selectedPin,
+                                    alignment: Alignment.bottomCenter,
+                                    child: const Icon(Icons.location_on, color: primary, size: 40),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: isLocating ? null : useCurrentLocation,
+                                  icon: isLocating ? const SizedBox(width: 16, height: 16, child: AppShimmerLoader(strokeWidth: 2)) : const Icon(Icons.my_location),
+                                  label: const Text('Use Current Location'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Selected: ${selectedPin.latitude.toStringAsFixed(6)}, ${selectedPin.longitude.toStringAsFixed(6)}',
+                            style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    final resolved = await ReverseGeocodingService.resolveFromCoordinates(
+                                      latitude: selectedPin.latitude,
+                                      longitude: selectedPin.longitude,
+                                    );
+                                    final fallbackLocation = '${selectedPin.latitude.toStringAsFixed(5)}, ${selectedPin.longitude.toStringAsFixed(5)}';
+                                    setState(() {
+                                      _latitudeController.text = selectedPin.latitude.toStringAsFixed(6);
+                                      _longitudeController.text = selectedPin.longitude.toStringAsFixed(6);
+                                      _locationController.text = resolved.hasData ? resolved.fullAddress : fallbackLocation;
+                                    });
+                                    if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                                  },
+                                  style: ElevatedButton.styleFrom(backgroundColor: primary, foregroundColor: Colors.white),
+                                  child: const Text('Use This Pin'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   // ── Mobile form: avatar on top center, fields below ──
   List<Widget> _buildMobileFormLayout(bool isFarmer) {
@@ -1109,7 +1298,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       if (isFarmer) ...[
         _buildInlineEditRow(label: 'Farm Store Name', controller: _nameController, icon: Icons.storefront_outlined),
         _buildInlineEditRow(label: 'Farm Specialty', controller: _specialtyController, icon: Icons.grass_outlined),
-        _buildInlineEditRow(label: 'Farm Location', controller: _locationController, icon: Icons.location_on_outlined),
+        _buildInlineEditRow(label: 'Farm Location', controller: _locationController, icon: Icons.location_on_outlined, suffixWidget: IconButton(onPressed: _openFarmPinPicker, icon: const Icon(Icons.map_outlined, color: primary))),
         _buildInlineEditRow(label: 'Business Phone', controller: _phoneController, icon: Icons.phone_outlined),
         _buildInlineEditRow(label: 'Registered Email', controller: _emailController, icon: Icons.mail_outline, readOnly: true, badge: 'Farmer Verified'),
       ] else ...[
@@ -1134,7 +1323,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 if (isFarmer) ...[
                   _buildInlineEditRow(label: 'Farm Store Name', controller: _nameController, icon: Icons.storefront_outlined),
                   _buildInlineEditRow(label: 'Farm Specialty', controller: _specialtyController, icon: Icons.grass_outlined),
-                  _buildInlineEditRow(label: 'Farm Location', controller: _locationController, icon: Icons.location_on_outlined),
+                  _buildInlineEditRow(label: 'Farm Location', controller: _locationController, icon: Icons.location_on_outlined, suffixWidget: IconButton(onPressed: _openFarmPinPicker, icon: const Icon(Icons.map_outlined, color: primary))),
                   _buildInlineEditRow(label: 'Business Phone', controller: _phoneController, icon: Icons.phone_outlined),
                   _buildInlineEditRow(label: 'Registered Email', controller: _emailController, icon: Icons.mail_outline, readOnly: true, badge: 'Farmer Verified'),
                 ] else ...[
@@ -1256,6 +1445,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     required IconData icon,
     bool readOnly = false,
     String? badge,
+    Widget? suffixWidget,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1290,14 +1480,14 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       ),
                       child: Text(
                         badge,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: GoogleFonts.inter(
                           fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: primary,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF166534),
                         ),
                       ),
                     )
-                  : null,
+                  : suffixWidget,
               suffixIconConstraints: const BoxConstraints(minHeight: 0, minWidth: 0),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,

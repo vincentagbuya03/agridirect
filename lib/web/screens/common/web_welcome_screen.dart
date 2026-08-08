@@ -9,6 +9,8 @@ import '../../../shared/router/app_routes.dart';
 import '../../widgets/web_hamburger_menu_button.dart';
 import '../../../shared/utils/apk_downloader.dart';
 import '../../widgets/quick_links/quick_links_dialogs.dart';
+import '../../../shared/services/core/supabase_config.dart';
+import 'dart:async';
 
 
 /// Web Welcome Screen — Premium animated landing page
@@ -35,9 +37,17 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   int _activeBannerIndex = 1; // 0, 1, or 2
   bool _showMobileBanner = true;
 
+  // Testimonials
+  List<Map<String, dynamic>> _testimonials = [];
+  late PageController _testimonialPageController;
+  Timer? _testimonialTimer;
+  int _currentTestimonialIndex = 0;
+
   @override
   void initState() {
     super.initState();
+    _testimonialPageController = PageController();
+    _fetchTestimonials();
     _waveController = AnimationController(
       duration: const Duration(seconds: 8),
       vsync: this,
@@ -46,16 +56,84 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     _heroFadeCtrl = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
-    )..forward();
+    );
 
     _navCtrl = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
-    )..forward();
+    );
+    
+    // Start animations
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) _heroFadeCtrl.forward();
+    });
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) _navCtrl.forward();
+    });
+  }
+
+  Future<void> _fetchTestimonials() async {
+    try {
+      final res = await SupabaseConfig.client
+          .from('product_reviews')
+          .select('''
+            review_text,
+            rating,
+            users (
+              name
+            )
+          ''')
+          .eq('rating', 5)
+          .not('review_text', 'is', null)
+          .order('created_at', ascending: false)
+          .limit(5);
+
+      if (mounted && res != null) {
+        final List<dynamic> data = res as List<dynamic>;
+        // Filter out empty texts just in case
+        final validReviews = data.where((r) {
+          final text = r['review_text']?.toString().trim() ?? '';
+          return text.isNotEmpty;
+        }).toList();
+
+        setState(() {
+          _testimonials = validReviews.cast<Map<String, dynamic>>();
+        });
+
+        if (_testimonials.length > 1) {
+          _startTestimonialTimer();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching testimonials: $e');
+    }
+  }
+
+  void _startTestimonialTimer() {
+    _testimonialTimer?.cancel();
+    _testimonialTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!mounted || _testimonials.isEmpty) return;
+      int next = _currentTestimonialIndex + 1;
+      if (next >= _testimonials.length) {
+        next = 0;
+        _testimonialPageController.jumpToPage(0);
+      } else {
+        _testimonialPageController.animateToPage(
+          next,
+          duration: const Duration(milliseconds: 800),
+          curve: Curves.easeInOut,
+        );
+      }
+      setState(() {
+        _currentTestimonialIndex = next;
+      });
+    });
   }
 
   @override
   void dispose() {
+    _testimonialTimer?.cancel();
+    _testimonialPageController.dispose();
     _waveController.dispose();
     _heroFadeCtrl.dispose();
     _navCtrl.dispose();
@@ -218,7 +296,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   // FLOATING NAV BAR with glassmorphism
   // ═══════════════════════════════════════════════════════════════
   Widget _buildNavBar() {
-    final navItems = ['Home', 'Shop', 'Community', 'Find Farmer'];
+    final navItems = ['Home', 'Shop', 'Community', 'Find Farmer', 'Weather'];
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 650;
 
@@ -227,6 +305,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
       '/shop',
       '/community',
       '/farmers-map',
+      '/weather-radar',
     ];
 
     return FadeTransition(
@@ -1567,6 +1646,18 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   // ═══════════════════════════════════════════════════════════════
   Widget _buildTestimonialSection() {
     final sw = MediaQuery.of(context).size.width;
+    
+    // Fallback static testimonial if no dynamic reviews exist
+    final fallbackTestimonial = {
+      'review_text': 'AgriDirect has completely transformed how we buy fresh produce. The quality is incomparable, and knowing exactly which farmer grew our food makes every meal special.',
+      'rating': 5,
+      'users': {'name': 'Sarah Jenkins'},
+      'subtitle': 'Professional Chef, Manila',
+    };
+
+    final hasDynamic = _testimonials.isNotEmpty;
+    final displayItems = hasDynamic ? _testimonials : [fallbackTestimonial];
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(
@@ -1589,125 +1680,181 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
             children: [
               const GradientDivider(width: 50, height: 4),
               const SizedBox(height: 20),
-              // Big quote block
-              Container(
-                padding: EdgeInsets.all(sw < 480 ? 24 : 48),
-                decoration: BoxDecoration(
-                  color: AgriColors.surface,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: AgriColors.border),
-                ),
-                child: Column(
-                  children: [
-                    // Quote icon
-                    Container(
-                      width: 56,
-                      height: 56,
+              
+              // Carousel Container
+              SizedBox(
+                height: sw < 480 ? 420 : 380, // Adjust height based on screen size
+                child: PageView.builder(
+                  controller: _testimonialPageController,
+                  itemCount: displayItems.length,
+                  onPageChanged: (idx) {
+                    setState(() {
+                      _currentTestimonialIndex = idx;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    final item = displayItems[index];
+                    final text = item['review_text']?.toString() ?? '';
+                    final rating = (item['rating'] as num?)?.toInt() ?? 5;
+                    
+                    final userData = item['users'] as Map<String, dynamic>? ?? {};
+                    final name = userData['name']?.toString() ?? 'AgriDirect User';
+                    final subtitle = item['subtitle']?.toString() ?? 'Verified Buyer';
+                    
+                    final initials = name.trim().split(' ').take(2).map((e) => e.isNotEmpty ? e[0].toUpperCase() : '').join('');
+
+                    return Container(
+                      padding: EdgeInsets.all(sw < 480 ? 24 : 48),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
                       decoration: BoxDecoration(
-                        gradient: AgriColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AgriColors.emerald500.withValues(
-                              alpha: 0.25,
+                        color: AgriColors.surface,
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(color: AgriColors.border),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Quote icon
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              gradient: AgriColors.primaryGradient,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AgriColors.emerald500.withValues(
+                                    alpha: 0.25,
+                                  ),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
                             ),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
+                            child: const Icon(
+                              Icons.format_quote_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+                          Expanded(
+                            child: Center(
+                              child: SingleChildScrollView(
+                                child: Text(
+                                  '"$text"',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: sw < 480
+                                        ? 16
+                                        : sw < 768
+                                        ? 18
+                                        : 22,
+                                    fontWeight: FontWeight.w600,
+                                    color: AgriColors.dark,
+                                    height: 1.6,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+                          Container(height: 1, color: AgriColors.border),
+                          const SizedBox(height: 24),
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 14,
+                            runSpacing: 14,
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: AgriColors.primaryGradient,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    initials,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: sw < 480 
+                                    ? CrossAxisAlignment.center 
+                                    : CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: AgriColors.dark,
+                                    ),
+                                  ),
+                                  Text(
+                                    subtitle,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: AgriColors.muted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (sw >= 600) const SizedBox(width: 10),
+                              // Stars
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: List.generate(
+                                  5,
+                                  (starIdx) => Padding(
+                                    padding: const EdgeInsets.only(right: 2),
+                                    child: Icon(
+                                      starIdx < rating
+                                          ? Icons.star_rounded
+                                          : Icons.star_outline_rounded,
+                                      color: Colors.amber,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.format_quote_rounded,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    Text(
-                      '"AgriDirect has completely transformed how we buy fresh produce. The quality is incomparable, and knowing exactly which farmer grew our food makes every meal special."',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: sw < 480
-                            ? 16
-                            : sw < 768
-                            ? 18
-                            : 22,
-                        fontWeight: FontWeight.w600,
-                        color: AgriColors.dark,
-                        height: 1.6,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    Container(height: 1, color: AgriColors.border),
-                    const SizedBox(height: 24),
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 14,
-                      runSpacing: 14,
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: AgriColors.primaryGradient,
-                          ),
-                          child: Center(
-                            child: Text(
-                              'SJ',
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Column(
-                          crossAxisAlignment: sw < 480 
-                              ? CrossAxisAlignment.center 
-                              : CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Sarah Jenkins',
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: AgriColors.dark,
-                              ),
-                            ),
-                            Text(
-                              'Professional Chef, Manila',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: AgriColors.muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (sw >= 600) const SizedBox(width: 10),
-                        // Stars
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: List.generate(
-                            5,
-                            (_) => const Padding(
-                              padding: EdgeInsets.only(right: 2),
-                              child: Icon(
-                                Icons.star_rounded,
-                                size: 20,
-                                color: Color(0xFFF59E0B),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
+              
+              if (displayItems.length > 1) ...[
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    displayItems.length,
+                    (index) => Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: _currentTestimonialIndex == index ? 24 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _currentTestimonialIndex == index
+                            ? AgriColors.emerald500
+                            : AgriColors.emerald500.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

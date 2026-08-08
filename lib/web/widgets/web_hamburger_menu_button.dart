@@ -89,7 +89,7 @@ class _WebHamburgerMenuButtonState extends State<WebHamburgerMenuButton> {
           } else if ((isFarmerMode && index == 6) || (!isFarmerMode && index == 5)) {
             context.go(AppRoutes.messages, extra: {'asFarmer': isFarmerMode});
           } else if (!isFarmerMode && index == 3) {
-            context.go(AppRoutes.profile);
+            widget.onNavigate(3);
           } else if (!isFarmerMode && index == 4) {
             if (widget.onCartTap != null) widget.onCartTap!();
           } else {
