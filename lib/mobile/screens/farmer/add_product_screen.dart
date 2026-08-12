@@ -217,9 +217,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _connectivity.onConnectivityChanged.listen((result) {
       final isOnline =
           result.isNotEmpty && result.first != ConnectivityResult.none;
+          
+      final wasOffline = !_isOnline; // Check previous state before updating
+      
       setState(() => _isOnline = isOnline);
 
-      if (isOnline && mounted) {
+      if (isOnline && wasOffline && mounted) {
         _loadCategoriesAndUnits();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
