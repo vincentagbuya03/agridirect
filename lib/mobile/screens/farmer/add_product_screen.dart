@@ -504,9 +504,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
       if (mounted) {
         setState(() {
           _categories = categories
-              .map((c) => {'id': c.categoryId, 'name': c.name})
+              .map<Map<String, dynamic>>((c) => {'id': c.categoryId, 'name': c.name})
               .toList();
-          _units = units.map((u) => {'id': u.unitId, 'name': u.name}).toList();
+          _units = units.map<Map<String, dynamic>>((u) => {'id': u.unitId, 'name': u.name}).toList();
           _isLoadingDropdowns = false;
         });
         await prefs.setString(_cachedCategoriesKey, jsonEncode(_categories));
@@ -1278,86 +1278,177 @@ class _AddProductScreenState extends State<AddProductScreen> {
       child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isWidescreen ? 1240 : 680),
-          child: Row(
-            children: [
-              OutlinedButton(
-                onPressed: () => context.pop(),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  side: const BorderSide(color: Color(0xFFCBD5E1)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(
-                  'Cancel',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF475569),
-                  ),
-                ),
-              ),
-              const Spacer(),
-              if (widget.editProduct != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: OutlinedButton.icon(
-                    onPressed: _isLoading ? null : _deleteProduct,
-                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
-                    label: Text(
-                      'Delete',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.red,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      side: const BorderSide(color: Colors.red, width: 1.5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ElevatedButton.icon(
-                onPressed: _isLoading ? null : _submitForm,
-                icon: _isLoading
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.5,
+          child: isWidescreen
+              ? Row(
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => context.pop(),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      )
-                    : const Icon(Icons.check_circle_outline_rounded, size: 20),
-                label: Text(
-                  widget.editProduct != null
-                      ? 'Save Changes'
-                      : (_isOnline
-                          ? 'Publish Product'
-                          : 'Save Offline & Publish Later'),
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
+                      ),
+                      child: Text(
+                        'Cancel',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    if (widget.editProduct != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoading ? null : _deleteProduct,
+                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+                          label: Text(
+                            'Delete',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.red,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            side: const BorderSide(color: Colors.red, width: 1.5),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _submitForm,
+                      icon: _isLoading
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Icon(Icons.check_circle_outline_rounded, size: 20),
+                      label: Text(
+                        widget.editProduct != null
+                            ? 'Save Changes'
+                            : (_isOnline ? 'Publish Product' : 'Save Offline & Publish Later'),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primary,
+                        disabledBackgroundColor: primary.withValues(alpha: 0.5),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: OutlinedButton(
+                        onPressed: () => context.pop(),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF475569),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (widget.editProduct != null) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 1,
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoading ? null : _deleteProduct,
+                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 16),
+                          label: Text(
+                            'Delete',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.red,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            side: const BorderSide(color: Colors.red, width: 1.5),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: widget.editProduct != null ? 1 : 2,
+                      child: ElevatedButton.icon(
+                        onPressed: _isLoading ? null : _submitForm,
+                        icon: _isLoading
+                            ? const SizedBox(
+                                height: 16,
+                                width: 16,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.check_circle_outline_rounded, size: 16),
+                        label: Text(
+                          widget.editProduct != null
+                              ? 'Save'
+                              : (_isOnline ? 'Publish' : 'Save Offline'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primary,
+                          disabledBackgroundColor: primary.withValues(alpha: 0.5),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primary,
-                  disabledBackgroundColor: primary.withValues(alpha: 0.5),
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

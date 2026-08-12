@@ -1556,9 +1556,9 @@ class _EditProductDialogState extends State<_EditProductDialog> {
           }
 
           _categories = cats
-              .map((c) => {'id': c.categoryId, 'name': c.name})
+              .map<Map<String, dynamic>>((c) => {'id': c.categoryId, 'name': c.name})
               .toList();
-          _units = unts.map((u) => {'id': u.unitId, 'name': u.name}).toList();
+          _units = unts.map<Map<String, dynamic>>((u) => {'id': u.unitId, 'name': u.name}).toList();
           _isLoadingDropdowns = false;
         });
       }
