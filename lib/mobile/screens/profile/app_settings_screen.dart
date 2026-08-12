@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/auto_update_service.dart';
 import '../../../shared/services/offline/offline_cache_service.dart';
@@ -10,6 +11,7 @@ import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../web/widgets/web_consumer_nav_bar.dart';
 import '../../../shared/router/app_routes.dart';
+import '../../widgets/auth/mobile_two_factor_sheet.dart';
 
 class AppSettingsScreen extends StatefulWidget {
   const AppSettingsScreen({super.key});
@@ -29,6 +31,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   String _userEmail = '';
   String _userPhone = '';
   bool _loadingUserData = true;
+  bool _is2faActive = false;
 
   @override
   void initState() {
@@ -45,7 +48,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
       try {
         final profile = await SupabaseConfig.client
             .from('users')
-            .select('phone, phone_number')
+            .select()
             .eq('user_id', user.id)
             .limit(1)
             .maybeSingle();
@@ -58,6 +61,13 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
         }
       } catch (e) {
         debugPrint('Error loading user profile details: $e');
+      }
+
+      try {
+        final res = await SupabaseConfig.client.auth.mfa.listFactors();
+        _is2faActive = res.totp.any((f) => f.status.toString().contains('verified'));
+      } catch (e) {
+        debugPrint('Error loading 2FA status: $e');
       }
     }
     if (mounted) {
@@ -334,6 +344,133 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     currentController.dispose();
     passwordController.dispose();
     confirmController.dispose();
+  }
+
+  Future<void> _openUpdatePhoneDialog() async {
+    final formKey = GlobalKey<FormState>();
+    final phoneController = TextEditingController(text: _userPhone);
+    bool isSaving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            Future<void> submit() async {
+              if (!formKey.currentState!.validate()) return;
+              setModalState(() => isSaving = true);
+              
+              final newPhone = phoneController.text.trim();
+              try {
+                final user = SupabaseConfig.client.auth.currentUser;
+                if (user != null) {
+                  // Update auth user metadata
+                  await SupabaseConfig.client.auth.updateUser(
+                    UserAttributes(data: {'phone_number': newPhone}),
+                  );
+                  // Update users table
+                  await SupabaseConfig.client
+                      .from('users')
+                      .update({'phone': newPhone, 'phone_number': newPhone})
+                      .eq('user_id', user.id);
+                      
+                  if (!mounted) return;
+                  setState(() {
+                    _userPhone = newPhone;
+                  });
+                }
+                
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Phone number updated successfully.'),
+                    backgroundColor: AppColors.success,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } catch (e) {
+                if (!dialogContext.mounted) return;
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to update phone number: $e'),
+                    backgroundColor: AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } finally {
+                setModalState(() => isSaving = false);
+              }
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.phone_outlined, color: AppColors.primary, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('Update Phone', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              content: SizedBox(
+                width: 380,
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Enter your new phone number. This will be used for your account profile.',
+                        style: TextStyle(fontSize: 13, color: Colors.grey, height: 1.4),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          labelText: 'Phone Number',
+                          prefixIcon: const Icon(Icons.phone_android_rounded, size: 20),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter a phone number.';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: isSaving ? null : submit,
+                  child: Text(isSaving ? 'Updating...' : 'Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    phoneController.dispose();
   }
 
   Future<void> _clearAutoCache() async {
@@ -652,8 +789,17 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 icon: Icons.security_rounded,
                 title: 'Two-Factor Authentication (2FA)',
                 subtitle: 'Add an extra layer of security with an Authenticator App.',
-                trailing: const Text('Active', style: TextStyle(color: Color(0xFF64748B))),
-                onTap: () {},
+                trailing: Text(
+                  _is2faActive ? 'Active' : 'Inactive',
+                  style: TextStyle(
+                    color: _is2faActive ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () async {
+                  final result = await MobileTwoFactorSheet.show(context, initialIsActive: _is2faActive);
+                  if (result == true) _loadUserData();
+                },
               ),
               const Divider(height: 1, color: Color(0xFFF1F5F9)),
               _SettingsTile(
@@ -795,7 +941,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
                     ],
                   ),
-                  onTap: () {},
+                  onTap: _openUpdatePhoneDialog,
                 ),
                 const Divider(height: 1, thickness: 1, color: Color(0xFFF5F5F5)),
                 _SettingsTile(
@@ -842,8 +988,17 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   icon: Icons.security_rounded,
                   title: 'Two-Factor Authentication (2FA)',
                   subtitle: 'Add an extra layer of security with an Authenticator App.',
-                  trailing: const Text('Active', style: TextStyle(color: Color(0xFF64748B))),
-                  onTap: () {},
+                  trailing: Text(
+                    _is2faActive ? 'Active' : 'Inactive',
+                    style: TextStyle(
+                      color: _is2faActive ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onTap: () async {
+                    final result = await MobileTwoFactorSheet.show(context, initialIsActive: _is2faActive);
+                    if (result == true) _loadUserData();
+                  },
                 ),
                 const Divider(height: 1, thickness: 1, color: Color(0xFFF5F5F5)),
                 _SettingsTile(

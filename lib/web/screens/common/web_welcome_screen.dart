@@ -88,7 +88,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
           .order('created_at', ascending: false)
           .limit(5);
 
-      if (mounted && res != null) {
+      if (mounted) {
         final List<dynamic> data = res as List<dynamic>;
         // Filter out empty texts just in case
         final validReviews = data.where((r) {

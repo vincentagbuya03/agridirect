@@ -806,6 +806,9 @@ class SupabaseDataService {
       longitude: (item['longitude'] as num?)?.toDouble(),
       isFeatured: item['is_featured'] == true,
       isPreorder: isPre,
+      isFreeShipping: item['is_free_shipping'] == true,
+      isWholesale: item['is_wholesale'] == true,
+      isFlashSale: item['is_flash_sale'] == true,
       createdAt: createdAtDate,
     );
   }
@@ -857,6 +860,100 @@ class SupabaseDataService {
       return [];
     }
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // QUICK ACTION QUERIES
+  // ══════════════════════════════════════════════════════════════════════════
+
+  Future<List<ProductItem>> getFreeShippingProducts() async {
+    try {
+      final response = await _client
+          .from('v_products')
+          .select()
+          .eq('is_free_shipping', true)
+          .eq('is_active', true)
+          .order('created_at', ascending: false);
+      
+      final items = response as List;
+      final enrichedItems = List<Map<String, dynamic>>.from(items);
+      await _enrichProductItemsWithFarmerProfiles(enrichedItems);
+      return enrichedItems.map((item) => _mapToProductItem(item)).toList();
+    } catch (e) {
+      debugPrint('Error fetching free shipping products: $e');
+      return [];
+    }
+  }
+
+  Future<List<ProductItem>> getWholesaleProducts() async {
+    try {
+      final response = await _client
+          .from('v_products')
+          .select()
+          .eq('is_wholesale', true)
+          .eq('is_active', true)
+          .order('created_at', ascending: false);
+      
+      final items = response as List;
+      final enrichedItems = List<Map<String, dynamic>>.from(items);
+      await _enrichProductItemsWithFarmerProfiles(enrichedItems);
+      return enrichedItems.map((item) => _mapToProductItem(item)).toList();
+    } catch (e) {
+      debugPrint('Error fetching wholesale products: $e');
+      return [];
+    }
+  }
+
+  Future<List<ProductItem>> getFlashSaleProducts() async {
+    try {
+      final response = await _client
+          .from('v_products')
+          .select()
+          .eq('is_flash_sale', true)
+          .eq('is_active', true)
+          .order('created_at', ascending: false);
+      
+      final items = response as List;
+      final enrichedItems = List<Map<String, dynamic>>.from(items);
+      await _enrichProductItemsWithFarmerProfiles(enrichedItems);
+      return enrichedItems.map((item) => _mapToProductItem(item)).toList();
+    } catch (e) {
+      debugPrint('Error fetching flash sale products: $e');
+      return [];
+    }
+  }
+
+  Future<List<VoucherItem>> getUserVouchers(String status) async {
+    try {
+      final userId = SupabaseConfig.currentUser?.id;
+      if (userId == null) return [];
+
+      final response = await _client
+          .from('user_vouchers')
+          .select('*, vouchers(*)')
+          .eq('user_id', userId)
+          .eq('status', status)
+          .order('created_at', ascending: false);
+      
+      final items = response as List;
+      return items.map((item) {
+        final voucher = item['vouchers'] as Map<String, dynamic>? ?? {};
+        return VoucherItem(
+          id: item['user_voucher_id']?.toString() ?? '',
+          code: voucher['code']?.toString() ?? '',
+          title: voucher['title']?.toString() ?? '',
+          description: voucher['description']?.toString(),
+          discountPercentage: (voucher['discount_percentage'] as num?)?.toDouble(),
+          minSpend: (voucher['min_spend'] as num?)?.toDouble(),
+          validUntil: voucher['valid_until'] != null ? DateTime.tryParse(voucher['valid_until']) : null,
+          status: item['status']?.toString() ?? 'available',
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching user vouchers: $e');
+      return [];
+    }
+  }
+
 
   // ══════════════════════════════════════════════════════════════════════════
   // FORUM POSTS BY USER (for public farmer profile)

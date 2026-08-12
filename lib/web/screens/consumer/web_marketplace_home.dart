@@ -9,6 +9,14 @@ import '../../widgets/animated_components.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 import '../../widgets/quick_links/quick_links_dialogs.dart';
+import 'web_free_shipping_screen.dart';
+import 'web_vouchers_screen.dart';
+import 'web_agrimall_screen.dart';
+import 'web_wholesale_screen.dart';
+import 'web_fresh_produce_screen.dart';
+import 'web_flash_sale_screen.dart';
+import 'web_local_shops_screen.dart';
+import 'web_more_actions_dialog.dart';
 
 /// Web Marketplace Home — Clean AgriDirect Landing Page
 /// Light mint/green design matching reference screenshot
@@ -94,6 +102,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
             children: [
               _buildNavBar(),
               _buildHero(),
+              _buildQuickActions(),
               _buildCategories(),
               _buildFeaturedProducts(),
               _buildFarmerSpotlight(),
@@ -749,6 +758,132 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // QUICK ACTIONS — Responsive grid 
+  // ─────────────────────────────────────────────
+  Widget _buildQuickActions() {
+    final actions = [
+      {'icon': Icons.local_shipping_rounded, 'label': 'Free Shipping', 'color': Colors.green},
+      {'icon': Icons.card_giftcard_rounded, 'label': 'Vouchers', 'color': Colors.orange},
+      {'icon': Icons.agriculture_rounded, 'label': 'AgriMall', 'color': Colors.red},
+      {'icon': Icons.inventory_2_rounded, 'label': 'Wholesale', 'color': Colors.blue},
+      {'icon': Icons.eco_rounded, 'label': 'Fresh Produce', 'color': Colors.teal},
+      {'icon': Icons.flash_on_rounded, 'label': 'Flash Sale', 'color': Colors.amber},
+      {'icon': Icons.storefront_rounded, 'label': 'Local Shops', 'color': Colors.purple},
+      {'icon': Icons.more_horiz_rounded, 'label': 'More', 'color': Colors.grey},
+    ];
+
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+    
+    // On mobile, show a 4-column grid similar to the mobile app
+    // On web desktop, show an 8-column row
+    final crossAxisCount = isMobile ? 4 : 8;
+
+    return Container(
+      color: Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 64,
+        vertical: 24,
+      ),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: isMobile ? 8 : 16,
+              childAspectRatio: isMobile ? 0.75 : 0.9,
+            ),
+            itemCount: actions.length,
+            itemBuilder: (context, index) {
+              final action = actions[index];
+              return InkWell(
+                onTap: () {
+                  final label = action['label'] as String;
+                  if (label == 'More') {
+                    showDialog(
+                      context: context,
+                      builder: (context) => const WebMoreActionsDialog(),
+                    );
+                    return;
+                  }
+                  
+                  Widget? screen;
+                  switch (label) {
+                    case 'Free Shipping':
+                      screen = const WebFreeShippingScreen();
+                      break;
+                    case 'Vouchers':
+                      screen = const WebVouchersScreen();
+                      break;
+                    case 'AgriMall':
+                      screen = const WebAgriMallScreen();
+                      break;
+                    case 'Wholesale':
+                      screen = const WebWholesaleScreen();
+                      break;
+                    case 'Fresh Produce':
+                      screen = const WebFreshProduceScreen();
+                      break;
+                    case 'Flash Sale':
+                      screen = const WebFlashSaleScreen();
+                      break;
+                    case 'Local Shops':
+                      screen = const WebLocalShopsScreen();
+                      break;
+                  }
+
+                  if (screen != null) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => screen!),
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(isMobile ? 12 : 16),
+                      decoration: BoxDecoration(
+                        color: (action['color'] as Color).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: (action['color'] as Color).withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Icon(
+                        action['icon'] as IconData, 
+                        color: action['color'] as Color, 
+                        size: isMobile ? 24 : 28,
+                      ),
+                    ),
+                    SizedBox(height: isMobile ? 8 : 12),
+                    Text(
+                      action['label'] as String,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: isMobile ? 10 : 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1E293B),
+                      ),
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }

@@ -1475,6 +1475,9 @@ class _EditProductDialogState extends State<_EditProductDialog> {
   late TextEditingController _descriptionController;
   late TextEditingController _harvestDaysController;
   bool _isPreorder = false;
+  bool _isFreeShipping = false;
+  bool _isWholesale = false;
+  bool _isFlashSale = false;
   bool _isLoading = false;
   bool _isLoadingDropdowns = true;
 
@@ -1510,6 +1513,9 @@ class _EditProductDialogState extends State<_EditProductDialog> {
       text: harvestVal.replaceAll(RegExp(r'[^0-9]'), ''),
     );
     _isPreorder = widget.product['is_preorder'] == true;
+    _isFreeShipping = widget.product['is_free_shipping'] == true;
+    _isWholesale = widget.product['is_wholesale'] == true;
+    _isFlashSale = widget.product['is_flash_sale'] == true;
     _loadProductDetailsAndDropdowns();
   }
 
@@ -1528,7 +1534,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
       final client = Supabase.instance.client;
       final productData = await client
           .from('products')
-          .select('category_id, unit_id, harvest_days, is_preorder')
+          .select('category_id, unit_id, harvest_days, is_preorder, is_free_shipping, is_wholesale, is_flash_sale')
           .eq('product_id', widget.product['id'])
           .single();
 
@@ -1541,6 +1547,9 @@ class _EditProductDialogState extends State<_EditProductDialog> {
           _selectedCategory = productData['category_id']?.toString();
           _selectedUnit = productData['unit_id']?.toString();
           _isPreorder = productData['is_preorder'] ?? false;
+          _isFreeShipping = productData['is_free_shipping'] ?? false;
+          _isWholesale = productData['is_wholesale'] ?? false;
+          _isFlashSale = productData['is_flash_sale'] ?? false;
           if (productData['harvest_days'] != null) {
             _harvestDaysController.text = productData['harvest_days']
                 .toString();
@@ -1584,6 +1593,9 @@ class _EditProductDialogState extends State<_EditProductDialog> {
             'description': description,
             'harvest_days': harvestDays,
             'is_preorder': _isPreorder,
+            'is_free_shipping': _isFreeShipping,
+            'is_wholesale': _isWholesale,
+            'is_flash_sale': _isFlashSale,
             if (_selectedCategory != null) 'category_id': _selectedCategory,
             if (_selectedUnit != null) 'unit_id': _selectedUnit,
           })
@@ -1962,6 +1974,72 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                                 },
                               ),
                             ],
+                            const SizedBox(height: 16),
+                            const Divider(height: 1),
+                            const SizedBox(height: 16),
+                            _buildFieldLabel('Promotions & Offers'),
+                            Text(
+                              'Boost your sales by opting into marketplace promotions.',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: const Color(0xFF6B7280),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: _isFreeShipping,
+                                  activeColor: const Color(0xFF16A34A),
+                                  onChanged: (val) => setState(() => _isFreeShipping = val ?? false),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Free Shipping (Cover delivery costs)',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF374151),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: _isWholesale,
+                                  activeColor: const Color(0xFF16A34A),
+                                  onChanged: (val) => setState(() => _isWholesale = val ?? false),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Wholesale Pricing (Offer bulk discounts)',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF374151),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: _isFlashSale,
+                                  activeColor: const Color(0xFF16A34A),
+                                  onChanged: (val) => setState(() => _isFlashSale = val ?? false),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Flash Sale (Join next flash sale)',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF374151),
+                                  ),
+                                ),
+                              ],
+                            ),
                             const SizedBox(height: 16),
 
                             // Description

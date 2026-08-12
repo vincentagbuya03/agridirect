@@ -185,8 +185,10 @@ class _UpdateDialogState extends State<_UpdateDialog> {
       OtaUpdate().execute(
         widget.apkUrl,
         destinationFilename: 'agridirect_update.apk',
+        usePackageInstaller: true,
       ).listen(
         (OtaEvent event) {
+          if (!mounted) return;
           switch (event.status) {
             case OtaStatus.DOWNLOADING:
               setState(() {
@@ -201,12 +203,45 @@ class _UpdateDialogState extends State<_UpdateDialog> {
             case OtaStatus.INSTALLING:
               setState(() {
                 _statusMessage = 'Installing update...';
+                final progressStr = event.value;
+                _downloadProgress = progressStr == null
+                    ? null
+                    : (double.tryParse(progressStr) ?? 0) / 100.0;
+              });
+              break;
+            case OtaStatus.INSTALLATION_DONE:
+              setState(() {
+                _statusMessage = 'Update installed. Restarting AgriDirect...';
+                _isDownloading = false;
                 _downloadProgress = null;
               });
               break;
-            default:
+            case OtaStatus.PERMISSION_NOT_GRANTED_ERROR:
               setState(() {
-                _statusMessage = 'Update failed or finished: ${event.status}';
+                _statusMessage =
+                    'Install permission was denied. Allow AgriDirect to install unknown apps, then try again.';
+                _isDownloading = false;
+                _downloadProgress = null;
+              });
+              break;
+            case OtaStatus.INSTALLATION_ERROR:
+              setState(() {
+                _statusMessage =
+                    'Android could not install this update. Make sure the APK is signed with the same key and has a higher version code.';
+                _isDownloading = false;
+                _downloadProgress = null;
+              });
+              break;
+            case OtaStatus.DOWNLOAD_ERROR:
+            case OtaStatus.CHECKSUM_ERROR:
+            case OtaStatus.INTERNAL_ERROR:
+            case OtaStatus.ALREADY_RUNNING_ERROR:
+            case OtaStatus.CANCELED:
+              setState(() {
+                final details = event.value?.trim();
+                _statusMessage = details == null || details.isEmpty
+                    ? 'Update failed: ${event.status.name}'
+                    : 'Update failed: ${event.status.name} ($details)';
                 _isDownloading = false;
                 _downloadProgress = null;
               });

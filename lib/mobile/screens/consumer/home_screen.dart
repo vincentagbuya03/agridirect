@@ -22,8 +22,15 @@ import '../../../shared/services/community/message_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/widgets/forum_video_player.dart';
-import '../farmer/farmer_community_hub.dart';
-
+import 'promo_action_screen.dart';
+import 'free_shipping_screen.dart';
+import 'vouchers_screen.dart';
+import 'agrimall_screen.dart';
+import 'wholesale_screen.dart';
+import 'fresh_produce_screen.dart';
+import 'flash_sale_screen.dart';
+import 'local_shops_screen.dart';
+import 'more_actions_bottom_sheet.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -39,11 +46,9 @@ class _HomeScreenState extends State<HomeScreen> {
   late Stream<int> _unreadCountStream;
   late Future<Map<String, dynamic>> _followingHomeDataFuture;
   late Future<List<CategoryItem>> _categoriesFuture;
+  late Future<List<ProductItem>> _dailyDiscoveriesFuture;
 
-  String _aiInsightTitle = 'Scanning market prices...';
-  String _aiInsightDesc =
-      'Our AI is analyzing local supply and pricing trends to find the best deals.';
-  bool _isLoadingInsight = true;
+
 
   @override
   void initState() {
@@ -54,80 +59,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     _followingHomeDataFuture = _loadFollowingHomeData();
     _categoriesFuture = SupabaseDataService().getCategories();
+    _dailyDiscoveriesFuture = SupabaseDataService().getNearbyProducts();
     _loadDefaultAddress();
-    _loadAIMarketInsight();
-  }
-
-  Future<void> _loadAIMarketInsight() async {
-    try {
-      final products = await SupabaseDataService().getNearbyProducts();
-      if (products.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _aiInsightTitle = 'Market is fresh today';
-            _aiInsightDesc =
-                'Browse the marketplace to discover fresh harvests from local farmers.';
-            _isLoadingInsight = false;
-          });
-        }
-        return;
-      }
-
-      final Map<String, List<ProductItem>> categories = {};
-      for (final p in products) {
-        final cat = p.categoryName ?? 'Produce';
-        categories.putIfAbsent(cat, () => []).add(p);
-      }
-
-      if (categories.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _aiInsightTitle = 'Fresh harvests available';
-            _aiInsightDesc =
-                'Explore the marketplace to see fresh items listed today.';
-            _isLoadingInsight = false;
-          });
-        }
-        return;
-      }
-
-      String peakCategory = categories.keys.first;
-      int maxCount = 0;
-      categories.forEach((cat, list) {
-        if (list.length > maxCount) {
-          maxCount = list.length;
-          peakCategory = cat;
-        }
-      });
-
-      final list = categories[peakCategory]!;
-      list.sort((a, b) {
-        final priceA =
-            double.tryParse(a.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
-        final priceB =
-            double.tryParse(b.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
-        return priceA.compareTo(priceB);
-      });
-      final cheapest = list.first;
-
-      if (mounted) {
-        setState(() {
-          _aiInsightTitle = '${cheapest.name} starting at ${cheapest.price}';
-          _aiInsightDesc =
-              'Peak supply detected in $peakCategory from ${cheapest.farm}. Grab fresh harvests at wholesale prices today.';
-          _isLoadingInsight = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _aiInsightTitle = 'Discover local produce';
-          _aiInsightDesc =
-              'Local farmers are offering fresh harvests at great prices. Tap below to browse.';
-          _isLoadingInsight = false;
-        });
-      }
-    }
   }
 
   Future<void> _loadDefaultAddress() async {
@@ -163,9 +96,9 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildGlassAIMarketInsight(),
 
-                  const SizedBox(height: 32),
+                  _buildPromoBannerCarousel(),
+                  _buildQuickActionMenu(),
                   _buildFollowingUpdatesSection(),
                   _buildSectionHeader('Browse Categories', 'Show all', () {
                     SupabaseDataService.navigationTabNotifier.value = 1;
@@ -173,6 +106,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         null;
                   }),
                   _buildCategoryGrid(),
+                  const SizedBox(height: 32),
+                  _buildDailyDiscoveries(),
                   const SizedBox(height: 32),
                   _buildSectionHeader(
                     'Featured Farmers',
@@ -202,6 +137,303 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  Widget _buildPromoBannerCarousel() {
+    return Container(
+      height: 180,
+      margin: const EdgeInsets.only(bottom: 24),
+      child: PageView(
+        children: [
+          _buildPromoBanner('Fresh Produce Sale', 'Up to 30% Off', const Color(0xFF10B981)),
+          _buildPromoBanner('Free Delivery', 'On orders over ₱500', const Color(0xFFF59E0B)),
+          _buildPromoBanner('Support Local', 'Buy directly from farmers', const Color(0xFF3B82F6)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPromoBanner(String title, String subtitle, Color color) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color, color.withValues(alpha: 0.7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Shop Now',
+                    style: GoogleFonts.inter(
+                      color: color,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Icon(
+            Icons.shopping_bag_outlined,
+            size: 64,
+            color: Colors.white.withValues(alpha: 0.2),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionMenu() {
+    final actions = [
+      {'icon': Icons.local_shipping_rounded, 'label': 'Free Shipping', 'color': Colors.green},
+      {'icon': Icons.card_giftcard_rounded, 'label': 'Vouchers', 'color': Colors.orange},
+      {'icon': Icons.agriculture_rounded, 'label': 'AgriMall', 'color': Colors.red},
+      {'icon': Icons.inventory_2_rounded, 'label': 'Wholesale', 'color': Colors.blue},
+      {'icon': Icons.eco_rounded, 'label': 'Fresh Produce', 'color': Colors.teal},
+      {'icon': Icons.flash_on_rounded, 'label': 'Flash Sale', 'color': Colors.amber},
+      {'icon': Icons.storefront_rounded, 'label': 'Local Shops', 'color': Colors.purple},
+      {'icon': Icons.more_horiz_rounded, 'label': 'More', 'color': Colors.grey},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 12,
+          childAspectRatio: 0.8,
+        ),
+        itemCount: actions.length,
+        itemBuilder: (context, index) {
+          final action = actions[index];
+          return InkWell(
+            onTap: () {
+              final label = action['label'] as String;
+              if (label == 'More') {
+                showMoreActionsBottomSheet(context);
+                return;
+              }
+              
+              Widget? screen;
+              switch (label) {
+                case 'Free Shipping':
+                  screen = const FreeShippingScreen();
+                  break;
+                case 'Vouchers':
+                  screen = const VouchersScreen();
+                  break;
+                case 'AgriMall':
+                  screen = const AgriMallScreen();
+                  break;
+                case 'Wholesale':
+                  screen = const WholesaleScreen();
+                  break;
+                case 'Fresh Produce':
+                  screen = const FreshProduceScreen();
+                  break;
+                case 'Flash Sale':
+                  screen = const FlashSaleScreen();
+                  break;
+                case 'Local Shops':
+                  screen = const LocalShopsScreen();
+                  break;
+                default:
+                  screen = PromoActionScreen(
+                    title: label,
+                    icon: action['icon'] as IconData,
+                    color: action['color'] as Color,
+                  );
+              }
+
+              if (screen != null) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => screen!),
+                );
+              }
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: (action['color'] as Color).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(action['icon'] as IconData, color: action['color'] as Color, size: 24),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  action['label'] as String,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDailyDiscoveries() {
+    return FutureBuilder<List<ProductItem>>(
+      future: _dailyDiscoveriesFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final products = snapshot.data ?? [];
+        if (products.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Daily Discoveries', style: AppTextStyles.headline2.copyWith(fontSize: 22)),
+                  GestureDetector(
+                    onTap: () {
+                      SupabaseDataService.navigationTabNotifier.value = 1;
+                    },
+                    child: Text(
+                      'See All',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.75,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: products.length > 6 ? 6 : products.length,
+                itemBuilder: (context, index) {
+                  final product = products[index];
+                  return GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => ProductViewScreen(product: product)),
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                              child: CachedNetworkImage(
+                                imageUrl: product.imageUrl,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                placeholder: (context, url) => const AppShimmerLoader(),
+                                errorWidget: (context, url, error) => const Icon(Icons.error),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  product.name,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  product.price,
+                                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
 
   Widget _buildSectionHeader(
     String title,
@@ -551,116 +783,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildGlassAIMarketInsight() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF0369A1), Color(0xFF0EA5E9)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0369A1).withValues(alpha: 0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.auto_awesome_rounded,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'AI MARKET SCAN',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white.withValues(alpha: 0.7),
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            if (_isLoadingInsight) ...[
-              const Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ] else ...[
-              Text(
-                _aiInsightTitle,
-                style: AppTextStyles.headline2.copyWith(
-                  color: Colors.white,
-                  fontSize: 22,
-                  height: 1.2,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                _aiInsightDesc,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: Colors.white.withValues(alpha: 0.8),
-                  height: 1.5,
-                ),
-              ),
-            ],
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                SupabaseDataService.marketplaceCategoryNotifier.value = null;
-                SupabaseDataService.navigationTabNotifier.value = 1;
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFF0369A1),
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 14,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: Text(
-                'Shop Best Prices',
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Future<Map<String, dynamic>> _loadFollowingHomeData() async {
     final results = await Future.wait<dynamic>([

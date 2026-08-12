@@ -203,6 +203,9 @@ class OfflineProductService {
     List<Uint8List>? webImageBytes,
     List<String>? webImageNames,
     String? uploadedImageUrl, // URLs from online upload (optional)
+    bool isFreeShipping = false,
+    bool isWholesale = false,
+    bool isFlashSale = false,
   }) async {
     final online = await isOnline();
 
@@ -221,6 +224,9 @@ class OfflineProductService {
           localImagePaths: localImagePaths,
           webImageBytes: webImageBytes,
           webImageNames: webImageNames,
+          isFreeShipping: isFreeShipping,
+          isWholesale: isWholesale,
+          isFlashSale: isFlashSale,
         );
       } catch (e) {
         debugPrint('Failed to upload to Supabase: $e, saving offline');
@@ -296,6 +302,9 @@ class OfflineProductService {
     required List<String> localImagePaths,
     List<Uint8List>? webImageBytes,
     List<String>? webImageNames,
+    bool isFreeShipping = false,
+    bool isWholesale = false,
+    bool isFlashSale = false,
   }) async {
     // Upload local images to Supabase Storage
     List<String> uploadedUrls = [];
@@ -360,6 +369,9 @@ class OfflineProductService {
       harvestDays: harvestDays,
       isPreorder: isPreorder,
       availableQuantity: availableQuantity,
+      isFreeShipping: isFreeShipping,
+      isWholesale: isWholesale,
+      isFlashSale: isFlashSale,
     );
 
     return product.productId;
@@ -411,6 +423,9 @@ class OfflineProductService {
           isPreorder: product.isPreorder,
           availableQuantity: product.availableQuantity.toDouble(),
           localImagePaths: product.localImagePaths,
+          isFreeShipping: false,
+          isWholesale: false,
+          isFlashSale: false,
         );
 
         // Mark as synced and clear local error
@@ -464,6 +479,9 @@ class OfflineProductService {
         isPreorder: product.isPreorder,
         availableQuantity: product.availableQuantity.toDouble(),
         localImagePaths: product.localImagePaths,
+        isFreeShipping: false,
+        isWholesale: false,
+        isFlashSale: false,
       );
 
       await _queueService.markAsSynced(productId);

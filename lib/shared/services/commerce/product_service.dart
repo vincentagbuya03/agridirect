@@ -104,6 +104,9 @@ class ProductService {
     int? harvestDays,
     bool isPreorder = false,
     double? availableQuantity,
+    bool isFreeShipping = false,
+    bool isWholesale = false,
+    bool isFlashSale = false,
   }) async {
     try {
       // Get current user ID from auth
@@ -166,6 +169,9 @@ class ProductService {
             'description': description,
             'harvest_days': harvestDays,
             'is_preorder': isPreorder,
+            'is_free_shipping': isFreeShipping,
+            'is_wholesale': isWholesale,
+            'is_flash_sale': isFlashSale,
             'farmer_id': farmerId,
             'category_id': categoryId,
             'unit_id': unitId,
@@ -320,6 +326,9 @@ class ProductService {
     String? imageUrl,
     int? harvestDays,
     bool? isPreorder,
+    bool? isFreeShipping,
+    bool? isWholesale,
+    bool? isFlashSale,
   }) async {
     try {
       final updateData = <String, dynamic>{
@@ -328,6 +337,9 @@ class ProductService {
         'description': ?description,
         'harvest_days': ?harvestDays,
         'is_preorder': ?isPreorder,
+        'is_free_shipping': ?isFreeShipping,
+        'is_wholesale': ?isWholesale,
+        'is_flash_sale': ?isFlashSale,
       };
 
       final response = await _supabase

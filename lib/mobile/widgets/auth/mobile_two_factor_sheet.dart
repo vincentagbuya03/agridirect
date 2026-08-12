@@ -60,7 +60,7 @@ class _MobileTwoFactorSheetState extends State<MobileTwoFactorSheet> {
   Future<void> _checkStatus() async {
     try {
       final res = await SupabaseConfig.client.auth.mfa.listFactors();
-      final hasTotp = res.totp.isNotEmpty;
+      final hasTotp = res.totp.any((f) => f.status.toString().contains('verified'));
 
       if (mounted) {
         setState(() {
@@ -80,7 +80,17 @@ class _MobileTwoFactorSheetState extends State<MobileTwoFactorSheet> {
     });
 
     try {
-      final enrollResponse = await SupabaseConfig.client.auth.mfa.enroll();
+      // Clean up any dangling unverified factors to prevent name conflicts
+      final factors = await SupabaseConfig.client.auth.mfa.listFactors();
+      for (final f in factors.totp) {
+        if (!f.status.toString().contains('verified')) {
+          await SupabaseConfig.client.auth.mfa.unenroll(f.id);
+        }
+      }
+
+      final enrollResponse = await SupabaseConfig.client.auth.mfa.enroll(
+        friendlyName: 'AgriDirect App ${DateTime.now().millisecondsSinceEpoch}',
+      );
 
       setState(() {
         _factorId = enrollResponse.id;

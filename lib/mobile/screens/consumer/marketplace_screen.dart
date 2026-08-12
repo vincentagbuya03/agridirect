@@ -2256,7 +2256,8 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
             .trim();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF5F5F5), // Shopee-like light gray background
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -2275,7 +2276,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
           _buildAppBarBtn(
             _isSaved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
             _toggleFavorite,
-            iconColor: _isSaved ? Colors.redAccent : AppColors.textHeadline,
+            iconColor: _isSaved ? Colors.redAccent : Colors.white,
           ),
           _buildAppBarBtn(
             Icons.ios_share_rounded,
@@ -2296,29 +2297,51 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
           const SizedBox(width: 8),
         ],
       ),
+      bottomNavigationBar: _buildStickyBottomBar(),
       body: ListView(
+        padding: EdgeInsets.zero,
         physics: const BouncingScrollPhysics(),
         children: [
           _buildImageGallery(),
-          Padding(
-            padding: const EdgeInsets.all(20),
+          _buildPriceBanner(),
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildNamePriceSection(rating, reviewCount),
-                const SizedBox(height: 24),
-                _buildHarvestBadge(),
-                const SizedBox(height: 28),
-                _buildAboutSection(),
-                const SizedBox(height: 28),
-                _buildFarmerCard(farmerAvatarUrl),
-                const SizedBox(height: 28),
-                _buildQuantitySelector(),
-                const SizedBox(height: 32),
-                _buildActionButtons(),
               ],
             ),
           ),
+          const SizedBox(height: 8),
+          _buildShippingRow(),
+          const SizedBox(height: 8),
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.all(16),
+            child: _buildHarvestBadge(),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            color: Colors.white,
+            child: _buildFarmerCard(farmerAvatarUrl),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.all(16),
+            child: _buildQuantitySelector(),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.all(16),
+            child: _buildAboutSection(),
+          ),
+          const SizedBox(height: 8),
+          _buildReviewsSection(),
+          const SizedBox(height: 32),
         ],
       ),
     );
@@ -2327,24 +2350,21 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   Widget _buildAppBarBtn(
     IconData icon,
     VoidCallback onTap, {
-    Color iconColor = AppColors.textHeadline,
+    Color iconColor = Colors.white,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-        padding: const EdgeInsets.all(8),
+        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 8,
-            ),
-          ],
+          color: Colors.black.withValues(alpha: 0.4),
+          shape: BoxShape.circle,
         ),
-        child: Icon(icon, size: 20, color: iconColor),
+        child: Center(
+          child: Icon(icon, size: 20, color: iconColor),
+        ),
       ),
     );
   }
@@ -2360,46 +2380,45 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
             context,
           ).push(MaterialPageRoute(builder: (_) => const CartScreen())),
           child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-            padding: const EdgeInsets.all(8),
+            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 8,
-                ),
-              ],
+              color: Colors.black.withValues(alpha: 0.4),
+              shape: BoxShape.circle,
             ),
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                const Icon(
-                  Icons.shopping_cart_outlined,
-                  size: 20,
-                  color: AppColors.textHeadline,
+                const Center(
+                  child: Icon(
+                    Icons.shopping_cart_outlined,
+                    size: 20,
+                    color: Colors.white,
+                  ),
                 ),
                 if (count > 0)
                   Positioned(
-                    top: -4,
-                    right: -4,
+                    top: -2,
+                    right: -2,
                     child: Container(
                       padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: AppColors.accent,
+                      decoration: BoxDecoration(
+                        color: Colors.red,
                         shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
                       ),
                       constraints: const BoxConstraints(
-                        minWidth: 12,
-                        minHeight: 12,
+                        minWidth: 16,
+                        minHeight: 16,
                       ),
                       child: Text(
                         '$count',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 8,
+                          fontSize: 10,
                           fontWeight: FontWeight.bold,
+                          height: 1.0,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -2417,126 +2436,183 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     return Stack(
       children: [
         SizedBox(
-          height: 320,
-          child: ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(32),
-            ),
-            child: widget.product.imageUrls.isNotEmpty
-                ? PageView.builder(
-                    itemCount: widget.product.imageUrls.length,
-                    onPageChanged: (i) => setState(() => _currentPage = i),
-                    itemBuilder: (context, i) =>
-                        widget.product.imageUrls[i].isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: widget.product.imageUrls[i],
-                            fit: BoxFit.cover,
-                          )
-                        : Container(
-                            color: AppColors.background,
-                            child: const Center(
-                              child: Icon(
-                                Icons.image_not_supported_outlined,
-                                color: AppColors.textSubtle,
-                                size: 48,
-                              ),
+          height: MediaQuery.of(context).size.width, // Square image
+          width: double.infinity,
+          child: widget.product.imageUrls.isNotEmpty
+              ? PageView.builder(
+                  itemCount: widget.product.imageUrls.length,
+                  onPageChanged: (i) => setState(() => _currentPage = i),
+                  itemBuilder: (context, i) =>
+                      widget.product.imageUrls[i].isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: widget.product.imageUrls[i],
+                          fit: BoxFit.cover,
+                        )
+                      : Container(
+                          color: AppColors.background,
+                          child: const Center(
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              color: AppColors.textSubtle,
+                              size: 48,
                             ),
                           ),
-                  )
-                : widget.product.imageUrl.isNotEmpty
-                ? (widget.heroTag != null 
-                    ? Hero(
-                        tag: widget.heroTag!,
-                        child: CachedNetworkImage(
-                          imageUrl: widget.product.imageUrl,
-                          fit: BoxFit.cover,
                         ),
-                      )
-                    : CachedNetworkImage(
+                )
+              : widget.product.imageUrl.isNotEmpty
+              ? (widget.heroTag != null 
+                  ? Hero(
+                      tag: widget.heroTag!,
+                      child: CachedNetworkImage(
                         imageUrl: widget.product.imageUrl,
                         fit: BoxFit.cover,
-                      ))
-                : Container(
-                    color: AppColors.background,
-                    child: const Center(
-                      child: Icon(
-                        Icons.image_not_supported_outlined,
-                        color: AppColors.textSubtle,
-                        size: 64,
                       ),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: widget.product.imageUrl,
+                      fit: BoxFit.cover,
+                    ))
+              : Container(
+                  color: AppColors.background,
+                  child: const Center(
+                    child: Icon(
+                      Icons.image_not_supported_outlined,
+                      color: AppColors.textSubtle,
+                      size: 64,
                     ),
                   ),
-          ),
+                ),
         ),
         if (widget.product.imageUrls.length > 1)
           Positioned(
-            bottom: 20,
-            left: 0,
-            right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: widget.product.imageUrls
-                  .asMap()
-                  .entries
-                  .map(
-                    (e) => AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: _currentPage == e.key ? 20 : 8,
-                      height: 8,
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(4),
-                        color: _currentPage == e.key
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  )
-                  .toList(),
+            bottom: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                '${_currentPage + 1}/${widget.product.imageUrls.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
       ],
     );
   }
 
+  Widget _buildPriceBanner() {
+    return const SizedBox.shrink();
+  }
+
+
   Widget _buildNamePriceSection(double? rating, int reviewCount) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.product.name,
-                style: AppTextStyles.headline1.copyWith(fontSize: 28),
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (rating != null) ...[
-                const SizedBox(height: 8),
-                _buildStarRating(rating),
-                Text(
-                  '$rating ($reviewCount reviews)',
-                  style: AppTextStyles.bodySmall.copyWith(fontSize: 12),
-                ),
-              ],
-            ],
-          ),
-        ),
-        Column(
+        Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              widget.product.price,
-              style: AppTextStyles.headline1.copyWith(
-                color: AppColors.primary,
-                fontSize: 32,
+            Expanded(
+              child: Text(
+                widget.product.price,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-            Text('per ${widget.product.unit}', style: AppTextStyles.bodySmall),
+            const SizedBox(width: 16),
+            GestureDetector(
+              onTap: _toggleFavorite,
+              child: Icon(
+                _isSaved ? Icons.favorite_rounded : Icons.favorite_border,
+                color: _isSaved ? Colors.redAccent : Colors.grey.shade600,
+                size: 24,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          widget.product.name,
+          style: AppTextStyles.headline1.copyWith(fontSize: 18, height: 1.2),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            if (rating != null && rating > 0) ...[
+              const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 16),
+              const SizedBox(width: 4),
+              Text(
+                rating.toStringAsFixed(1),
+                style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 12),
+              Container(width: 1, height: 12, color: Colors.grey.shade300),
+              const SizedBox(width: 12),
+            ],
+            Text(
+              '$reviewCount Reviews',
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: () {
+                if (widget.product.productId == null) return;
+                final shareUrl = ShareUtil.generateProductShareLink(widget.product.productId!);
+                ShareBottomSheet.show(
+                  context: context,
+                  shareUrl: shareUrl,
+                  title: 'Share Product',
+                  subtitle: 'Let others scan this QR code or share the link to this product.',
+                  shareSubject: 'Check out ${widget.product.name} on AgriDirect!',
+                );
+              },
+              child: Icon(Icons.share_outlined, color: Colors.grey.shade400, size: 20),
+            ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildShippingRow() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Icon(Icons.local_shipping_outlined, color: AppColors.primary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Free Shipping',
+                  style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Get up to ₱40 if order arrives late',
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400, size: 24),
+        ],
+      ),
     );
   }
 
@@ -2686,12 +2762,8 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   Widget _buildFarmerCard(String avatarUrl) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.textHeadline.withValues(alpha: 0.1),
-        ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
       ),
       child: Row(
         children: [
@@ -2699,7 +2771,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
             imageUrl: avatarUrl,
             radius: 32,
             child: const Icon(
-              Icons.agriculture_rounded,
+              Icons.storefront_rounded,
               color: AppColors.primary,
             ),
           ),
@@ -2709,34 +2781,71 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Farm',
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColors.textSubtle,
-                  ),
+                  widget.product.farm.isNotEmpty ? widget.product.farm : 'Farm / Store',
+                  style: AppTextStyles.headline3.copyWith(fontSize: 16),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                Text(widget.product.farm, style: AppTextStyles.headline3),
+                const SizedBox(height: 4),
+                Text(
+                  'Tap to view shop profile',
+                  style: AppTextStyles.bodySmall.copyWith(color: Colors.grey.shade600),
+                ),
               ],
             ),
           ),
-          _buildMessageBtn(),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: () {
+              if (widget.product.farmerId != null) {
+                context.push('${AppRoutes.farmerProfileBase}/${widget.product.farmerId}');
+              }
+            },
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColors.primary),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              'Visit',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontSize: 12,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMessageBtn() {
-    return GestureDetector(
-      onTap: () => context.push(
-        AppRoutes.customerMessages,
-        extra: {'farmerId': widget.product.farmerId, 'product': widget.product},
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.message_rounded, color: Colors.white, size: 20),
+  Widget _buildReviewsSection() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Product Reviews', style: AppTextStyles.headline3),
+              Text(
+                'View All >',
+                style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No reviews yet for this product.',
+            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
+          ),
+        ],
       ),
     );
   }
@@ -2810,121 +2919,139 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     return false;
   }
 
-  Widget _buildActionButtons() {
+  Widget _buildStickyBottomBar() {
     final isOwnProduct =
         AuthService().userId.isNotEmpty &&
         widget.product.farmerId == AuthService().userId;
 
     if (isOwnProduct) {
       return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-        ),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.info_outline_rounded,
-              color: AppColors.primary,
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'This is your own product. You cannot order or add it to your cart.',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
-                  height: 1.4,
-                ),
-              ),
-            ),
-          ],
+        color: Colors.white,
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          'This is your own product.',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.primary),
         ),
       );
     }
 
     final isPreOrder = widget.product.targetQuantity != null;
-
-    if (isPreOrder) {
-      final harvested = _isHarvested(widget.product);
-      if (!harvested) {
-        return SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () =>
-                context.push(AppRoutes.preorderDetails, extra: widget.product),
-            icon: const Icon(Icons.hourglass_empty_rounded),
-            label: const Text('Pre-Order Now'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accent,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        );
-      }
-    }
-
     final isOutOfStock =
         !widget.product.isPreorder && (widget.product.stockQuantity ?? 0) <= 0;
 
-    return Row(
-      children: [
-        Expanded(
-          child: ElevatedButton.icon(
-            key: _addToCartBtnKey,
-            onPressed: isOutOfStock
-                ? null
-                : () async {
-                    _runFlyToCartAnimation(_addToCartBtnKey, widget.product.imageUrl);
-                    final errorMsg = await CartService().addItem(
-                      widget.product,
-                      _quantity,
-                    );
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(errorMsg ?? 'Added to cart'),
-                        duration: const Duration(seconds: 1),
+    return Container(
+      height: 60,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            offset: const Offset(0, -2),
+            blurRadius: 4,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => context.push(
+                      AppRoutes.customerMessages,
+                      extra: {'farmerId': widget.product.farmerId, 'product': widget.product},
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.chat_bubble_outline, color: AppColors.primary, size: 20),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Chat',
+                          style: TextStyle(fontSize: 10, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Container(width: 1, height: 30, color: Colors.grey.shade300),
+                Expanded(
+                  child: InkWell(
+                    key: _addToCartBtnKey,
+                    onTap: isOutOfStock
+                        ? null
+                        : () async {
+                            _runFlyToCartAnimation(_addToCartBtnKey, widget.product.imageUrl);
+                            final errorMsg = await CartService().addItem(
+                              widget.product,
+                              _quantity,
+                            );
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(errorMsg ?? 'Added to cart'),
+                                duration: const Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add_shopping_cart,
+                          color: isOutOfStock ? Colors.grey : AppColors.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isOutOfStock ? 'No Stock' : 'Add to Cart',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isOutOfStock ? Colors.grey : Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: InkWell(
+              onTap: (isOutOfStock || _isOrdering) ? null : _showCheckoutSheet,
+              child: Container(
+                color: isOutOfStock ? Colors.grey.shade400 : AppColors.primary,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      isPreOrder ? 'Pre-Order Now' : 'Order Now',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  },
-            icon: const Icon(Icons.shopping_bag_rounded),
-            label: Text(isOutOfStock ? 'Out of Stock' : 'Add to Cart'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isOutOfStock ? Colors.grey : AppColors.primary,
-              disabledBackgroundColor: Colors.grey.shade300,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                    ),
+                    if (!isOutOfStock)
+                      Text(
+                        widget.product.price,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: (isOutOfStock || _isOrdering) ? null : _showCheckoutSheet,
-            icon: const Icon(Icons.flash_on_rounded),
-            label: Text(isOutOfStock ? 'Unavailable' : 'Order Now'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isOutOfStock ? Colors.grey : AppColors.accent,
-              disabledBackgroundColor: Colors.grey.shade300,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -2986,22 +3113,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
     }
   }
 
-  Widget _buildStarRating(double rating) {
-    return Row(
-      children: List.generate(
-        5,
-        (i) => Icon(
-          i + 1 <= rating
-              ? Icons.star_rounded
-              : (rating > i
-                    ? Icons.star_half_rounded
-                    : Icons.star_outline_rounded),
-          color: AppColors.primary,
-          size: 18,
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildMapButton() {
     return _buildSmallBtn(Icons.map_outlined, 'View Map', _showFarmerMapSheet);

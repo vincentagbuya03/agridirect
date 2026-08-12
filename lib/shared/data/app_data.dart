@@ -26,6 +26,9 @@ class ProductItem {
   final double? longitude;
   final bool isFeatured;
   final bool isPreorder;
+  final bool isFreeShipping;
+  final bool isWholesale;
+  final bool isFlashSale;
   final DateTime? createdAt;
 
   const ProductItem({
@@ -52,7 +55,32 @@ class ProductItem {
     this.longitude,
     this.isFeatured = false,
     this.isPreorder = false,
+    this.isFreeShipping = false,
+    this.isWholesale = false,
+    this.isFlashSale = false,
     this.createdAt,
+  });
+}
+
+class VoucherItem {
+  final String id;
+  final String code;
+  final String title;
+  final String? description;
+  final double? discountPercentage;
+  final double? minSpend;
+  final DateTime? validUntil;
+  final String status; // 'available', 'used', 'expired'
+
+  const VoucherItem({
+    required this.id,
+    required this.code,
+    required this.title,
+    this.description,
+    this.discountPercentage,
+    this.minSpend,
+    this.validUntil,
+    this.status = 'available',
   });
 }
 

@@ -48,6 +48,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
   String? _selectedCategory;
   String? _selectedUnit;
   bool _isPreorder = false;
+  bool _isFreeShipping = false;
+  bool _isWholesale = false;
+  bool _isFlashSale = false;
   bool _isLoading = false;
   bool _isLoadingDropdowns = true;
   bool _isOnline = true;
@@ -106,6 +109,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _harvestDaysController.text = (hd is num && hd > 0) ? hd.toString() : '';
 
     _isPreorder = prod['is_preorder'] == true;
+    _isFreeShipping = prod['is_free_shipping'] == true;
+    _isWholesale = prod['is_wholesale'] == true;
+    _isFlashSale = prod['is_flash_sale'] == true;
     _selectedCategory = prod['category_id']?.toString();
     _selectedUnit = prod['unit_id']?.toString();
 
@@ -300,6 +306,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ? (double.tryParse(_harvestDaysController.text.trim())?.toInt() ?? 0)
               : 0,
           'is_preorder': _isPreorder,
+          'is_free_shipping': _isFreeShipping,
+          'is_wholesale': _isWholesale,
+          'is_flash_sale': _isFlashSale,
         }).eq('product_id', productId);
 
         // 2. Update inventory table
@@ -394,6 +403,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
         localImagePaths: localImagePaths,
         webImageBytes: webImageBytes,
         webImageNames: webImageNames,
+        isFreeShipping: _isFreeShipping,
+        isWholesale: _isWholesale,
+        isFlashSale: _isFlashSale,
       );
 
       if (mounted) {
@@ -952,6 +964,52 @@ class _AddProductScreenState extends State<AddProductScreen> {
             value: _selectedCategory,
             items: _categories,
             onChanged: (value) => setState(() => _selectedCategory = value),
+          ),
+          const SizedBox(height: 24),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Promotions & Offers',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Boost your sales by opting into marketplace promotions.',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildCheckboxTile(
+            title: 'Free Shipping',
+            subtitle: 'Cover delivery costs for buyers',
+            value: _isFreeShipping,
+            onChanged: (value) => setState(() => _isFreeShipping = value ?? false),
+          ),
+          const SizedBox(height: 8),
+          _buildCheckboxTile(
+            title: 'Wholesale Pricing',
+            subtitle: 'Offer bulk discounts to buyers',
+            value: _isWholesale,
+            onChanged: (value) => setState(() => _isWholesale = value ?? false),
+          ),
+          const SizedBox(height: 8),
+          _buildCheckboxTile(
+            title: 'Flash Sale',
+            subtitle: 'Feature this item in the next flash sale',
+            value: _isFlashSale,
+            onChanged: (value) => setState(() => _isFlashSale = value ?? false),
           ),
         ],
       ),
