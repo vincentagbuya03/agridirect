@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../consumer/marketplace_screen.dart';
+import '../../widgets/address_management_sheets.dart';
 import '../../../shared/models/auth/user_address_model.dart';
 import '../../../shared/services/user/user_service.dart';
 import '../../../shared/styles/app_theme.dart';
@@ -223,7 +223,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
     return _buildMobileLayout();
   }
 
-  // ─── Web Layout ───────────────────────────────────────────────────────────
+  // â”€â”€â”€ Web Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildWebLayout() {
     return Scaffold(
@@ -366,7 +366,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
     );
   }
 
-  // ─── Mobile Layout ────────────────────────────────────────────────────────
+  // â”€â”€â”€ Mobile Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildMobileLayout() {
     return Scaffold(
@@ -476,7 +476,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
     );
   }
 
-  // ─── Shared Empty State ───────────────────────────────────────────────────
+  // â”€â”€â”€ Shared Empty State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildEmptyState({required bool isWeb}) {
     return Center(
@@ -533,7 +533,7 @@ class _AddressBookScreenState extends State<AddressBookScreen> {
   }
 }
 
-// ─── Add Button ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Add Button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _AddButton extends StatelessWidget {
   final VoidCallback onTap;
@@ -562,7 +562,7 @@ class _AddButton extends StatelessWidget {
   }
 }
 
-// ─── Address Card ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Address Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _AddressCard extends StatefulWidget {
   final UserAddress address;
@@ -655,7 +655,7 @@ class _AddressCardState extends State<_AddressCard>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ─── Header ─────────────────────────────────────────────────
+              // â”€â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               Row(
                 children: [
                   Container(
@@ -720,7 +720,7 @@ class _AddressCardState extends State<_AddressCard>
               const Divider(height: 1, color: Color(0xFFF1F5F9)),
               const SizedBox(height: 12),
 
-              // ─── Recipient name ──────────────────────────────────────────
+              // â”€â”€â”€ Recipient name â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               Row(children: [
                 const Icon(
                   Icons.person_outline_rounded,
@@ -742,7 +742,7 @@ class _AddressCardState extends State<_AddressCard>
               ]),
               const SizedBox(height: 6),
 
-              // ─── Address ─────────────────────────────────────────────────
+              // â”€â”€â”€ Address â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -788,7 +788,7 @@ class _AddressCardState extends State<_AddressCard>
               const Divider(height: 1, color: Color(0xFFF1F5F9)),
               const SizedBox(height: 10),
 
-              // ─── Actions ─────────────────────────────────────────────────
+              // â”€â”€â”€ Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
               Row(
                 children: [
                   _ActionChip(
@@ -838,7 +838,7 @@ class _AddressCardState extends State<_AddressCard>
   }
 }
 
-// ─── Action Chip ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Action Chip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _ActionChip extends StatelessWidget {
   final IconData icon;

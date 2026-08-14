@@ -1,4 +1,4 @@
-import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
@@ -455,136 +455,85 @@ class _MascotWidgetState extends State<MascotWidget> with SingleTickerProviderSt
   }
 
   Widget _buildCelebration() {
-    final theme = Theme.of(context);
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.topCenter,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 70, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Woohoo! 🎉',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF047857),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  widget.text,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: const Color(0xFF374151),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    if (widget.onClose != null) widget.onClose!();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Awesome!'),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            top: -60,
-            child: Container(
-              decoration: const BoxDecoration(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            )
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 10,
-                    offset: Offset(0, 5),
-                  )
-                ]
               ),
-              child: CircleAvatar(
-                radius: 60,
-                backgroundColor: const Color(0xFFECFDF5),
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Image.asset(
-                    _getAssetPath(MascotExpression.celebrating),
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.celebration, color: Color(0xFF10B981), size: 48);
-                    },
+              child: const Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFF10B981),
+                size: 56,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Success!',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              widget.text,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                color: const Color(0xFF64748B),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  if (widget.onClose != null) widget.onClose!();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: Text(
+                  'Continue',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
             ),
-          ),
-          // Confetti simulation using CustomPainter
-          Positioned.fill(
-            child: IgnorePointer(
-              child: CustomPaint(
-                painter: _ConfettiPainter(),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
-}
-
-class _ConfettiPainter extends CustomPainter {
-  final List<_ConfettiParticle> particles = List.generate(40, (index) {
-    final random = Random();
-    return _ConfettiParticle(
-      color: [
-        Colors.red,
-        Colors.blue,
-        Colors.green,
-        Colors.yellow,
-        Colors.orange,
-        Colors.purple,
-        Colors.pink
-      ][random.nextInt(7)],
-      position: Offset(random.nextDouble() * 280, random.nextDouble() * 200),
-      radius: random.nextDouble() * 4 + 2,
-    );
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
-    for (var p in particles) {
-      paint.color = p.color;
-      canvas.drawCircle(p.position, p.radius, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _ConfettiParticle {
-  final Color color;
-  final Offset position;
-  final double radius;
-
-  _ConfettiParticle({
-    required this.color,
-    required this.position,
-    required this.radius,
-  });
 }

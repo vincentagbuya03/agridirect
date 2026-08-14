@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -30,9 +30,9 @@ class SupabaseDataService {
   static final ValueNotifier<String?> marketplaceCategoryNotifier =
       ValueNotifier<String?>(null);
 
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // PRODUCTS
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<List<ProductItem>> getPreOrderProducts() async {
     try {
@@ -137,7 +137,7 @@ class SupabaseDataService {
           ? Map<String, dynamic>.from(rawResponse as Map)
           : Map<String, dynamic>.from(viewResponse as Map);
 
-      // Overlay v_products data on top — it has enriched fields (farmer info, ratings, etc.)
+      // Overlay v_products data on top â€” it has enriched fields (farmer info, ratings, etc.)
       // but only overwrite if the value is non-null and non-empty
       if (viewResponse != null) {
         final viewMap = Map<String, dynamic>.from(viewResponse as Map);
@@ -788,7 +788,7 @@ class SupabaseDataService {
       farmerImageUrl: item['farmer_image_url']?.toString(),
       name: item['name'] ?? '',
       farm: item['farm_name'] ?? '',
-      price: '₱${item['price']?.toString() ?? '0'}',
+      price: '\u20B1${item['price']?.toString() ?? '0'}',
       unit: item['unit_abbr'] ?? item['unit_name'] ?? '',
       imageUrl: item['image_url'] ?? '',
       imageUrls:
@@ -813,9 +813,9 @@ class SupabaseDataService {
     );
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // PRODUCTS BY FARMER (for public farmer profile)
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Get all products by a specific farmer ID (public view)
   Future<List<ProductItem>> getProductsByFarmerId(String farmerId) async {
@@ -861,9 +861,9 @@ class SupabaseDataService {
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // QUICK ACTION QUERIES
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Future<List<ProductItem>> getFreeShippingProducts() async {
     try {
@@ -954,10 +954,53 @@ class SupabaseDataService {
     }
   }
 
+  Future<List<VoucherItem>> getAvailablePlatformVouchers() async {
+    try {
+      final response = await _client
+          .from('vouchers')
+          .select()
+          .order('created_at', ascending: false);
+          
+      final items = response as List;
+      return items.map((item) {
+        return VoucherItem(
+          id: item['voucher_id']?.toString() ?? '',
+          code: item['code']?.toString() ?? '',
+          title: item['title']?.toString() ?? '',
+          description: item['description']?.toString(),
+          discountPercentage: (item['discount_percentage'] as num?)?.toDouble(),
+          minSpend: (item['min_spend'] as num?)?.toDouble(),
+          validUntil: item['valid_until'] != null ? DateTime.tryParse(item['valid_until']) : null,
+          status: 'available',
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching available platform vouchers: $e');
+      return [];
+    }
+  }
 
-  // ══════════════════════════════════════════════════════════════════════════
+  Future<bool> claimVoucher(String voucherId) async {
+    try {
+      final userId = SupabaseConfig.currentUser?.id;
+      if (userId == null) return false;
+
+      await _client.from('user_vouchers').insert({
+        'user_id': userId,
+        'voucher_id': voucherId,
+        'status': 'available',
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error claiming voucher: $e');
+      return false;
+    }
+  }
+
+
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // FORUM POSTS BY USER (for public farmer profile)
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Get all forum posts by a specific user ID
   Future<List<ForumPostItem>> getForumPostsByUserId(String userId) async {
@@ -1008,9 +1051,9 @@ class SupabaseDataService {
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // FORUM POSTS
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   Stream<List<ForumPostItem>> watchForumPosts() {
     return _watchForumPostsInternal().asBroadcastStream();
@@ -1429,9 +1472,9 @@ class SupabaseDataService {
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // ARTICLES
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Get all published articles
   Future<List<ArticleItem>> getArticles() async {
@@ -1626,9 +1669,9 @@ class SupabaseDataService {
     });
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // DASHBOARD METRICS (for farmers)
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Get dashboard metrics for the current farmer
   Future<List<DashboardMetric>> getDashboardMetrics() async {
@@ -1658,7 +1701,7 @@ class SupabaseDataService {
       return [
         DashboardMetric(
           label: 'Total Revenue',
-          value: '₱${totalRevenue.toStringAsFixed(0)}',
+          value: 'â‚±${totalRevenue.toStringAsFixed(0)}',
           subtitle: 'This month',
           iconCodePoint: 0xe25e, // Icons.attach_money
           color: 0xFF13EC5B,
@@ -1695,7 +1738,7 @@ class SupabaseDataService {
     return [
       const DashboardMetric(
         label: 'Total Revenue',
-        value: '₱0',
+        value: 'â‚±0',
         subtitle: 'This month',
         iconCodePoint: 0xe25e,
         color: 0xFF13EC5B,
@@ -1724,9 +1767,9 @@ class SupabaseDataService {
     ];
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // ORDERS
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Watch farmer orders in real-time
   Stream<List<Map<String, dynamic>>> watchFarmerOrders() async* {
@@ -1920,7 +1963,7 @@ class SupabaseDataService {
           'deliveryFee': (item['delivery_fee'] as num?)?.toDouble() ?? 0.0,
           'timeAgo': _formatTimeAgo(createdAt),
           'items': itemsSummary,
-          'total': '₱${rawTotal.toStringAsFixed(2)}',
+          'total': 'â‚±${rawTotal.toStringAsFixed(2)}',
           'rawTotal': rawTotal,
           'createdAt': createdAt,
           'status': statusCode,
@@ -1929,7 +1972,7 @@ class SupabaseDataService {
           'cancellationReason': item['cancellation_reason']?.toString(),
         });
         debugPrint(
-          '📦 Mapped Order: ${mappedOrders.last['orderId']} - AddressID: ${mappedOrders.last['deliveryAddressId']} - Method: ${mappedOrders.last['paymentMethod']}',
+          'ðŸ“¦ Mapped Order: ${mappedOrders.last['orderId']} - AddressID: ${mappedOrders.last['deliveryAddressId']} - Method: ${mappedOrders.last['paymentMethod']}',
         );
       }
 
@@ -2007,7 +2050,7 @@ class SupabaseDataService {
             (item) => {
               'orderId': item['order_number'] ?? 'AD-0000',
               'items': item['items'] ?? '',
-              'total': '₱${item['total']?.toString() ?? '0'}',
+              'total': 'â‚±${item['total']?.toString() ?? '0'}',
               'status': item['status'] ?? 'PENDING',
               'createdAt': item['created_at'],
             },
@@ -2019,9 +2062,9 @@ class SupabaseDataService {
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // FARMERS (for consumer home screen)
-  // ══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
   /// Get featured farmers
   Future<List<Map<String, dynamic>>> getFeaturedFarmers() async {

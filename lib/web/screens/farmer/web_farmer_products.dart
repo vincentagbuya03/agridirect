@@ -70,19 +70,14 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
     super.dispose();
   }
 
-  void _openProduct(Map<String, dynamic> productMap) {
-    _showEditProductDialog(productMap);
-  }
-
-  void _showEditProductDialog(Map<String, dynamic> product) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => _EditProductDialog(
-        product: product,
-        onSaved: _refreshProducts,
-      ),
+  Future<void> _openProduct(Map<String, dynamic> productMap) async {
+    final result = await context.push(
+      AppRoutes.editProduct,
+      extra: productMap,
     );
+    if (result == true) {
+      _refreshProducts();
+    }
   }
 
   @override

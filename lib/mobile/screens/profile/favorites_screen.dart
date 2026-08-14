@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import '../consumer/marketplace_screen.dart';
+﻿import 'package:flutter/material.dart';
+import '../consumer/product_view_screen.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/models/cached_product.dart';
 import '../../../shared/services/offline/offline_cache_service.dart';
@@ -56,7 +56,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       farmerImageUrl: product.farmerImageUrl,
       name: product.name,
       farm: product.farmName ?? 'Farm',
-      price: '₱${product.price.toStringAsFixed(2)}',
+      price: 'â‚±${product.price.toStringAsFixed(2)}',
       unit: (product.unit ?? '').trim().isEmpty ? 'kg' : product.unit!.trim(),
       imageUrl: product.imageUrl ?? '',
       categoryName: product.category,
@@ -175,7 +175,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                '₱${product.price.toStringAsFixed(2)}',
+                                'â‚±${product.price.toStringAsFixed(2)}',
                                 style: AppTextStyles.headline3.copyWith(
                                   color: AppColors.primary,
                                 ),

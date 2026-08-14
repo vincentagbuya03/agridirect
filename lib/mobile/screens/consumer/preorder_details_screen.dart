@@ -178,15 +178,30 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
       children: [
         AspectRatio(
           aspectRatio: 1.08,
-          child: imageUrl.isEmpty
-              ? _buildImageFallback()
-              : SafeNetworkImage(
-                  imageUrl: imageUrl,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  placeholder: Container(color: AppColors.background),
-                  errorWidget: _buildImageFallback(),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              imageUrl.isEmpty
+                  ? _buildImageFallback()
+                  : SafeNetworkImage(
+                      imageUrl: imageUrl,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      placeholder: Container(color: AppColors.background),
+                      errorWidget: _buildImageFallback(),
+                    ),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.transparent, AppColors.background],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: const [0.5, 1.0],
+                  ),
                 ),
+              ),
+            ],
+          ),
         ),
         Positioned(
           top: 12,
@@ -221,8 +236,15 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
-              color: AppColors.primary,
+              color: AppColors.primary.withValues(alpha: 0.9),
               borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Text(
               'PRE-ORDER ACTIVE',
@@ -239,6 +261,11 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
   }
 
   Widget _buildContent(ProductItem product) {
+    final rating = double.tryParse(product.rating ?? '') ?? 0.0;
+    final targetQty = product.targetQuantity ?? 0;
+    final reservedQty = product.reservedQuantity ?? 0;
+    final availableQty = (targetQty - reservedQty).clamp(0, targetQty);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 120),
       child: Column(
@@ -247,7 +274,10 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
           _buildCountdownBanner(product),
           const SizedBox(height: 18),
           _farmChip(product),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
+          // Farmer profile row
+          _buildFarmerRow(product),
+          const SizedBox(height: 14),
           Text(
             product.name,
             style: AppTextStyles.headline1.copyWith(
@@ -262,7 +292,7 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
               Text(
                 _formatCurrencyLabel(product.price),
                 style: AppTextStyles.headline1.copyWith(
-                  fontSize: 28,
+                  fontSize: 26,
                   color: AppColors.textHeadline,
                 ),
               ),
@@ -276,9 +306,12 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
                   ),
                 ),
               ),
+              const Spacer(),
+              if (rating > 0) _buildStarRating(rating),
             ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 20),
+          // Info tiles: 2x2 grid
           Row(
             children: [
               Expanded(
@@ -298,27 +331,55 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _infoTile(
+                  Icons.category_rounded,
+                  'Category',
+                  (product.categoryName ?? '').isNotEmpty
+                      ? product.categoryName!
+                      : 'General',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _infoTile(
+                  Icons.people_alt_rounded,
+                  'Reserved',
+                  targetQty > 0
+                      ? '${((reservedQty / targetQty) * 100).round()}%'
+                      : 'TBD',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _buildReservationProgress(product),
           const SizedBox(height: 18),
-          _quantityCard(product),
+          _quantityCard(product, availableQty.round()),
           const SizedBox(height: 18),
           _paymentCard(),
-          if ((product.description ?? '').trim().isNotEmpty) ...[
-            const SizedBox(height: 22),
-            Text(
-              'About this harvest',
-              style: AppTextStyles.headline3.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+          const SizedBox(height: 22),
+          Text(
+            'About this harvest',
+            style: AppTextStyles.headline3.copyWith(
+              fontWeight: FontWeight.w800,
             ),
-            const SizedBox(height: 10),
-            Text(
-              product.description!.trim(),
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textBody,
-                height: 1.5,
-              ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            (product.description ?? '').trim().isNotEmpty
+                ? product.description!.trim()
+                : 'No description provided by the farmer yet.',
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: (product.description ?? '').trim().isNotEmpty
+                  ? AppColors.textBody
+                  : AppColors.textSubtle,
+              height: 1.6,
             ),
-          ],
+          ),
           const SizedBox(height: 28),
           CropMilestonesTimeline(milestones: _milestones),
         ],
@@ -356,25 +417,39 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: bannerColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: textColor.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: bannerColor,
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: textColor, size: 24),
-          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: textColor.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: textColor, size: 24),
+          ),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   stageTitle,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    fontWeight: FontWeight.bold,
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    fontWeight: FontWeight.w800,
                     color: textColor,
                   ),
                 ),
@@ -388,6 +463,103 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReservationProgress(ProductItem product) {
+    final targetQty = product.targetQuantity ?? 0;
+    final reservedQty = product.reservedQuantity ?? 0;
+    final reservedPercentage = targetQty > 0 ? (reservedQty / targetQty).clamp(0.0, 1.0) : 0.0;
+    final reservedPercentText = targetQty > 0 ? (reservedPercentage * 100).round() : 0;
+    final isHot = reservedPercentText > 75;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Reservation Progress',
+                style: AppTextStyles.headline3.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
+              if (isHot)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.local_fire_department_rounded, color: AppColors.error, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Selling Fast',
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.error,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: reservedPercentage,
+              minHeight: 10,
+              backgroundColor: AppColors.textHeadline.withValues(alpha: 0.05),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isHot ? AppColors.error : AppColors.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '$reservedPercentText% Reserved',
+                style: AppTextStyles.labelSmall.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: isHot ? AppColors.error : AppColors.textHeadline,
+                ),
+              ),
+              Text(
+                targetQty > 0
+                    ? '${targetQty.toStringAsFixed(0)} ${product.unit.isNotEmpty ? product.unit : 'kg'} Target'
+                    : 'Target TBD',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textSubtle,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -527,7 +699,7 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
     );
   }
 
-  Widget _quantityCard(ProductItem product) {
+  Widget _quantityCard(ProductItem product, int availableQty) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _panelDecoration(),
@@ -546,9 +718,13 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
                   ),
                 ),
                 Text(
-                  'Min order: 1 ${_unitLabel(product)}',
+                  availableQty > 0
+                      ? 'Available: $availableQty ${_unitLabel(product)}'
+                      : 'Min order: 1 ${_unitLabel(product)}',
                   style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSubtle,
+                    color: availableQty > 0 && availableQty <= 10
+                        ? AppColors.error
+                        : AppColors.textSubtle,
                   ),
                 ),
               ],
@@ -567,7 +743,11 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
               ),
             ),
           ),
-          _qtyButton(Icons.add_rounded, () => setState(() => _quantity++)),
+          _qtyButton(Icons.add_rounded, () {
+            if (availableQty <= 0 || _quantity < availableQty) {
+              setState(() => _quantity++);
+            }
+          }),
         ],
       ),
     );
@@ -680,6 +860,96 @@ class _PreOrderDetailsScreenState extends State<PreOrderDetailsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFarmerRow(ProductItem product) {
+    final name = (product.farmerName ?? '').isNotEmpty
+        ? product.farmerName!
+        : product.farm;
+    final avatarUrl = product.farmerAvatarUrl ?? '';
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.background,
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: avatarUrl.isNotEmpty
+              ? Image.network(
+                  avatarUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.person_rounded,
+                    size: 20,
+                    color: AppColors.textSubtle,
+                  ),
+                )
+              : const Icon(
+                  Icons.person_rounded,
+                  size: 20,
+                  color: AppColors.textSubtle,
+                ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textHeadline,
+                ),
+              ),
+              Text(
+                'Farmer · AgriDirect',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textSubtle,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStarRating(double rating) {
+    final fullStars = rating.floor();
+    final hasHalf = (rating - fullStars) >= 0.5;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ...List.generate(5, (i) {
+          if (i < fullStars) {
+            return const Icon(Icons.star_rounded,
+                size: 16, color: AppColors.accent);
+          } else if (i == fullStars && hasHalf) {
+            return const Icon(Icons.star_half_rounded,
+                size: 16, color: AppColors.accent);
+          }
+          return const Icon(Icons.star_outline_rounded,
+              size: 16, color: AppColors.accent);
+        }),
+        const SizedBox(width: 4),
+        Text(
+          rating.toStringAsFixed(1),
+          style: AppTextStyles.labelSmall.copyWith(
+            color: AppColors.textSubtle,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 

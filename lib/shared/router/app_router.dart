@@ -16,7 +16,7 @@ import '../../mobile/screens/farmer/farmer_followers_screen.dart';
 import '../../mobile/screens/farmer/farmer_vouchers_screen.dart';
 import '../../mobile/screens/consumer/claimed_vouchers_screen.dart';
 import '../../mobile/screens/consumer/cart_screen.dart';
-import '../../mobile/screens/consumer/marketplace_screen.dart';
+import '../../mobile/screens/consumer/product_view_screen.dart';
 import '../../mobile/screens/consumer/preorder_details_screen.dart';
 import '../../mobile/screens/consumer/preorder_hub_screen.dart';
 import '../../mobile/screens/consumer/farmers_map_screen.dart';
@@ -47,6 +47,18 @@ import '../../web/screens/consumer/web_checkout_screen.dart';
 import '../../web/screens/consumer/web_cart_checkout_screen.dart';
 import '../../web/screens/consumer/web_order_success_screen.dart';
 import '../../web/screens/consumer/web_consumer_weather_radar_screen.dart';
+import '../../web/screens/consumer/web_free_shipping_screen.dart';
+import '../../web/screens/consumer/web_flash_sale_screen.dart';
+import '../../web/screens/consumer/web_vouchers_screen.dart';
+import '../../web/screens/consumer/web_fresh_produce_screen.dart';
+import '../../web/screens/consumer/web_wholesale_screen.dart';
+import '../../web/screens/consumer/web_local_shops_screen.dart';
+import '../../mobile/screens/consumer/free_shipping_screen.dart';
+import '../../mobile/screens/consumer/flash_sale_screen.dart';
+import '../../mobile/screens/consumer/vouchers_screen.dart';
+import '../../mobile/screens/consumer/fresh_produce_screen.dart';
+import '../../mobile/screens/consumer/wholesale_screen.dart';
+import '../../mobile/screens/consumer/local_shops_screen.dart';
 import '../../web/screens/admin/admin_dashboard_redesigned.dart';
 import '../../web/screens/common/web_welcome_screen.dart';
 import '../screens/messages/messages_screen.dart';
@@ -100,7 +112,7 @@ GoRouter createAppRouter({String? initialRoute}) {
     redirect: (BuildContext context, GoRouterState state) async {
       // 0. Hold redirection until auth is initialized (restored from Supabase)
       if (!auth.isInitialized) {
-        debugPrint('⏳ Router: Hold redirection until auth is initialized');
+        debugPrint('â³ Router: Hold redirection until auth is initialized');
         return null;
       }
 
@@ -136,14 +148,14 @@ GoRouter createAppRouter({String? initialRoute}) {
       final width = view.physicalSize.width / view.devicePixelRatio;
       final isMobile = !kIsWeb && (width <= 800);
 
-      // debugPrint('🔀 Router Redirect: [${isMobile ? "MOBILE" : "WEB"}] location=$location isLoggedIn=$isLoggedIn admin=$isAdmin needsProfile=${auth.needsProfileCompletion}');
+      // debugPrint('ðŸ”€ Router Redirect: [${isMobile ? "MOBILE" : "WEB"}] location=$location isLoggedIn=$isLoggedIn admin=$isAdmin needsProfile=${auth.needsProfileCompletion}');
 
       // 1. ABSOLUTE PRIORITY: Admin Redirect
       if (isLoggedIn && isAdmin) {
         if (location != AppRoutes.admin &&
             location != AppRoutes.loading &&
             location != AppRoutes.webWelcome) {
-          debugPrint('↪️ Router: Force routing Admin to /admin');
+          debugPrint('â†ªï¸ Router: Force routing Admin to /admin');
           return AppRoutes.admin;
         }
         return null;
@@ -223,7 +235,7 @@ GoRouter createAppRouter({String? initialRoute}) {
       if (kIsWeb && !isLoggedIn) {
         if (protectedRoutes.contains(location)) {
           debugPrint(
-            '↪️ Router: Unauthenticated web user on protected route, going to welcome',
+            'â†ªï¸ Router: Unauthenticated web user on protected route, going to welcome',
           );
           return AppRoutes.webWelcome;
         }
@@ -237,7 +249,7 @@ GoRouter createAppRouter({String? initialRoute}) {
         // On mobile, the "Dashboard" is just the home route (/)
         if (isMobile) {
           debugPrint(
-            '↪️ Router: Logged in mobile user at entry page, sending to home',
+            'â†ªï¸ Router: Logged in mobile user at entry page, sending to home',
           );
           return AppRoutes.home;
         }
@@ -246,7 +258,7 @@ GoRouter createAppRouter({String? initialRoute}) {
             ? AppRoutes.admin
             : (isFarmer ? AppRoutes.farmerDashboard : AppRoutes.marketplace);
         debugPrint(
-          '↪️ Router: Logged in web user at entry page, sending to $target',
+          'â†ªï¸ Router: Logged in web user at entry page, sending to $target',
         );
         return target;
       }
@@ -255,7 +267,7 @@ GoRouter createAppRouter({String? initialRoute}) {
     },
 
     routes: [
-      // ── Home (acts as redirect hub) ──────────────────────────────────────────
+      // â”€â”€ Home (acts as redirect hub) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.home,
         builder: (context, state) => LayoutBuilder(
@@ -283,7 +295,7 @@ GoRouter createAppRouter({String? initialRoute}) {
         ),
       ),
 
-      // ── Web Tab Routes (Responsive: WebNavigation on desktop, MobileNavigation on phone) ──
+      // â”€â”€ Web Tab Routes (Responsive: WebNavigation on desktop, MobileNavigation on phone) â”€â”€
       GoRoute(
         path: AppRoutes.marketplace,
         builder: (context, state) => LayoutBuilder(
@@ -504,7 +516,7 @@ GoRouter createAppRouter({String? initialRoute}) {
         },
       ),
 
-      // ── Wallet (shared) ──────────────────────────────────────────────────
+      // â”€â”€ Wallet (shared) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.addProduct,
         builder: (context, state) => const AddProductScreen(),
@@ -528,6 +540,55 @@ GoRouter createAppRouter({String? initialRoute}) {
         path: AppRoutes.farmersMap,
         builder: (context, state) =>
             kIsWeb ? const WebFindFarmerScreen() : const FarmersMapScreen(),
+      ),
+      // ── Consumer Promos & Hubs ──────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.freshProduce,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+              ? const WebFreshProduceScreen()
+              : const FreshProduceScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.flashSale,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+              ? const WebFlashSaleScreen()
+              : const FlashSaleScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.freeShipping,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+              ? const WebFreeShippingScreen()
+              : const FreeShippingScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.vouchers,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+              ? const WebVouchersScreen()
+              : const VouchersScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.wholesale,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+              ? const WebWholesaleScreen()
+              : const WholesaleScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.localShops,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+              ? const WebLocalShopsScreen()
+              : const LocalShopsScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.notifications,
@@ -584,13 +645,13 @@ GoRouter createAppRouter({String? initialRoute}) {
         },
       ),
 
-      // ── Web Welcome (landing page for first-time visitors) ────────────────
+      // â”€â”€ Web Welcome (landing page for first-time visitors) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.webWelcome,
         builder: (context, state) => const WebWelcomeScreen(),
       ),
 
-      // ── Onboarding (mobile only) ──────────────────────────────────────────
+      // â”€â”€ Onboarding (mobile only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.onboarding,
         builder: (context, state) => OnboardingScreen(
@@ -655,7 +716,7 @@ GoRouter createAppRouter({String? initialRoute}) {
         ),
       ),
 
-      // ── Login ─────────────────────────────────────────────────────────────
+      // â”€â”€ Login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.login,
         builder: (context, state) => LayoutBuilder(
@@ -676,7 +737,7 @@ GoRouter createAppRouter({String? initialRoute}) {
         ),
       ),
 
-      // ── Registration ──────────────────────────────────────────────────────
+      // â”€â”€ Registration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.register,
         builder: (context, state) => LayoutBuilder(
@@ -697,14 +758,14 @@ GoRouter createAppRouter({String? initialRoute}) {
         ),
       ),
 
-      // ── Google Complete Profile ───────────────────────────────────────────
+      // â”€â”€ Google Complete Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.completeProfile,
         builder: (context, state) =>
             CompleteProfileScreen(onComplete: () => context.go(AppRoutes.home)),
       ),
 
-      // ── Farmer Registration (mobile) ──────────────────────────────────────
+      // â”€â”€ Farmer Registration (mobile) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.farmerRegister,
         builder: (context, state) {
@@ -715,7 +776,7 @@ GoRouter createAppRouter({String? initialRoute}) {
         },
       ),
 
-      // ── Farmer Registration (web) ─────────────────────────────────────────
+      // â”€â”€ Farmer Registration (web) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.webFarmerRegister,
         builder: (context, state) {
@@ -726,13 +787,13 @@ GoRouter createAppRouter({String? initialRoute}) {
         },
       ),
 
-      // ── Face Capture ──────────────────────────────────────────────────────
+      // â”€â”€ Face Capture â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.faceCapture,
         builder: (context, state) => const FaceCaptureScreen(),
       ),
 
-      // ── Admin Dashboard ───────────────────────────────────────────────────
+      // â”€â”€ Admin Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.admin,
         builder: (context, state) => AdminDashboardRedesigned(
@@ -743,7 +804,7 @@ GoRouter createAppRouter({String? initialRoute}) {
         ),
       ),
 
-      // ── Preorder Details ──────────────────────────────────────────────────
+      // â”€â”€ Preorder Details â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.preorderDetails,
         builder: (context, state) => LayoutBuilder(
@@ -962,7 +1023,7 @@ GoRouter createAppRouter({String? initialRoute}) {
           );
         },
       ),
-      // ── Web Call Page (full-screen, used when calling from web) ─────────
+      // â”€â”€ Web Call Page (full-screen, used when calling from web) â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: '/call/:callId',
         builder: (context, state) {
@@ -1042,25 +1103,25 @@ GoRouter createAppRouter({String? initialRoute}) {
         builder: (context, state) => const KikoAiChatScreen(),
       ),
 
-      // ── Auth Callback (Google OAuth) ──────────────────────────────────────
+      // â”€â”€ Auth Callback (Google OAuth) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.authCallback,
         builder: (context, state) => const WebAuthCallbackScreen(),
       ),
 
-      // ── Password Reset ────────────────────────────────────────────────────
+      // â”€â”€ Password Reset â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.resetPassword,
         builder: (context, state) => const WebPasswordResetScreen(),
       ),
 
-      // ── Password Reset with Code ──────────────────────────────────────────
+      // â”€â”€ Password Reset with Code â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.resetPasswordWithCode,
         builder: (context, state) => const WebPasswordResetWithCodeScreen(),
       ),
 
-      // ── 2FA MFA Challenge ───────────────────────────────────────────────
+      // â”€â”€ 2FA MFA Challenge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.mfaChallenge,
         builder: (context, state) => const MfaChallengeScreen(),

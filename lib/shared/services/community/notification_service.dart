@@ -876,9 +876,19 @@ class NotificationService {
             'is_read': true,
             'read_at': DateTime.now().toIso8601String(),
           })
-          .eq('notification_id', notificationId);
+          .or('notification_id.eq.$notificationId,id.eq.$notificationId');
     } catch (e) {
-      debugPrint('Error marking notification as read: $e');
+      try {
+        await supabase
+            .from('notifications')
+            .update({
+              'is_read': true,
+              'read_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', notificationId);
+      } catch (e2) {
+        debugPrint('Error marking notification as read: $e2');
+      }
     }
   }
 
@@ -904,9 +914,16 @@ class NotificationService {
       await supabase
           .from('notifications')
           .delete()
-          .eq('notification_id', notificationId);
+          .or('notification_id.eq.$notificationId,id.eq.$notificationId');
     } catch (e) {
-      debugPrint('Error deleting notification: $e');
+      try {
+        await supabase
+            .from('notifications')
+            .delete()
+            .eq('id', notificationId);
+      } catch (e2) {
+        debugPrint('Error deleting notification: $e2');
+      }
     }
   }
 

@@ -369,7 +369,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          context.pop();
+          context.pop(true);
         }
         return;
       }
@@ -419,7 +419,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         MascotService.showCelebration(
           context,
           message: message,
-          onDismiss: () => context.pop(),
+          onDismiss: () => context.pop(true),
         );
       }
     } catch (e) {

@@ -111,24 +111,6 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
           Expanded(child: _buildPreOrderList()),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showSavedSeedsInfo,
-        backgroundColor: AppColors.textHeadline,
-        elevation: 12,
-        icon: const Icon(
-          Icons.bookmark_outline_rounded,
-          color: Colors.white,
-          size: 20,
-        ),
-        label: Text(
-          'SAVED SEEDS',
-          style: AppTextStyles.labelSmall.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1,
-          ),
-        ),
-      ),
     );
   }
 
@@ -136,97 +118,81 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, Color(0xFF047857)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textHeadline.withValues(alpha: 0.03),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: AppColors.primary.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
           child: Column(
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.hub_rounded,
-                        color: AppColors.primary,
-                        size: 28,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Pre-Order Hub',
-                        style: AppTextStyles.headline1.copyWith(fontSize: 22),
-                      ),
-                    ],
+                  const Icon(
+                    Icons.hub_rounded,
+                    color: Colors.white,
+                    size: 22,
                   ),
-                  _buildLocationBadge(),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Pre-Order Hub',
+                      style: AppTextStyles.headline2.copyWith(
+                        fontSize: 19,
+                        color: Colors.white,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: AppColors.textHeadline.withValues(alpha: 0.05),
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: 'Search upcoming harvests...',
-                          hintStyle: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSubtle,
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.search_rounded,
-                            color: AppColors.textSubtle,
-                            size: 22,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 14,
-                          ),
-                        ),
-                      ),
+              const SizedBox(height: 14),
+              Container(
+                height: 46,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
+                  ],
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: 'Search upcoming harvests...',
+                    hintStyle: AppTextStyles.bodyMedium.copyWith(
+                      color: Colors.grey.shade400,
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 13),
                   ),
-                  const SizedBox(width: 12),
-                  Container(
-                    height: 52,
-                    width: 52,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppColors.textHeadline.withValues(alpha: 0.05),
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.tune_rounded,
-                      color: AppColors.textHeadline,
-                      size: 22,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),
@@ -235,65 +201,44 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
     );
   }
 
-  Widget _buildLocationBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.location_on_rounded,
-            color: AppColors.primary,
-            size: 14,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            'San Carlos',
-            style: AppTextStyles.labelSmall.copyWith(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Location badge removed — location is not dynamically available from AuthService.
+  // Reserved for future implementation when user profile includes address data.
 
   Widget _buildSleekFilterChips() {
     return Container(
-      height: 64,
-      padding: const EdgeInsets.only(top: 16),
+      height: 56,
+      padding: const EdgeInsets.only(top: 12),
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
         itemCount: _filters.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (_, i) {
           final isSelected = _selectedFilter == i;
           return GestureDetector(
             onTap: () => setState(() => _selectedFilter = i),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              duration: const Duration(milliseconds: 200),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.textHeadline : AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
+                color:
+                    isSelected ? AppColors.textHeadline : AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: isSelected
                       ? AppColors.textHeadline
-                      : AppColors.textHeadline.withValues(alpha: 0.05),
+                      : AppColors.textHeadline.withValues(alpha: 0.06),
                 ),
               ),
               child: Text(
                 _filters[i],
                 style: AppTextStyles.labelSmall.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: isSelected ? Colors.white : AppColors.textSubtle,
-                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color:
+                      isSelected ? Colors.white : AppColors.textSubtle,
+                  fontSize: 12,
                 ),
               ),
             ),
@@ -312,7 +257,8 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
           .where((p) => p.isPreorder)
           .map(_cachedToProductItem)
           .where((p) {
-            final isNotMine = currentUserId.isEmpty || p.farmerId != currentUserId;
+            final isNotMine =
+                currentUserId.isEmpty || p.farmerId != currentUserId;
             return _matchesCurrentFilters(p) && isNotMine;
           })
           .toList();
@@ -360,12 +306,11 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
         }
 
         final currentUserId = AuthService().userId;
-        final preOrders = (snapshot.data ?? [])
-            .where((p) {
-              final isNotMine = currentUserId.isEmpty || p.farmerId != currentUserId;
-              return _matchesCurrentFilters(p) && isNotMine && !_isHarvested(p);
-            })
-            .toList();
+        final preOrders = (snapshot.data ?? []).where((p) {
+          final isNotMine =
+              currentUserId.isEmpty || p.farmerId != currentUserId;
+          return _matchesCurrentFilters(p) && isNotMine && !_isHarvested(p);
+        }).toList();
 
         // Auto-cache preorder products
         final allPreOrders = snapshot.data ?? [];
@@ -479,33 +424,40 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
 
   Widget _buildPreOrderSectionHeader(int count) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
-              Icons.bolt_rounded,
-              color: AppColors.accent,
-              size: 20,
+              Icons.eco_rounded,
+              color: AppColors.primary,
+              size: 18,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Text(
-            'Ending Soon',
-            style: AppTextStyles.headline2.copyWith(fontSize: 22),
+            'Upcoming Harvests',
+            style: AppTextStyles.headline2.copyWith(fontSize: 18),
           ),
           const Spacer(),
-          Text(
-            '$count LIVE',
-            style: AppTextStyles.labelSmall.copyWith(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1,
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '$count available',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -597,7 +549,6 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
                           ),
                         ),
                       ),
-
               ),
               Positioned(
                 top: 16,
@@ -654,76 +605,141 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
             ],
           ),
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Category badge
+                          if ((product.categoryName ?? '').isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary
+                                      .withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  product.categoryName!.toUpperCase(),
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    fontSize: 9,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // Product name
                           Text(
                             product.name,
                             style: AppTextStyles.headline2.copyWith(
-                              fontSize: 20,
+                              fontSize: 19,
                             ),
                           ),
-                          if (product.harvestDays != null) ...[
+                          // Urgent harvest warning
+                          if (product.harvestDays != null)
                             Builder(
                               builder: (context) {
-                                final days = int.tryParse(product.harvestDays!) ?? 7;
+                                final days =
+                                    int.tryParse(product.harvestDays!) ?? 7;
                                 if (product.createdAt != null) {
-                                  final harvestDate = product.createdAt!.add(Duration(days: days));
-                                  final diff = harvestDate.difference(DateTime.now());
-                                  final remainingDays = diff.inDays;
-                                  if (remainingDays >= 0 && remainingDays <= 3) {
+                                  final harvestDate = product.createdAt!.add(
+                                      Duration(days: days));
+                                  final diff =
+                                      harvestDate.difference(DateTime.now());
+                                  if (!diff.isNegative &&
+                                      diff.inDays <= 3) {
                                     return Padding(
-                                      padding: const EdgeInsets.only(top: 6),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.error.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          '⚠️ Harvesting Soon!',
-                                          style: AppTextStyles.labelSmall.copyWith(
+                                      padding:
+                                          const EdgeInsets.only(top: 4),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.alarm_rounded,
+                                            size: 12,
                                             color: AppColors.error,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.bold,
                                           ),
-                                        ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Harvesting soon!',
+                                            style: AppTextStyles.labelSmall
+                                                .copyWith(
+                                              color: AppColors.error,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     );
                                   }
                                 }
                                 return const SizedBox.shrink();
-                              }
+                              },
                             ),
-                          ],
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
+                          // Farmer chip
                           Row(
                             children: [
+                              if ((product.farmerAvatarUrl ?? '').isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: CircleAvatar(
+                                    radius: 10,
+                                    backgroundImage: NetworkImage(
+                                        product.farmerAvatarUrl!),
+                                    backgroundColor: AppColors.background,
+                                  ),
+                                ),
                               const Icon(
-                                Icons.eco_rounded,
-                                size: 14,
+                                Icons.storefront_rounded,
+                                size: 13,
                                 color: AppColors.primary,
                               ),
-                              const SizedBox(width: 6),
-                              Text(
-                                product.farm,
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.textSubtle,
+                              const SizedBox(width: 5),
+                              Flexible(
+                                child: Text(
+                                  product.farmerName?.isNotEmpty == true
+                                      ? product.farmerName!
+                                      : product.farm,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.textSubtle,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
+                          // Description excerpt
+                          if ((product.description ?? '').trim().isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                product.description!.trim(),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.textSubtle,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
                     _buildHotTag(isHot),
                   ],
                 ),
@@ -969,13 +985,7 @@ class _PreOrderHubScreenState extends State<PreOrderHubScreen> {
     );
   }
 
-  void _showSavedSeedsInfo() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Saved pre-orders are available offline after browsing.'),
-      ),
-    );
-  }
+  // _showSavedSeedsInfo removed — unused dead code.
 
   Widget _buildHotTag(bool isHot) {
     if (!isHot) return const SizedBox.shrink();

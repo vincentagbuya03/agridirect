@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -9,7 +9,7 @@ import '../../../shared/styles/app_theme.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/services/commerce/cart_service.dart';
 import 'package:geolocator/geolocator.dart';
-import 'marketplace_screen.dart';
+import 'product_view_screen.dart';
 import 'cart_screen.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/social/follow_service.dart';
@@ -845,7 +845,7 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    type == 'flat' ? '₱${val.toStringAsFixed(0)}' : '${val.toStringAsFixed(0)}%',
+                                    type == 'flat' ? 'â‚±${val.toStringAsFixed(0)}' : '${val.toStringAsFixed(0)}%',
                                     style: GoogleFonts.plusJakartaSans(
                                       fontWeight: FontWeight.w900,
                                       fontSize: 14,
@@ -894,7 +894,7 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      'Min Spend ₱${minSpend.toStringAsFixed(0)}',
+                                      'Min Spend â‚±${minSpend.toStringAsFixed(0)}',
                                       style: GoogleFonts.inter(
                                         fontSize: 9,
                                         fontWeight: FontWeight.w600,
@@ -1025,7 +1025,7 @@ String _titleCase(String text) {
   }).join(' ');
 }
 
-// ── Products Tab ──
+// â”€â”€ Products Tab â”€â”€
 class _ProductsTab extends StatelessWidget {
   final String farmerId;
   const _ProductsTab({required this.farmerId});
@@ -1206,7 +1206,7 @@ class _ProductsTab extends StatelessWidget {
   }
 }
 
-// ── Posts Tab ──
+// â”€â”€ Posts Tab â”€â”€
 class _PostsTab extends StatelessWidget {
   final String farmerUserId;
   const _PostsTab({required this.farmerUserId});

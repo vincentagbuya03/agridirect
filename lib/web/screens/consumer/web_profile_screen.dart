@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -17,7 +17,7 @@ import 'package:agridirect/shared/widgets/premium_confirm_dialog.dart';
 import '../../../shared/services/social/follow_service.dart';
 import '../../../shared/models/auth/user_address_model.dart';
 import '../../../shared/services/user/user_service.dart';
-import '../../../mobile/screens/consumer/marketplace_screen.dart';
+import '../../../mobile/widgets/address_management_sheets.dart';
 import '../../../mobile/screens/profile/manage_device_screen.dart';
 import '../../../mobile/screens/profile/account_activity_screen.dart';
 import '../../../mobile/screens/consumer/orders_screen.dart';
@@ -345,7 +345,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     );
   }
 
-  // ─── Mobile Layout: compact header + tab strip + content ───
+  // â”€â”€â”€ Mobile Layout: compact header + tab strip + content â”€â”€â”€
   Widget _buildMobileLayout(AuthService auth) {
     final isFarmer = auth.isViewingAsFarmer;
     final displayName = isFarmer && _farmerProfile != null
@@ -361,7 +361,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
 
     return Column(
       children: [
-        // ── Compact user header ──
+        // â”€â”€ Compact user header â”€â”€
         Container(
           color: Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -433,7 +433,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 ],
               ),
               const SizedBox(height: 12),
-              // ── Horizontal tab strip ──
+              // â”€â”€ Horizontal tab strip â”€â”€
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -451,7 +451,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             ],
           ),
         ),
-        // ── Content scrolls below the sticky header ──
+        // â”€â”€ Content scrolls below the sticky header â”€â”€
         Expanded(
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
@@ -509,7 +509,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     );
   }
 
-  // ─── Desktop Layout: sidebar left + content right ───
+  // â”€â”€â”€ Desktop Layout: sidebar left + content right â”€â”€â”€
   Widget _buildDesktopLayout(AuthService auth) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -533,7 +533,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     );
   }
 
-  // ─── Shopee Style Left Sidebar ───
+  // â”€â”€â”€ Shopee Style Left Sidebar â”€â”€â”€
   Widget _buildShopeeSidebar(AuthService auth, {required bool isMobile}) {
     final isFarmer = auth.isViewingAsFarmer;
     final displayName = isFarmer && _farmerProfile != null
@@ -792,7 +792,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     );
   }
 
-  // ─── Shopee Style Main Content Card ───
+  // â”€â”€â”€ Shopee Style Main Content Card â”€â”€â”€
   Widget _buildShopeeMainContent(AuthService auth) {
     if (_selectedTab == 1) {
       return _buildAddressesContent();
@@ -840,13 +840,13 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Header (responsive) ──
+                // â”€â”€ Header (responsive) â”€â”€
                 if (isMobileLayout) ..._buildMobileHeader(isFarmer)
                 else ..._buildDesktopHeader(isFarmer),
 
                 const Divider(height: 32, color: Color(0xFFF1F5F9)),
 
-                // ── Farmer Store Performance Banner ──
+                // â”€â”€ Farmer Store Performance Banner â”€â”€
                 if (isFarmer) ...[
                   Container(
                     margin: const EdgeInsets.only(bottom: 24),
@@ -879,7 +879,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   ),
                 ],
 
-                // ── Form + Avatar (responsive) ──
+                // â”€â”€ Form + Avatar (responsive) â”€â”€
                 if (isMobileLayout) ..._buildMobileFormLayout(isFarmer)
                 else ..._buildDesktopFormLayout(isFarmer),
               ],
@@ -890,7 +890,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     );
   }
 
-  // ── Mobile header: icon+title stacked above save button ──
+  // â”€â”€ Mobile header: icon+title stacked above save button â”€â”€
   List<Widget> _buildMobileHeader(bool isFarmer) {
     return [
       Row(
@@ -974,7 +974,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     ];
   }
 
-  // ── Desktop header: icon+title on left, save button on right ──
+  // â”€â”€ Desktop header: icon+title on left, save button on right â”€â”€
   List<Widget> _buildDesktopHeader(bool isFarmer) {
     return [
       Row(
@@ -1232,7 +1232,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     );
   }
 
-  // ── Mobile form: avatar on top center, fields below ──
+  // â”€â”€ Mobile form: avatar on top center, fields below â”€â”€
   List<Widget> _buildMobileFormLayout(bool isFarmer) {
     return [
       Center(
@@ -1310,7 +1310,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     ];
   }
 
-  // ── Desktop form: fields on left, avatar on right ──
+  // â”€â”€ Desktop form: fields on left, avatar on right â”€â”€
   List<Widget> _buildDesktopFormLayout(bool isFarmer) {
     return [
       Row(
@@ -2070,7 +2070,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
 
 
 
-  // ─── Navigation Bar ───
+  // â”€â”€â”€ Navigation Bar â”€â”€â”€
   Widget _buildNavBar() {
     return WebConsumerNavBar(
       currentIndex: widget.currentIndex,

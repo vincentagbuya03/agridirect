@@ -62,6 +62,14 @@ class AppRoutes {
   static const String webFarmerRegister = '/web-farmer-register';
   static const String farmerPreorderDetail = '/farmer-preorder-detail';
 
+  // Consumer Promos & Hubs
+  static const String freshProduce = '/fresh-produce';
+  static const String flashSale = '/flash-sale';
+  static const String freeShipping = '/free-shipping';
+  static const String vouchers = '/vouchers';
+  static const String wholesale = '/wholesale';
+  static const String localShops = '/local-shops';
+
   static String farmerProfile(String farmerId) =>
       '$farmerProfileBase/$farmerId';
 

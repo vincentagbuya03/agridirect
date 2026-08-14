@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/address_management_sheets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/commerce/cart_service.dart';
@@ -7,7 +8,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/services/user/user_service.dart';
 import '../../../shared/models/auth/user_address_model.dart';
-import 'marketplace_screen.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/models/farmer/farmer_profile_model.dart';
 import '../../../shared/services/farmer/farmer_service.dart';
@@ -349,7 +349,7 @@ class _CartScreenState extends State<CartScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          '₱${item.priceValue.toStringAsFixed(2)}',
+                          'â‚±${item.priceValue.toStringAsFixed(2)}',
                           style: AppTextStyles.headline3.copyWith(
                             color: AppColors.primary,
                             fontSize: 15,
@@ -398,7 +398,10 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ),
           _buildQtyBtn(Icons.add, () async {
-            final warning = await CartService().updateQuantity(item.productId, item.quantity + 1);
+            final warning = await CartService().updateQuantity(
+              item.productId,
+              item.quantity + 1,
+            );
             if (warning != null && mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -406,7 +409,9 @@ class _CartScreenState extends State<CartScreen> {
                   duration: const Duration(seconds: 1),
                   backgroundColor: AppColors.primary,
                   behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               );
             }
@@ -474,7 +479,7 @@ class _CartScreenState extends State<CartScreen> {
                   ],
                 ),
                 Text(
-                  '₱${total.toStringAsFixed(2)}',
+                  'â‚±${total.toStringAsFixed(2)}',
                   style: AppTextStyles.headline1.copyWith(
                     color: AppColors.primary,
                     fontSize: 26,
@@ -531,7 +536,9 @@ class _CartScreenState extends State<CartScreen> {
     try {
       farmerProfiles = await FarmerService().getFarmerProfilesByIds(farmerIds);
       if (currentUserId.isNotEmpty) {
-        final raw = await VoucherService().getUserClaimedVouchers(currentUserId);
+        final raw = await VoucherService().getUserClaimedVouchers(
+          currentUserId,
+        );
         claimedVouchers = raw.map((item) {
           final voucher = item['vouchers'] as Map<String, dynamic>? ?? {};
           final enriched = Map<String, dynamic>.from(voucher);
@@ -605,7 +612,8 @@ class _CartScreenState extends State<CartScreen> {
             }
           }
 
-          final grandTotal = CartService().totalAmount + totalDeliveryFee - totalDiscount;
+          final grandTotal =
+              CartService().totalAmount + totalDeliveryFee - totalDiscount;
 
           return Container(
             decoration: const BoxDecoration(
@@ -634,16 +642,28 @@ class _CartScreenState extends State<CartScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  Text(
-                    'Checkout Confirmation',
-                    style: AppTextStyles.headline1.copyWith(fontSize: 22),
+                  Row(
+                    children: [
+                      const Icon(Icons.receipt_long_rounded, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Checkout Confirmation',
+                        style: AppTextStyles.headline1.copyWith(fontSize: 20),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
 
                   // Selected Products List
-                  Text(
-                    'Selected Products',
-                    style: AppTextStyles.headline3.copyWith(fontSize: 14),
+                  Row(
+                    children: [
+                      const Icon(Icons.shopping_bag_outlined, size: 18, color: AppColors.textHeadline),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Selected Products',
+                        style: AppTextStyles.headline3.copyWith(fontSize: 14),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Container(
@@ -697,12 +717,12 @@ class _CartScreenState extends State<CartScreen> {
                                           MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          '${item.quantity} ${item.unit} x ₱${item.priceValue.toStringAsFixed(0)}',
+                                          '${item.quantity} ${item.unit} x \u20B1${item.priceValue.toStringAsFixed(0)}',
                                           style: AppTextStyles.bodySmall
                                               .copyWith(fontSize: 12),
                                         ),
                                         Text(
-                                          '₱${(item.priceValue * item.quantity).toStringAsFixed(2)}',
+                                          '\u20B1${(item.priceValue * item.quantity).toStringAsFixed(2)}',
                                           style: AppTextStyles.headline3
                                               .copyWith(
                                                 fontSize: 14,
@@ -734,14 +754,24 @@ class _CartScreenState extends State<CartScreen> {
                   const SizedBox(height: 24),
 
                   // Address Section
-                  Text(
-                    _paymentMethod == 'COP'
-                        ? 'Pickup Location (at Farm)'
-                        : 'Shipping Address',
-                    style: AppTextStyles.headline3.copyWith(
-                      fontSize: 14,
-                      color: AppColors.textHeadline,
-                    ),
+                  Row(
+                    children: [
+                      Icon(
+                        _paymentMethod == 'COP' ? Icons.storefront_rounded : Icons.local_shipping_outlined,
+                        size: 18,
+                        color: AppColors.textHeadline,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _paymentMethod == 'COP'
+                            ? 'Pickup Location (at Farm)'
+                            : 'Shipping Address',
+                        style: AppTextStyles.headline3.copyWith(
+                          fontSize: 14,
+                          color: AppColors.textHeadline,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Container(
@@ -946,12 +976,18 @@ class _CartScreenState extends State<CartScreen> {
                   const SizedBox(height: 20),
 
                   // Payment Method
-                  Text(
-                    'Payment Method',
-                    style: AppTextStyles.headline3.copyWith(
-                      fontSize: 14,
-                      color: AppColors.textHeadline,
-                    ),
+                  Row(
+                    children: [
+                      const Icon(Icons.payment_rounded, size: 18, color: AppColors.textHeadline),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Payment Method',
+                        style: AppTextStyles.headline3.copyWith(
+                          fontSize: 14,
+                          color: AppColors.textHeadline,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -982,19 +1018,11 @@ class _CartScreenState extends State<CartScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  Text(
-                    'Special Instructions (Optional)',
-                    style: AppTextStyles.headline3.copyWith(
-                      fontSize: 14,
-                      color: AppColors.textHeadline,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                   TextField(
                     controller: _instructionsController,
                     maxLines: 2,
                     decoration: InputDecoration(
-                      hintText: 'e.g. Leave at the gate, call upon arrival...',
+                      hintText: 'Special Instructions (Optional)',
                       hintStyle: AppTextStyles.bodySmall.copyWith(
                         color: AppColors.textSubtle,
                       ),
@@ -1002,15 +1030,7 @@ class _CartScreenState extends State<CartScreen> {
                       fillColor: AppColors.background,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: AppColors.textHeadline.withValues(alpha: 0.1),
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: AppColors.textHeadline.withValues(alpha: 0.1),
-                        ),
+                        borderSide: BorderSide.none,
                       ),
                     ),
                   ),
@@ -1024,7 +1044,7 @@ class _CartScreenState extends State<CartScreen> {
                         children: [
                           Text('Subtotal', style: AppTextStyles.bodyMedium),
                           Text(
-                            '₱${CartService().totalAmount.toStringAsFixed(2)}',
+                            '\u20B1${CartService().totalAmount.toStringAsFixed(2)}',
                             style: AppTextStyles.bodyMedium.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
@@ -1038,7 +1058,7 @@ class _CartScreenState extends State<CartScreen> {
                           Text('Delivery Fee', style: AppTextStyles.bodyMedium),
                           Text(
                             totalDeliveryFee > 0
-                                ? '₱${totalDeliveryFee.toStringAsFixed(2)}'
+                                ? '\u20B1${totalDeliveryFee.toStringAsFixed(2)}'
                                 : 'Free',
                             style: AppTextStyles.bodyMedium.copyWith(
                               fontWeight: FontWeight.w700,
@@ -1056,7 +1076,7 @@ class _CartScreenState extends State<CartScreen> {
                           children: [
                             Text('Discount', style: AppTextStyles.bodyMedium),
                             Text(
-                              '-₱${totalDiscount.toStringAsFixed(2)}',
+                              '-\u20B1${totalDiscount.toStringAsFixed(2)}',
                               style: AppTextStyles.bodyMedium.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: Colors.redAccent,
@@ -1069,12 +1089,13 @@ class _CartScreenState extends State<CartScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Total Amount', style: AppTextStyles.bodyLarge),
+                          Text('Total Amount', style: AppTextStyles.headline3.copyWith(fontSize: 18)),
                           Text(
-                            '₱${grandTotal.toStringAsFixed(2)}',
+                            '\u20B1${grandTotal.toStringAsFixed(2)}',
                             style: AppTextStyles.headline1.copyWith(
                               color: AppColors.primary,
                               fontSize: 24,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
                         ],
@@ -1287,7 +1308,9 @@ class _CartScreenState extends State<CartScreen> {
       String? firstCategory;
       if (cartItems.isNotEmpty) {
         try {
-          final firstProduct = await SupabaseDataService().getProductById(cartItems.first.productId);
+          final firstProduct = await SupabaseDataService().getProductById(
+            cartItems.first.productId,
+          );
           firstCategory = firstProduct?.categoryName;
         } catch (_) {}
       }
@@ -1304,10 +1327,10 @@ class _CartScreenState extends State<CartScreen> {
           backgroundColor: Colors.green,
         ),
       );
-      
+
       // Close checkout confirmation sheet
       Navigator.of(context).pop();
-      
+
       // Route to our beautiful animated success page
       context.go(AppRoutes.orderSuccess, extra: firstCategory);
     } catch (e) {
@@ -1380,7 +1403,9 @@ class _CartScreenState extends State<CartScreen> {
               children: [
                 Icon(
                   Icons.confirmation_number_outlined,
-                  color: selected != null ? AppColors.primary : AppColors.textSubtle,
+                  color: selected != null
+                      ? AppColors.primary
+                      : AppColors.textSubtle,
                   size: 20,
                 ),
                 const SizedBox(width: 12),
@@ -1403,8 +1428,12 @@ class _CartScreenState extends State<CartScreen> {
                             : '${applicableVouchers.length} vouchers available',
                         style: AppTextStyles.bodySmall.copyWith(
                           fontSize: 11,
-                          color: selected != null ? AppColors.primary : AppColors.textSubtle,
-                          fontWeight: selected != null ? FontWeight.w700 : FontWeight.w500,
+                          color: selected != null
+                              ? AppColors.primary
+                              : AppColors.textSubtle,
+                          fontWeight: selected != null
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                         ),
                       ),
                     ],
@@ -1415,16 +1444,21 @@ class _CartScreenState extends State<CartScreen> {
                   onPressed: applicableVouchers.isEmpty
                       ? null
                       : () => _showVoucherSelectionDialog(
-                            sheetCtx,
-                            setSheetState,
-                            farmerId,
-                            applicableVouchers,
-                          ),
+                          sheetCtx,
+                          setSheetState,
+                          farmerId,
+                          applicableVouchers,
+                        ),
                   style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    foregroundColor: selected != null ? Colors.redAccent : AppColors.primary,
+                    foregroundColor: selected != null
+                        ? Colors.redAccent
+                        : AppColors.primary,
                   ),
                   child: Text(
                     selected != null
@@ -1464,7 +1498,9 @@ class _CartScreenState extends State<CartScreen> {
               color: AppColors.textHeadline,
             ),
           ),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           content: SizedBox(
             width: double.maxFinite,
             child: ListView.builder(
@@ -1485,7 +1521,10 @@ class _CartScreenState extends State<CartScreen> {
                     side: BorderSide(color: Colors.grey.shade200),
                   ),
                   child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     title: Text(
                       code,
                       style: GoogleFonts.inter(
@@ -1495,21 +1534,23 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                     ),
                     subtitle: Text(
-                      'Min Spend ₱${minSpend.toStringAsFixed(0)} · ${type == 'flat' ? '₱${val.toStringAsFixed(0)}' : '${val.toStringAsFixed(0)}%'} OFF',
+                      'Min Spend â‚±${minSpend.toStringAsFixed(0)} Â· ${type == 'flat' ? 'â‚±${val.toStringAsFixed(0)}' : '${val.toStringAsFixed(0)}%'} OFF',
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         color: AppColors.textSubtle,
                       ),
                     ),
                     trailing: Icon(
-                      _selectedVouchersByFarmer[farmerId]?['voucher_id'] == v['voucher_id']
+                      _selectedVouchersByFarmer[farmerId]?['voucher_id'] ==
+                              v['voucher_id']
                           ? Icons.check_circle_rounded
                           : Icons.add_circle_outline_rounded,
                       color: AppColors.primary,
                     ),
                     onTap: () {
                       setSheetState(() {
-                        if (_selectedVouchersByFarmer[farmerId]?['voucher_id'] == v['voucher_id']) {
+                        if (_selectedVouchersByFarmer[farmerId]?['voucher_id'] ==
+                            v['voucher_id']) {
                           _selectedVouchersByFarmer.remove(farmerId);
                         } else {
                           _selectedVouchersByFarmer[farmerId] = v;

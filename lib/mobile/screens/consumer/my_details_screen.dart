@@ -510,12 +510,9 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Profile Image Section (both farmers and customers)
-                    _buildProfileImageSection(isFarmer),
-                    const SizedBox(height: 52),
-
-                    // Header card with role info
-                    _buildHeaderCard(isFarmer),
+                    // Profile Image & Header Section
+                    _buildModernProfileHeader(isFarmer),
+                    const SizedBox(height: 32),
                     const SizedBox(height: 28),
                     // Form fields
                     Text(
@@ -726,74 +723,37 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     );
   }
 
-  Widget _buildProfileImageSection(bool isFarmer) {
+  Widget _buildModernProfileHeader(bool isFarmer) {
     final imageUrl = isFarmer ? _farmerImageUrl : _customerImageUrl;
     final icon = isFarmer ? Icons.agriculture : Icons.person;
+    final roleText = isFarmer ? 'Verified Farm Profile' : 'Buyer Profile';
+    final name = isFarmer ? _nameController.text : _nameController.text;
+    final color = isFarmer ? AppColors.primary : Colors.blue;
 
-    return Stack(
-      alignment: Alignment.center,
-      clipBehavior: Clip.none,
-      children: [
-        // Cover Banner Container
-        Container(
-          height: 120,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isFarmer
-                  ? [const Color(0xFF047857), AppColors.primary]
-                  : [const Color(0xFF1D4ED8), Colors.blue],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Stack(
-              children: [
-                Positioned(
-                  right: -30,
-                  top: -30,
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.08),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: -20,
-                  bottom: -20,
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.04),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // Profile Photo Overlapping the Banner
-        Positioned(
-          bottom: -40,
-          child: Stack(
+        ],
+      ),
+      child: Column(
+        children: [
+          Stack(
             clipBehavior: Clip.none,
             children: [
               GestureDetector(
                 onTap: (_isUploadingImage || _isImagePickerActive)
                     ? null
                     : () {
-                        if (!_isEditing) {
-                          setState(() => _isEditing = true);
-                        }
+                        if (!_isEditing) setState(() => _isEditing = true);
                         _uploadFarmerImage();
                       },
                 child: Container(
@@ -801,15 +761,8 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                   height: 100,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white,
-                    border: Border.all(color: Colors.white, width: 3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
+                    color: Colors.grey.shade50,
+                    border: Border.all(color: color.withValues(alpha: 0.2), width: 3),
                   ),
                   child: ClipOval(
                     child: imageUrl != null && imageUrl.isNotEmpty
@@ -818,113 +771,78 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                             fit: BoxFit.cover,
                             placeholder: (_, _) => Container(color: Colors.grey[100]),
                             errorWidget: (_, _, _) => Container(
-                              color: Colors.grey[200],
-                              child: Icon(icon, size: 36, color: Colors.grey),
+                              color: Colors.grey[100],
+                              child: Icon(icon, size: 40, color: Colors.grey.shade400),
                             ),
                           )
                         : Container(
-                            color: Colors.grey[200],
-                            child: Icon(icon, size: 36, color: Colors.grey),
+                            color: Colors.grey[100],
+                            child: Icon(icon, size: 40, color: Colors.grey.shade400),
                           ),
                   ),
                 ),
               ),
               Positioned(
                 bottom: 0,
-                right: 0,
+                right: -4,
                 child: GestureDetector(
-                  onTap: (_isUploadingImage || _isImagePickerActive)
-                      ? null
-                      : _uploadFarmerImage,
+                  onTap: (_isUploadingImage || _isImagePickerActive) ? null : _uploadFarmerImage,
                   child: Container(
-                    padding: const EdgeInsets.all(7),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: AppColors.accent,
                       shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.accent.withValues(alpha: 0.3),
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
+                          color: AppColors.accent.withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
                     child: _isUploadingImage
                         ? const SizedBox(
-                            width: 14,
-                            height: 14,
+                            width: 16,
+                            height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
-                        : const Icon(
-                            Icons.camera_alt_rounded,
-                            color: Colors.white,
-                            size: 14,
-                          ),
+                        : const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16),
                   ),
                 ),
               ),
             ],
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHeaderCard(bool isFarmer) {
-    final role = isFarmer ? 'Verified Farm Profile' : 'Buyer Profile';
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isFarmer
-            ? AppColors.primary.withValues(alpha: 0.06)
-            : Colors.blue.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isFarmer
-              ? AppColors.primary.withValues(alpha: 0.15)
-              : Colors.blue.withValues(alpha: 0.15),
-          width: 1.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isFarmer ? AppColors.primary : Colors.blue,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              isFarmer ? Icons.agriculture : Icons.shopping_bag,
-              color: Colors.white,
-              size: 20,
+          const SizedBox(height: 16),
+          Text(
+            name.isNotEmpty ? name : 'My Profile',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textHeadline,
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
+                Icon(isFarmer ? Icons.verified_rounded : Icons.shopping_bag_rounded, size: 14, color: color),
+                const SizedBox(width: 6),
                 Text(
-                  role,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                    color: isFarmer ? AppColors.primary : Colors.blue,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isFarmer
-                      ? 'Manage your farm settings and stall location details'
-                      : 'Manage your default personal account',
+                  roleText,
                   style: GoogleFonts.inter(
-                    color: AppColors.textSubtle,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
                   ),
                 ),
               ],
@@ -945,55 +863,70 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     bool isRequired = true,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
-      controller: controller,
-      enabled: enabled,
-      keyboardType: keyboardType,
-      maxLines: maxLines,
-      style: GoogleFonts.inter(
-        fontWeight: FontWeight.w600,
-        color: AppColors.textHeadline,
-        fontSize: 14,
+    return Container(
+      decoration: BoxDecoration(
+        color: enabled ? Colors.white : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: enabled
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : [],
       ),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: GoogleFonts.inter(
-          color: Colors.grey.shade500,
-          fontWeight: FontWeight.w500,
+      child: TextFormField(
+        controller: controller,
+        enabled: enabled,
+        keyboardType: keyboardType,
+        maxLines: maxLines,
+        style: GoogleFonts.inter(
+          fontWeight: FontWeight.w600,
+          color: enabled ? AppColors.textHeadline : Colors.grey.shade600,
+          fontSize: 14,
         ),
-        prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
-        filled: true,
-        fillColor: enabled ? Colors.grey.shade50 : Colors.grey.shade100,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: GoogleFonts.inter(
+            color: Colors.grey.shade500,
+            fontWeight: FontWeight.w500,
+          ),
+          prefixIcon: Icon(icon, color: enabled ? AppColors.primary : Colors.grey.shade400, size: 22),
+          filled: true,
+          fillColor: Colors.transparent,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Colors.transparent),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        validator: (value) {
+          if (!enabled) return null;
+
+          if (validator != null) {
+            return validator(value);
+          }
+
+          if (isRequired && (value?.trim().isEmpty ?? true)) {
+            return 'This field cannot be empty';
+          }
+          return null;
+        },
       ),
-      validator: (value) {
-        if (!enabled) return null;
-
-        if (validator != null) {
-          return validator(value);
-        }
-
-        if (isRequired && (value?.trim().isEmpty ?? true)) {
-          return 'This field cannot be empty';
-        }
-        return null;
-      },
     );
   }
 
