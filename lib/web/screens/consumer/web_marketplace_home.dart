@@ -9,7 +9,8 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/commerce/cart_service.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
-import '../../widgets/quick_links/quick_links_dialogs.dart';
+import '../../widgets/web_footer.dart';
+import '../../../shared/utils/apk_downloader.dart';
 
 /// Web Marketplace Home — Clean AgriDirect Landing Page
 /// Light mint/green design matching reference screenshot
@@ -55,7 +56,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
       'title': 'FRESH LOCAL HARVEST!',
       'subtitle':
           'Fresh local produce & farm essentials direct from San Carlos City, Pangasinan growers.',
-      'badge1': '🎟️ ₱100 OFF VOUCHER',
+      'badge1': '🌾 100% FARM-DIRECT',
       'badge2': '⚡ UP TO 50% OFF',
       'badge3': '🚚 LOCAL DELIVERY',
       'bgGradient': [Color(0xFF991B1B), Color(0xFFDC2626), Color(0xFFEA580C)],
@@ -183,7 +184,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
               _buildFarmerSpotlight(),
               _buildTrustPillars(),
               _buildTestimonials(),
-              _buildFooter(),
+              const AgriDirectWebFooter(),
             ],
           ),
         ),
@@ -615,10 +616,10 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+                colors: [Color(0xFFECFDF5), Color(0xFFD1FAE5)],
               ),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFDE68A)),
+              border: Border.all(color: const Color(0xFFA7F3D0)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -626,27 +627,27 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 Row(
                   children: [
                     const Icon(
-                      Icons.local_shipping_rounded,
+                      Icons.agriculture_rounded,
                       size: 16,
-                      color: Color(0xFFD97706),
+                      color: Color(0xFF059669),
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'FREE SHIPPING',
+                      'FARM-TO-DOOR',
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFFB45309),
+                        color: const Color(0xFF065F46),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Exclusive vouchers for first 3 farm-direct orders',
+                  'Fresh harvest delivered directly from verified growers',
                   style: GoogleFonts.inter(
                     fontSize: 10,
-                    color: const Color(0xFF78350F),
+                    color: const Color(0xFF047857),
                   ),
                 ),
               ],
@@ -685,8 +686,8 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => context.push(AppRoutes.vouchers),
+            child: ElevatedButton.icon(
+              onPressed: () => ApkDownloader.download(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF059669),
                 foregroundColor: Colors.white,
@@ -696,8 +697,9 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: Text(
-                'CLAIM ₱100 VOUCHER',
+              icon: const Icon(Icons.android_rounded, size: 16),
+              label: Text(
+                'GET ANDROID APP',
                 style: GoogleFonts.inter(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
@@ -743,12 +745,12 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
         'route': AppRoutes.freeShipping,
       },
       {
-        'icon': Icons.confirmation_number_rounded,
-        'title': 'Voucher Center',
-        'subtitle': 'Collect & Save Big',
+        'icon': Icons.groups_rounded,
+        'title': 'Farmer Network',
+        'subtitle': 'Verified Local Growers',
         'color': const Color(0xFFD97706),
         'bgColor': const Color(0xFFFFFBEB),
-        'route': AppRoutes.vouchers,
+        'route': AppRoutes.farmersMap,
       },
       {
         'icon': Icons.inventory_2_rounded,
@@ -2638,546 +2640,5 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
     if (parts.isEmpty) return 'AD';
     return parts.map((part) => part[0].toUpperCase()).join();
   }
-
-  Widget _buildFooter() {
-    final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 768;
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 24 : 64,
-        vertical: 48,
-      ),
-      color: _dark,
-      child: Column(
-        children: [
-          if (isMobile)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Brand
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: _primary,
-                            borderRadius: BorderRadius.circular(7),
-                          ),
-                          child: const Icon(
-                            Icons.eco_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'AgriDirect',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: _white,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Connecting local farmers\ndirectly to your kitchen for a\nhealthier, more sustainable\nworld.',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: const Color(0xFF9CA3AF),
-                        height: 1.7,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        _buildSocialIcon(Icons.language),
-                        const SizedBox(width: 8),
-                        _buildSocialIcon(Icons.facebook_rounded),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                // Links and Categories in a Row
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Quick Links',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: _white,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          _buildFooterLink('Find a Farmer'),
-                          _buildFooterLink('Seasonal Calendar'),
-                          _buildFooterLink('Pricing Plans'),
-                          _buildFooterLink('Help Center'),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Categories',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: _white,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          _buildFooterLink('Vegetables'),
-                          _buildFooterLink('Fruits & Berries'),
-                          _buildFooterLink('Dairy & Eggs'),
-                          _buildFooterLink('Organic Grains'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                // Newsletter
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Newsletter',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: _white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Get the latest harvest updates and recipes.',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: const Color(0xFF9CA3AF),
-                        height: 1.6,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            height: 38,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1F2937),
-                              borderRadius: BorderRadius.circular(7),
-                              border: Border.all(
-                                color: const Color(0xFF374151),
-                              ),
-                            ),
-                            child: TextField(
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: _white,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: 'Email address',
-                                hintStyle: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  color: const Color(0xFF6B7280),
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 9,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: _primary,
-                            borderRadius: BorderRadius.circular(7),
-                          ),
-                          child: const Icon(
-                            Icons.send_rounded,
-                            size: 16,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            )
-          else
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Brand
-                Expanded(
-                  flex: 3,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: _primary,
-                              borderRadius: BorderRadius.circular(7),
-                            ),
-                            child: const Icon(
-                              Icons.eco_rounded,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'AgriDirect',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: _white,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        'Connecting local farmers\ndirectly to your kitchen for a\nhealthier, more sustainable\nworld.',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: const Color(0xFF9CA3AF),
-                          height: 1.7,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          _buildSocialIcon(Icons.language),
-                          const SizedBox(width: 8),
-                          _buildSocialIcon(Icons.facebook_rounded),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // Quick Links
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Quick Links',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: _white,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      _buildFooterLink('Find a Farmer'),
-                      _buildFooterLink('Seasonal Calendar'),
-                      _buildFooterLink('Pricing Plans'),
-                      _buildFooterLink('Help Center'),
-                    ],
-                  ),
-                ),
-                // Categories
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Categories',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: _white,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      _buildFooterLink('Vegetables'),
-                      _buildFooterLink('Fruits & Berries'),
-                      _buildFooterLink('Dairy & Eggs'),
-                      _buildFooterLink('Organic Grains'),
-                    ],
-                  ),
-                ),
-                // Newsletter
-                Expanded(
-                  flex: 3,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Newsletter',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: _white,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Get the latest harvest\nupdates and recipes.',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: const Color(0xFF9CA3AF),
-                          height: 1.6,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 38,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1F2937),
-                                borderRadius: BorderRadius.circular(7),
-                                border: Border.all(
-                                  color: const Color(0xFF374151),
-                                ),
-                              ),
-                              child: TextField(
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  color: _white,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'Email address',
-                                  hintStyle: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    color: const Color(0xFF6B7280),
-                                  ),
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    vertical: 9,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: _primary,
-                              borderRadius: BorderRadius.circular(7),
-                            ),
-                            child: const Icon(
-                              Icons.send_rounded,
-                              size: 16,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          const SizedBox(height: 36),
-          Container(height: 1, color: const Color(0xFF1F2937)),
-          const SizedBox(height: 20),
-          if (isMobile)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Â© 2024 AgriDirect. All rights reserved.',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: const Color(0xFF6B7280),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 20,
-                  runSpacing: 8,
-                  children: [
-                    _buildFooterBottomLink('Privacy Policy'),
-                    _buildFooterBottomLink('Terms of Service'),
-                    _buildFooterBottomLink('Cookie Policy'),
-                  ],
-                ),
-              ],
-            )
-          else
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Â© 2024 AgriDirect. All rights reserved.',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: const Color(0xFF6B7280),
-                  ),
-                ),
-                Row(
-                  children: [
-                    _buildFooterBottomLink('Privacy Policy'),
-                    const SizedBox(width: 20),
-                    _buildFooterBottomLink('Terms of Service'),
-                    const SizedBox(width: 20),
-                    _buildFooterBottomLink('Cookie Policy'),
-                  ],
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  static const String _privacyPolicyText =
-      'At AgriDirect, we value your privacy. We collect basic account details (name, email, phone) to facilitate purchases and connect you with local farmers. We never share your data with third parties without your consent. By using the app, you agree to our standard data handling procedures.';
-  static const String _termsOfServiceText =
-      'Welcome to AgriDirect. By registering as a consumer or farmer, you agree to comply with our community guidelines. Farmers must supply authentic information and fresh, high-quality produce. Customers must complete transaction payments in good faith.';
-  static const String _cookiePolicyText =
-      'AgriDirect uses cookies to enhance your browsing experience, store session parameters, and analyze site metrics. Cookies are stored locally on your device and can be managed through your browser settings at any time.';
-
-  void _handleFooterLinkTap(String text) {
-    if (text == 'Find a Farmer') {
-      FindAFarmerDialog.show(
-        context,
-        onExploreFarmers: () => context.go(AppRoutes.farmersMap),
-      );
-    } else if (text == 'Vegetables' ||
-        text == 'Fruits & Berries' ||
-        text == 'Dairy & Eggs' ||
-        text == 'Organic Grains') {
-      widget.onNavigate(1, text);
-    } else if (text == 'Seasonal Calendar') {
-      SeasonalCalendarDialog.show(context);
-    } else if (text == 'Pricing Plans') {
-      PricingPlansDialog.show(context);
-    } else if (text == 'Help Center') {
-      HelpCenterDialog.show(context);
-    } else if (text == 'Privacy Policy') {
-      _showPolicyModal('Privacy Policy', _privacyPolicyText);
-    } else if (text == 'Terms of Service') {
-      _showPolicyModal('Terms of Service', _termsOfServiceText);
-    } else if (text == 'Cookie Policy') {
-      _showPolicyModal('Cookie Policy', _cookiePolicyText);
-    }
-  }
-
-  void _showPolicyModal(String title, String content) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          title,
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
-        ),
-        content: SizedBox(
-          width: 500,
-          child: SingleChildScrollView(
-            child: Text(
-              content,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                height: 1.6,
-                color: Colors.grey[800],
-              ),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSocialIcon(IconData icon) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Redirecting to official social media channel...'),
-            ),
-          );
-        },
-        child: Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1F2937),
-            borderRadius: BorderRadius.circular(7),
-            border: Border.all(color: const Color(0xFF374151)),
-          ),
-          child: Icon(icon, size: 15, color: const Color(0xFF9CA3AF)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFooterLink(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: () => _handleFooterLinkTap(text),
-          child: Text(
-            text,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: const Color(0xFF9CA3AF),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFooterBottomLink(String text) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () => _handleFooterLinkTap(text),
-        child: Text(
-          text,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            color: const Color(0xFF6B7280),
-          ),
-        ),
-      ),
-    );
-  }
 }
+

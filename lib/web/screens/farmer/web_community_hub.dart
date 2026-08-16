@@ -18,6 +18,7 @@ import '../../../shared/services/integration/weather_service.dart';
 import '../../../shared/models/weather_model.dart';
 import '../../widgets/web_consumer_nav_bar.dart';
 import '../../widgets/web_hamburger_menu_button.dart';
+import '../../widgets/web_footer.dart';
 import '../../../shared/widgets/image_widgets.dart';
 
 import '../../../shared/screens/article_detail_screen.dart';
@@ -243,23 +244,43 @@ class _WebCommunityHubState extends State<WebCommunityHub>
               height: 1000,
             ),
           ),
-          Column(
-            children: [
-              _buildNavBar(),
-              _buildTopBar(),
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Main content
-                    Expanded(flex: 3, child: _buildMainContent()),
-                    // Right sidebar
-                    if (showSidebar)
-                      SizedBox(width: 320, child: _buildRightSidebar()),
-                  ],
+          SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildNavBar(),
+                _buildTopBar(),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1280),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: sw < 700 ? 16 : 28,
+                        vertical: 24,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Main content feed (Forum / Articles)
+                          Expanded(
+                            child: _buildMainContent(),
+                          ),
+                          // Right sidebar
+                          if (showSidebar) ...[
+                            const SizedBox(width: 28),
+                            SizedBox(
+                              width: 320,
+                              child: _buildRightSidebar(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 56),
+                const AgriDirectWebFooter(),
+              ],
+            ),
           ),
         ],
       ),
@@ -534,112 +555,106 @@ class _WebCommunityHubState extends State<WebCommunityHub>
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: _border)),
       ),
-      child: Row(
-        children: [
-          const Text(
-            'Community Hub',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: _dark,
-            ),
-          ),
-          const SizedBox(width: 32),
-          // Search
-          Expanded(
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: _surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _border),
-              ),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Search topics, pests, crops...',
-                  hintStyle: TextStyle(color: _muted, fontSize: 13),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: _muted,
-                    size: 18,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1280),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+            child: Row(
+              children: [
+                const Text(
+                  'Community Hub',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _dark,
                   ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          // Tabs
-          Container(
-            decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _border),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              labelColor: _primary,
-              unselectedLabelColor: _muted,
-              indicatorSize: TabBarIndicatorSize.label,
-              indicatorColor: _primary,
-              indicatorWeight: 2,
-              labelStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-              unselectedLabelStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-              dividerColor: Colors.transparent,
-              tabAlignment: TabAlignment.center,
-              tabs: const [
-                Tab(text: 'Forum'),
-                Tab(text: 'Articles'),
+                const SizedBox(width: 32),
+                // Search
+                Expanded(
+                  child: Container(
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: _surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _border),
+                    ),
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Search topics, pests, crops...',
+                        hintStyle: TextStyle(color: _muted, fontSize: 13),
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          color: _muted,
+                          size: 18,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Tabs
+                Container(
+                  decoration: BoxDecoration(
+                    color: _surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _border),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    isScrollable: true,
+                    labelColor: _primary,
+                    unselectedLabelColor: _muted,
+                    indicatorSize: TabBarIndicatorSize.label,
+                    indicatorColor: _primary,
+                    indicatorWeight: 2,
+                    labelStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    dividerColor: Colors.transparent,
+                    tabAlignment: TabAlignment.center,
+                    tabs: const [
+                      Tab(text: 'Forum'),
+                      Tab(text: 'Articles'),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
   // ─── Main Content ───
   Widget _buildMainContent() {
-    return TabBarView(
-      controller: _tabController,
-      children: [
-        Align(
-          alignment: Alignment.topCenter,
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 680),
-            child: _buildForumFeed(),
-          ),
-        ),
-        Align(
-          alignment: Alignment.topCenter,
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: _buildArticlesFeed(),
-          ),
-        ),
-      ],
+    return AnimatedBuilder(
+      animation: _tabController,
+      builder: (context, _) {
+        if (_tabController.index == 1) {
+          return _buildArticlesFeed();
+        }
+        return _buildForumFeed();
+      },
     );
   }
 
   Widget _buildForumFeed() {
-    final sw = MediaQuery.of(context).size.width;
-    final padding = sw < 600 ? const EdgeInsets.all(16) : const EdgeInsets.all(32);
-
     if (_postsList != null) {
-      return _buildForumList(padding, _postsList!);
+      return _buildForumList(_postsList!);
     }
 
     return FutureBuilder<List<ForumPostItem>>(
@@ -656,32 +671,28 @@ class _WebCommunityHubState extends State<WebCommunityHub>
         final posts = snapshot.data ?? [];
         _postsList = List.from(posts);
 
-        return _buildForumList(padding, _postsList!);
+        return _buildForumList(_postsList!);
       },
     );
   }
 
-  Widget _buildForumList(EdgeInsets padding, List<ForumPostItem> posts) {
-    if (posts.isEmpty) {
-      return Center(
-        child: Text('No forum posts yet', style: TextStyle(color: _muted)),
-      );
-    }
-
+  Widget _buildForumList(List<ForumPostItem> posts) {
     // Sync controllers once
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _syncPostControllers(posts.length);
     });
 
-    final showCreateCard = AuthService().isSeller;
+    final showCreateCard = AuthService().isLoggedIn;
     return ListView.builder(
-      padding: padding,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
       itemCount: posts.length + (showCreateCard ? 1 : 0),
       itemBuilder: (context, i) {
         if (showCreateCard) {
           if (i == 0) {
             return Padding(
-              padding: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.only(bottom: 20),
               child: _buildFacebookCreatePostCard(),
             );
           }
@@ -1370,9 +1381,6 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildArticlesFeed() {
-    final sw = MediaQuery.of(context).size.width;
-    final padding = sw < 600 ? const EdgeInsets.all(16) : const EdgeInsets.all(32);
-
     return FutureBuilder<List<ArticleItem>>(
       future: SupabaseDataService().getArticles(),
       builder: (context, snapshot) {
@@ -1386,13 +1394,25 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
         final articles = snapshot.data ?? [];
         if (articles.isEmpty) {
-          return Center(
-            child: Text('No articles yet', style: TextStyle(color: _muted)),
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 48),
+            alignment: Alignment.center,
+            child: Column(
+              children: [
+                Icon(Icons.menu_book_rounded, size: 48, color: Colors.grey.shade400),
+                const SizedBox(height: 12),
+                Text('No articles published yet', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 16, color: _dark)),
+                const SizedBox(height: 4),
+                Text('Admin publications and DA advisories will appear here.', style: GoogleFonts.inter(fontSize: 13, color: _muted)),
+              ],
+            ),
           );
         }
 
         return ListView.builder(
-          padding: padding,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
           itemCount: articles.length,
           itemBuilder: (context, i) => Padding(
             padding: const EdgeInsets.only(bottom: 20),
@@ -1547,27 +1567,19 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   }
 
   Widget _buildRightSidebar() {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: _border)),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildWeatherWidget(),
-            const SizedBox(height: 24),
-            _buildMarketPriceTrends(),
-            const SizedBox(height: 24),
-            _buildTrendingTopics(),
-            const SizedBox(height: 24),
-            _buildPopularTags(),
-            const SizedBox(height: 24),
-            _buildTopContributors(),
-          ],
-        ),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildWeatherWidget(),
+        const SizedBox(height: 20),
+        _buildMarketPriceTrends(),
+        const SizedBox(height: 20),
+        _buildTrendingTopics(),
+        const SizedBox(height: 20),
+        _buildPopularTags(),
+        const SizedBox(height: 20),
+        _buildTopContributors(),
+      ],
     );
   }
 

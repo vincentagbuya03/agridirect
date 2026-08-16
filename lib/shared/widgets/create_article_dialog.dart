@@ -19,8 +19,18 @@ class _CreateArticleDialogState extends State<CreateArticleDialog> {
   final _imageUrlController = TextEditingController();
   bool _isPublished = true;
   String _audience = 'ALL';
+  String _category = 'DA Advisories';
   bool _isLoading = false;
   bool _isUploadingImage = false;
+
+  final List<String> _categories = const [
+    'DA Advisories',
+    'Livestock & Fodder',
+    'Crop Protection',
+    'Smart AgTech & Fencing',
+    'Soil & Fertilizer',
+    'General News',
+  ];
 
   @override
   void initState() {
@@ -32,6 +42,7 @@ class _CreateArticleDialogState extends State<CreateArticleDialog> {
       _imageUrlController.text = widget.initialData!['cover_image_url'] ?? '';
       _isPublished = widget.initialData!['is_published'] ?? true;
       _audience = widget.initialData!['audience'] ?? 'ALL';
+      _category = widget.initialData!['category'] ?? 'DA Advisories';
     }
     _imageUrlController.addListener(() {
       if (mounted) setState(() {});
@@ -61,6 +72,7 @@ class _CreateArticleDialogState extends State<CreateArticleDialog> {
           title: _titleController.text.trim(),
           summary: _summaryController.text.trim(),
           body: _bodyController.text.trim(),
+          category: _category,
           coverImageUrl: _imageUrlController.text.trim().isNotEmpty ? _imageUrlController.text.trim() : null,
           audience: _audience,
         );
@@ -69,6 +81,7 @@ class _CreateArticleDialogState extends State<CreateArticleDialog> {
           title: _titleController.text.trim(),
           summary: _summaryController.text.trim(),
           body: _bodyController.text.trim(),
+          category: _category,
           coverImageUrl: _imageUrlController.text.trim().isNotEmpty ? _imageUrlController.text.trim() : null,
           isPublished: _isPublished,
           audience: _audience,
@@ -137,7 +150,13 @@ class _CreateArticleDialogState extends State<CreateArticleDialog> {
               const SizedBox(height: 20),
               _buildField('Summary / Excerpt', _summaryController, hint: 'A short hook to grab readers...', maxLines: 2),
               const SizedBox(height: 20),
-              _buildAudienceSelector(),
+              Row(
+                children: [
+                  Expanded(child: _buildCategorySelector()),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildAudienceSelector()),
+                ],
+              ),
               const SizedBox(height: 20),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -273,6 +292,33 @@ class _CreateArticleDialogState extends State<CreateArticleDialog> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCategorySelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Category', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textHeadline)),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.grey.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _categories.contains(_category) ? _category : 'DA Advisories',
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
+              items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+              onChanged: (val) => setState(() => _category = val ?? 'DA Advisories'),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

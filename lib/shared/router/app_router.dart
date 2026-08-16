@@ -53,6 +53,8 @@ import '../../web/screens/consumer/web_vouchers_screen.dart';
 import '../../web/screens/consumer/web_fresh_produce_screen.dart';
 import '../../web/screens/consumer/web_wholesale_screen.dart';
 import '../../web/screens/consumer/web_local_shops_screen.dart';
+import '../../web/screens/common/web_articles_screen.dart';
+import '../../web/screens/common/web_about_us_screen.dart';
 import '../../mobile/screens/consumer/free_shipping_screen.dart';
 import '../../mobile/screens/consumer/flash_sale_screen.dart';
 import '../../mobile/screens/consumer/vouchers_screen.dart';
@@ -589,6 +591,17 @@ GoRouter createAppRouter({String? initialRoute}) {
               ? const WebLocalShopsScreen()
               : const LocalShopsScreen(),
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.articles,
+        builder: (context, state) {
+          final articleId = state.uri.queryParameters['id'];
+          return WebArticlesScreen(initialArticleId: articleId);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.aboutUs,
+        builder: (context, state) => const WebAboutUsScreen(),
       ),
       GoRoute(
         path: AppRoutes.notifications,

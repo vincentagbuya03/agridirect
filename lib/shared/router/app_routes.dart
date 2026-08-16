@@ -47,6 +47,8 @@ class AppRoutes {
   static const String kikoAiChat = '/kiko-ai-chat';
   // Web-specific
   static const String webWelcome = '/web-welcome';
+  static const String articles = '/articles';
+  static const String aboutUs = '/about-us';
   static const String marketplace = '/marketplace';
   static const String shop = '/shop';
   static const String community = '/community';

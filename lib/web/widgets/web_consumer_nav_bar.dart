@@ -52,7 +52,7 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
         final isFarmerMode = AuthService().isViewingAsFarmer;
         final navItems = isFarmerMode
             ? const ['Dashboard', 'Products', 'Orders', 'Community']
-            : const ['Home', 'Shop', 'Community', 'Find Farmer', 'Weather'];
+            : const ['Home', 'Shop', 'Community', 'DA Articles', 'About Us', 'Find Farmer', 'Weather'];
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -80,7 +80,7 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                   MouseRegion(
                     cursor: SystemMouseCursors.click,
                     child: GestureDetector(
-                      onTap: () => widget.onNavigate(0),
+                      onTap: () => context.go('/'),
                       child: BrandLogo(
                         size: isMobile
                             ? BrandLogoSize.small
@@ -98,8 +98,10 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                         AppRoutes.marketplace, // 0 - Home
                         AppRoutes.shop,        // 1 - Shop
                         AppRoutes.community,   // 2 - Community
-                        AppRoutes.farmersMap,  // 3 - Find Farmer
-                        AppRoutes.weatherRadar, // 4 - Weather
+                        AppRoutes.articles,    // 3 - DA Articles
+                        AppRoutes.aboutUs,     // 4 - About Us
+                        AppRoutes.farmersMap,  // 5 - Find Farmer
+                        AppRoutes.weatherRadar, // 6 - Weather
                       ];
 
                       return Row(
@@ -127,10 +129,22 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                               onExit: (_) => setState(() => _hoveredNav = -1),
                               child: GestureDetector(
                                 onTap: () {
-                                  if (!isFarmerMode && i == 3) {
-                                    context.go(AppRoutes.farmersMap);
-                                  } else if (!isFarmerMode && i == 4) {
-                                    context.go(AppRoutes.weatherRadar);
+                                  if (!isFarmerMode) {
+                                    if (i == 0) {
+                                      context.go(AppRoutes.marketplace);
+                                    } else if (i == 1) {
+                                      context.go(AppRoutes.shop);
+                                    } else if (i == 2) {
+                                      context.go(AppRoutes.community);
+                                    } else if (i == 3) {
+                                      context.go(AppRoutes.articles);
+                                    } else if (i == 4) {
+                                      context.go(AppRoutes.aboutUs);
+                                    } else if (i == 5) {
+                                      context.go(AppRoutes.farmersMap);
+                                    } else if (i == 6) {
+                                      context.go(AppRoutes.weatherRadar);
+                                    }
                                   } else {
                                     widget.onNavigate(i);
                                   }

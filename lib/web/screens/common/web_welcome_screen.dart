@@ -8,8 +8,10 @@ import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../widgets/web_hamburger_menu_button.dart';
 import '../../../shared/utils/apk_downloader.dart';
-import '../../widgets/quick_links/quick_links_dialogs.dart';
 import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/services/articles/articles_service.dart';
+import '../../widgets/web_footer.dart';
+import 'web_articles_screen.dart';
 import 'dart:async';
 
 
@@ -42,12 +44,14 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   late PageController _testimonialPageController;
   Timer? _testimonialTimer;
   int _currentTestimonialIndex = 0;
+  List<DAArticleData> _liveDaArticles = [];
 
   @override
   void initState() {
     super.initState();
     _testimonialPageController = PageController();
     _fetchTestimonials();
+    _fetchLiveArticles();
     _waveController = AnimationController(
       duration: const Duration(seconds: 8),
       vsync: this,
@@ -76,13 +80,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     try {
       final res = await SupabaseConfig.client
           .from('product_reviews')
-          .select('''
-            review_text,
-            rating,
-            users (
-              name
-            )
-          ''')
+          .select('review_text, rating')
           .eq('rating', 5)
           .not('review_text', 'is', null)
           .order('created_at', ascending: false)
@@ -90,10 +88,13 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
 
       if (mounted) {
         final List<dynamic> data = res as List<dynamic>;
-        // Filter out empty texts just in case
         final validReviews = data.where((r) {
           final text = r['review_text']?.toString().trim() ?? '';
           return text.isNotEmpty;
+        }).map((r) => {
+          'review_text': r['review_text'],
+          'rating': r['rating'],
+          'users': {'name': 'Verified Customer'},
         }).toList();
 
         setState(() {
@@ -106,6 +107,19 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
       }
     } catch (e) {
       debugPrint('Error fetching testimonials: $e');
+    }
+  }
+
+  Future<void> _fetchLiveArticles() async {
+    try {
+      final list = await ArticlesService().getPublishedArticles();
+      if (mounted && list.isNotEmpty) {
+        setState(() {
+          _liveDaArticles = list;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching live articles: $e');
     }
   }
 
@@ -167,13 +181,20 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
 
                 _buildStatsBar(),
 
+                _buildFarmingShowcaseSection(),
+
                 _buildFeaturesSection(),
+
+                _buildFeaturedFarmersSection(),
+
+                _buildDaArticlesSection(),
+
                 _buildAppDownloadSection(),
                 _buildHowItWorksSection(),
                 _buildTestimonialSection(),
                 _buildCtaSection(),
 
-                _buildFooter(),
+                const AgriDirectWebFooter(),
               ],
             ),
           ),
@@ -296,7 +317,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   // FLOATING NAV BAR with glassmorphism
   // ═══════════════════════════════════════════════════════════════
   Widget _buildNavBar() {
-    final navItems = ['Home', 'Shop', 'Community', 'Find Farmer', 'Weather'];
+    final navItems = ['Home', 'Shop', 'Community', 'DA Articles', 'About Us', 'Find Farmer', 'Weather'];
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 650;
 
@@ -304,6 +325,8 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
       '/',
       '/shop',
       '/community',
+      '/articles',
+      '/about-us',
       '/farmers-map',
       '/weather-radar',
     ];
@@ -2845,395 +2868,128 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     );
   }
 
-  Widget _buildFooter() {
+  // ═══════════════════════════════════════════════════════════════
+  // FARMING EQUIPMENT & HARVEST BUNDLES SHOWCASE (Inspiration Screenshot 1)
+  // ═══════════════════════════════════════════════════════════════
+  Widget _buildFarmingShowcaseSection() {
     final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 850;
+
     return Container(
       width: double.infinity,
+      color: Colors.white,
       padding: EdgeInsets.symmetric(
-        horizontal: sw < 480
-            ? 16
-            : sw < 768
-            ? 24
-            : 48,
-        vertical: sw < 480
-            ? 40
-            : sw < 768
-            ? 48
-            : 56,
+        horizontal: isMobile ? 16 : 48,
+        vertical: isMobile ? 40 : 80,
       ),
-      color: AgriColors.dark,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
           child: Column(
             children: [
-              if (sw < 768)
-                // Mobile: stacked footer
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Brand
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const BrandLogo(
-                          size: BrandLogoSize.small,
-                          inverted: true,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Connecting local farmers\ndirectly to your kitchen for a\nhealthier, more sustainable world.',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: AgriColors.mutedLight,
-                            height: 1.6,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Social icons
-                        Row(
+              // Spotlight 1: Farm Power Equipment & Yard Tools
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: isMobile
+                      ? Column(
                           children: [
-                            _socialIcon(Icons.language),
-                            const SizedBox(width: 10),
-                            _socialIcon(Icons.facebook_rounded),
-                            const SizedBox(width: 10),
-                            _socialIcon(Icons.camera_alt_outlined),
+                            _buildShowcaseImage(
+                              'https://images.unsplash.com/photo-1592417817098-8f3d6910985b?q=80&w=1000&auto=format&fit=crop',
+                              height: 240,
+                            ),
+                            _buildShowcaseContent(
+                              tag: 'FARM & YARD POWER MACHINERY',
+                              title: 'Heavy-Duty Farming & Yard Equipment',
+                              description:
+                                  'Keep your farm, homestead, and crops in peak condition with certified high-durability outdoor power equipment. From motorized brushcutters and crop sprayers to solar boundary energizers, chainsaws, and water pumps. Built to withstand demanding agricultural conditions.',
+                              buttonText: 'See The Full Range',
+                              onTap: () => context.go(AppRoutes.shop),
+                            ),
                           ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-                    // Links
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Quick Links',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              _footerLink('Find a Farmer'),
-                              _footerLink('Seasonal Calendar'),
-                              _footerLink('Pricing Plans'),
-                              _footerLink('Help Center'),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Categories',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              _footerLink('Vegetables'),
-                              _footerLink('Fruits & Berries'),
-                              _footerLink('Dairy & Eggs'),
-                              _footerLink('Organic Grains'),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-                    // Newsletter
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Stay Updated',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Get harvest updates, recipes, and\nexclusive deals in your inbox.',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: AgriColors.mutedLight,
-                            height: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
+                        )
+                      : Row(
                           children: [
                             Expanded(
-                              child: Container(
-                                height: 40,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AgriColors.darkMuted,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: const Color(0xFF374151),
-                                  ),
-                                ),
-                                child: TextField(
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    color: Colors.white,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: 'Email address',
-                                    hintStyle: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      color: AgriColors.muted,
-                                    ),
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 10,
-                                    ),
-                                  ),
-                                ),
+                              flex: 5,
+                              child: _buildShowcaseImage(
+                                'https://images.unsplash.com/photo-1592417817098-8f3d6910985b?q=80&w=1000&auto=format&fit=crop',
+                                height: 360,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                gradient: AgriColors.primaryGradient,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.send_rounded,
-                                size: 16,
-                                color: Colors.white,
+                            Expanded(
+                              flex: 6,
+                              child: _buildShowcaseContent(
+                                tag: 'FARM & YARD POWER MACHINERY',
+                                title: 'Heavy-Duty Farming & Yard Equipment',
+                                description:
+                                    'Keep your farm, homestead, and crops in peak condition with certified high-durability outdoor power equipment. From motorized brushcutters and crop sprayers to solar boundary energizers, chainsaws, and water pumps. Built to withstand demanding agricultural conditions.',
+                                buttonText: 'See The Full Range',
+                                onTap: () => context.go(AppRoutes.shop),
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ],
-                )
-              else
-                // Desktop: horizontal footer
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Brand
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const BrandLogo(
-                            size: BrandLogoSize.small,
-                            inverted: true,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Connecting local farmers\ndirectly to your kitchen for a\nhealthier, more sustainable world.',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: AgriColors.mutedLight,
-                              height: 1.7,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          // Social icons
-                          Row(
-                            children: [
-                              _socialIcon(Icons.language),
-                              const SizedBox(width: 10),
-                              _socialIcon(Icons.facebook_rounded),
-                              const SizedBox(width: 10),
-                              _socialIcon(Icons.camera_alt_outlined),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Links
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Quick Links',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          _footerLink('Find a Farmer'),
-                          _footerLink('Seasonal Calendar'),
-                          _footerLink('Pricing Plans'),
-                          _footerLink('Help Center'),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Categories',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          _footerLink('Vegetables'),
-                          _footerLink('Fruits & Berries'),
-                          _footerLink('Dairy & Eggs'),
-                          _footerLink('Organic Grains'),
-                        ],
-                      ),
-                    ),
-                    // Newsletter
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Stay Updated',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Get harvest updates, recipes, and\nexclusive deals in your inbox.',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              color: AgriColors.mutedLight,
-                              height: 1.6,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  height: 44,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AgriColors.darkMuted,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: const Color(0xFF374151),
-                                    ),
-                                  ),
-                                  child: TextField(
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      color: Colors.white,
-                                    ),
-                                    decoration: InputDecoration(
-                                      hintText: 'Email address',
-                                      hintStyle: GoogleFonts.inter(
-                                        fontSize: 13,
-                                        color: AgriColors.muted,
-                                      ),
-                                      border: InputBorder.none,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                          ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  gradient: AgriColors.primaryGradient,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.send_rounded,
-                                  size: 18,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
-              const SizedBox(height: 48),
-              Container(height: 1, color: const Color(0xFF1F2937)),
-              const SizedBox(height: 24),
-              if (sw < 768)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '© 2026 AgriDirect. All rights reserved.',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: AgriColors.muted,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 8,
-                      children: [
-                        _buildBottomLink('Privacy Policy'),
-                        _buildBottomLink('Terms of Service'),
-                        _buildBottomLink('Cookie Policy'),
-                      ],
-                    ),
-                  ],
-                )
-              else
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '© 2026 AgriDirect. All rights reserved.',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: AgriColors.muted,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        _buildBottomLink('Privacy Policy'),
-                        const SizedBox(width: 24),
-                        _buildBottomLink('Terms of Service'),
-                        const SizedBox(width: 24),
-                        _buildBottomLink('Cookie Policy'),
-                      ],
-                    ),
-                  ],
+              ),
+
+              const SizedBox(height: 36),
+
+              // Spotlight 2: Farm-Direct Produce Bundles & Harvesting Sets
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFDCFCE7)),
                 ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: isMobile
+                      ? Column(
+                          children: [
+                            _buildShowcaseImage(
+                              'https://images.unsplash.com/photo-1589923188900-85dae523342b?q=80&w=1000&auto=format&fit=crop',
+                              height: 240,
+                            ),
+                            _buildShowcaseContent(
+                              tag: 'FARM-TO-TABLE HARVEST BUNDLES',
+                              title: 'Fresh Cooperative Harvest Boxes & Tools',
+                              description:
+                                  'Explore curated seasonal produce crates and essential farm accessories packed directly by verified agrarian cooperatives. High-nutrient organic staples, heirloom seeds, and protective gear delivered fresh at fair farm-gate pricing.',
+                              buttonText: 'See Bundle Options',
+                              onTap: () => context.go(AppRoutes.freshProduce),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Expanded(
+                              flex: 6,
+                              child: _buildShowcaseContent(
+                                tag: 'FARM-TO-TABLE HARVEST BUNDLES',
+                                title: 'Fresh Cooperative Harvest Boxes & Tools',
+                                description:
+                                    'Explore curated seasonal produce crates and essential farm accessories packed directly by verified agrarian cooperatives. High-nutrient organic staples, heirloom seeds, and protective gear delivered fresh at fair farm-gate pricing.',
+                                buttonText: 'See Bundle Options',
+                                onTap: () => context.go(AppRoutes.freshProduce),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 5,
+                              child: _buildShowcaseImage(
+                                'https://images.unsplash.com/photo-1589923188900-85dae523342b?q=80&w=1000&auto=format&fit=crop',
+                                height: 360,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
             ],
           ),
         ),
@@ -3241,103 +2997,546 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     );
   }
 
-  static const String _privacyPolicyText = 'At AgriDirect, we value your privacy. We collect basic account details (name, email, phone) to facilitate purchases and connect you with local farmers. We never share your data with third parties without your consent. By using the app, you agree to our standard data handling procedures.';
-  static const String _termsOfServiceText = 'Welcome to AgriDirect. By registering as a consumer or farmer, you agree to comply with our community guidelines. Farmers must supply authentic information and fresh, high-quality produce. Customers must complete transaction payments in good faith.';
-  static const String _cookiePolicyText = 'AgriDirect uses cookies to enhance your browsing experience, store session parameters, and analyze site metrics. Cookies are stored locally on your device and can be managed through your browser settings at any time.';
-
-  void _handleFooterLinkTap(String text) {
-    if (text == 'Find a Farmer') {
-      FindAFarmerDialog.show(context, onExploreFarmers: () => _completeWelcome());
-    } else if (text == 'Vegetables' || text == 'Fruits & Berries' || text == 'Dairy & Eggs' || text == 'Organic Grains') {
-      _completeWelcome();
-    } else if (text == 'Seasonal Calendar') {
-      SeasonalCalendarDialog.show(context);
-    } else if (text == 'Pricing Plans') {
-      PricingPlansDialog.show(context);
-    } else if (text == 'Help Center') {
-      HelpCenterDialog.show(context);
-    } else if (text == 'Privacy Policy') {
-      _showPolicyModal('Privacy Policy', _privacyPolicyText);
-    } else if (text == 'Terms of Service') {
-      _showPolicyModal('Terms of Service', _termsOfServiceText);
-    } else if (text == 'Cookie Policy') {
-      _showPolicyModal('Cookie Policy', _cookiePolicyText);
-    }
-  }
-
-  void _showPolicyModal(String title, String content) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-        content: SizedBox(
-          width: 500,
-          child: SingleChildScrollView(
-            child: Text(
-              content,
-              style: GoogleFonts.inter(fontSize: 12, height: 1.6, color: Colors.grey[800]),
-            ),
+  Widget _buildShowcaseImage(String url, {required double height}) {
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => Container(
+          color: const Color(0xFF005A36),
+          child: const Center(
+            child: Icon(Icons.agriculture_rounded, color: Colors.white24, size: 64),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+      ),
+    );
+  }
+
+  Widget _buildShowcaseContent({
+    required String tag,
+    required String title,
+    required String description,
+    required String buttonText,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.all(36),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF005A36).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              tag,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF005A36),
+                letterSpacing: 1.0,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF005A36),
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            description,
+            style: GoogleFonts.inter(
+              fontSize: 14.5,
+              color: const Color(0xFF475569),
+              height: 1.65,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: onTap,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF005A36),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              buttonText,
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBottomLink(String text) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () => _handleFooterLinkTap(text),
-        child: Text(
-          text,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            color: AgriColors.muted,
+  // ═══════════════════════════════════════════════════════════════
+  // FEATURED LOCAL FARMERS SPOTLIGHT
+  // ═══════════════════════════════════════════════════════════════
+  Widget _buildFeaturedFarmersSection() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
+    final farmers = [
+      {
+        'name': 'Danilo "Mang Danny" Santos',
+        'coop': 'Benguet Highland Growers Co-op',
+        'location': 'La Trinidad, Benguet',
+        'experience': '24 Years Farming',
+        'crops': 'Highland Lettuce, Strawberries, Heirloom Carrots',
+        'image': 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?q=80&w=800&auto=format&fit=crop',
+      },
+      {
+        'name': 'Teresa "Aling Tess" Ramos',
+        'coop': 'Isabela Organic Grains Association',
+        'location': 'Cauayan, Isabela',
+        'experience': '19 Years Farming',
+        'crops': 'Organic Dinorado, Black Rice & Sweet Corn',
+        'image': 'https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?q=80&w=800&auto=format&fit=crop',
+      },
+      {
+        'name': 'Ramon Fernandez',
+        'coop': 'Bukidnon Highland Orchards',
+        'location': 'Malaybalay, Bukidnon',
+        'experience': '16 Years Farming',
+        'crops': 'Hass Avocados, Heirloom Cacao & Dragonfruit',
+        'image': 'https://images.unsplash.com/photo-1523741543316-beb7fc7023d8?q=80&w=800&auto=format&fit=crop',
+      },
+    ];
+
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFF8FAFC),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 48,
+        vertical: isMobile ? 48 : 80,
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Column(
+            children: [
+              const GradientDivider(width: 50, height: 4),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AgriColors.emerald50,
+                  borderRadius: BorderRadius.circular(40),
+                ),
+                child: Text(
+                  'MEET OUR VERIFIED GROWERS',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF005A36),
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Direct from the Hands that Feed Us',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: isMobile ? 26 : 36,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Every product on AgriDirect is traceable to certified local farmers receiving 100% fair farm-gate pricing.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(fontSize: 15, color: AgriColors.muted),
+              ),
+              const SizedBox(height: 48),
+
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final cols = constraints.maxWidth < 768 ? 1 : 3;
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: cols,
+                      crossAxisSpacing: 24,
+                      mainAxisSpacing: 24,
+                      childAspectRatio: cols == 1 ? 1.2 : 0.82,
+                    ),
+                    itemCount: farmers.length,
+                    itemBuilder: (context, index) {
+                      final f = farmers[index];
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.03),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AspectRatio(
+                                aspectRatio: 16 / 10,
+                                child: Image.network(
+                                  f['image']!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => Container(color: const Color(0xFF005A36)),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.verified_rounded, color: Color(0xFF005A36), size: 16),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          f['experience']!,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFF005A36),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      f['name']!,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      f['location']!,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'Crops: ${f['crops']!}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12.5,
+                                        color: const Color(0xFF475569),
+                                        height: 1.4,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton(
+                                        onPressed: () => context.go(AppRoutes.shop),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: const Color(0xFF005A36),
+                                          side: const BorderSide(color: Color(0xFF005A36)),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(vertical: 10),
+                                        ),
+                                        child: Text(
+                                          'Explore Farmer\'s Produce',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _socialIcon(IconData icon) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Redirecting to official social media channel...')),
-          );
-        },
-        child: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: AgriColors.darkMuted,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFF374151)),
-          ),
-          child: Icon(icon, size: 16, color: AgriColors.mutedLight),
-        ),
-      ),
-    );
-  }
+  // ═══════════════════════════════════════════════════════════════
+  // DEPARTMENT OF AGRICULTURE (DA) ARTICLES SECTION (Inspiration Screenshot 2)
+  // ═══════════════════════════════════════════════════════════════
+  Widget _buildDaArticlesSection() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
 
-  Widget _footerLink(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: () => _handleFooterLinkTap(text),
-          child: Text(
-            text,
-            style: GoogleFonts.inter(fontSize: 13, color: AgriColors.mutedLight),
+    final previewArticles = _liveDaArticles.take(4).toList();
+    if (previewArticles.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 48,
+        vertical: isMobile ? 48 : 80,
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF005A36).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.verified_rounded, color: Color(0xFF005A36), size: 14),
+                              const SizedBox(width: 6),
+                              Text(
+                                'DEPARTMENT OF AGRICULTURE (DA) BULLETINS',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF005A36),
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'All Articles & Farming Guides',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: isMobile ? 26 : 36,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF005A36),
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Field advisories, drought resilience insights, and technical advice from DA experts.',
+                          style: GoogleFonts.inter(
+                            fontSize: 14.5,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!isMobile)
+                    ElevatedButton.icon(
+                      onPressed: () => context.go('/articles'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF005A36),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                      label: Text(
+                        'View All Articles',
+                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 40),
+
+              // 4 Cards Grid
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final crossAxisCount = constraints.maxWidth < 650
+                      ? 1
+                      : constraints.maxWidth < 1000
+                          ? 2
+                          : 4;
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 24,
+                      mainAxisSpacing: 24,
+                      childAspectRatio: crossAxisCount == 1 ? 1.05 : 0.72,
+                    ),
+                    itemCount: previewArticles.length,
+                    itemBuilder: (context, index) {
+                      final item = previewArticles[index];
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.03),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AspectRatio(
+                                aspectRatio: 16 / 10,
+                                child: Image.network(
+                                  item.imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => Container(color: const Color(0xFF005A36)),
+                                ),
+                              ),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.title,
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: const Color(0xFF005A36),
+                                          height: 1.3,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        item.date,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey.shade500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Expanded(
+                                        child: Text(
+                                          item.summary,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            color: const Color(0xFF64748B),
+                                            height: 1.45,
+                                          ),
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed: () => context.go('/articles?id=${item.id}'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF005A36),
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(vertical: 10),
+                                          ),
+                                          child: Text(
+                                            'Read more',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+
+              if (isMobile) ...[
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.go('/articles'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF005A36),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                    label: Text(
+                      'View All Articles',
+                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),

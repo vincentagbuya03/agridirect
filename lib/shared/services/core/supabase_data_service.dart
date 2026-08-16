@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -98,7 +98,9 @@ class SupabaseDataService {
       }
 
       if (currentFarmerId != null) {
-        enrichedItems.removeWhere((item) => item['farmer_id']?.toString() == currentFarmerId);
+        enrichedItems.removeWhere(
+          (item) => item['farmer_id']?.toString() == currentFarmerId,
+        );
       }
 
       await _enrichProductItemsWithFarmerProfiles(enrichedItems);
@@ -154,7 +156,9 @@ class SupabaseDataService {
             : 0.0;
         if (viewPrice == 0.0 && rawPrice > 0.0) {
           item['price'] = rawPrice;
-          debugPrint('Price was 0 in v_products, using raw price: $rawPrice for ID: $productId');
+          debugPrint(
+            'Price was 0 in v_products, using raw price: $rawPrice for ID: $productId',
+          );
         }
 
         // Same logic for name
@@ -267,12 +271,16 @@ class SupabaseDataService {
       }
 
       if (currentFarmerId != null) {
-        enrichedItems.removeWhere((item) => item['farmer_id']?.toString() == currentFarmerId);
+        enrichedItems.removeWhere(
+          (item) => item['farmer_id']?.toString() == currentFarmerId,
+        );
       }
 
       await _enrichProductItemsWithFarmerProfiles(enrichedItems);
 
-      final mapped = enrichedItems.map((item) => _mapToProductItem(item)).toList();
+      final mapped = enrichedItems
+          .map((item) => _mapToProductItem(item))
+          .toList();
       return mapped.where((p) => !p.isPreorder).toList();
     } catch (e) {
       debugPrint('Error fetching nearby products: $e');
@@ -770,7 +778,9 @@ class SupabaseDataService {
 
   ProductItem _mapToProductItem(Map<String, dynamic> item) {
     final rawCreated = item['created_at']?.toString() ?? '';
-    final createdAtDate = rawCreated.isNotEmpty ? DateTime.tryParse(rawCreated) : null;
+    final createdAtDate = rawCreated.isNotEmpty
+        ? DateTime.tryParse(rawCreated)
+        : null;
     final harvestDaysNum = (item['harvest_days'] as num?)?.toInt() ?? 0;
     bool isPre = item['is_preorder'] == true;
     if (isPre && harvestDaysNum > 0 && createdAtDate != null) {
@@ -873,7 +883,7 @@ class SupabaseDataService {
           .eq('is_free_shipping', true)
           .eq('is_active', true)
           .order('created_at', ascending: false);
-      
+
       final items = response as List;
       final enrichedItems = List<Map<String, dynamic>>.from(items);
       await _enrichProductItemsWithFarmerProfiles(enrichedItems);
@@ -892,7 +902,7 @@ class SupabaseDataService {
           .eq('is_wholesale', true)
           .eq('is_active', true)
           .order('created_at', ascending: false);
-      
+
       final items = response as List;
       final enrichedItems = List<Map<String, dynamic>>.from(items);
       await _enrichProductItemsWithFarmerProfiles(enrichedItems);
@@ -911,7 +921,7 @@ class SupabaseDataService {
           .eq('is_flash_sale', true)
           .eq('is_active', true)
           .order('created_at', ascending: false);
-      
+
       final items = response as List;
       final enrichedItems = List<Map<String, dynamic>>.from(items);
       await _enrichProductItemsWithFarmerProfiles(enrichedItems);
@@ -933,7 +943,7 @@ class SupabaseDataService {
           .eq('user_id', userId)
           .eq('status', status)
           .order('created_at', ascending: false);
-      
+
       final items = response as List;
       return items.map((item) {
         final voucher = item['vouchers'] as Map<String, dynamic>? ?? {};
@@ -942,9 +952,12 @@ class SupabaseDataService {
           code: voucher['code']?.toString() ?? '',
           title: voucher['title']?.toString() ?? '',
           description: voucher['description']?.toString(),
-          discountPercentage: (voucher['discount_percentage'] as num?)?.toDouble(),
+          discountPercentage: (voucher['discount_percentage'] as num?)
+              ?.toDouble(),
           minSpend: (voucher['min_spend'] as num?)?.toDouble(),
-          validUntil: voucher['valid_until'] != null ? DateTime.tryParse(voucher['valid_until']) : null,
+          validUntil: voucher['valid_until'] != null
+              ? DateTime.tryParse(voucher['valid_until'])
+              : null,
           status: item['status']?.toString() ?? 'available',
         );
       }).toList();
@@ -960,7 +973,7 @@ class SupabaseDataService {
           .from('vouchers')
           .select()
           .order('created_at', ascending: false);
-          
+
       final items = response as List;
       return items.map((item) {
         return VoucherItem(
@@ -970,7 +983,9 @@ class SupabaseDataService {
           description: item['description']?.toString(),
           discountPercentage: (item['discount_percentage'] as num?)?.toDouble(),
           minSpend: (item['min_spend'] as num?)?.toDouble(),
-          validUntil: item['valid_until'] != null ? DateTime.tryParse(item['valid_until']) : null,
+          validUntil: item['valid_until'] != null
+              ? DateTime.tryParse(item['valid_until'])
+              : null,
           status: 'available',
         );
       }).toList();
@@ -996,7 +1011,6 @@ class SupabaseDataService {
       return false;
     }
   }
-
 
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // FORUM POSTS BY USER (for public farmer profile)
@@ -1043,7 +1057,11 @@ class SupabaseDataService {
 
       return (response).map((item) {
         final postId = item['post_id'].toString();
-        return _mapToForumPostItem(item, likedPostIds.contains(postId), avatarUrl);
+        return _mapToForumPostItem(
+          item,
+          likedPostIds.contains(postId),
+          avatarUrl,
+        );
       }).toList();
     } catch (e) {
       debugPrint('Error fetching forum posts by user: $e');
@@ -1432,7 +1450,11 @@ class SupabaseDataService {
     }
   }
 
-  ForumPostItem _mapToForumPostItem(Map<String, dynamic> item, bool isLiked, [String? authorAvatarUrl]) {
+  ForumPostItem _mapToForumPostItem(
+    Map<String, dynamic> item,
+    bool isLiked, [
+    String? authorAvatarUrl,
+  ]) {
     final createdAt = DateTime.tryParse(item['created_at'] ?? '');
     final timeAgo = createdAt != null ? _formatTimeAgo(createdAt) : 'Recently';
 
@@ -1479,7 +1501,7 @@ class SupabaseDataService {
   /// Get all published articles
   Future<List<ArticleItem>> getArticles() async {
     try {
-      var query = _client.from('v_articles').select().eq('published', true);
+      var query = _client.from('admin_articles').select().eq('is_published', true);
 
       // Determine user role and filter audience
       final userId = _client.auth.currentUser?.id;
@@ -1546,9 +1568,9 @@ class SupabaseDataService {
   Future<ArticleItem?> getArticleById(String id) async {
     try {
       final response = await _client
-          .from('v_articles')
+          .from('admin_articles')
           .select()
-          .eq('id', id)
+          .eq('article_id', id)
           .maybeSingle();
       if (response != null) {
         return _mapToArticleItem(response);
@@ -2062,11 +2084,6 @@ class SupabaseDataService {
     }
   }
 
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-  // FARMERS (for consumer home screen)
-  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-  /// Get featured farmers
   Future<List<Map<String, dynamic>>> getFeaturedFarmers() async {
     try {
       dynamic response;
@@ -2163,7 +2180,6 @@ class SupabaseDataService {
       return [];
     }
   }
-
 
   int _toInt(dynamic value) {
     if (value is int) return value;
