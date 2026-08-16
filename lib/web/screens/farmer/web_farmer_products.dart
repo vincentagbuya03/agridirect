@@ -1469,10 +1469,13 @@ class _EditProductDialogState extends State<_EditProductDialog> {
   late TextEditingController _stockController;
   late TextEditingController _descriptionController;
   late TextEditingController _harvestDaysController;
+  late TextEditingController _discountPercentController;
   bool _isPreorder = false;
   bool _isFreeShipping = false;
   bool _isWholesale = false;
   bool _isFlashSale = false;
+  DateTime? _flashSaleEndDate;
+  String _flashDurationOption = '24_hours';
   bool _isLoading = false;
   bool _isLoadingDropdowns = true;
 
@@ -1507,6 +1510,11 @@ class _EditProductDialogState extends State<_EditProductDialog> {
     _harvestDaysController = TextEditingController(
       text: harvestVal.replaceAll(RegExp(r'[^0-9]'), ''),
     );
+    final discVal = widget.product['discount_percent'] ??
+        widget.product['discount_percentage'];
+    _discountPercentController = TextEditingController(
+      text: discVal != null ? discVal.toString() : '30',
+    );
     _isPreorder = widget.product['is_preorder'] == true;
     _isFreeShipping = widget.product['is_free_shipping'] == true;
     _isWholesale = widget.product['is_wholesale'] == true;
@@ -1521,6 +1529,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
     _stockController.dispose();
     _descriptionController.dispose();
     _harvestDaysController.dispose();
+    _discountPercentController.dispose();
     super.dispose();
   }
 
@@ -1529,7 +1538,9 @@ class _EditProductDialogState extends State<_EditProductDialog> {
       final client = Supabase.instance.client;
       final productData = await client
           .from('products')
-          .select('category_id, unit_id, harvest_days, is_preorder, is_free_shipping, is_wholesale, is_flash_sale')
+          .select(
+            'category_id, unit_id, harvest_days, is_preorder, is_free_shipping, is_wholesale, is_flash_sale, discount_percent',
+          )
           .eq('product_id', widget.product['id'])
           .single();
 
@@ -1543,6 +1554,12 @@ class _EditProductDialogState extends State<_EditProductDialog> {
           _selectedUnit = productData['unit_id']?.toString();
           _isPreorder = productData['is_preorder'] ?? false;
           _isFreeShipping = productData['is_free_shipping'] ?? false;
+          _isWholesale = productData['is_wholesale'] ?? false;
+          _isFlashSale = productData['is_flash_sale'] ?? false;
+          if (productData['discount_percent'] != null) {
+            _discountPercentController.text =
+                productData['discount_percent'].toString();
+          }
           _isWholesale = productData['is_wholesale'] ?? false;
           _isFlashSale = productData['is_flash_sale'] ?? false;
           if (productData['harvest_days'] != null) {
@@ -1579,6 +1596,28 @@ class _EditProductDialogState extends State<_EditProductDialog> {
 
       final client = Supabase.instance.client;
 
+      final double? discPercent = _isFlashSale
+          ? double.tryParse(_discountPercentController.text.trim()) ?? 30.0
+          : null;
+
+      final now = DateTime.now();
+      DateTime? flashEnd;
+      if (_isFlashSale) {
+        if (_flashDurationOption == 'midnight') {
+          flashEnd = DateTime(now.year, now.month, now.day + 1);
+        } else if (_flashDurationOption == '24_hours') {
+          flashEnd = now.add(const Duration(hours: 24));
+        } else if (_flashDurationOption == '3_days') {
+          flashEnd = now.add(const Duration(days: 3));
+        } else if (_flashDurationOption == '7_days') {
+          flashEnd = now.add(const Duration(days: 7));
+        } else if (_flashDurationOption == 'custom') {
+          flashEnd = _flashSaleEndDate ?? now.add(const Duration(hours: 24));
+        } else {
+          flashEnd = _flashSaleEndDate ?? now.add(const Duration(hours: 24));
+        }
+      }
+
       // Update basic product details
       await client
           .from('products')
@@ -1591,6 +1630,9 @@ class _EditProductDialogState extends State<_EditProductDialog> {
             'is_free_shipping': _isFreeShipping,
             'is_wholesale': _isWholesale,
             'is_flash_sale': _isFlashSale,
+            'discount_percent': discPercent,
+            if (_isFlashSale) 'flash_sale_start': now.toIso8601String(),
+            if (_isFlashSale) 'flash_sale_end': flashEnd?.toIso8601String(),
             if (_selectedCategory != null) 'category_id': _selectedCategory,
             if (_selectedUnit != null) 'unit_id': _selectedUnit,
           })
@@ -2035,6 +2077,102 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                                 ),
                               ],
                             ),
+                            if (_isFlashSale) ...[
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 32, right: 8, bottom: 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildFieldLabel('Flash Sale Discount (%)'),
+                                    TextFormField(
+                                      controller: _discountPercentController,
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      style: GoogleFonts.inter(fontSize: 14),
+                                      decoration: _buildInputDecoration('e.g. 35').copyWith(
+                                        suffixText: '% OFF',
+                                        helperText: 'Discount percentage during active flash sale events',
+                                      ),
+                                      validator: (val) {
+                                        if (_isFlashSale) {
+                                          if (val == null || val.trim().isEmpty) {
+                                            return 'Please enter a discount %';
+                                          }
+                                          final d = double.tryParse(val.trim());
+                                          if (d == null || d <= 0 || d >= 100) {
+                                            return 'Enter a percentage between 1 and 99';
+                                          }
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _buildFieldLabel('Countdown & Duration'),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 6,
+                                      children: [
+                                        _buildDurationChip('Today Midnight', 'midnight'),
+                                        _buildDurationChip('24 Hours', '24_hours'),
+                                        _buildDurationChip('3 Days', '3_days'),
+                                        _buildDurationChip('7 Days', '7_days'),
+                                        _buildDurationChip('Custom End Date', 'custom'),
+                                      ],
+                                    ),
+                                    if (_flashDurationOption == 'custom') ...[
+                                      const SizedBox(height: 8),
+                                      InkWell(
+                                        onTap: () async {
+                                          final picked = await showDatePicker(
+                                            context: context,
+                                            initialDate: _flashSaleEndDate ?? DateTime.now().add(const Duration(days: 1)),
+                                            firstDate: DateTime.now(),
+                                            lastDate: DateTime.now().add(const Duration(days: 90)),
+                                          );
+                                          if (picked != null) {
+                                            setState(() {
+                                              _flashSaleEndDate = DateTime(
+                                                picked.year,
+                                                picked.month,
+                                                picked.day,
+                                                23,
+                                                59,
+                                                59,
+                                              );
+                                            });
+                                          }
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF8FAFC),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.event_rounded, size: 16, color: Color(0xFF16A34A)),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                _flashSaleEndDate != null
+                                                    ? 'Ends: ${_flashSaleEndDate!.month}/${_flashSaleEndDate!.day}/${_flashSaleEndDate!.year}'
+                                                    : 'Pick Custom End Date',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: const Color(0xFF1E293B),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 16),
 
                             // Description
@@ -2152,6 +2290,33 @@ class _EditProductDialogState extends State<_EditProductDialog> {
           color: const Color(0xFF374151),
         ),
       ),
+    );
+  }
+
+  Widget _buildDurationChip(String label, String value) {
+    final isSelected = _flashDurationOption == value;
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          color: isSelected ? Colors.white : const Color(0xFF334155),
+        ),
+      ),
+      selected: isSelected,
+      selectedColor: const Color(0xFFDC2626),
+      backgroundColor: const Color(0xFFF1F5F9),
+      side: BorderSide(
+        color: isSelected ? const Color(0xFFDC2626) : const Color(0xFFCBD5E1),
+      ),
+      onSelected: (selected) {
+        if (selected) {
+          setState(() {
+            _flashDurationOption = value;
+          });
+        }
+      },
     );
   }
 

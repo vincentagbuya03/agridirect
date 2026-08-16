@@ -9,6 +9,9 @@ CREATE TABLE public.users (
   user_id uuid NOT NULL DEFAULT auth.uid(),
   name text NOT NULL DEFAULT ''::text,
   email_verified boolean DEFAULT false,
+  promo_alerts boolean DEFAULT false,
+  email_alerts boolean DEFAULT true,
+  push_alerts boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT users_pkey PRIMARY KEY (user_id)
@@ -105,6 +108,9 @@ CREATE TABLE public.products (
   is_preorder boolean DEFAULT false,
   is_featured boolean DEFAULT false,
   is_active boolean DEFAULT true,
+  is_free_shipping boolean DEFAULT false,
+  is_wholesale boolean DEFAULT false,
+  is_flash_sale boolean DEFAULT false,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT products_pkey PRIMARY KEY (product_id),
@@ -547,22 +553,6 @@ CREATE TABLE public.crop_milestones (
   CONSTRAINT crop_milestones_pkey PRIMARY KEY (milestone_id),
   CONSTRAINT crop_milestones_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(product_id)
 );
-CREATE TABLE public.vouchers (
-  usage_limit integer NOT NULL DEFAULT 100,
-  used_count integer NOT NULL DEFAULT 0,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  farmer_id uuid NOT NULL,
-  code text NOT NULL,
-  discount_type text NOT NULL CHECK (discount_type = ANY (ARRAY['percentage'::text, 'flat'::text])),
-  discount_value numeric NOT NULL CHECK (discount_value > 0::numeric),
-  max_discount numeric,
-  start_date timestamp with time zone NOT NULL,
-  end_date timestamp with time zone NOT NULL,
-  voucher_id uuid NOT NULL DEFAULT gen_random_uuid(),
-  min_spend numeric NOT NULL DEFAULT 0.00 CHECK (min_spend >= 0::numeric),
-  CONSTRAINT vouchers_pkey PRIMARY KEY (voucher_id),
-  CONSTRAINT vouchers_farmer_id_fkey FOREIGN KEY (farmer_id) REFERENCES auth.users(id)
-);
 CREATE TABLE public.user_claimed_vouchers (
   user_id uuid NOT NULL,
   voucher_id uuid NOT NULL,
@@ -570,6 +560,33 @@ CREATE TABLE public.user_claimed_vouchers (
   is_used boolean NOT NULL DEFAULT false,
   claimed_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT user_claimed_vouchers_pkey PRIMARY KEY (claim_id),
-  CONSTRAINT user_claimed_vouchers_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-  CONSTRAINT user_claimed_vouchers_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES public.vouchers(voucher_id)
+  CONSTRAINT user_claimed_vouchers_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.vouchers (
+  farmer_id uuid NOT NULL,
+  code text NOT NULL UNIQUE,
+  title text NOT NULL,
+  description text,
+  discount_percentage numeric,
+  min_spend numeric,
+  valid_until timestamp with time zone,
+  voucher_id uuid NOT NULL DEFAULT gen_random_uuid(),
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  discount_type text DEFAULT 'percentage'::text CHECK (discount_type = ANY (ARRAY['percentage'::text, 'flat'::text, 'free_shipping'::text])),
+  product_id uuid,
+  max_discount numeric,
+  CONSTRAINT vouchers_pkey PRIMARY KEY (voucher_id),
+  CONSTRAINT fk_vouchers_farmer FOREIGN KEY (farmer_id) REFERENCES public.farmers(farmer_id),
+  CONSTRAINT vouchers_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(product_id)
+);
+CREATE TABLE public.user_vouchers (
+  user_id uuid NOT NULL,
+  voucher_id uuid NOT NULL,
+  status text NOT NULL CHECK (status = ANY (ARRAY['available'::text, 'used'::text, 'expired'::text])),
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  claimed_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_vouchers_pkey PRIMARY KEY (id),
+  CONSTRAINT fk_user_vouchers_user FOREIGN KEY (user_id) REFERENCES public.users(user_id),
+  CONSTRAINT fk_user_vouchers_voucher FOREIGN KEY (voucher_id) REFERENCES public.vouchers(voucher_id)
 );

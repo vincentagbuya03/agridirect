@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:agridirect/shared/services/social/follow_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
@@ -46,41 +47,43 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
   }
 
   Future<void> _loadDashboardStats() async {
-    final userId = SupabaseConfig.currentUser?.id;
-    if (userId == null) return;
+    final auth = AuthService();
+    final userId = (SupabaseConfig.currentUser?.id ?? auth.userId).trim();
+    if (userId.isEmpty) return;
     try {
-      // Products count
-      final products = await SupabaseConfig.client
+      final farmer = await SupabaseConfig.client
+          .from('farmers')
+          .select('farmer_id, rating')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      final farmerId = farmer?['farmer_id']?.toString();
+      if (farmerId == null || farmerId.isEmpty) return;
+
+      // 1. Real Followers count from farmer_follows
+      final followerCount = await FollowService().getFollowerCount(farmerId);
+
+      // 2. Real Products count from products table
+      final productsRes = await SupabaseConfig.client
           .from('products')
-          .select('id')
-          .eq('farmer_id', userId)
-          .eq('status', 'active');
-          
-      // Followers count (assuming farmer_followers table exists or mock for now)
-      final followers = await SupabaseConfig.client
-          .from('farmer_followers')
-          .select('id')
-          .eq('farmer_id', userId)
-          .count();
+          .select('product_id')
+          .eq('farmer_id', farmerId);
+      final productCount = (productsRes as List).length;
+
+      // 3. Real Rating
+      final rating = (farmer?['rating'] as num?)?.toDouble() ?? 5.0;
 
       if (mounted) {
         setState(() {
           _dashboardStats = {
-            'activeListings': products.length,
-            'followers': followers.count,
+            'activeListings': productCount,
+            'followers': followerCount,
+            'rating': rating.toStringAsFixed(1),
           };
         });
       }
     } catch (e) {
       debugPrint('Error loading dashboard stats: $e');
-      if (mounted) {
-        setState(() {
-          _dashboardStats = {
-            'activeListings': 0,
-            'followers': 0,
-          };
-        });
-      }
     }
   }
 
@@ -99,7 +102,9 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
     try {
       final farmers = await SupabaseConfig.client
           .from('farmers')
-          .select('farm_name, image_url, location, specialty, farming_history, years_of_experience')
+          .select(
+            'farm_name, image_url, location, specialty, farming_history, years_of_experience',
+          )
           .eq('user_id', userId)
           .limit(1);
 
@@ -112,8 +117,10 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
           _yearsExperience = farmers[0]['years_of_experience'] as int?;
         });
         final rawUrl = farmers[0]['image_url'] as String?;
-        final safeUrl =
-            await SupabaseDatabase.getSafeUrl(rawUrl, defaultBucket: 'uploads');
+        final safeUrl = await SupabaseDatabase.getSafeUrl(
+          rawUrl,
+          defaultBucket: 'uploads',
+        );
         if (mounted) {
           setState(() {
             _farmerImageUrl = safeUrl;
@@ -193,18 +200,62 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           child: Column(
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  GestureDetector(
+                    onTap: _handleSwitchToCustomer,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.swap_horiz_rounded,
+                            size: 15,
+                            color: _primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Buyer Mode',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: _primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   IconButton(
-                    icon: const Icon(Icons.settings_outlined, size: 24, color: Colors.white),
+                    icon: const Icon(
+                      Icons.settings_outlined,
+                      size: 24,
+                      color: Colors.white,
+                    ),
                     onPressed: () => context.push(AppRoutes.appSettings),
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -214,23 +265,38 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                     height: 64,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                      border: Border.all(color: Colors.white, width: 2.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
                     child: ClipOval(
-                      child: (_farmerImageUrl != null && _farmerImageUrl!.isNotEmpty)
+                      child:
+                          (_farmerImageUrl != null &&
+                              _farmerImageUrl!.isNotEmpty)
                           ? CachedNetworkImage(
                               key: ValueKey(_farmerImageUrl),
                               imageUrl: _farmerImageUrl!,
                               fit: BoxFit.cover,
-                              placeholder: (_, _) => Container(color: Colors.white24),
+                              placeholder: (_, _) =>
+                                  Container(color: Colors.white24),
                               errorWidget: (_, _, _) => const Icon(
-                                  Icons.agriculture,
-                                  size: 32,
-                                  color: Colors.white54),
+                                Icons.agriculture,
+                                size: 32,
+                                color: Colors.white54,
+                              ),
                             )
                           : Container(
                               color: Colors.white24,
-                              child: const Icon(Icons.agriculture, size: 32, color: Colors.white54),
+                              child: const Icon(
+                                Icons.agriculture,
+                                size: 32,
+                                color: Colors.white54,
+                              ),
                             ),
                     ),
                   ),
@@ -246,7 +312,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
                           ),
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
@@ -261,34 +327,20 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                               Text(
                                 'Edit Farm Details',
                                 style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: Colors.white70,
+                                  fontSize: 12.5,
+                                  color: Colors.white.withValues(alpha: 0.85),
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
-                              const Icon(Icons.chevron_right_rounded, size: 16, color: Colors.white70),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 16,
+                                color: Colors.white.withValues(alpha: 0.85),
+                              ),
                             ],
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _handleSwitchToCustomer,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'Buyer Mode',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: _primary,
-                        ),
-                      ),
                     ),
                   ),
                 ],
@@ -307,17 +359,58 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Row(
         children: [
-          Expanded(child: _buildStatItem('${_dashboardStats['followers'] ?? 0}', 'Followers', Icons.groups_rounded, Colors.blue)),
+          Expanded(
+            child: InkWell(
+              onTap: () async {
+                await context.push(AppRoutes.farmerFollowers);
+                _loadDashboardStats();
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: _buildStatItem(
+                '${_dashboardStats['followers'] ?? 0}',
+                'Followers',
+                Icons.groups_rounded,
+                Colors.blue,
+              ),
+            ),
+          ),
           Container(width: 1, height: 30, color: const Color(0xFFF1F5F9)),
-          Expanded(child: _buildStatItem('4.9', 'Rating', Icons.star_rounded, Colors.amber)),
+          Expanded(
+            child: _buildStatItem(
+              _dashboardStats['rating']?.toString() ?? '5.0',
+              'Rating',
+              Icons.star_rounded,
+              Colors.amber,
+            ),
+          ),
           Container(width: 1, height: 30, color: const Color(0xFFF1F5F9)),
-          Expanded(child: _buildStatItem('${_dashboardStats['activeListings'] ?? 0}', 'Products', Icons.inventory_2_rounded, Colors.green)),
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                SupabaseDataService.navigationTabNotifier.value =
+                    1; // Products tab
+                widget.onModeChanged();
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: _buildStatItem(
+                '${_dashboardStats['activeListings'] ?? 0}',
+                'Products',
+                Icons.inventory_2_rounded,
+                Colors.green,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(String value, String label, IconData icon, Color color) {
+  Widget _buildStatItem(
+    String value,
+    String label,
+    IconData icon,
+    Color color,
+  ) {
     return Column(
       children: [
         Row(
@@ -325,11 +418,25 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
           children: [
             Icon(icon, size: 16, color: color),
             const SizedBox(width: 6),
-            Text(value, style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w800, color: _dark)),
+            Text(
+              value,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: _dark,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 6),
-        Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: _muted)),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: _muted,
+          ),
+        ),
       ],
     );
   }
@@ -355,19 +462,21 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
               ),
               GestureDetector(
                 onTap: () {
-                  SupabaseDataService.navigationTabNotifier.value = 2; // Orders tab
+                  SupabaseDataService.navigationTabNotifier.value =
+                      2; // Orders tab
                   widget.onModeChanged();
                 },
                 child: Row(
                   children: [
                     Text(
                       'View Sales History',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: _muted,
-                      ),
+                      style: GoogleFonts.inter(fontSize: 12, color: _muted),
                     ),
-                    const Icon(Icons.chevron_right_rounded, size: 16, color: _muted),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: _muted,
+                    ),
                   ],
                 ),
               ),
@@ -385,8 +494,16 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                 SupabaseDataService.navigationTabNotifier.value = 1;
                 widget.onModeChanged();
               }),
-              _buildIconAction(Icons.add_circle_outline_rounded, 'Add Product', () => context.push(AppRoutes.addProduct)),
-              _buildIconAction(Icons.confirmation_number_outlined, 'Vouchers', () => context.push(AppRoutes.farmerVouchers)),
+              _buildIconAction(
+                Icons.add_circle_outline_rounded,
+                'Add Product',
+                () => context.push(AppRoutes.addProduct),
+              ),
+              _buildIconAction(
+                Icons.confirmation_number_outlined,
+                'Vouchers',
+                () => context.push(AppRoutes.farmerVouchers),
+              ),
             ],
           ),
         ],
@@ -419,13 +536,33 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
             crossAxisSpacing: 8,
             childAspectRatio: 0.9,
             children: [
-              _buildGridAction(Icons.groups_rounded, 'Followers', Colors.blue, () => context.push(AppRoutes.farmerFollowers)),
-              _buildGridAction(Icons.forum_outlined, 'Community', Colors.green, () {
-                SupabaseDataService.navigationTabNotifier.value = 3;
-                widget.onModeChanged();
-              }),
-              _buildGridAction(Icons.chat_bubble_outline_rounded, 'Messages', Colors.orange, () => context.push(AppRoutes.farmerMessages)),
-              _buildGridAction(Icons.shield_outlined, 'Security', Colors.red, () => context.push(AppRoutes.appSettings)),
+              _buildGridAction(
+                Icons.groups_rounded,
+                'Followers',
+                Colors.blue,
+                () => context.push(AppRoutes.farmerFollowers),
+              ),
+              _buildGridAction(
+                Icons.forum_outlined,
+                'Community',
+                Colors.green,
+                () {
+                  SupabaseDataService.navigationTabNotifier.value = 3;
+                  widget.onModeChanged();
+                },
+              ),
+              _buildGridAction(
+                Icons.chat_bubble_outline_rounded,
+                'Messages',
+                Colors.orange,
+                () => context.push(AppRoutes.farmerMessages),
+              ),
+              _buildGridAction(
+                Icons.shield_outlined,
+                'Security',
+                Colors.red,
+                () => context.push(AppRoutes.appSettings),
+              ),
             ],
           ),
         ],
@@ -435,8 +572,11 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
 
   // ─── About My Farm ───
   Widget _buildAboutMyFarm() {
-    final hasHistory = _farmerHistory != null && _farmerHistory!.trim().isNotEmpty;
-    final expText = _yearsExperience != null ? '$_yearsExperience years' : 'Not configured';
+    final hasHistory =
+        _farmerHistory != null && _farmerHistory!.trim().isNotEmpty;
+    final expText = _yearsExperience != null
+        ? '$_yearsExperience years'
+        : 'Not configured';
 
     return Container(
       color: Colors.white,
@@ -454,8 +594,16 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          _buildAboutRow(Icons.spa_outlined, 'Specialty', _farmerSpecialty ?? 'Not configured'),
-          _buildAboutRow(Icons.location_on_outlined, 'Location', _farmerLocation ?? 'Not configured'),
+          _buildAboutRow(
+            Icons.spa_outlined,
+            'Specialty',
+            _farmerSpecialty ?? 'Not configured',
+          ),
+          _buildAboutRow(
+            Icons.location_on_outlined,
+            'Location',
+            _farmerLocation ?? 'Not configured',
+          ),
           _buildAboutRow(Icons.timeline_outlined, 'Experience', expText),
           const Divider(height: 24, color: Color(0xFFF1F5F9)),
           Text(
@@ -468,7 +616,9 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            hasHistory ? _farmerHistory! : 'No bio configured yet. Tap Edit Farm Details to describe your farm!',
+            hasHistory
+                ? _farmerHistory!
+                : 'No bio configured yet. Tap Edit Farm Details to describe your farm!',
             style: GoogleFonts.inter(
               fontSize: 13,
               color: const Color(0xFF64748B),
@@ -532,8 +682,16 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          _buildListAction(Icons.help_outline_rounded, 'Help Center', () => context.push(AppRoutes.helpCenter)),
-          _buildListAction(Icons.description_outlined, 'Terms of Service', () {}),
+          _buildListAction(
+            Icons.help_outline_rounded,
+            'Help Center',
+            () => context.push(AppRoutes.helpCenter),
+          ),
+          _buildListAction(
+            Icons.description_outlined,
+            'Terms of Service',
+            () {},
+          ),
           _buildListAction(Icons.privacy_tip_outlined, 'Privacy Policy', () {}),
           _buildListAction(Icons.policy_outlined, 'Community Rules', () {}),
           const Divider(height: 24, color: Color(0xFFF1F5F9)),
@@ -582,7 +740,11 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF94A3B8)),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: Color(0xFF94A3B8),
+            ),
           ],
         ),
       ),
@@ -615,7 +777,12 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
     );
   }
 
-  Widget _buildGridAction(IconData icon, String label, Color color, VoidCallback onTap) {
+  Widget _buildGridAction(
+    IconData icon,
+    String label,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Column(

@@ -53,6 +53,7 @@ class _WebShopScreenState extends State<WebShopScreen>
 
   // ─── State ───
   final _dataService = SupabaseDataService();
+  String? _currentFarmerId;
   List<ProductItem> _allProducts = [];
   List<ProductItem> _filteredProducts = [];
   bool _isLoading = true;
@@ -119,12 +120,23 @@ class _WebShopScreenState extends State<WebShopScreen>
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
     try {
-      final products = await _dataService.getAllProducts();
-      final categories = _deriveCategories(products);
+      _currentFarmerId = await _dataService.getCurrentFarmerId();
+      final products = await _dataService.getAllProducts(
+        excludeCurrentFarmer: true,
+      );
+      final currentUserId = SupabaseConfig.currentUser?.id;
+      final filteredList = products.where((p) {
+        if (currentUserId != null && p.farmerId == currentUserId) return false;
+        if (_currentFarmerId != null && p.farmerId == _currentFarmerId) {
+          return false;
+        }
+        return true;
+      }).toList();
+      final categories = _deriveCategories(filteredList);
       if (!mounted) return;
 
       setState(() {
-        _allProducts = products;
+        _allProducts = filteredList;
         _categories = categories;
         _isLoading = false;
       });
@@ -173,6 +185,9 @@ class _WebShopScreenState extends State<WebShopScreen>
     setState(() {
       _filteredProducts = _allProducts.where((p) {
         if (currentUserId != null && p.farmerId == currentUserId) {
+          return false;
+        }
+        if (_currentFarmerId != null && p.farmerId == _currentFarmerId) {
           return false;
         }
 
@@ -701,9 +716,18 @@ class _WebShopScreenState extends State<WebShopScreen>
   // ─────────────────────────────────────────────
   Widget _buildFeaturedSection() {
     if (_showPreOrders) return const SizedBox.shrink();
-    var featuredProducts = _allProducts.where((p) => p.isFeatured).toList();
+    final currentUserId = SupabaseConfig.currentUser?.id;
+    final available = _allProducts.where((p) {
+      if (currentUserId != null && p.farmerId == currentUserId) return false;
+      if (_currentFarmerId != null && p.farmerId == _currentFarmerId) {
+        return false;
+      }
+      if (p.isPreorder) return false;
+      return true;
+    }).toList();
+    var featuredProducts = available.where((p) => p.isFeatured).toList();
     if (featuredProducts.isEmpty) {
-      featuredProducts = List<ProductItem>.from(_allProducts);
+      featuredProducts = List<ProductItem>.from(available);
       featuredProducts.sort((a, b) {
         final ra = double.tryParse(a.rating ?? '0') ?? 0.0;
         final rb = double.tryParse(b.rating ?? '0') ?? 0.0;

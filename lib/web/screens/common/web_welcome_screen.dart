@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
@@ -13,7 +14,6 @@ import '../../../shared/services/articles/articles_service.dart';
 import '../../widgets/web_footer.dart';
 import 'web_articles_screen.dart';
 import 'dart:async';
-
 
 /// Web Welcome Screen — Premium animated landing page
 /// Features: animated wave hero, floating particles, scroll-reveal sections,
@@ -42,6 +42,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   // Testimonials
   List<Map<String, dynamic>> _testimonials = [];
   late PageController _testimonialPageController;
+  final ScrollController _scrollController = ScrollController();
   Timer? _testimonialTimer;
   int _currentTestimonialIndex = 0;
   List<DAArticleData> _liveDaArticles = [];
@@ -66,7 +67,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     // Start animations
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) _heroFadeCtrl.forward();
@@ -88,14 +89,19 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
 
       if (mounted) {
         final List<dynamic> data = res as List<dynamic>;
-        final validReviews = data.where((r) {
-          final text = r['review_text']?.toString().trim() ?? '';
-          return text.isNotEmpty;
-        }).map((r) => {
-          'review_text': r['review_text'],
-          'rating': r['rating'],
-          'users': {'name': 'Verified Customer'},
-        }).toList();
+        final validReviews = data
+            .where((r) {
+              final text = r['review_text']?.toString().trim() ?? '';
+              return text.isNotEmpty;
+            })
+            .map(
+              (r) => {
+                'review_text': r['review_text'],
+                'rating': r['rating'],
+                'users': {'name': 'Verified Customer'},
+              },
+            )
+            .toList();
 
         setState(() {
           _testimonials = validReviews.cast<Map<String, dynamic>>();
@@ -148,6 +154,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   void dispose() {
     _testimonialTimer?.cancel();
     _testimonialPageController.dispose();
+    _scrollController.dispose();
     _waveController.dispose();
     _heroFadeCtrl.dispose();
     _navCtrl.dispose();
@@ -173,6 +180,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
       body: Stack(
         children: [
           SingleChildScrollView(
+            controller: _scrollController,
             child: Column(
               children: [
                 _buildNavBar(),
@@ -185,7 +193,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
 
                 _buildFeaturesSection(),
 
-                _buildFeaturedFarmersSection(),
+                _buildSanCarlosAgricultureSection(),
 
                 _buildDaArticlesSection(),
 
@@ -278,7 +286,10 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -317,9 +328,17 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   // FLOATING NAV BAR with glassmorphism
   // ═══════════════════════════════════════════════════════════════
   Widget _buildNavBar() {
-    final navItems = ['Home', 'Shop', 'Community', 'DA Articles', 'About Us', 'Find Farmer', 'Weather'];
+    final navItems = [
+      'Home',
+      'Shop',
+      'Community',
+      'DA Articles',
+      'About Us',
+      'Find Farmer',
+      'Weather',
+    ];
     final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 650;
+    final isMobile = sw < 1000;
 
     final navRoutes = [
       '/',
@@ -359,7 +378,15 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
             MouseRegion(
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
-                onTap: () => context.go('/shop'),
+                onTap: () {
+                  if (_scrollController.hasClients) {
+                    _scrollController.animateTo(
+                      0,
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.easeOutCubic,
+                    );
+                  }
+                },
                 child: BrandLogo(
                   size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium,
                 ),
@@ -377,7 +404,19 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     onEnter: (_) => setState(() => _hoveredNav = i),
                     onExit: (_) => setState(() => _hoveredNav = -1),
                     child: GestureDetector(
-                      onTap: () => context.go(navRoutes[i]),
+                      onTap: () {
+                        if (i == 0) {
+                          if (_scrollController.hasClients) {
+                            _scrollController.animateTo(
+                              0,
+                              duration: const Duration(milliseconds: 500),
+                              curve: Curves.easeOutCubic,
+                            );
+                          }
+                        } else {
+                          context.go(navRoutes[i]);
+                        }
+                      },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(
@@ -438,7 +477,15 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               WebHamburgerMenuButton(
                 currentIndex: 0,
                 onNavigate: (index) {
-                  if (index == 3) {
+                  if (index == 0) {
+                    if (_scrollController.hasClients) {
+                      _scrollController.animateTo(
+                        0,
+                        duration: const Duration(milliseconds: 500),
+                        curve: Curves.easeOutCubic,
+                      );
+                    }
+                  } else if (index == 3) {
                     context.go('/login');
                   } else {
                     context.go(navRoutes[index]);
@@ -1191,8 +1238,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment:
-          isMobile ? MainAxisAlignment.center : MainAxisAlignment.start,
+      mainAxisAlignment: isMobile
+          ? MainAxisAlignment.center
+          : MainAxisAlignment.start,
       children: [
         Container(
           width: isMobile ? 40 : 48,
@@ -1363,11 +1411,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       crossAxisCount: crossAxisCount,
                       crossAxisSpacing: 24,
                       mainAxisSpacing: 24,
-                      childAspectRatio: constraints.maxWidth < 480 
-                          ? 2.0 
-                          : constraints.maxWidth < 768 
-                              ? 2.8 
-                              : 1.3,
+                      childAspectRatio: constraints.maxWidth < 480
+                          ? 2.0
+                          : constraints.maxWidth < 768
+                          ? 2.8
+                          : 1.3,
                     ),
                     itemCount: features.length,
                     shrinkWrap: true,
@@ -1669,10 +1717,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   // ═══════════════════════════════════════════════════════════════
   Widget _buildTestimonialSection() {
     final sw = MediaQuery.of(context).size.width;
-    
+
     // Fallback static testimonial if no dynamic reviews exist
     final fallbackTestimonial = {
-      'review_text': 'AgriDirect has completely transformed how we buy fresh produce. The quality is incomparable, and knowing exactly which farmer grew our food makes every meal special.',
+      'review_text':
+          'AgriDirect has completely transformed how we buy fresh produce. The quality is incomparable, and knowing exactly which farmer grew our food makes every meal special.',
       'rating': 5,
       'users': {'name': 'Sarah Jenkins'},
       'subtitle': 'Professional Chef, Manila',
@@ -1703,10 +1752,12 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
             children: [
               const GradientDivider(width: 50, height: 4),
               const SizedBox(height: 20),
-              
+
               // Carousel Container
               SizedBox(
-                height: sw < 480 ? 420 : 380, // Adjust height based on screen size
+                height: sw < 480
+                    ? 420
+                    : 380, // Adjust height based on screen size
                 child: PageView.builder(
                   controller: _testimonialPageController,
                   itemCount: displayItems.length,
@@ -1719,12 +1770,20 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     final item = displayItems[index];
                     final text = item['review_text']?.toString() ?? '';
                     final rating = (item['rating'] as num?)?.toInt() ?? 5;
-                    
-                    final userData = item['users'] as Map<String, dynamic>? ?? {};
-                    final name = userData['name']?.toString() ?? 'AgriDirect User';
-                    final subtitle = item['subtitle']?.toString() ?? 'Verified Buyer';
-                    
-                    final initials = name.trim().split(' ').take(2).map((e) => e.isNotEmpty ? e[0].toUpperCase() : '').join('');
+
+                    final userData =
+                        item['users'] as Map<String, dynamic>? ?? {};
+                    final name =
+                        userData['name']?.toString() ?? 'AgriDirect User';
+                    final subtitle =
+                        item['subtitle']?.toString() ?? 'Verified Buyer';
+
+                    final initials = name
+                        .trim()
+                        .split(' ')
+                        .take(2)
+                        .map((e) => e.isNotEmpty ? e[0].toUpperCase() : '')
+                        .join('');
 
                     return Container(
                       padding: EdgeInsets.all(sw < 480 ? 24 : 48),
@@ -1810,8 +1869,8 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                 ),
                               ),
                               Column(
-                                crossAxisAlignment: sw < 480 
-                                    ? CrossAxisAlignment.center 
+                                crossAxisAlignment: sw < 480
+                                    ? CrossAxisAlignment.center
                                     : CrossAxisAlignment.start,
                                 children: [
                                   Text(
@@ -1857,7 +1916,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   },
                 ),
               ),
-              
+
               if (displayItems.length > 1) ...[
                 const SizedBox(height: 24),
                 Row(
@@ -2196,7 +2255,8 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
 
               if (isDesktop) {
                 final apkUrl = ApkDownloader.apkUrl;
-                final qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${Uri.encodeComponent(apkUrl)}';
+                final qrUrl =
+                    'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${Uri.encodeComponent(apkUrl)}';
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -2205,7 +2265,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.1),
+                        ),
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
@@ -2213,11 +2275,12 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                           qrUrl,
                           width: 160,
                           height: 160,
-                          errorBuilder: (context, error, stackTrace) => const Icon(
-                            Icons.qr_code_2_rounded,
-                            size: 160,
-                            color: Colors.white24,
-                          ),
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
+                                Icons.qr_code_2_rounded,
+                                size: 160,
+                                color: Colors.white24,
+                              ),
                         ),
                       ),
                     ),
@@ -2243,7 +2306,11 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.shield_outlined, color: AgriColors.emerald400, size: 14),
+              const Icon(
+                Icons.shield_outlined,
+                color: AgriColors.emerald400,
+                size: 14,
+              ),
               const SizedBox(width: 6),
               Text(
                 'Virus-free & Malware-free guaranteed',
@@ -2366,7 +2433,10 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
       decoration: BoxDecoration(
         color: AgriColors.darkCard,
         borderRadius: BorderRadius.circular(40),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 8),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.15),
+          width: 8,
+        ),
         boxShadow: [
           BoxShadow(
             color: AgriColors.emerald500.withValues(alpha: 0.15),
@@ -2385,9 +2455,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
         child: Container(
           width: double.infinity,
           height: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: AgriColors.darkGradient,
-          ),
+          decoration: const BoxDecoration(gradient: AgriColors.darkGradient),
           child: Column(
             children: [
               // Status bar simulator
@@ -2407,17 +2475,25 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     ),
                     Row(
                       children: const [
-                        Icon(Icons.signal_cellular_alt_rounded, color: Colors.white, size: 10),
+                        Icon(
+                          Icons.signal_cellular_alt_rounded,
+                          color: Colors.white,
+                          size: 10,
+                        ),
                         SizedBox(width: 4),
                         Icon(Icons.wifi_rounded, color: Colors.white, size: 10),
                         SizedBox(width: 4),
-                        Icon(Icons.battery_full_rounded, color: Colors.white, size: 10),
+                        Icon(
+                          Icons.battery_full_rounded,
+                          color: Colors.white,
+                          size: 10,
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
-              
+
               // Notch
               Align(
                 alignment: Alignment.topCenter,
@@ -2433,9 +2509,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // App mockup UI header
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2444,7 +2520,10 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     const BrandLogo(size: BrandLogoSize.small, inverted: true),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AgriColors.emerald500.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
@@ -2457,13 +2536,13 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                    )
+                    ),
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Mini features mockup
               Expanded(
                 child: Padding(
@@ -2479,11 +2558,13 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                           gradient: LinearGradient(
                             colors: [
                               AgriColors.emerald800.withValues(alpha: 0.4),
-                              AgriColors.emerald900.withValues(alpha: 0.4)
+                              AgriColors.emerald900.withValues(alpha: 0.4),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.05),
+                          ),
                         ),
                         child: Stack(
                           children: [
@@ -2524,9 +2605,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                           ],
                         ),
                       ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Mock Dashboard item 1
                       _buildMockDashboardItem(
                         icon: Icons.storefront_rounded,
@@ -2554,7 +2635,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   ),
                 ),
               ),
-              
+
               // Bottom Indicator Bar
               Container(
                 height: 5,
@@ -2611,10 +2692,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: GoogleFonts.inter(
-                    color: Colors.white54,
-                    fontSize: 8,
-                  ),
+                  style: GoogleFonts.inter(color: Colors.white54, fontSize: 8),
                 ),
               ],
             ),
@@ -2635,7 +2713,8 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
       {
         'num': '2',
         'title': 'Allow Settings',
-        'desc': 'Enable "Install from Unknown Sources" in your Android settings.',
+        'desc':
+            'Enable "Install from Unknown Sources" in your Android settings.',
         'icon': Icons.settings_suggest_rounded,
       },
       {
@@ -2856,8 +2935,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   child: Image.asset(
                     assetPath,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) =>
-                        Container(color: Colors.white10),
+                    errorBuilder: (_, _, _) => Container(color: Colors.white10),
                   ),
                 ),
               ),
@@ -2868,9 +2946,6 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // FARMING EQUIPMENT & HARVEST BUNDLES SHOWCASE (Inspiration Screenshot 1)
-  // ═══════════════════════════════════════════════════════════════
   Widget _buildFarmingShowcaseSection() {
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 850;
@@ -2900,7 +2975,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       ? Column(
                           children: [
                             _buildShowcaseImage(
-                              'https://images.unsplash.com/photo-1592417817098-8f3d6910985b?q=80&w=1000&auto=format&fit=crop',
+                              'assets/images/farmer_1.jpg',
                               height: 240,
                             ),
                             _buildShowcaseContent(
@@ -2918,7 +2993,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                             Expanded(
                               flex: 5,
                               child: _buildShowcaseImage(
-                                'https://images.unsplash.com/photo-1592417817098-8f3d6910985b?q=80&w=1000&auto=format&fit=crop',
+                                'assets/images/farmer_1.jpg',
                                 height: 360,
                               ),
                             ),
@@ -2953,7 +3028,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       ? Column(
                           children: [
                             _buildShowcaseImage(
-                              'https://images.unsplash.com/photo-1589923188900-85dae523342b?q=80&w=1000&auto=format&fit=crop',
+                              'assets/images/farmer_2.jpg',
                               height: 240,
                             ),
                             _buildShowcaseContent(
@@ -2972,7 +3047,8 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                               flex: 6,
                               child: _buildShowcaseContent(
                                 tag: 'FARM-TO-TABLE HARVEST BUNDLES',
-                                title: 'Fresh Cooperative Harvest Boxes & Tools',
+                                title:
+                                    'Fresh Cooperative Harvest Boxes & Tools',
                                 description:
                                     'Explore curated seasonal produce crates and essential farm accessories packed directly by verified agrarian cooperatives. High-nutrient organic staples, heirloom seeds, and protective gear delivered fresh at fair farm-gate pricing.',
                                 buttonText: 'See Bundle Options',
@@ -2982,7 +3058,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                             Expanded(
                               flex: 5,
                               child: _buildShowcaseImage(
-                                'https://images.unsplash.com/photo-1589923188900-85dae523342b?q=80&w=1000&auto=format&fit=crop',
+                                'assets/images/farmer_2.jpg',
                                 height: 360,
                               ),
                             ),
@@ -2997,20 +3073,58 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     );
   }
 
-  Widget _buildShowcaseImage(String url, {required double height}) {
+  Widget _buildShowcaseImage(String path, {required double height}) {
     return SizedBox(
       height: height,
       width: double.infinity,
-      child: Image.network(
-        url,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => Container(
-          color: const Color(0xFF005A36),
-          child: const Center(
-            child: Icon(Icons.agriculture_rounded, color: Colors.white24, size: 64),
-          ),
-        ),
-      ),
+      child: path.startsWith('assets/')
+          ? Image.asset(
+              path,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                String fallback = 'assets/images/san_carlos_farming_1.jpg';
+                if (path.contains('2')) {
+                  fallback = 'assets/images/san_carlos_farming_2.jpg';
+                }
+                return Image.asset(
+                  fallback,
+                  fit: BoxFit.cover,
+                  errorBuilder: (c, e, s) => Container(
+                    color: const Color(0xFF005A36),
+                    child: const Center(
+                      child: Icon(
+                        Icons.agriculture_rounded,
+                        color: Colors.white70,
+                        size: 64,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            )
+          : CachedNetworkImage(
+              imageUrl: path,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => Container(
+                color: const Color(0xFFF1F5F9),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF005A36),
+                  ),
+                ),
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: const Color(0xFF005A36),
+                child: const Center(
+                  child: Icon(
+                    Icons.agriculture_rounded,
+                    color: Colors.white70,
+                    size: 64,
+                  ),
+                ),
+              ),
+            ),
     );
   }
 
@@ -3088,36 +3202,42 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // FEATURED LOCAL FARMERS SPOTLIGHT
+  // PROMOTING SAN CARLOS CITY AGRICULTURE & FARMLANDS
   // ═══════════════════════════════════════════════════════════════
-  Widget _buildFeaturedFarmersSection() {
+  Widget _buildSanCarlosAgricultureSection() {
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 768;
 
-    final farmers = [
+    final farmingPillars = [
       {
-        'name': 'Danilo "Mang Danny" Santos',
-        'coop': 'Benguet Highland Growers Co-op',
-        'location': 'La Trinidad, Benguet',
-        'experience': '24 Years Farming',
-        'crops': 'Highland Lettuce, Strawberries, Heirloom Carrots',
-        'image': 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?q=80&w=800&auto=format&fit=crop',
+        'title': 'Golden Rice Plains & Cornfields',
+        'badge': 'RICE & GRAIN AGRICULTURE',
+        'location': 'Brgy. Magtaking & Turac Agricultural Plains',
+        'description':
+            'Vast fertile fields cultivating top-tier Pangasinan Dinorado, premium white rice, and sweet corn through sustainable irrigation and direct grain-milling traditions.',
+        'image': 'assets/images/san_carlos_farming_1.jpg',
+        'actionText': 'Browse Grains & Harvests',
+        'route': AppRoutes.freshProduce,
       },
       {
-        'name': 'Teresa "Aling Tess" Ramos',
-        'coop': 'Isabela Organic Grains Association',
-        'location': 'Cauayan, Isabela',
-        'experience': '19 Years Farming',
-        'crops': 'Organic Dinorado, Black Rice & Sweet Corn',
-        'image': 'https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?q=80&w=800&auto=format&fit=crop',
+        'title': 'Community Cooperative Farming',
+        'badge': 'AGRARIAN COMMUNITY HUBS',
+        'location': 'Tarectec, Mapolopolo & Pulong Co-ops',
+        'description':
+            'Empowered agrarian associations collaborating in unity to cultivate certified high-yield crops, ensuring direct farm-to-door distribution with fair farm-gate pricing.',
+        'image': 'assets/images/san_carlos_farming_2.jpg',
+        'actionText': 'Discover Local Farm Hubs',
+        'route': AppRoutes.localShops,
       },
       {
-        'name': 'Ramon Fernandez',
-        'coop': 'Bukidnon Highland Orchards',
-        'location': 'Malaybalay, Bukidnon',
-        'experience': '16 Years Farming',
-        'crops': 'Hass Avocados, Heirloom Cacao & Dragonfruit',
-        'image': 'https://images.unsplash.com/photo-1523741543316-beb7fc7023d8?q=80&w=800&auto=format&fit=crop',
+        'title': 'High-Yield Produce & Fruit Orchards',
+        'badge': 'DIVERSIFIED FRESH CROPS',
+        'location': 'Balite Sur & Agro-Ecological Districts',
+        'description':
+            'Rich San Carlos soil yielding daily harvests of crisp eggplants, bitter gourd, native tomatoes, bell peppers, and world-famous sweet Pangasinan native mangoes.',
+        'image': 'assets/images/san_carlos_farming_3.jpg',
+        'actionText': 'Shop Farm-Fresh Produce',
+        'route': AppRoutes.shop,
       },
     ];
 
@@ -3136,13 +3256,16 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               const GradientDivider(width: 50, height: 4),
               const SizedBox(height: 20),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: AgriColors.emerald50,
                   borderRadius: BorderRadius.circular(40),
                 ),
                 child: Text(
-                  'MEET OUR VERIFIED GROWERS',
+                  'AGRICULTURAL HEART OF SAN CARLOS CITY',
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -3153,7 +3276,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               ),
               const SizedBox(height: 14),
               Text(
-                'Direct from the Hands that Feed Us',
+                'Cultivating the Rich Farmlands of San Carlos City',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: isMobile ? 26 : 36,
@@ -3163,7 +3286,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               ),
               const SizedBox(height: 10),
               Text(
-                'Every product on AgriDirect is traceable to certified local farmers receiving 100% fair farm-gate pricing.',
+                'San Carlos City, Pangasinan is home to expansive fertile plains, rich farming heritage, and vibrant agrarian communities dedicated to nourishing the province.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(fontSize: 15, color: AgriColors.muted),
               ),
@@ -3172,120 +3295,31 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
               LayoutBuilder(
                 builder: (context, constraints) {
                   final cols = constraints.maxWidth < 768 ? 1 : 3;
+                  if (cols == 1) {
+                    return Column(
+                      children: farmingPillars
+                          .map(
+                            (pillar) => Padding(
+                              padding: const EdgeInsets.only(bottom: 24),
+                              child: _buildFarmingPillarCard(pillar),
+                            ),
+                          )
+                          .toList(),
+                    );
+                  }
                   return GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: cols,
-                      crossAxisSpacing: 24,
-                      mainAxisSpacing: 24,
-                      childAspectRatio: cols == 1 ? 1.2 : 0.82,
-                    ),
-                    itemCount: farmers.length,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 24,
+                          mainAxisSpacing: 24,
+                          childAspectRatio: 0.70,
+                        ),
+                    itemCount: farmingPillars.length,
                     itemBuilder: (context, index) {
-                      final f = farmers[index];
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.03),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              AspectRatio(
-                                aspectRatio: 16 / 10,
-                                child: Image.network(
-                                  f['image']!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => Container(color: const Color(0xFF005A36)),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(20),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.verified_rounded, color: Color(0xFF005A36), size: 16),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          f['experience']!,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            color: const Color(0xFF005A36),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      f['name']!,
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w800,
-                                        color: const Color(0xFF0F172A),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      f['location']!,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      'Crops: ${f['crops']!}',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12.5,
-                                        color: const Color(0xFF475569),
-                                        height: 1.4,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: OutlinedButton(
-                                        onPressed: () => context.go(AppRoutes.shop),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: const Color(0xFF005A36),
-                                          side: const BorderSide(color: Color(0xFF005A36)),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          padding: const EdgeInsets.symmetric(vertical: 10),
-                                        ),
-                                        child: Text(
-                                          'Explore Farmer\'s Produce',
-                                          style: GoogleFonts.plusJakartaSans(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
+                      return _buildFarmingPillarCard(farmingPillars[index]);
                     },
                   );
                 },
@@ -3297,9 +3331,191 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // DEPARTMENT OF AGRICULTURE (DA) ARTICLES SECTION (Inspiration Screenshot 2)
-  // ═══════════════════════════════════════════════════════════════
+  Widget _buildFarmingPillarCard(Map<String, String> pillar) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 10,
+              child: _buildFarmingPhoto(pillar['image']!),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF005A36).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      pillar['badge']!,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF005A36),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    pillar['title']!,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF0F172A),
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on_rounded,
+                        size: 14,
+                        color: Color(0xFF005A36),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          pillar['location']!,
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    pillar['description']!,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      color: const Color(0xFF475569),
+                      height: 1.45,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => context.go(pillar['route']!),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF005A36),
+                        side: const BorderSide(color: Color(0xFF005A36)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      child: Text(
+                        pillar['actionText']!,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFarmingPhoto(String path) {
+    if (path.startsWith('assets/')) {
+      return Image.asset(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          String cleanFallback = path
+              .replaceFirst(
+                'assets/images/farmer images/Pangasinan-farmers.jpg',
+                'assets/images/san_carlos_farming_1.jpg',
+              )
+              .replaceFirst(
+                'assets/images/farmer images/images (1).jpg',
+                'assets/images/san_carlos_farming_2.jpg',
+              )
+              .replaceFirst(
+                'assets/images/farmer images/images.jpg',
+                'assets/images/san_carlos_farming_3.jpg',
+              );
+          return Image.asset(
+            cleanFallback,
+            fit: BoxFit.cover,
+            errorBuilder: (c, e, s) => Container(
+              color: const Color(0xFF005A36),
+              child: const Center(
+                child: Icon(
+                  Icons.agriculture_rounded,
+                  color: Colors.white70,
+                  size: 48,
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+    return CachedNetworkImage(
+      imageUrl: path,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Container(
+        color: const Color(0xFFF1F5F9),
+        child: const Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Color(0xFF005A36),
+          ),
+        ),
+      ),
+      errorWidget: (context, url, error) => Container(
+        color: const Color(0xFF005A36),
+        child: const Center(
+          child: Icon(
+            Icons.agriculture_rounded,
+            color: Colors.white70,
+            size: 48,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDaArticlesSection() {
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 768;
@@ -3331,15 +3547,24 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF005A36).withValues(alpha: 0.1),
+                            color: const Color(
+                              0xFF005A36,
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.verified_rounded, color: Color(0xFF005A36), size: 14),
+                              const Icon(
+                                Icons.verified_rounded,
+                                color: Color(0xFF005A36),
+                                size: 14,
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 'DEPARTMENT OF AGRICULTURE (DA) BULLETINS',
@@ -3380,7 +3605,10 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF005A36),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 22,
+                          vertical: 14,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -3388,7 +3616,9 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       icon: const Icon(Icons.arrow_forward_rounded, size: 16),
                       label: Text(
                         'View All Articles',
-                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                 ],
@@ -3401,8 +3631,8 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   final crossAxisCount = constraints.maxWidth < 650
                       ? 1
                       : constraints.maxWidth < 1000
-                          ? 2
-                          : 4;
+                      ? 2
+                      : 4;
                   return GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -3438,14 +3668,16 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                 child: Image.network(
                                   item.imageUrl,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => Container(color: const Color(0xFF005A36)),
+                                  errorBuilder: (_, _, _) =>
+                                      Container(color: const Color(0xFF005A36)),
                                 ),
                               ),
                               Expanded(
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         item.title,
@@ -3484,15 +3716,22 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                                       SizedBox(
                                         width: double.infinity,
                                         child: ElevatedButton(
-                                          onPressed: () => context.go('/articles?id=${item.id}'),
+                                          onPressed: () => context.go(
+                                            '/articles?id=${item.id}',
+                                          ),
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF005A36),
+                                            backgroundColor: const Color(
+                                              0xFF005A36,
+                                            ),
                                             foregroundColor: Colors.white,
                                             elevation: 0,
                                             shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(10),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
                                             ),
-                                            padding: const EdgeInsets.symmetric(vertical: 10),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 10,
+                                            ),
                                           ),
                                           child: Text(
                                             'Read more',
@@ -3526,12 +3765,16 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                       backgroundColor: const Color(0xFF005A36),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     icon: const Icon(Icons.arrow_forward_rounded, size: 16),
                     label: Text(
                       'View All Articles',
-                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
@@ -3555,17 +3798,12 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
         shape: BoxShape.circle,
         border: isHovered
             ? null
-            : Border.all(
-                color: AgriColors.emerald200,
-                width: 2,
-              ),
+            : Border.all(color: AgriColors.emerald200, width: 2),
         boxShadow: [
           BoxShadow(
             color: isHovered
                 ? AgriColors.emerald500.withValues(alpha: 0.3)
-                : Colors.black.withValues(
-                    alpha: 0.05,
-                  ),
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: isHovered ? 24 : 8,
             offset: const Offset(0, 4),
           ),
@@ -3573,11 +3811,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
       ),
       child: Center(
         child: isHovered
-            ? Icon(
-                step.icon,
-                color: Colors.white,
-                size: 28,
-              )
+            ? Icon(step.icon, color: Colors.white, size: 28)
             : Text(
                 '${index + 1}',
                 style: GoogleFonts.plusJakartaSans(
@@ -3610,10 +3844,7 @@ class _PulseDownloadButton extends StatefulWidget {
   final VoidCallback onTap;
   final bool fullWidth;
 
-  const _PulseDownloadButton({
-    required this.onTap,
-    this.fullWidth = false,
-  });
+  const _PulseDownloadButton({required this.onTap, this.fullWidth = false});
 
   @override
   State<_PulseDownloadButton> createState() => _PulseDownloadButtonState();
@@ -3633,13 +3864,15 @@ class _PulseDownloadButtonState extends State<_PulseDownloadButton>
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
-    
-    _glowAnimation = Tween<double>(begin: 8.0, end: 24.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.03).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+
+    _glowAnimation = Tween<double>(
+      begin: 8.0,
+      end: 24.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.03,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -3688,10 +3921,16 @@ class _PulseDownloadButtonState extends State<_PulseDownloadButton>
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Row(
-                mainAxisSize: widget.fullWidth ? MainAxisSize.max : MainAxisSize.min,
+                mainAxisSize: widget.fullWidth
+                    ? MainAxisSize.max
+                    : MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.android_rounded, color: Colors.white, size: 24),
+                  const Icon(
+                    Icons.android_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                   const SizedBox(width: 12),
                   Text(
                     'Download APK',
@@ -3703,7 +3942,10 @@ class _PulseDownloadButtonState extends State<_PulseDownloadButton>
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black26,
                       borderRadius: BorderRadius.circular(4),

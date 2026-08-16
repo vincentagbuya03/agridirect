@@ -1,25 +1,23 @@
-import 'dart:typed_data';
+import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
-import '../../../shared/services/mascot/mascot_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../shared/services/commerce/product_service.dart';
-import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/core/bootstrap_cache_service.dart';
+import '../../../shared/services/core/supabase_config.dart';
+import '../../../shared/services/mascot/mascot_service.dart';
 import '../../../shared/services/offline/offline_product_service.dart';
 import '../../../shared/services/offline/offline_queue_service.dart';
-import '../../../shared/styles/app_theme.dart';
-import '../../../shared/models/product/category_model.dart';
-import '../../../shared/models/product/unit_model.dart';
 
-/// Add Product Screen for Farmers with Offline Support
+/// Add & Edit Product Screen for Farmers with Premium UI and Offline Support
 class AddProductScreen extends StatefulWidget {
   final Map<String, dynamic>? editProduct;
   const AddProductScreen({super.key, this.editProduct});
@@ -29,7 +27,12 @@ class AddProductScreen extends StatefulWidget {
 }
 
 class _AddProductScreenState extends State<AddProductScreen> {
-  static const Color primary = AppColors.primary;
+  static const Color _primary = Color(0xFF059669);
+  static const Color _textHeadline = Color(0xFF0F172A);
+  static const Color _textSubtle = Color(0xFF64748B);
+  static const Color _borderColor = Color(0xFFE2E8F0);
+  static const Color _bgCard = Colors.white;
+
   static const String _cachedCategoriesKey =
       BootstrapCacheService.cachedCategoriesKey;
   static const String _cachedUnitsKey = BootstrapCacheService.cachedUnitsKey;
@@ -40,6 +43,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _descriptionController = TextEditingController();
   final _harvestDaysController = TextEditingController();
   final _quantityController = TextEditingController();
+  final _discountPercentController = TextEditingController(text: '30');
   final ImagePicker _imagePicker = ImagePicker();
 
   late OfflineProductService _offlineService;
@@ -51,6 +55,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   bool _isFreeShipping = false;
   bool _isWholesale = false;
   bool _isFlashSale = false;
+  DateTime? _flashSaleEndDate;
+  String _flashDurationOption = '24_hours';
   bool _isLoading = false;
   bool _isLoadingDropdowns = true;
   bool _isOnline = true;
@@ -60,6 +66,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _units = [];
 
+  bool get _isEditMode => widget.editProduct != null;
+
   @override
   void initState() {
     super.initState();
@@ -67,7 +75,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _checkConnectivity();
     _listenToConnectivity();
     _loadCategoriesAndUnits();
-    if (widget.editProduct != null) {
+    if (_isEditMode) {
       _prefillFields();
     }
     _nameController.addListener(_onFormStateChanged);
@@ -103,26 +111,34 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _descriptionController.text = prod['description']?.toString() ?? '';
 
     final avail = prod['available'] ?? prod['available_quantity'] ?? 0;
-    _quantityController.text = (avail is num) ? avail.toInt().toString() : avail.toString();
+    _quantityController.text =
+        (avail is num) ? avail.toInt().toString() : avail.toString();
 
     final hd = prod['harvest_days'] ?? 0;
-    _harvestDaysController.text = (hd is num && hd > 0) ? hd.toString() : '';
+    _harvestDaysController.text =
+        (hd is num && hd > 0) ? hd.toString() : '';
 
     _isPreorder = prod['is_preorder'] == true;
     _isFreeShipping = prod['is_free_shipping'] == true;
     _isWholesale = prod['is_wholesale'] == true;
     _isFlashSale = prod['is_flash_sale'] == true;
+    final disc = prod['discount_percent'] ?? prod['discount_percentage'];
+    if (disc != null) {
+      _discountPercentController.text = disc.toString();
+    }
     _selectedCategory = prod['category_id']?.toString();
     _selectedUnit = prod['unit_id']?.toString();
 
     final imagePath = prod['image']?.toString() ?? '';
     if (imagePath.isNotEmpty) {
-      _selectedImageFiles.add(_PickedProductImage(
-        name: 'existing_image.jpg',
-        bytes: Uint8List(0),
-        path: imagePath,
-        isExisting: true,
-      ));
+      _selectedImageFiles.add(
+        _PickedProductImage(
+          name: 'existing_image.jpg',
+          bytes: Uint8List(0),
+          path: imagePath,
+          isExisting: true,
+        ),
+      );
     }
   }
 
@@ -133,30 +149,39 @@ class _AddProductScreenState extends State<AddProductScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Delete Product',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w700,
+            color: _textHeadline,
+          ),
         ),
         content: Text(
           'Are you sure you want to delete "${widget.editProduct!['name']}"? This action cannot be undone.',
-          style: GoogleFonts.inter(),
+          style: GoogleFonts.inter(color: _textSubtle, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text(
               'Cancel',
-              style: GoogleFonts.inter(color: AppColors.textSubtle, fontWeight: FontWeight.w600),
+              style: GoogleFonts.inter(
+                color: _textSubtle,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
             ),
             child: Text(
               'Delete',
-              style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -169,7 +194,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
       try {
         if (!_isOnline) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Deleting products requires an active internet connection.')),
+            const SnackBar(
+              content: Text(
+                'Deleting products requires an active internet connection.',
+              ),
+            ),
           );
           return;
         }
@@ -178,7 +207,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Product deleted successfully!'),
-              backgroundColor: Colors.green,
+              backgroundColor: Color(0xFF059669),
             ),
           );
           context.pop();
@@ -186,7 +215,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete product: $e'), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text('Failed to delete product: $e'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       } finally {
@@ -217,9 +249,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _connectivity.onConnectivityChanged.listen((result) {
       final isOnline =
           result.isNotEmpty && result.first != ConnectivityResult.none;
-          
-      final wasOffline = !_isOnline; // Check previous state before updating
-      
+      final wasOffline = !_isOnline;
+
       setState(() => _isOnline = isOnline);
 
       if (isOnline && wasOffline && mounted) {
@@ -227,7 +258,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ Back online! Syncing pending products...'),
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFF059669),
             duration: Duration(seconds: 2),
           ),
         );
@@ -235,33 +266,58 @@ class _AddProductScreenState extends State<AddProductScreen> {
     });
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickImageSource(ImageSource source) async {
     try {
-      final pickedFiles = await _imagePicker.pickMultiImage(
-        limit: 5,
-        imageQuality: 85,
-      );
-
-      if (pickedFiles.isNotEmpty) {
-        final selectedImages = <_PickedProductImage>[];
-        for (final file in pickedFiles) {
+      if (source == ImageSource.camera) {
+        final file = await _imagePicker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 85,
+        );
+        if (file != null) {
           final bytes = await file.readAsBytes();
           final imageName = file.name.isNotEmpty
               ? file.name
               : 'product_${DateTime.now().millisecondsSinceEpoch}.jpg';
-          selectedImages.add(
-            _PickedProductImage(name: imageName, bytes: bytes, path: file.path),
-          );
+          setState(() {
+            _selectedImageFiles.add(
+              _PickedProductImage(
+                name: imageName,
+                bytes: bytes,
+                path: file.path,
+              ),
+            );
+          });
         }
-        setState(() {
-          _selectedImageFiles.addAll(selectedImages);
-        });
+      } else {
+        final pickedFiles = await _imagePicker.pickMultiImage(
+          limit: 5 - _selectedImageFiles.length,
+          imageQuality: 85,
+        );
+        if (pickedFiles.isNotEmpty) {
+          final selectedImages = <_PickedProductImage>[];
+          for (final file in pickedFiles) {
+            final bytes = await file.readAsBytes();
+            final imageName = file.name.isNotEmpty
+                ? file.name
+                : 'product_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            selectedImages.add(
+              _PickedProductImage(
+                name: imageName,
+                bytes: bytes,
+                path: file.path,
+              ),
+            );
+          }
+          setState(() {
+            _selectedImageFiles.addAll(selectedImages);
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: $e')),
+        );
       }
     }
   }
@@ -286,10 +342,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
     try {
       final userId = SupabaseConfig.currentUser?.id ?? '';
 
-      if (widget.editProduct != null) {
+      if (_isEditMode) {
         if (!_isOnline) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Editing products requires an active internet connection.')),
+            const SnackBar(
+              content: Text(
+                'Editing products requires an active internet connection.',
+              ),
+            ),
           );
           setState(() => _isLoading = false);
           return;
@@ -306,12 +366,32 @@ class _AddProductScreenState extends State<AddProductScreen> {
           'category_id': _selectedCategory,
           'unit_id': _selectedUnit,
           'harvest_days': _harvestDaysController.text.isNotEmpty
-              ? (double.tryParse(_harvestDaysController.text.trim())?.toInt() ?? 0)
+              ? (double.tryParse(_harvestDaysController.text.trim())
+                      ?.toInt() ??
+                  0)
               : 0,
           'is_preorder': _isPreorder,
           'is_free_shipping': _isFreeShipping,
           'is_wholesale': _isWholesale,
           'is_flash_sale': _isFlashSale,
+          'discount_percent': _isFlashSale
+              ? double.tryParse(_discountPercentController.text.trim()) ?? 30.0
+              : null,
+          if (_isFlashSale) 'flash_sale_start': DateTime.now().toIso8601String(),
+          if (_isFlashSale)
+            'flash_sale_end': (_flashDurationOption == 'midnight'
+                    ? DateTime(
+                        DateTime.now().year,
+                        DateTime.now().month,
+                        DateTime.now().day + 1,
+                      )
+                    : (_flashDurationOption == '3_days'
+                        ? DateTime.now().add(const Duration(days: 3))
+                        : (_flashDurationOption == '7_days'
+                            ? DateTime.now().add(const Duration(days: 7))
+                            : (_flashSaleEndDate ??
+                                DateTime.now().add(const Duration(hours: 24))))))
+                .toIso8601String(),
         }).eq('product_id', productId);
 
         // 2. Update inventory table
@@ -347,13 +427,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
         }
 
         // 3. Upload new images and save to product_images table if selected
-        final newImages = _selectedImageFiles.where((img) => !img.isExisting).toList();
+        final newImages =
+            _selectedImageFiles.where((img) => !img.isExisting).toList();
         if (newImages.isNotEmpty) {
           for (final img in newImages) {
-            final fileName = 'product_${DateTime.now().millisecondsSinceEpoch}_${img.name}';
+            final fileName =
+                'product_${DateTime.now().millisecondsSinceEpoch}_${img.name}';
             final path = 'products/$fileName';
             await client.storage.from('uploads').uploadBinary(path, img.bytes);
-            final publicUrl = client.storage.from('uploads').getPublicUrl(path);
+            final publicUrl =
+                client.storage.from('uploads').getPublicUrl(path);
             await client.from('product_images').insert({
               'product_id': productId,
               'image_url': publicUrl,
@@ -366,7 +449,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Product updated successfully!'),
-              backgroundColor: Colors.green,
+              backgroundColor: Color(0xFF059669),
             ),
           );
           context.pop(true);
@@ -375,9 +458,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
       }
 
       // Get local image paths
-      final localImagePaths = _selectedImageFiles
-          .map((img) => img.path)
-          .toList();
+      final localImagePaths =
+          _selectedImageFiles.map((img) => img.path).toList();
 
       final webImageBytes = kIsWeb
           ? _selectedImageFiles.map((img) => img.bytes).toList()
@@ -424,9 +506,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
       }
     } finally {
       if (mounted) {
@@ -443,7 +525,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final cachedUnits = _readCachedOptions(prefs.getString(_cachedUnitsKey));
 
     try {
-      debugPrint('🔵 Loading categories and units...');
       final connectivityResult = await _connectivity.checkConnectivity();
       final currentlyOnline =
           connectivityResult.isNotEmpty &&
@@ -477,50 +558,27 @@ class _AddProductScreenState extends State<AddProductScreen> {
         return;
       }
 
-      List<Category> categories = [];
-      List<Unit> units = [];
-
-      try {
-        debugPrint('🔵 Fetching categories...');
-        categories = await service.getCategories();
-        debugPrint('✅ Categories loaded: ${categories.length}');
-        for (var cat in categories) {
-          debugPrint('   - ${cat.name} (${cat.categoryId})');
-        }
-      } catch (e) {
-        debugPrint('❌ Failed to load categories: $e');
-        rethrow;
-      }
-
-      try {
-        debugPrint('🔵 Fetching units...');
-        units = await service.getUnits();
-        debugPrint('✅ Units loaded: ${units.length}');
-        for (var unit in units) {
-          debugPrint('   - ${unit.name} (${unit.unitId})');
-        }
-      } catch (e) {
-        debugPrint('❌ Failed to load units: $e');
-        rethrow;
-      }
+      final categories = await service.getCategories();
+      final units = await service.getUnits();
 
       if (mounted) {
         setState(() {
           _categories = categories
-              .map<Map<String, dynamic>>((c) => {'id': c.categoryId, 'name': c.name})
+              .map<Map<String, dynamic>>(
+                (c) => {'id': c.categoryId, 'name': c.name},
+              )
               .toList();
-          _units = units.map<Map<String, dynamic>>((u) => {'id': u.unitId, 'name': u.name}).toList();
+          _units = units
+              .map<Map<String, dynamic>>(
+                (u) => {'id': u.unitId, 'name': u.name},
+              )
+              .toList();
           _isLoadingDropdowns = false;
         });
         await prefs.setString(_cachedCategoriesKey, jsonEncode(_categories));
         await prefs.setString(_cachedUnitsKey, jsonEncode(_units));
-        debugPrint(
-          '✅ Dropdowns populated with ${_categories.length} categories and ${_units.length} units',
-        );
       }
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error loading categories/units: $e');
-      debugPrint('Stack trace: $stackTrace');
+    } catch (e) {
       if (mounted) {
         if (cachedCategories.isNotEmpty && cachedUnits.isNotEmpty) {
           setState(() {
@@ -530,32 +588,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
           });
           return;
         }
-
-        if (_isOnline) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Failed to load categories/units.\n\n'
-                'Make sure these tables exist in Supabase:\n'
-                '- categories table with: id, name\n'
-                '- units table with: id, name\n\n'
-                'Error: $e',
-              ),
-              duration: const Duration(seconds: 10),
-              action: SnackBarAction(label: 'Dismiss', onPressed: () {}),
-            ),
-          );
-        }
-        setState(() {
-          _isLoadingDropdowns = false;
-        });
+        setState(() => _isLoadingDropdowns = false);
       }
     }
   }
 
   List<Map<String, dynamic>> _readCachedOptions(String? rawJson) {
     if (rawJson == null || rawJson.isEmpty) return [];
-
     try {
       final decoded = jsonDecode(rawJson);
       if (decoded is! List) return [];
@@ -564,7 +603,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
           .map((item) => Map<String, dynamic>.from(item))
           .toList();
     } catch (e) {
-      debugPrint('Failed to read cached dropdown options: $e');
       return [];
     }
   }
@@ -577,65 +615,76 @@ class _AddProductScreenState extends State<AddProductScreen> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        leading: GestureDetector(
-          onTap: () => context.pop(),
-          child: Container(
-            margin: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 16,
-              color: Color(0xFF0F172A),
-            ),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 18,
+            color: _textHeadline,
           ),
+          onPressed: () => context.pop(),
         ),
-        title: Text(
-          widget.editProduct != null ? 'Edit Product' : 'Add New Product',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF0F172A),
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _isEditMode ? 'Edit Product' : 'Add New Product',
+              style: GoogleFonts.poppins(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: _textHeadline,
+              ),
+            ),
+            Text(
+              _isEditMode
+                  ? 'Update listing details & pricing'
+                  : 'List fresh produce to the marketplace',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: _textSubtle,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
-        centerTitle: false,
         actions: [
+          // Online / Offline Status Chip
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.only(right: 8),
             child: Center(
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
+                  horizontal: 10,
+                  vertical: 4,
                 ),
                 decoration: BoxDecoration(
                   color: _isOnline
-                      ? Colors.green.withValues(alpha: 0.1)
-                      : Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
+                      ? const Color(0xFFECFDF5)
+                      : const Color(0xFFFFF7ED),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _isOnline ? Colors.green : Colors.orange,
-                    width: 1,
+                    color: _isOnline
+                        ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                        : const Color(0xFFF97316).withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     CircleAvatar(
-                      radius: 4,
-                      backgroundColor: _isOnline ? Colors.green : Colors.orange,
+                      radius: 3.5,
+                      backgroundColor: _isOnline
+                          ? const Color(0xFF059669)
+                          : const Color(0xFFF97316),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Text(
                       _isOnline ? 'Online' : 'Offline',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                         color: _isOnline
-                            ? Colors.green[700]
-                            : Colors.orange[700],
+                            ? const Color(0xFF059669)
+                            : const Color(0xFFC2410C),
                       ),
                     ),
                   ],
@@ -643,7 +692,21 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
             ),
           ),
+          if (_isEditMode)
+            IconButton(
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+                color: Color(0xFFEF4444),
+                size: 22,
+              ),
+              onPressed: _isLoading ? null : _deleteProduct,
+              tooltip: 'Delete Product',
+            ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: _borderColor, height: 1),
+        ),
       ),
       body: SafeArea(
         child: LayoutBuilder(
@@ -658,21 +721,21 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       physics: const BouncingScrollPhysics(),
                       padding: EdgeInsets.symmetric(
                         horizontal: isWidescreen ? 32 : 16,
-                        vertical: 24,
+                        vertical: 16,
                       ),
                       child: Center(
                         child: ConstrainedBox(
                           constraints: BoxConstraints(
-                            maxWidth: isWidescreen ? 1240 : 680,
+                            maxWidth: isWidescreen ? 1100 : 640,
                           ),
                           child: isWidescreen
-                              ? _buildDesktopWidescreenLayout()
-                              : _buildMobileStackedLayout(),
+                              ? _buildDesktopLayout()
+                              : _buildMobileLayout(),
                         ),
                       ),
                     ),
                   ),
-                  _buildBottomStickyActionBar(isWidescreen),
+                  _buildBottomActionBar(isWidescreen),
                 ],
               ),
             );
@@ -682,7 +745,26 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-  Widget _buildDesktopWidescreenLayout() {
+  Widget _buildMobileLayout() {
+    return Column(
+      children: [
+        _buildMediaSection(),
+        const SizedBox(height: 16),
+        _buildBasicInfoSection(),
+        const SizedBox(height: 16),
+        _buildPricingSection(),
+        const SizedBox(height: 16),
+        _buildPromotionsSection(),
+        const SizedBox(height: 16),
+        _buildFarmingDetailsSection(),
+        const SizedBox(height: 16),
+        _buildLivePreviewCard(),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildDesktopLayout() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -690,26 +772,25 @@ class _AddProductScreenState extends State<AddProductScreen> {
           flex: 5,
           child: Column(
             children: [
-              _buildFormCard(
-                title: 'Media',
-                icon: Icons.photo_library_rounded,
-                child: _buildImagePicker(),
-              ),
-              const SizedBox(height: 24),
+              _buildMediaSection(),
+              const SizedBox(height: 20),
               _buildLivePreviewCard(),
             ],
           ),
         ),
-        const SizedBox(width: 32),
+        const SizedBox(width: 24),
         Expanded(
           flex: 7,
           child: Column(
             children: [
-              _buildBasicInfoCard(),
+              _buildBasicInfoSection(),
+              const SizedBox(height: 20),
+              _buildPricingSection(),
+              const SizedBox(height: 20),
+              _buildPromotionsSection(),
+              const SizedBox(height: 20),
+              _buildFarmingDetailsSection(),
               const SizedBox(height: 24),
-              _buildPricingCategoryCard(),
-              const SizedBox(height: 24),
-              _buildFarmingDetailsCard(),
             ],
           ),
         ),
@@ -717,343 +798,571 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-  Widget _buildMobileStackedLayout() {
-    return Column(
-      children: [
-        _buildFormCard(
-          title: 'Media',
-          icon: Icons.photo_library_rounded,
-          child: _buildImagePicker(),
-        ),
-        const SizedBox(height: 20),
-        _buildLivePreviewCard(),
-        const SizedBox(height: 20),
-        _buildBasicInfoCard(),
-        const SizedBox(height: 20),
-        _buildPricingCategoryCard(),
-        const SizedBox(height: 20),
-        _buildFarmingDetailsCard(),
-      ],
-    );
-  }
-
-  Widget _buildBasicInfoCard() {
-    return _buildFormCard(
-      title: 'Basic Information',
-      icon: Icons.info_outline_rounded,
+  // ─── 1. Media Upload Section ───
+  Widget _buildMediaSection() {
+    return _buildSectionCard(
+      title: 'Product Photos',
+      subtitle: 'Upload up to 5 clear photos. First photo is the main cover.',
+      icon: Icons.photo_library_rounded,
+      badge: '${_selectedImageFiles.length}/5',
       child: Column(
         children: [
-          _buildTextField(
-            controller: _nameController,
-            label: 'Product Name',
-            hint: 'e.g., Fresh Organic Tomatoes',
-            validator: (value) =>
-                value?.isEmpty ?? true ? 'Product name is required' : null,
-          ),
-          const SizedBox(height: 16),
-          _buildTextField(
-            controller: _descriptionController,
-            label: 'Description',
-            hint: 'Highlight key details (organic, size, origin)...',
-            maxLines: 4,
-          ),
+          if (_selectedImageFiles.isNotEmpty)
+            SizedBox(
+              height: 110,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: _selectedImageFiles.length +
+                    (_selectedImageFiles.length < 5 ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == _selectedImageFiles.length) {
+                    return _buildAddMorePhotoButton();
+                  }
+
+                  final item = _selectedImageFiles[index];
+                  final isMain = index == 0;
+
+                  return Container(
+                    width: 100,
+                    margin: const EdgeInsets.only(right: 10),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: item.isExisting
+                              ? CachedNetworkImage(
+                                  imageUrl: item.path,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, _) => Container(
+                                    color: const Color(0xFFF1F5F9),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: _primary,
+                                      ),
+                                    ),
+                                  ),
+                                  errorWidget: (_, _, _) => Container(
+                                    color: const Color(0xFFF1F5F9),
+                                    child: const Icon(
+                                      Icons.broken_image,
+                                      color: _textSubtle,
+                                    ),
+                                  ),
+                                )
+                              : Image.memory(item.bytes, fit: BoxFit.cover),
+                        ),
+                        // Main Cover Badge
+                        Positioned(
+                          top: 6,
+                          left: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isMain
+                                  ? _primary
+                                  : Colors.black.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              isMain ? 'COVER' : '#${index + 1}',
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Delete Button
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedImageFiles.removeAt(index);
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.65),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            )
+          else
+            _buildEmptyPhotoUploader(),
         ],
       ),
     );
   }
 
-  Widget _buildPricingCategoryCard() {
-    return _buildFormCard(
-      title: 'Pricing & Category',
-      icon: Icons.sell_outlined,
+  Widget _buildEmptyPhotoUploader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFCBD5E1),
+          style: BorderStyle.solid,
+        ),
+      ),
       child: Column(
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final useStackedLayout = constraints.maxWidth < 360;
-
-              if (useStackedLayout) {
-                return Column(
-                  children: [
-                    _buildTextField(
-                      controller: _priceController,
-                      label: 'Price',
-                      hint: '0.00',
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      prefixIcon: Icons.sell_outlined,
-                      prefixText: '₱ ',
-                      validator: (value) {
-                        if (value?.isEmpty ?? true) return 'Required';
-                        if (double.tryParse(value!) == null) {
-                          return 'Invalid';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDropdownField(
-                      label: 'Unit',
-                      value: _selectedUnit,
-                      items: _units,
-                      onChanged: (value) =>
-                          setState(() => _selectedUnit = value),
-                    ),
-                  ],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: _buildTextField(
-                      controller: _priceController,
-                      label: 'Price',
-                      hint: '0.00',
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      prefixIcon: Icons.sell_outlined,
-                      prefixText: '₱ ',
-                      validator: (value) {
-                        if (value?.isEmpty ?? true) return 'Required';
-                        if (double.tryParse(value!) == null) {
-                          return 'Invalid';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: _buildDropdownField(
-                      label: 'Unit',
-                      value: _selectedUnit,
-                      items: _units,
-                      onChanged: (value) =>
-                          setState(() => _selectedUnit = value),
-                    ),
-                  ),
-                ],
-              );
-            },
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF5),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.add_a_photo_rounded,
+              color: _primary,
+              size: 26,
+            ),
           ),
-          const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final useStackedLayout = constraints.maxWidth < 360;
-
-              if (useStackedLayout) {
-                return Column(
-                  children: [
-                    _buildTextField(
-                      controller: _quantityController,
-                      label: 'Available Quantity',
-                      hint: '0',
-                      keyboardType: TextInputType.number,
-                      prefixIcon: Icons.inventory_2_outlined,
-                      validator: (value) {
-                        if (value?.isEmpty ?? true) return 'Required';
-                        if (double.tryParse(value!) == null) {
-                          return 'Invalid';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        border: Border.all(color: Colors.grey[200]!),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Total Value',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _calculateTotalValue(),
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: _buildTextField(
-                      controller: _quantityController,
-                      label: 'Available Quantity',
-                      hint: '0',
-                      keyboardType: TextInputType.number,
-                      prefixIcon: Icons.inventory_2_outlined,
-                      validator: (value) {
-                        if (value?.isEmpty ?? true) return 'Required';
-                        if (double.tryParse(value!) == null) {
-                          return 'Invalid';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        border: Border.all(color: Colors.grey[200]!),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Total Value',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _calculateTotalValue(),
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-          _buildDropdownField(
-            label: 'Category',
-            value: _selectedCategory,
-            items: _categories,
-            onChanged: (value) => setState(() => _selectedCategory = value),
-          ),
-          const SizedBox(height: 24),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Promotions & Offers',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF0F172A),
-              ),
+          const SizedBox(height: 10),
+          Text(
+            'Upload Fresh Produce Photos',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: _textHeadline,
             ),
           ),
           const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Boost your sales by opting into marketplace promotions.',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: const Color(0xFF64748B),
+          Text(
+            'High quality photos increase buyer trust and orders.',
+            style: GoogleFonts.inter(fontSize: 12, color: _textSubtle),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _pickImageSource(ImageSource.camera),
+                  icon: const Icon(Icons.camera_alt_rounded, size: 16),
+                  label: const Text('Camera'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _primary,
+                    side: const BorderSide(color: Color(0xFF10B981)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildCheckboxTile(
-            title: 'Free Shipping',
-            subtitle: 'Cover delivery costs for buyers',
-            value: _isFreeShipping,
-            onChanged: (value) => setState(() => _isFreeShipping = value ?? false),
-          ),
-          const SizedBox(height: 8),
-          _buildCheckboxTile(
-            title: 'Wholesale Pricing',
-            subtitle: 'Offer bulk discounts to buyers',
-            value: _isWholesale,
-            onChanged: (value) => setState(() => _isWholesale = value ?? false),
-          ),
-          const SizedBox(height: 8),
-          _buildCheckboxTile(
-            title: 'Flash Sale',
-            subtitle: 'Feature this item in the next flash sale',
-            value: _isFlashSale,
-            onChanged: (value) => setState(() => _isFlashSale = value ?? false),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _pickImageSource(ImageSource.gallery),
+                  icon: const Icon(Icons.photo_library_rounded, size: 16),
+                  label: const Text('Gallery'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFarmingDetailsCard() {
-    return _buildFormCard(
-      title: 'Farming Details',
+  Widget _buildAddMorePhotoButton() {
+    return GestureDetector(
+      onTap: () => _pickImageSource(ImageSource.gallery),
+      child: Container(
+        width: 100,
+        margin: const EdgeInsets.only(right: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: const Color(0xFFCBD5E1),
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.add_photo_alternate_rounded, color: _primary, size: 24),
+            const SizedBox(height: 4),
+            Text(
+              'Add More',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: _primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── 2. Basic Information Section ───
+  Widget _buildBasicInfoSection() {
+    return _buildSectionCard(
+      title: 'Basic Information',
+      subtitle: 'Name your product and choose its marketplace category',
+      icon: Icons.info_outline_rounded,
+      child: Column(
+        children: [
+          _buildStyledTextField(
+            controller: _nameController,
+            label: 'Product / Crop Name',
+            hint: 'e.g., Fresh Organic Native Tomatoes',
+            prefixIcon: Icons.grass_rounded,
+            validator: (value) =>
+                value?.trim().isEmpty ?? true ? 'Product name is required' : null,
+          ),
+          const SizedBox(height: 14),
+          _buildCategoryDropdown(),
+          const SizedBox(height: 14),
+          _buildStyledTextField(
+            controller: _descriptionController,
+            label: 'Description & Origin (Optional)',
+            hint: 'Describe farming practices (organic, pesticide-free), taste profile, harvest origin...',
+            maxLines: 3,
+            prefixIcon: Icons.description_outlined,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── 3. Pricing & Inventory Section ───
+  Widget _buildPricingSection() {
+    return _buildSectionCard(
+      title: 'Pricing & Inventory',
+      subtitle: 'Set unit pricing and current stock availability',
+      icon: Icons.sell_outlined,
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: _buildStyledTextField(
+                  controller: _priceController,
+                  label: 'Price per Unit',
+                  hint: '0.00',
+                  prefixText: '₱ ',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  validator: (value) {
+                    if (value?.trim().isEmpty ?? true) return 'Required';
+                    if (double.tryParse(value!) == null) return 'Invalid';
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: _buildUnitDropdown(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: _buildStyledTextField(
+                  controller: _quantityController,
+                  label: 'Available Stock',
+                  hint: 'e.g., 50',
+                  prefixIcon: Icons.inventory_2_outlined,
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value?.trim().isEmpty ?? true) return 'Required';
+                    if (double.tryParse(value!) == null) return 'Invalid';
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Dynamic Total Value Pill
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Total Inventory Value',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: _textHeadline,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                        ),
+                      ),
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        _calculateTotalValue(),
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: _primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── 4. Promotions & Marketplace Features (Replaces Grey Checkboxes) ───
+  Widget _buildPromotionsSection() {
+    return _buildSectionCard(
+      title: 'Marketplace Features & Promotions',
+      subtitle: 'Attract more buyers and enable bulk or seasonal discounts',
+      icon: Icons.auto_awesome_rounded,
+      child: Column(
+        children: [
+          _buildFeatureToggleTile(
+            icon: Icons.local_shipping_outlined,
+            iconColor: const Color(0xFF0284C7),
+            title: 'Free Shipping',
+            subtitle: 'Cover delivery costs to attract 3x more consumer orders',
+            value: _isFreeShipping,
+            onChanged: (val) => setState(() => _isFreeShipping = val),
+          ),
+          const SizedBox(height: 10),
+          _buildFeatureToggleTile(
+            icon: Icons.storefront_outlined,
+            iconColor: const Color(0xFF7C3AED),
+            title: 'Wholesale Pricing',
+            subtitle: 'Offer volume discounts for restaurants, bulk buyers & vendors',
+            value: _isWholesale,
+            onChanged: (val) => setState(() => _isWholesale = val),
+          ),
+          const SizedBox(height: 10),
+          _buildFeatureToggleTile(
+            icon: Icons.bolt_rounded,
+            iconColor: const Color(0xFFEA580C),
+            title: 'Flash Sale Nomination',
+            subtitle: 'Spotlight this item in seasonal and weekend flash deals',
+            value: _isFlashSale,
+            onChanged: (val) => setState(() => _isFlashSale = val),
+          ),
+          if (_isFlashSale) ...[
+            const SizedBox(height: 10),
+            _buildStyledTextField(
+              controller: _discountPercentController,
+              label: 'Flash Sale Discount Percentage (%)',
+              hint: 'e.g., 35',
+              prefixIcon: Icons.percent_rounded,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Countdown Duration',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF334155),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _buildAddProdDurationChip('Midnight', 'midnight'),
+                _buildAddProdDurationChip('24 Hours', '24_hours'),
+                _buildAddProdDurationChip('3 Days', '3_days'),
+                _buildAddProdDurationChip('7 Days', '7_days'),
+                _buildAddProdDurationChip('Custom Date', 'custom'),
+              ],
+            ),
+            if (_flashDurationOption == 'custom') ...[
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _flashSaleEndDate ??
+                        DateTime.now().add(const Duration(days: 1)),
+                    firstDate: DateTime.now(),
+                    lastDate:
+                        DateTime.now().add(const Duration(days: 90)),
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      _flashSaleEndDate = DateTime(
+                        picked.year,
+                        picked.month,
+                        picked.day,
+                        23,
+                        59,
+                        59,
+                      );
+                    });
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.event_rounded,
+                          size: 16, color: Color(0xFFDC2626)),
+                      const SizedBox(width: 8),
+                      Text(
+                        _flashSaleEndDate != null
+                            ? 'Ends: ${_flashSaleEndDate!.month}/${_flashSaleEndDate!.day}/${_flashSaleEndDate!.year}'
+                            : 'Pick Custom End Date',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E293B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ─── 5. Farming & Pre-order Details ───
+  Widget _buildFarmingDetailsSection() {
+    return _buildSectionCard(
+      title: 'Harvest & Pre-order Details',
+      subtitle: 'Schedule upcoming harvests and accept advance customer reservations',
       icon: Icons.eco_outlined,
       child: Column(
         children: [
-          _buildTextField(
+          _buildStyledTextField(
             controller: _harvestDaysController,
-            label: 'Days to Harvest (Optional)',
-            hint: 'e.g., 30',
-            keyboardType: TextInputType.number,
+            label: 'Estimated Days to Harvest (Optional)',
+            hint: 'e.g., 14',
             prefixIcon: Icons.calendar_month_rounded,
+            keyboardType: TextInputType.number,
           ),
-          const SizedBox(height: 16),
-          _buildCheckboxTile(
-            title: 'Pre-order Product',
-            subtitle: 'Allow customers to buy before harvest',
+          const SizedBox(height: 12),
+          _buildFeatureToggleTile(
+            icon: Icons.grass_rounded,
+            iconColor: const Color(0xFF059669),
+            title: 'Enable Pre-order for this Crop',
+            subtitle: 'Allow buyers to reserve and pay in advance before harvest date',
             value: _isPreorder,
-            onChanged: (value) => setState(() => _isPreorder = value ?? false),
+            onChanged: (val) => setState(() => _isPreorder = val),
           ),
+          if (_isPreorder) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    color: Color(0xFF059669),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Pre-orders let you post growth updates (🌱 sprouting, flowering, harvest) to build excitement with reserving buyers!',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: const Color(0xFF065F46),
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
+  // ─── 6. Live Marketplace Buyer Preview ───
   Widget _buildLivePreviewCard() {
     final name = _nameController.text.trim().isEmpty
-        ? 'Fresh Farm Product'
+        ? 'Fresh Farm Produce'
         : _nameController.text.trim();
     final priceText = _priceController.text.trim().isEmpty
         ? '0.00'
         : _priceController.text.trim();
     final qty = _quantityController.text.trim();
 
-    String categoryName = 'General Produce';
+    String categoryName = 'Produce';
     if (_selectedCategory != null) {
       final cat = _categories.firstWhere(
         (c) => c['id']?.toString() == _selectedCategory,
@@ -1062,25 +1371,25 @@ class _AddProductScreenState extends State<AddProductScreen> {
       if (cat['name'] != null) categoryName = cat['name'].toString();
     }
 
-    String unitName = '';
+    String unitName = 'kg';
     if (_selectedUnit != null) {
       final u = _units.firstWhere(
         (un) => un['id']?.toString() == _selectedUnit,
         orElse: () => <String, dynamic>{},
       );
-      if (u['name'] != null) unitName = '/ ${u['name']}';
+      if (u['name'] != null) unitName = u['name'].toString();
     }
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -1088,170 +1397,169 @@ class _AddProductScreenState extends State<AddProductScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: const BoxDecoration(
               color: Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              border: Border(bottom: BorderSide(color: _borderColor)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.remove_red_eye_rounded, size: 16, color: primary),
-                const SizedBox(width: 8),
+                const Icon(
+                  Icons.visibility_outlined,
+                  size: 16,
+                  color: _primary,
+                ),
+                const SizedBox(width: 6),
                 Text(
-                  'Live Marketplace Preview',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
+                  'Marketplace Live Preview',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F172A),
+                    color: _textHeadline,
                   ),
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2.5,
+                  ),
                   decoration: BoxDecoration(
-                    color: primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     'BUYER VIEW',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10,
+                    style: GoogleFonts.inter(
+                      fontSize: 9.5,
                       fontWeight: FontWeight.w800,
-                      color: primary,
-                      letterSpacing: 0.5,
+                      color: _primary,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          AspectRatio(
-            aspectRatio: 1.4,
-            child: Container(
-              width: double.infinity,
-              color: const Color(0xFFF1F5F9),
-              child: _selectedImageFiles.isNotEmpty
-                  ? ClipRRect(
-                      child: _selectedImageFiles.first.isExisting
-                          ? CachedNetworkImage(
-                              imageUrl: _selectedImageFiles.first.path,
-                              fit: BoxFit.cover,
-                              placeholder: (_, _) => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                              errorWidget: (_, _, _) => const Icon(Icons.error),
-                            )
-                          : Image.memory(
-                              _selectedImageFiles.first.bytes,
-                              fit: BoxFit.cover,
-                            ),
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.image_not_supported_outlined,
-                          size: 44,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No Image Uploaded Yet',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            color: Colors.grey[500],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
+            padding: const EdgeInsets.all(14),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    categoryName.toUpperCase(),
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF475569),
-                      letterSpacing: 0.5,
-                    ),
+                // Preview Image
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 76,
+                    height: 76,
+                    child: _selectedImageFiles.isNotEmpty
+                        ? (_selectedImageFiles.first.isExisting
+                            ? CachedNetworkImage(
+                                imageUrl: _selectedImageFiles.first.path,
+                                fit: BoxFit.cover,
+                              )
+                            : Image.memory(
+                                _selectedImageFiles.first.bytes,
+                                fit: BoxFit.cover,
+                              ))
+                        : Container(
+                            color: const Color(0xFFF1F5F9),
+                            child: const Icon(
+                              Icons.agriculture_rounded,
+                              color: Color(0xFF94A3B8),
+                              size: 28,
+                            ),
+                          ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      '₱$priceText',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: primary,
-                      ),
-                    ),
-                    if (unitName.isNotEmpty) ...[
-                      const SizedBox(width: 4),
-                      Text(
-                        unitName,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                    const Spacer(),
-                    if (_isPreorder)
+                const SizedBox(width: 12),
+                // Preview Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.amber.shade300),
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          'PRE-ORDER',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 10,
+                          categoryName.toUpperCase(),
+                          style: GoogleFonts.inter(
+                            fontSize: 9.5,
                             fontWeight: FontWeight.w700,
-                            color: Colors.amber.shade900,
+                            color: const Color(0xFF475569),
                           ),
                         ),
-                      )
-                    else if (qty.isNotEmpty)
+                      ),
+                      const SizedBox(height: 4),
                       Text(
-                        '$qty available',
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF64748B),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _textHeadline,
                         ),
                       ),
-                  ],
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Text(
+                            '₱$priceText',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: _primary,
+                            ),
+                          ),
+                          Text(
+                            ' / $unitName',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: _textSubtle,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (_isPreorder)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0F9FF),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(0xFF0284C7).withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Text(
+                                'PRE-ORDER',
+                                style: GoogleFonts.inter(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF0284C7),
+                                ),
+                              ),
+                            )
+                          else if (qty.isNotEmpty)
+                            Text(
+                              '$qty in stock',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: _textSubtle,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1261,217 +1569,108 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-  Widget _buildBottomStickyActionBar(bool isWidescreen) {
+  // ─── 7. Sticky Bottom Action Bar ───
+  Widget _buildBottomActionBar(bool isWidescreen) {
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: isWidescreen ? 32 : 16,
-        vertical: 16,
+        vertical: 12,
       ),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -4),
-          ),
-        ],
-        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(top: BorderSide(color: _borderColor)),
       ),
       child: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isWidescreen ? 1240 : 680),
-          child: isWidescreen
-              ? Row(
-                  children: [
-                    OutlinedButton(
-                      onPressed: () => context.pop(),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                        side: const BorderSide(color: Color(0xFFCBD5E1)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF475569),
-                        ),
-                      ),
+          constraints: BoxConstraints(maxWidth: isWidescreen ? 1100 : 640),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 1,
+                child: OutlinedButton(
+                  onPressed: () => context.pop(),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const Spacer(),
-                    if (widget.editProduct != null)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: OutlinedButton.icon(
-                          onPressed: _isLoading ? null : _deleteProduct,
-                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
-                          label: Text(
-                            'Delete',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.red,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            side: const BorderSide(color: Colors.red, width: 1.5),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _submitForm,
-                      icon: _isLoading
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                          : const Icon(Icons.check_circle_outline_rounded, size: 20),
-                      label: Text(
-                        widget.editProduct != null
-                            ? 'Save Changes'
-                            : (_isOnline ? 'Publish Product' : 'Save Offline & Publish Later'),
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primary,
-                        disabledBackgroundColor: primary.withValues(alpha: 0.5),
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF475569),
                     ),
-                  ],
-                )
-              : Row(
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: OutlinedButton(
-                        onPressed: () => context.pop(),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: const BorderSide(color: Color(0xFFCBD5E1)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          'Cancel',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF475569),
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (widget.editProduct != null) ...[
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 1,
-                        child: OutlinedButton.icon(
-                          onPressed: _isLoading ? null : _deleteProduct,
-                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 16),
-                          label: Text(
-                            'Delete',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.red,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: const BorderSide(color: Colors.red, width: 1.5),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: widget.editProduct != null ? 1 : 2,
-                      child: ElevatedButton.icon(
-                        onPressed: _isLoading ? null : _submitForm,
-                        icon: _isLoading
-                            ? const SizedBox(
-                                height: 16,
-                                width: 16,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.check_circle_outline_rounded, size: 16),
-                        label: Text(
-                          widget.editProduct != null
-                              ? 'Save'
-                              : (_isOnline ? 'Publish' : 'Save Offline'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primary,
-                          disabledBackgroundColor: primary.withValues(alpha: 0.5),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _submitForm,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 17,
+                        ),
+                  label: Text(
+                    _isEditMode
+                        ? 'Save Changes'
+                        : (_isOnline ? 'Publish Product' : 'Save Offline'),
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primary,
+                    disabledBackgroundColor: _primary.withValues(alpha: 0.5),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildFormCard({
+  // ─── Section Card Wrapper ───
+  Widget _buildSectionCard({
     required String title,
+    required String subtitle,
     required IconData icon,
+    String? badge,
     required Widget child,
   }) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        color: _bgCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -1481,204 +1680,133 @@ class _AddProductScreenState extends State<AddProductScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.1),
+                  color: const Color(0xFFECFDF5),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, size: 20, color: primary),
+                child: Icon(icon, size: 18, color: _primary),
               ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF0F172A),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: _textHeadline,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: _textSubtle,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              if (badge != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    badge,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _primary,
+                    ),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           child,
         ],
       ),
     );
   }
 
-  Widget _buildImagePicker() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Product Images',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF0F172A),
-              ),
-            ),
-            Text(
-              '${_selectedImageFiles.length}/5',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF64748B),
-              ),
-            ),
-          ],
+  // ─── Interactive Feature Toggle Tile (Replaces dated checkboxes) ───
+  Widget _buildFeatureToggleTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      decoration: BoxDecoration(
+        color: value ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: value
+              ? const Color(0xFF10B981).withValues(alpha: 0.4)
+              : _borderColor,
+          width: 1,
         ),
-        const SizedBox(height: 12),
-        if (_selectedImageFiles.isNotEmpty)
-          SizedBox(
-            height: 120,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: _selectedImageFiles.length + 1,
-              itemBuilder: (context, index) {
-                if (index == _selectedImageFiles.length) {
-                  if (_selectedImageFiles.length >= 5) {
-                    return const SizedBox.shrink();
-                  }
-
-                  return GestureDetector(
-                    onTap: _pickImage,
-                    child: Container(
-                      width: 100,
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        border: Border.all(
-                          color: primary.withValues(alpha: 0.1),
-                          width: 2,
-                          style: BorderStyle.solid,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.add_rounded,
-                          color: primary,
-                          size: 32,
-                        ),
-                      ),
-                    ),
-                  );
-                }
-
-                return Stack(
-                  children: [
-                    Container(
-                      width: 120,
-                      margin: const EdgeInsets.only(right: 12),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: _selectedImageFiles[index].isExisting
-                            ? CachedNetworkImage(
-                                imageUrl: _selectedImageFiles[index].path,
-                                height: 120,
-                                width: 120,
-                                fit: BoxFit.cover,
-                                placeholder: (_, _) => const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                                errorWidget: (_, _, _) => const Icon(Icons.error),
-                              )
-                            : Image.memory(
-                                _selectedImageFiles[index].bytes,
-                                height: 120,
-                                width: 120,
-                                fit: BoxFit.cover,
-                              ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 4,
-                      right: 16,
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedImageFiles.removeAt(index);
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-          )
-        else
-          GestureDetector(
-            onTap: _pickImage,
-            child: Container(
-              height: 160,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                border: Border.all(
-                  color: primary.withValues(alpha: 0.1),
-                  width: 2,
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: _textHeadline,
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: primary.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.add_a_photo_rounded,
-                      size: 32,
-                      color: primary,
-                    ),
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: _textSubtle,
+                    height: 1.3,
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Upload Product Images',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF0F172A),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Up to 5 images (JPG or PNG)',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-      ],
+          Switch(
+            value: value,
+            activeThumbColor: _primary,
+            activeTrackColor: const Color(0xFF10B981).withValues(alpha: 0.3),
+            onChanged: onChanged,
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildTextField({
+  Widget _buildStyledTextField({
     required TextEditingController controller,
     required String label,
     required String hint,
@@ -1693,231 +1821,263 @@ class _AddProductScreenState extends State<AddProductScreen> {
       children: [
         Text(
           label,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
+          style: GoogleFonts.inter(
+            fontSize: 12.5,
             fontWeight: FontWeight.w600,
-            color: const Color(0xFF334155),
+            color: _textHeadline,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
           maxLines: maxLines,
           validator: validator,
+          style: GoogleFonts.inter(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w500,
+            color: _textHeadline,
+          ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: GoogleFonts.plusJakartaSans(
-              color: Colors.grey[400],
-              fontSize: 14,
+            hintStyle: GoogleFonts.inter(
+              color: const Color(0xFF94A3B8),
+              fontSize: 13,
             ),
             filled: true,
             fillColor: const Color(0xFFF8FAFC),
             prefixIcon: prefixIcon != null
-                ? Icon(prefixIcon, color: Colors.grey[500], size: 20)
+                ? Icon(prefixIcon, color: const Color(0xFF94A3B8), size: 18)
                 : null,
             prefixText: prefixText,
-            prefixStyle: GoogleFonts.plusJakartaSans(
-              color: const Color(0xFF0F172A),
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
+            prefixStyle: GoogleFonts.poppins(
+              color: _primary,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+              borderSide: const BorderSide(color: _borderColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
+              borderSide: const BorderSide(color: _borderColor),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: primary, width: 2),
+              borderSide: const BorderSide(color: _primary, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.red, width: 1),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1),
             ),
             contentPadding: EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: maxLines > 1 ? 16 : 0,
+              horizontal: 14,
+              vertical: maxLines > 1 ? 12 : 10,
             ),
-          ),
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-            color: const Color(0xFF0F172A),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildDropdownField({
-    required String label,
-    required String? value,
-    required List<Map<String, dynamic>> items,
-    required ValueChanged<String?> onChanged,
-  }) {
-    final validValue = items.any((item) => (item['id'] as String?) == value) ? value : null;
+  Widget _buildCategoryDropdown() {
+    final validValue =
+        _categories.any((item) => (item['id'] as String?) == _selectedCategory)
+            ? _selectedCategory
+            : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          label,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
+          'Product Category',
+          style: GoogleFonts.inter(
+            fontSize: 12.5,
             fontWeight: FontWeight.w600,
-            color: const Color(0xFF334155),
+            color: _textHeadline,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         _isLoadingDropdowns
             ? Container(
-                height: 48,
+                height: 44,
                 decoration: BoxDecoration(
                   color: const Color(0xFFF8FAFC),
-                  border: Border.all(color: Colors.grey[200]!),
+                  border: Border.all(color: _borderColor),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Center(
+                child: const Center(
                   child: SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: AppShimmerLoader(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(Colors.grey[400]),
+                      color: _primary,
                     ),
-                  ),
-                ),
-              )
-            : items.isEmpty
-            ? Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.1)),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: Text(
-                    'No $label available',
-                    style: TextStyle(color: Colors.red[400]),
                   ),
                 ),
               )
             : DropdownButtonFormField<String>(
                 initialValue: validValue,
-                items: items.map((item) {
-                  final displayText =
-                      (item['name'] as String?) ??
-                      (item['id'] as String?) ??
-                      'Unknown';
+                items: _categories.map((item) {
+                  final displayText = (item['name'] as String?) ?? 'Produce';
                   final id = (item['id'] as String?) ?? '';
-                  return DropdownMenuItem(value: id, child: Text(displayText));
+                  return DropdownMenuItem(
+                    value: id,
+                    child: Text(displayText),
+                  );
                 }).toList(),
-                onChanged: onChanged,
-                icon: Icon(
+                onChanged: (val) => setState(() => _selectedCategory = val),
+                icon: const Icon(
                   Icons.keyboard_arrow_down_rounded,
-                  color: Colors.grey[500],
+                  color: Color(0xFF64748B),
+                ),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  prefixIcon: const Icon(
+                    Icons.category_outlined,
+                    size: 18,
+                    color: Color(0xFF94A3B8),
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _borderColor),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _borderColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _primary, width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                ),
+                style: GoogleFonts.inter(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                  color: _textHeadline,
+                ),
+                validator: (value) =>
+                    value == null || value.isEmpty ? 'Category is required' : null,
+              ),
+      ],
+    );
+  }
+
+  Widget _buildUnitDropdown() {
+    final validValue =
+        _units.any((item) => (item['id'] as String?) == _selectedUnit)
+            ? _selectedUnit
+            : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Unit',
+          style: GoogleFonts.inter(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: _textHeadline,
+          ),
+        ),
+        const SizedBox(height: 6),
+        _isLoadingDropdowns
+            ? Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  border: Border.all(color: _borderColor),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _primary,
+                    ),
+                  ),
+                ),
+              )
+            : DropdownButtonFormField<String>(
+                initialValue: validValue,
+                items: _units.map((item) {
+                  final displayText = (item['name'] as String?) ?? 'kg';
+                  final id = (item['id'] as String?) ?? '';
+                  return DropdownMenuItem(
+                    value: id,
+                    child: Text(displayText),
+                  );
+                }).toList(),
+                onChanged: (val) => setState(() => _selectedUnit = val),
+                icon: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: Color(0xFF64748B),
                 ),
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: const Color(0xFFF8FAFC),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+                    borderSide: const BorderSide(color: _borderColor),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
+                    borderSide: const BorderSide(color: _borderColor),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: primary, width: 2),
+                    borderSide: const BorderSide(color: _primary, width: 1.5),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 0,
+                    horizontal: 12,
+                    vertical: 10,
                   ),
                 ),
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 15,
+                style: GoogleFonts.inter(
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w500,
-                  color: const Color(0xFF0F172A),
+                  color: _textHeadline,
                 ),
                 validator: (value) =>
-                    value == null || value.isEmpty ? 'Required' : null,
+                    value == null || value.isEmpty ? 'Unit is required' : null,
               ),
       ],
     );
   }
 
-  Widget _buildCheckboxTile({
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool?> onChanged,
-  }) {
-    return InkWell(
-      onTap: () => onChanged(!value),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: value
-              ? primary.withValues(alpha: 0.1)
-              : const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: value ? primary.withValues(alpha: 0.1) : Colors.grey[200]!,
-            width: 1,
-          ),
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            SizedBox(
-              height: 24,
-              width: 24,
-              child: Checkbox(
-                value: value,
-                onChanged: onChanged,
-                activeColor: primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                side: BorderSide(color: Colors.grey[400]!, width: 1.5),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF0F172A),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+  Widget _buildAddProdDurationChip(String label, String value) {
+    final isSelected = _flashDurationOption == value;
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          color: isSelected ? Colors.white : const Color(0xFF334155),
         ),
       ),
+      selected: isSelected,
+      selectedColor: const Color(0xFFDC2626),
+      backgroundColor: const Color(0xFFF1F5F9),
+      side: BorderSide(
+        color: isSelected ? const Color(0xFFDC2626) : const Color(0xFFCBD5E1),
+      ),
+      onSelected: (selected) {
+        if (selected) {
+          setState(() {
+            _flashDurationOption = value;
+          });
+        }
+      },
     );
   }
 

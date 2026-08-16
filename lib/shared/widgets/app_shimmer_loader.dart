@@ -218,7 +218,7 @@ class AppShimmerCard extends StatelessWidget {
         children: [
           // Image skeleton with match border radius
           Expanded(
-            flex: 3,
+            flex: 5,
             child: ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               child: Container(
@@ -232,41 +232,37 @@ class AppShimmerCard extends StatelessWidget {
             ),
           ),
           Expanded(
+            flex: 6,
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   // Badge + Rating Row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      AppShimmerLoader.rectangle(width: 80, height: 20, borderRadius: 6),
-                      AppShimmerLoader.rectangle(width: 40, height: 20, borderRadius: 6),
+                      AppShimmerLoader.rectangle(width: 60, height: 16, borderRadius: 4),
+                      AppShimmerLoader.rectangle(width: 36, height: 16, borderRadius: 4),
                     ],
                   ),
-                  const SizedBox(height: 14),
                   // Title
-                  AppShimmerLoader.text(width: 140, height: 16),
-                  const SizedBox(height: 10),
+                  AppShimmerLoader.text(width: 120, height: 14),
                   // Farmer row
                   Row(
                     children: [
-                      AppShimmerLoader.circle(size: 20),
-                      const SizedBox(width: 8),
-                      AppShimmerLoader.text(width: 80, height: 11),
+                      AppShimmerLoader.circle(size: 16),
+                      const SizedBox(width: 6),
+                      AppShimmerLoader.text(width: 70, height: 10),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  // Progress indicator or description line
-                  AppShimmerLoader.rectangle(width: double.infinity, height: 8, borderRadius: 4),
-                  const Spacer(),
                   // Price and button row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      AppShimmerLoader.rectangle(width: 60, height: 24, borderRadius: 6),
-                      AppShimmerLoader.rectangle(width: 100, height: 38, borderRadius: 12),
+                      AppShimmerLoader.rectangle(width: 50, height: 18, borderRadius: 4),
+                      AppShimmerLoader.rectangle(width: 70, height: 26, borderRadius: 8),
                     ],
                   ),
                 ],

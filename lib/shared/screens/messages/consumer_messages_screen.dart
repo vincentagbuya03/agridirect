@@ -242,73 +242,96 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
             const SizedBox(height: 32),
             const Divider(),
             const SizedBox(height: 16),
-             _buildInfoTile(
-               icon: Icons.person_outline_rounded,
-               title: 'View Profile',
-               onTap: () async {
-                 Navigator.pop(context);
-                 try {
-                   final profile = await SupabaseDataService().getFarmerProfile(conversation.otherUserId);
-                   if (profile != null && profile['farmer_id'] != null) {
-                     if (context.mounted) {
-                       context.go(AppRoutes.farmerProfile(profile['farmer_id'].toString()));
-                     }
-                   } else {
-                     if (context.mounted) {
-                       ScaffoldMessenger.of(context).showSnackBar(
-                         SnackBar(content: Text('${conversation.otherDisplayName} is a customer profile.')),
-                       );
-                     }
-                   }
-                 } catch (e) {
-                   if (context.mounted) {
-                     ScaffoldMessenger.of(context).showSnackBar(
-                       const SnackBar(content: Text('Failed to load profile.')),
-                     );
-                   }
-                 }
-               },
-             ),
-             _buildInfoTile(
-               icon: Icons.notifications_off_outlined,
-               title: 'Mute Notifications',
-               onTap: () {
-                 Navigator.pop(context);
-                 ScaffoldMessenger.of(context).showSnackBar(
-                   SnackBar(content: Text('Notifications muted for ${conversation.otherDisplayName}.')),
-                 );
-               },
-             ),
-             _buildInfoTile(
-               icon: Icons.block_flipped,
-               title: 'Block User',
-               isDestructive: true,
-               onTap: () {
-                 Navigator.pop(context);
-                 showDialog(
-                   context: context,
-                   builder: (ctx) => AlertDialog(
-                     title: Text('Block ${conversation.otherDisplayName}?'),
-                     content: const Text('You will no longer receive messages or notifications from this user.'),
-                     actions: [
-                       TextButton(
-                         onPressed: () => Navigator.pop(ctx),
-                         child: const Text('Cancel'),
-                       ),
-                       TextButton(
-                         onPressed: () {
-                           Navigator.pop(ctx);
-                           ScaffoldMessenger.of(context).showSnackBar(
-                             SnackBar(content: Text('${conversation.otherDisplayName} has been blocked.')),
-                           );
-                         },
-                         child: const Text('Block', style: TextStyle(color: Colors.red)),
-                       ),
-                     ],
-                   ),
-                 );
-               },
-             ),
+            _buildInfoTile(
+              icon: Icons.person_outline_rounded,
+              title: 'View Profile',
+              onTap: () async {
+                Navigator.pop(context);
+                try {
+                  final profile = await SupabaseDataService().getFarmerProfile(
+                    conversation.otherUserId,
+                  );
+                  if (profile != null && profile['farmer_id'] != null) {
+                    if (context.mounted) {
+                      context.go(
+                        AppRoutes.farmerProfile(
+                          profile['farmer_id'].toString(),
+                        ),
+                      );
+                    }
+                  } else {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '${conversation.otherDisplayName} is a customer profile.',
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Failed to load profile.')),
+                    );
+                  }
+                }
+              },
+            ),
+            _buildInfoTile(
+              icon: Icons.notifications_off_outlined,
+              title: 'Mute Notifications',
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Notifications muted for ${conversation.otherDisplayName}.',
+                    ),
+                  ),
+                );
+              },
+            ),
+            _buildInfoTile(
+              icon: Icons.block_flipped,
+              title: 'Block User',
+              isDestructive: true,
+              onTap: () {
+                Navigator.pop(context);
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text('Block ${conversation.otherDisplayName}?'),
+                    content: const Text(
+                      'You will no longer receive messages or notifications from this user.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${conversation.otherDisplayName} has been blocked.',
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Block',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
             const SizedBox(height: 16),
           ],
         ),
@@ -341,6 +364,19 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant ConsumerMessagesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialConversationId != null &&
+        widget.initialConversationId != oldWidget.initialConversationId) {
+      setState(() {
+        _selectedConversationId = widget.initialConversationId;
+        _isKikoSelected = false;
+      });
+      NotificationService().setActiveConversation(widget.initialConversationId);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 900;
     return PopScope(
@@ -356,162 +392,114 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: isWide || _selectedConversationId != null
-            ? null
-            : AppBar(
-                backgroundColor: Colors.white,
-                surfaceTintColor: Colors.white,
-                elevation: 0,
-                centerTitle: false,
-                leading: context.canPop()
-                    ? IconButton(
-                        icon: const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          size: 20,
-                        ),
-                        onPressed: () => context.pop(),
-                      )
-                    : null,
-                title: Text(
-                  'Messages',
-                  style: AppTextStyles.headline1.copyWith(fontSize: 24),
-                ),
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(1),
-                  child: Container(
-                    color: AppColors.textSubtle.withValues(alpha: 0.1),
-                    height: 1,
-                  ),
-                ),
-                actions: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: _buildAsFarmerBadge(),
-                  ),
-                ],
-              ),
-        body: Column(
-          children: [
-            if (_errorText != null) _buildErrorBanner(),
-            Expanded(
-              child: StreamBuilder<List<MessageConversation>>(
-                stream: _inboxStream,
-                builder: (context, snapshot) {
-                  if (_startingInitialConversation) {
-                    return const Center(child: AppShimmerLoader());
-                  }
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              if (_errorText != null) _buildErrorBanner(),
+              Expanded(
+                child: StreamBuilder<List<MessageConversation>>(
+                  stream: _inboxStream,
+                  builder: (context, snapshot) {
+                    if (_startingInitialConversation) {
+                      return const Center(child: AppShimmerLoader());
+                    }
 
-                  if (snapshot.connectionState == ConnectionState.waiting &&
-                      !snapshot.hasData) {
-                    return const Center(child: AppShimmerLoader());
-                  }
+                    if (snapshot.connectionState == ConnectionState.waiting &&
+                        !snapshot.hasData) {
+                      return const Center(child: AppShimmerLoader());
+                    }
 
-                  if (snapshot.hasError) {
-                    return _buildEmptyState(
-                      title: 'Something went wrong',
-                      subtitle:
-                          'We couldn\'t load your messages. Please try again.',
-                      actionLabel: 'Retry',
-                      onPressed: _refreshInbox,
-                    );
-                  }
+                    if (snapshot.hasError) {
+                      return _buildEmptyState(
+                        title: 'Something went wrong',
+                        subtitle:
+                            'We couldn\'t load your messages. Please try again.',
+                        actionLabel: 'Retry',
+                        onPressed: _refreshInbox,
+                      );
+                    }
 
-                  final conversations =
-                      snapshot.data ?? const <MessageConversation>[];
+                    final conversations =
+                        snapshot.data ?? const <MessageConversation>[];
 
-                  if (conversations.isEmpty) {
-                    _selectedConversationId = null;
-                    return Scaffold(
-                      backgroundColor: AppColors.background,
-                      body: _buildEmptyState(
+                    if (conversations.isEmpty) {
+                      _selectedConversationId = null;
+                      return _buildEmptyState(
                         title: 'Your inbox is empty',
                         subtitle:
                             'Start a conversation from any product or farm profile to ask questions.',
                         actionLabel: 'Refresh Inbox',
                         onPressed: _refreshInbox,
-                      ),
-                    );
-                  }
-
-                  final hasSelectedConversation = conversations.any(
-                    (conversation) =>
-                        conversation.conversationId == _selectedConversationId,
-                  );
-
-                  if (!hasSelectedConversation &&
-                      !_startingInitialConversation) {
-                    if (isWide && conversations.isNotEmpty) {
-                      _selectedConversationId =
-                          conversations.first.conversationId;
-                      NotificationService().setActiveConversation(
-                        _selectedConversationId,
                       );
-                    } else if (!isWide) {
-                      _selectedConversationId = null;
                     }
-                  }
 
-                  MessageConversation? current;
-                  if (_selectedConversationId != null) {
-                    final found = conversations.where(
-                      (c) => c.conversationId == _selectedConversationId,
-                    );
-                    if (found.isNotEmpty) {
-                      current = found.first;
+                    MessageConversation? current;
+                    if (_selectedConversationId != null) {
+                      final found = conversations.where(
+                        (c) =>
+                            c.conversationId == _selectedConversationId ||
+                            c.otherUserId == _selectedConversationId,
+                      );
+                      if (found.isNotEmpty) {
+                        current = found.first;
+                        _selectedConversationId = current.conversationId;
+                      }
                     }
-                  }
 
-                  if (current == null && isWide && conversations.isNotEmpty && !_isKikoSelected) {
-                    current = conversations.first;
-                    _selectedConversationId = current.conversationId;
-                  }
+                    if (current == null &&
+                        isWide &&
+                        conversations.isNotEmpty &&
+                        !_isKikoSelected) {
+                      current = conversations.first;
+                      _selectedConversationId = current.conversationId;
+                    }
 
-                  if (isWide) {
-                    return _buildWebMessengerLayout(conversations, current);
-                  }
+                    if (isWide) {
+                      return _buildWebMessengerLayout(conversations, current);
+                    }
 
-                  if (current == null && _selectedConversationId == null) {
-                    return _buildConversationList(conversations);
-                  }
+                    if (current == null && _selectedConversationId == null) {
+                      return _buildConversationList(conversations);
+                    }
 
-                  if (current == null && _selectedConversationId != null) {
-                    return const Center(child: AppShimmerLoader());
-                  }
+                    if (current == null && _selectedConversationId != null) {
+                      return _buildConversationList(conversations);
+                    }
 
-                  return _buildChatPanel(current!);
-                },
+                    return _buildChatPanel(current!);
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildAsFarmerBadge() {
+  Widget _buildAsConsumerBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.1),
+        color: const Color(0xFFEFF6FF),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
+        border: Border.all(
+          color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.person_outline_rounded,
-            size: 14,
-            color: AppColors.warning,
-          ),
-          const SizedBox(width: 6),
+          const Text('🛒', style: TextStyle(fontSize: 12)),
+          const SizedBox(width: 4),
           Text(
-            'CUSTOMER',
-            style: AppTextStyles.labelSmall.copyWith(
-              fontSize: 10,
+            'BUYER',
+            style: GoogleFonts.inter(
+              fontSize: 10.5,
               fontWeight: FontWeight.w800,
-              letterSpacing: 1.0,
-              color: AppColors.warning,
+              color: const Color(0xFF2563EB),
+              letterSpacing: 0.4,
             ),
           ),
         ],
@@ -606,7 +594,7 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                           ),
                         ),
                         const Spacer(),
-                        _buildAsFarmerBadge(),
+                        _buildAsConsumerBadge(),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -644,10 +632,14 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
               ),
               // Pinned Kiko AI Assistant Contact
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 child: InkWell(
                   onTap: () {
-                    final isWideLayout = MediaQuery.of(context).size.width >= 800;
+                    final isWideLayout =
+                        MediaQuery.of(context).size.width >= 800;
                     if (isWideLayout) {
                       setState(() {
                         _isKikoSelected = true;
@@ -660,7 +652,10 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                   },
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: _isKikoSelected
                           ? const Color(0xFFD1FAE5)
@@ -681,14 +676,21 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFF10B981), width: 1.5),
+                            border: Border.all(
+                              color: const Color(0xFF10B981),
+                              width: 1.5,
+                            ),
                           ),
                           child: Padding(
                             padding: const EdgeInsets.all(4.0),
                             child: Image.asset(
                               'assets/images/kiko_happy.png',
                               errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(Icons.support_agent_rounded, color: Color(0xFF10B981), size: 22),
+                                  const Icon(
+                                    Icons.support_agent_rounded,
+                                    color: Color(0xFF10B981),
+                                    size: 22,
+                                  ),
                             ),
                           ),
                         ),
@@ -698,7 +700,8 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     'Kiko AI Assistant 🌾',
@@ -709,7 +712,10 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                                     ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFF10B981),
                                       borderRadius: BorderRadius.circular(8),
@@ -921,13 +927,13 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
             child: _isKikoSelected
                 ? const KikoAiChatScreen(embedMode: true)
                 : (current != null
-                    ? _buildWebChatPanel(current)
-                    : const Center(
-                        child: Text(
-                          'Select a conversation to start messaging',
-                          style: TextStyle(color: AppColors.textSubtle),
-                        ),
-                      )),
+                      ? _buildWebChatPanel(current)
+                      : const Center(
+                          child: Text(
+                            'Select a conversation to start messaging',
+                            style: TextStyle(color: AppColors.textSubtle),
+                          ),
+                        )),
           ),
         ),
       ],
@@ -1407,8 +1413,45 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
 
     return Column(
       children: [
+        // Mobile Header
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: [
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 18,
+                  color: AppColors.textHeadline,
+                ),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go(AppRoutes.home);
+                  }
+                },
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Messages',
+                style: GoogleFonts.poppins(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textHeadline,
+                ),
+              ),
+              const Spacer(),
+              _buildAsConsumerBadge(),
+            ],
+          ),
+        ),
+
+        // Search Bar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
           child: Container(
             height: 44,
             decoration: BoxDecoration(
@@ -1418,25 +1461,23 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.03),
                   blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  offset: const Offset(0, 3),
                 ),
               ],
-              border: Border.all(
-                color: AppColors.textSubtle.withValues(alpha: 0.1),
-              ),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: TextField(
               onChanged: (val) =>
                   setState(() => _conversationSearchQuery = val),
               decoration: InputDecoration(
                 hintText: 'Search conversations...',
-                hintStyle: AppTextStyles.bodyMedium.copyWith(
-                  color: Colors.grey.shade400,
-                  fontSize: 14,
+                hintStyle: GoogleFonts.inter(
+                  color: const Color(0xFF94A3B8),
+                  fontSize: 13.5,
                 ),
-                prefixIcon: Icon(
+                prefixIcon: const Icon(
                   Icons.search_rounded,
-                  color: Colors.grey.shade400,
+                  color: Color(0xFF94A3B8),
                   size: 20,
                 ),
                 border: InputBorder.none,
@@ -1447,13 +1488,153 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
             ),
           ),
         ),
+
+        // Pinned Kiko VIP AI Support Card
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFECFDF5), Color(0xFFD1FAE5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFF10B981).withValues(alpha: 0.3),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF059669).withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const KikoAiChatScreen(embedMode: false),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(18),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
+                  child: Row(
+                    children: [
+                      Stack(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: ClipOval(
+                              child: Image.asset(
+                                'assets/images/kiko_happy.png',
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            right: 1,
+                            bottom: 1,
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Kiko AI Assistant',
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                    color: const Color(0xFF064E3B),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 5,
+                                    vertical: 1.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF059669),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'VIP AI',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Moo! Ask 24/7 about orders, fresh crops, or deals!',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                color: const Color(0xFF047857),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 13,
+                        color: Color(0xFF059669),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // Conversations List
         Expanded(
           child: RefreshIndicator(
             onRefresh: _refreshInbox,
             displacement: 20,
             color: AppColors.accent,
             child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               itemBuilder: (context, index) {
                 final conversation = filtered[index];
                 final isSelected =
@@ -1461,30 +1642,27 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
 
                 return InkWell(
                   onTap: () => _openConversation(conversation),
-                  borderRadius: BorderRadius.circular(20),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.all(16),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.white : Colors.transparent,
-                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
                       border: Border.all(
                         color: isSelected
                             ? AppColors.accent.withValues(alpha: 0.3)
-                            : Colors.transparent,
-                        width: 1.5,
+                            : const Color(0xFFE2E8F0),
+                        width: 1.2,
                       ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: AppColors.textHeadline.withValues(
-                                  alpha: 0.05,
-                                ),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ]
-                          : [],
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF0F172A,
+                          ).withValues(alpha: 0.02),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
@@ -1492,21 +1670,20 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                           children: [
                             SafeCircleAvatar(
                               imageUrl: conversation.otherAvatarUrl,
-                              radius: 28,
+                              radius: 26,
                               defaultBucket: 'uploads',
-                              backgroundColor: isSelected
-                                  ? AppColors.accent.withValues(alpha: 0.1)
-                                  : AppColors.textSubtle.withValues(alpha: 0.1),
+                              backgroundColor: AppColors.accent.withValues(
+                                alpha: 0.1,
+                              ),
                               child: Text(
                                 conversation.otherDisplayName.isNotEmpty
                                     ? conversation.otherDisplayName[0]
                                           .toUpperCase()
                                     : '?',
-                                style: AppTextStyles.headline3.copyWith(
-                                  color: isSelected
-                                      ? AppColors.accent
-                                      : AppColors.textSubtle,
-                                  fontSize: 20,
+                                style: GoogleFonts.poppins(
+                                  color: AppColors.accent,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
@@ -1527,10 +1704,10 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                                       color: Colors.white,
                                       shape: BoxShape.circle,
                                     ),
-                                    padding: const EdgeInsets.all(2.5),
+                                    padding: const EdgeInsets.all(2),
                                     child: PulsingStatusIndicator(
                                       isOnline: true,
-                                      size: 11,
+                                      size: 10,
                                     ),
                                   ),
                                 );
@@ -1538,7 +1715,7 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1550,24 +1727,24 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                                       conversation.otherDisplayName,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: AppTextStyles.bodyLarge.copyWith(
+                                      style: GoogleFonts.poppins(
                                         fontWeight: FontWeight.w700,
-                                        color: AppColors.textHeadline,
+                                        fontSize: 15,
+                                        color: const Color(0xFF0F172A),
                                       ),
                                     ),
                                   ),
                                   Text(
                                     _formatTime(conversation.lastMessageAt),
-                                    style: AppTextStyles.labelSmall.copyWith(
+                                    style: GoogleFonts.inter(
                                       fontSize: 11,
-                                      color: isSelected
-                                          ? AppColors.accent
-                                          : AppColors.textSubtle,
+                                      fontWeight: FontWeight.w500,
+                                      color: const Color(0xFF94A3B8),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 4),
                               Row(
                                 children: [
                                   Expanded(
@@ -1575,13 +1752,14 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                                       _getDisplayText(conversation.lastMessage),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: AppTextStyles.bodyMedium.copyWith(
-                                        color: isSelected
-                                            ? AppColors.textHeadline
-                                            : AppColors.textSubtle,
+                                      style: GoogleFonts.inter(
+                                        color: conversation.unreadCount > 0
+                                            ? const Color(0xFF0F172A)
+                                            : const Color(0xFF64748B),
                                         fontWeight: conversation.unreadCount > 0
                                             ? FontWeight.w700
                                             : FontWeight.w400,
+                                        fontSize: 13,
                                       ),
                                     ),
                                   ),
@@ -1589,8 +1767,8 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                                     Container(
                                       margin: const EdgeInsets.only(left: 8),
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
+                                        horizontal: 7,
+                                        vertical: 3,
                                       ),
                                       decoration: BoxDecoration(
                                         color: AppColors.accent,
@@ -1598,7 +1776,7 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                                       ),
                                       child: Text(
                                         '${conversation.unreadCount}',
-                                        style: const TextStyle(
+                                        style: GoogleFonts.inter(
                                           color: Colors.white,
                                           fontSize: 10,
                                           fontWeight: FontWeight.w800,
@@ -1641,7 +1819,7 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
           child: SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               child: Row(
                 children: [
                   if (MediaQuery.of(context).size.width < 900)
@@ -1652,11 +1830,10 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                       }),
                       icon: const Icon(
                         Icons.arrow_back_ios_new_rounded,
-                        size: 20,
+                        size: 18,
                       ),
                       color: AppColors.textHeadline,
                     ),
-                  const SizedBox(width: 4),
                   Hero(
                     tag: 'avatar_${conversation.conversationId}',
                     child: SafeCircleAvatar(
@@ -1668,14 +1845,15 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                         conversation.otherDisplayName.isNotEmpty
                             ? conversation.otherDisplayName[0].toUpperCase()
                             : '?',
-                        style: AppTextStyles.headline3.copyWith(
+                        style: GoogleFonts.poppins(
                           color: AppColors.accent,
                           fontSize: 18,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1684,9 +1862,9 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                           conversation.otherDisplayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.bodyLarge.copyWith(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 17,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15.5,
                             color: AppColors.textHeadline,
                           ),
                         ),
@@ -1705,7 +1883,7 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                                 );
                               },
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 5),
                             Expanded(
                               child: ValueListenableBuilder<Set<String>>(
                                 valueListenable:
@@ -1719,7 +1897,7 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                                       'Active now',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: AppTextStyles.labelSmall.copyWith(
+                                      style: GoogleFonts.inter(
                                         color: AppColors.success,
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
@@ -1745,7 +1923,7 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                                     statusText,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: AppTextStyles.labelSmall.copyWith(
+                                    style: GoogleFonts.inter(
                                       color: AppColors.textSubtle,
                                       fontSize: 11,
                                     ),
@@ -1758,37 +1936,69 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
                       ],
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => _showCallDialog(
-                      conversation.otherDisplayName,
-                      conversation.otherAvatarUrl,
-                      conversation.otherUserId,
-                      isVideo: false,
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
                     ),
-                    icon: const Icon(
-                      Icons.phone_rounded,
-                      color: AppColors.accent,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => _showCallDialog(
+                        conversation.otherDisplayName,
+                        conversation.otherAvatarUrl,
+                        conversation.otherUserId,
+                        isVideo: false,
+                      ),
+                      icon: const Icon(
+                        Icons.phone_rounded,
+                        color: AppColors.accent,
+                        size: 18,
+                      ),
+                      tooltip: 'Voice Call',
                     ),
-                    tooltip: 'Voice Call',
                   ),
-                  IconButton(
-                    onPressed: () => _showCallDialog(
-                      conversation.otherDisplayName,
-                      conversation.otherAvatarUrl,
-                      conversation.otherUserId,
-                      isVideo: true,
+                  const SizedBox(width: 6),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
                     ),
-                    icon: const Icon(
-                      Icons.videocam_rounded,
-                      color: AppColors.accent,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => _showCallDialog(
+                        conversation.otherDisplayName,
+                        conversation.otherAvatarUrl,
+                        conversation.otherUserId,
+                        isVideo: true,
+                      ),
+                      icon: const Icon(
+                        Icons.videocam_rounded,
+                        color: Color(0xFF2563EB),
+                        size: 19,
+                      ),
+                      tooltip: 'Video Call',
                     ),
-                    tooltip: 'Video Call',
                   ),
-                  IconButton(
-                    onPressed: () => _showConversationInfo(conversation),
-                    icon: const Icon(
-                      Icons.info_outline_rounded,
-                      color: AppColors.textSubtle,
+                  const SizedBox(width: 6),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => _showConversationInfo(conversation),
+                      icon: const Icon(
+                        Icons.info_outline_rounded,
+                        color: Color(0xFF64748B),
+                        size: 18,
+                      ),
                     ),
                   ),
                 ],
@@ -2594,16 +2804,16 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
 
   Widget _buildQuickReplies() {
     final replies = [
-      'Is this product still available?',
-      'Where is the pickup location?',
-      'Can I order this for delivery?',
-      'How much is the shipping fee?',
-      'Thank you so much!',
+      '🌾 Is this crop still available?',
+      '📍 Where is the farm / pickup location?',
+      '🚚 Can I order this for delivery?',
+      '📦 When is the estimated harvest date?',
+      '💚 Thank you so much!',
     ];
 
     return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       child: ScrollConfiguration(
         behavior: ScrollConfiguration.of(context).copyWith(
           dragDevices: {
@@ -2623,15 +2833,18 @@ class _ConsumerMessagesScreenState extends State<ConsumerMessagesScreen> {
               child: ActionChip(
                 label: Text(
                   reply,
-                  style: AppTextStyles.bodySmall.copyWith(
+                  style: GoogleFonts.inter(
                     fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
+                    fontSize: 11.5,
+                    color: AppColors.accent,
                   ),
                 ),
-                backgroundColor: AppColors.primaryLight.withValues(alpha: 0.5),
-                side: BorderSide.none,
+                backgroundColor: AppColors.accent.withValues(alpha: 0.08),
+                side: BorderSide(
+                  color: AppColors.accent.withValues(alpha: 0.25),
+                ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 onPressed: () {
                   _composerController.text = reply;

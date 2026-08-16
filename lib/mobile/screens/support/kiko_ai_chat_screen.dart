@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import '../../../shared/styles/app_theme.dart';
+import 'dart:async';
 import '../../../shared/services/auth/auth_service.dart';
 
 class KikoAiChatScreen extends StatefulWidget {
@@ -12,28 +12,69 @@ class KikoAiChatScreen extends StatefulWidget {
   State<KikoAiChatScreen> createState() => _KikoAiChatScreenState();
 }
 
-class _KikoAiChatScreenState extends State<KikoAiChatScreen> {
+class _KikoAiChatScreenState extends State<KikoAiChatScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
   late final List<Map<String, dynamic>> _messages;
   bool _isTyping = false;
+  String _currentKikoMood = 'assets/images/kiko_happy.png';
 
   final AuthService _auth = AuthService();
 
-  List<String> get _quickPrompts {
+  // Categorized Discovery Prompts
+  List<Map<String, dynamic>> get _discoveryCategories {
     final isFarmer = _auth.isViewingAsFarmer;
     if (isFarmer) {
       return [
-        '🌾 How to list new crops?',
-        '🌧️ How does weather alert work?',
-        '📊 How to view my sales?',
+        {
+          'category': 'FARMING',
+          'icon': Icons.eco_rounded,
+          'color': const Color(0xFF059669),
+          'bg': const Color(0xFFECFDF5),
+          'prompts': [
+            '🌾 How to list & price new crops?',
+            '🌱 Best weather window for planting?',
+            '🌧️ How to protect crops from heavy rain?',
+          ],
+        },
+        {
+          'category': 'SALES & ORDERS',
+          'icon': Icons.receipt_long_rounded,
+          'color': const Color(0xFF2563EB),
+          'bg': const Color(0xFFEFF6FF),
+          'prompts': [
+            '📊 How to view my daily & monthly sales?',
+            '📦 How do harvest pre-orders work?',
+            '🎟️ How to create shop vouchers for fans?',
+          ],
+        },
       ];
     } else {
       return [
-        '🎟️ How to claim shop vouchers?',
-        '🚚 How do pre-orders work?',
-        '💳 Supported payment methods?',
+        {
+          'category': 'SHOPPING',
+          'icon': Icons.shopping_basket_rounded,
+          'color': const Color(0xFF059669),
+          'bg': const Color(0xFFECFDF5),
+          'prompts': [
+            '🛒 How to order fresh produce directly?',
+            '🎟️ How to claim discount vouchers?',
+            '🚚 How do pre-orders work?',
+          ],
+        },
+        {
+          'category': 'PAYMENT & SUPPORT',
+          'icon': Icons.payments_rounded,
+          'color': const Color(0xFF7C3AED),
+          'bg': const Color(0xFFF5F3FF),
+          'prompts': [
+            '💳 Supported payment & delivery methods?',
+            '📍 How to track my order status?',
+            '🎧 Contact direct customer support',
+          ],
+        },
       ];
     }
   }
@@ -45,8 +86,14 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen> {
     _messages = [
       {
         'isUser': false,
-        'text': 'Moo! Hello! I\'m Kiko your AgriDirect Carabao Assistant 🌾. How can I help you today? Tap a quick question below or type your inquiry!',
+        'text':
+            'Moo! Hello! I\'m Kiko, your official AgriDirect Carabao AI Assistant 🌾.\n\nAsk me anything about farming schedules, weather advisories, marketplace orders, or voucher discounts!',
         'time': nowStr,
+        'followUps': <String>[
+          '🌾 How to list new crops?',
+          '🌦️ Weather & Rain Advice',
+          '🎟️ Vouchers & Discounts',
+        ],
       },
     ];
   }
@@ -75,106 +122,177 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen> {
         'time': nowStr,
       });
       _isTyping = true;
+      _currentKikoMood = 'assets/images/kiko_cloudy.png'; // Thinking state
     });
 
     _scrollToBottom();
 
-    await Future<void>.delayed(const Duration(milliseconds: 1000));
+    await Future<void>.delayed(const Duration(milliseconds: 900));
     if (!mounted) return;
 
-    final String reply = _generateKikoAiReply(text);
+    final Map<String, dynamic> replyData = _generateKikoAiReply(text);
     final replyTimeStr = DateFormat('h:mm a').format(DateTime.now());
 
     setState(() {
       _isTyping = false;
+      _currentKikoMood = replyData['mood'] as String? ?? 'assets/images/kiko_happy.png';
       _messages.add({
         'isUser': false,
-        'text': reply,
+        'text': replyData['text'] as String,
         'time': replyTimeStr,
+        'followUps': replyData['followUps'] as List<String>?,
       });
     });
 
     _scrollToBottom();
   }
 
-  String _generateKikoAiReply(String userQuery) {
+  Map<String, dynamic> _generateKikoAiReply(String userQuery) {
     final lower = userQuery.toLowerCase();
 
-    // 1. Greetings & Personal Questions
-    if (lower.contains('hello') || lower.contains('hi') || lower.contains('kumusta') || lower.contains('kamusta') || lower.contains('gandang') || lower.contains('sino ka') || lower.contains('hey') || lower.contains('oy') || lower.contains('uy') || lower.contains('musta') || lower.contains('morning') || lower.contains('afternoon') || lower.contains('evening')) {
-      return 'Moo! 🐮 Magandang araw po! Ako si Kiko, ang inyong opisyal na AgriDirect Carabao AI Assistant 🌾.\n\n'
-          'Handa akong tumulong sa inyo—mula sa pag-order ng sariwang gulay at prutas, pag-preorder ng ani, hanggang sa pagbebenta at pag-track ng inyong orders. Anong maipaglilingkod ko ngayon?';
+    // 1. Greetings
+    if (lower.contains('hello') ||
+        lower.contains('hi') ||
+        lower.contains('kumusta') ||
+        lower.contains('kamusta') ||
+        lower.contains('gandang') ||
+        lower.contains('sino ka') ||
+        lower.contains('hey') ||
+        lower.contains('oy') ||
+        lower.contains('morning') ||
+        lower.contains('afternoon')) {
+      return {
+        'text':
+            'Moo! 🐮 Magandang araw po! Ako si Kiko, ang inyong opisyal na AgriDirect Carabao AI Assistant 🌾.\n\nHanda akong tumulong sa inyo—mula sa pag-order ng sariwang gulay at prutas, pag-preorder ng ani, hanggang sa pagbebenta at pag-track ng inyong orders.',
+        'mood': 'assets/images/kiko_happy.png',
+        'followUps': ['🌾 How to list crops?', '🛒 How to order?', '🌦️ Weather tips'],
+      };
     }
 
     // 2. Listing Crops & Selling (Farmer Support)
-    if (lower.contains('paano magbenta') || lower.contains('list') || lower.contains('crop') || lower.contains('sell') || lower.contains('magbenta') || lower.contains('product') || lower.contains('tindahan') || lower.contains('benta') || lower.contains('upload') || lower.contains('paninda') || lower.contains('tindero') || lower.contains('pano mag sell') || lower.contains('paano po magbenta') || lower.contains('gulay') || lower.contains('prutas')) {
-      return 'Moo! 🌱 Para mag-list at magbenta ng ani bilang magsasaka:\n\n'
-          '1️⃣ Pumunta sa Profile o gamitin ang top toggle para mag-switch sa **Farmer Mode**.\n'
-          '2️⃣ I-tap ang **"+ Add Product"** button sa inyong dashboard.\n'
-          '3️⃣ Mag-upload ng malinaw na larawan ng ani, ilagay ang presyo (per kg/bundle), at ilagay ang dami ng stock.\n'
-          '4️⃣ Kung hindi pa ready ang ani, maaari mong i-toggle ang **Pre-Order** at ilagay ang estimated harvest date.\n'
-          '5️⃣ I-tap ang **Publish** para makita agad ng mga buyers sa marketplace!';
+    if (lower.contains('list') ||
+        lower.contains('crop') ||
+        lower.contains('sell') ||
+        lower.contains('magbenta') ||
+        lower.contains('product') ||
+        lower.contains('tindahan') ||
+        lower.contains('upload') ||
+        lower.contains('gulay')) {
+      return {
+        'text':
+            'Moo! 🌱 Para mag-list at magbenta ng ani bilang magsasaka:\n\n'
+            '1️⃣ Pumunta sa Profile o gamitin ang top toggle para mag-switch sa **Farmer Mode**.\n'
+            '2️⃣ I-tap ang **"+ Add Product"** button sa inyong dashboard.\n'
+            '3️⃣ Mag-upload ng malinaw na larawan ng ani, ilagay ang presyo (per kg/bundle), at ilagay ang dami ng stock.\n'
+            '4️⃣ Kung paparating pa lang ang ani, maaari mong i-toggle ang **Pre-Order** at ilagay ang estimated harvest date.\n'
+            '5️⃣ I-tap ang **Publish** para makita agad ng mga buyers sa marketplace!',
+        'mood': 'assets/images/kiko_happy.png',
+        'followUps': ['📊 How to view my sales?', '🎟️ Create shop vouchers'],
+      };
     }
 
     // 3. Buying & How to Order (Consumer Support)
-    if (lower.contains('paano bumili') || lower.contains('order') || lower.contains('buy') || lower.contains('bumili') || lower.contains('cart') || lower.contains('checkout') || lower.contains('bili') || lower.contains('pabili') || lower.contains('pano bumili') || lower.contains('paorder') || lower.contains('purchase') || lower.contains('paano po bumili') || lower.contains('add to cart')) {
-      return 'Moo! 🛒 Madali lang bumili ng sariwang ani sa AgriDirect:\n\n'
-          '• Pumunta sa **Marketplace** tab para mag-browse ng fresh produce mula sa ating local farmers.\n'
-          '• I-tap ang item na gusto mo at piliin ang **Add to Cart** o **Buy Now**.\n'
-          '• Sa checkout, piliin ang inyong delivery address at payment method (Cash on Delivery / Pickup).\n'
-          '• Maaari ring mag-preorder ng mga aning paparating pa lang sa ilalim ng **Pre-Orders** hub!';
+    if (lower.contains('order') ||
+        lower.contains('buy') ||
+        lower.contains('bumili') ||
+        lower.contains('cart') ||
+        lower.contains('checkout') ||
+        lower.contains('pabili')) {
+      return {
+        'text':
+            'Moo! 🛒 Madali lang bumili ng sariwang ani sa AgriDirect:\n\n'
+            '• Pumunta sa **Marketplace** tab para mag-browse ng fresh produce mula sa ating local farmers.\n'
+            '• I-tap ang item na gusto mo at piliin ang **Add to Cart** o **Buy Now**.\n'
+            '• Sa checkout, piliin ang inyong delivery address at payment method (Cash on Delivery / Pickup).\n'
+            '• Maaari ring mag-preorder ng mga aning paparating pa lang sa ilalim ng **Pre-Orders** hub!',
+        'mood': 'assets/images/kiko_happy.png',
+        'followUps': ['💳 Payment methods?', '🎟️ Claim discount vouchers'],
+      };
     }
 
     // 4. Pre-Orders & Harvest Schedules
-    if (lower.contains('pre-order') || lower.contains('preorder') || lower.contains('reserve') || lower.contains('ani') || lower.contains('harvest') || lower.contains('advance') || lower.contains('paano mag pre order') || lower.contains('paparating') || lower.contains('padating') || lower.contains('pareserve')) {
-      return 'Moo! 🌾 Ang **Pre-Orders** ay paraan para ma-reserve mo ang ani habang tinatanim pa lang ng magsasaka!\n\n'
-          '• Siguradong sariwa dahil diretsong ihaharvest para sa order mo.\n'
-          '• Maaari mong i-track ang growth milestones ng tanim under **Orders -> Track Order**.\n'
-          '• Pagka-harvest, diretso itong ipadadala sa inyong tahanan o pickup point.';
+    if (lower.contains('pre-order') ||
+        lower.contains('preorder') ||
+        lower.contains('reserve') ||
+        lower.contains('ani') ||
+        lower.contains('harvest')) {
+      return {
+        'text':
+            'Moo! 🌾 Ang **Pre-Orders** ay paraan para ma-reserve mo ang ani habang tinatanim pa lang ng magsasaka!\n\n'
+            '• Siguradong sariwa dahil diretsong ihaharvest para sa order mo.\n'
+            '• Maaari mong i-track ang growth milestones ng tanim under **Orders -> Track Order**.\n'
+            '• Pagka-harvest, diretso itong ipadadala sa inyong tahanan o pickup point.',
+        'mood': 'assets/images/kiko_happy.png',
+        'followUps': ['🛒 Browse Marketplace', '📍 Track existing orders'],
+      };
     }
 
     // 5. Vouchers & Discounts
-    if (lower.contains('voucher') || lower.contains('discount') || lower.contains('tipid') || lower.contains('code') || lower.contains('claim') || lower.contains('promo') || lower.contains('sale') || lower.contains('bawas') || lower.contains('free delivery') || lower.contains('free shipping') || lower.contains('coupon') || lower.contains('less')) {
-      return 'Moo! 🎟️ Gusto mo ba ng karagdagang bawas sa presyo?\n\n'
-          '• Bisitahin ang pampublikong profile ng inyong paboritong magsasaka para mag-claim ng exclusive shop vouchers.\n'
-          '• Tingnan ang inyong claimed codes sa **Profile -> My Vouchers**.\n'
-          '• Awtomatikong ma-a-apply ang discount code kapag nag-checkout ka!';
+    if (lower.contains('voucher') ||
+        lower.contains('discount') ||
+        lower.contains('tipid') ||
+        lower.contains('code') ||
+        lower.contains('claim') ||
+        lower.contains('promo') ||
+        lower.contains('sale')) {
+      return {
+        'text':
+            'Moo! 🎟️ Gusto mo ba ng karagdagang bawas sa presyo?\n\n'
+            '• Bisitahin ang pampublikong profile ng inyong paboritong magsasaka para mag-claim ng exclusive shop vouchers.\n'
+            '• Tingnan ang inyong claimed codes sa **Profile -> My Vouchers**.\n'
+            '• Awtomatikong ma-a-apply ang discount code kapag nag-checkout ka!',
+        'mood': 'assets/images/kiko_happy.png',
+        'followUps': ['🛒 Go to Marketplace', '🌾 List new crops'],
+      };
     }
 
-    // 6. Weather Alerts & Climate Analytics
-    if (lower.contains('weather') || lower.contains('rain') || lower.contains('radar') || lower.contains('ulan') || lower.contains('bagyo') || lower.contains('panahon') || lower.contains('baha') || lower.contains('init') || lower.contains('forecast') || lower.contains('typhoon') || lower.contains('lingo') || lower.contains('araw')) {
-      return 'Moo! 🌧️ May live rain radar at weather alerts ang AgriDirect!\n\n'
-          '• Makikita sa inyong Home Dashboard ang kasalukuyang panahon at rain probability sa inyong barangay.\n'
-          '• Awtomatikong nagbibigay ng heads-up alert si Kiko kapag inaasahang uulan ngayon para ma-protektahan ang inyong ani at delivery schedule.';
+    // 6. Weather & Climate Advisories
+    if (lower.contains('weather') ||
+        lower.contains('rain') ||
+        lower.contains('ulan') ||
+        lower.contains('bagyo') ||
+        lower.contains('panahon') ||
+        lower.contains('init') ||
+        lower.contains('forecast') ||
+        lower.contains('spraying')) {
+      return {
+        'text':
+            'Moo! 🌧️ Narito ang live agronomic weather guidance mula kay Kiko:\n\n'
+            '• **Spraying Advisory**: Kung may banta ng ulan o hangin higit sa 15 km/h, ipagpaliban ang pag-spray ng foliar fertilizers para maiwasan ang wash-off.\n'
+            '• **Irrigation Window**: Sa mainit na araw (higit sa 30°C), magdilig nang maaga sa umaga (5:30–7:30 AM) para mabawasan ang evaporation.\n'
+            '• Buksan ang **Weather & Farm Intelligence** screen para sa live radar map at 24-hour temperature curve!',
+        'mood': 'assets/images/kiko_rainy.jpg',
+        'followUps': ['🌾 Crop care tips', '📦 Pre-orders status'],
+      };
     }
 
     // 7. Payment Methods & Shipping
-    if (lower.contains('payment') || lower.contains('cod') || lower.contains('cop') || lower.contains('pay') || lower.contains('bayad') || lower.contains('deliver') || lower.contains('shipping') || lower.contains('gcash') || lower.contains('maya') || lower.contains('bank') || lower.contains('card') || lower.contains('credit') || lower.contains('cash') || lower.contains('pera') || lower.contains('padala')) {
-      return 'Moo! 💳 Suportado ng AgriDirect ang dalawang ligtas na paraan ng pagbabayad:\n\n'
-          '1️⃣ **Cash on Delivery (COD)** – Magbayad pagkarating ng sariwang gulay at prutas sa inyong pintuan.\n'
-          '2️⃣ **Cash on Pickup (COP)** – Magbayad kapag kinuha ang order sa mismong farm hub ng magsasaka.\n\n'
-          'Maaari mong baguhin ang delivery address sa **Profile -> Address Book**.';
+    if (lower.contains('payment') ||
+        lower.contains('cod') ||
+        lower.contains('cop') ||
+        lower.contains('bayad') ||
+        lower.contains('deliver') ||
+        lower.contains('shipping') ||
+        lower.contains('gcash')) {
+      return {
+        'text':
+            'Moo! 💳 Suportado ng AgriDirect ang dalawang ligtas na paraan ng pagbabayad:\n\n'
+            '1️⃣ **Cash on Delivery (COD)** – Magbayad pagkarating ng sariwang gulay at prutas sa inyong pintuan.\n'
+            '2️⃣ **Cash on Pickup (COP)** – Magbayad kapag kinuha ang order sa mismong farm hub ng magsasaka.\n\n'
+            'Maaari mong i-manage ang inyong addresses sa **Profile -> Address Book**.',
+        'mood': 'assets/images/kiko_happy.png',
+        'followUps': ['🛒 Start Shopping', '🎟️ Claim Vouchers'],
+      };
     }
 
-    // 8. Support Escalation & Contact
-    if (lower.contains('tulong') || lower.contains('help') || lower.contains('support') || lower.contains('tawag') || lower.contains('contact') || lower.contains('reklamo') || lower.contains('report') || lower.contains('problem') || lower.contains('issue') || lower.contains('sira') || lower.contains('refund') || lower.contains('return') || lower.contains('mali') || lower.contains('kulang') || lower.contains('customer service') || lower.contains('hotline')) {
-      return 'Moo! 🎧 Kung kailangan mo ng direktang kausap o may problema sa order:\n\n'
-          '• Maaari kang mag-submit ng support ticket sa **Contact Support**.\n'
-          '• Mag-email sa support@agridirect.ph o tumawag sa ating hotline.\n'
-          '• O gamitin ang **Report an Issue** kung may na-encounter na bug o delivery glitch.';
-    }
-
-    // 9. Sales & Analytics (Farmer Support)
-    if (lower.contains('sales') || lower.contains('benta') || lower.contains('kita') || lower.contains('analytics') || lower.contains('tubo') || lower.contains('dashboard') || lower.contains('history') || lower.contains('magkano kinita') || lower.contains('pera ko') || lower.contains('balance') || lower.contains('wallet') || lower.contains('earnings') || lower.contains('revenue')) {
-      return 'Moo! 📊 Para makita ang inyong sales at kita:\n\n'
-          '• Pumunta sa **Farmer Dashboard** at i-tap ang **Analytics** tab.\n'
-          '• Makikita mo rito ang inyong total revenue, top selling crops, at sales history.\n'
-          '• Makakatulong ito sa inyo para magplano ng susunod na itatanim!';
-    }
-
-    // Default Friendly Intelligent Response
-    return 'Moo! 🌾 Salamat sa pagtatanong tungkol sa "$userQuery"!\n\n'
-        'Maaari mong i-explore ang **Marketplace** para sa mga sariwang gulay, tingnan ang **FAQs** sa ilalim ng Kiko Support, o pumunta sa **Contact Support** para sa direktang tulong ng ating team. Nandidito lang ako para tumulong!';
+    // Default Friendly Response
+    return {
+      'text':
+          'Moo! 🌾 Salamat sa pagtatanong tungkol sa "$userQuery"!\n\n'
+          'Maaari mong i-explore ang **Marketplace** para sa mga sariwang gulay, tingnan ang **Weather & Farm Intelligence** para sa agronomic forecasts, o mag-reach out sa **Contact Support** para sa direktang tulong.',
+      'mood': 'assets/images/kiko_happy.png',
+      'followUps': ['🌾 Listing crops guide', '🌦️ Weather Advisory', '🛒 How to order'],
+    };
   }
 
   void _scrollToBottom() {
@@ -192,310 +310,592 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: widget.embedMode
-          ? null
-          : AppBar(
-              backgroundColor: Colors.white,
-              elevation: 1,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: AppColors.textHeadline, size: 20),
-                onPressed: () => Navigator.pop(context),
-              ),
-              title: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFDCFCE7),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4.0),
-                      child: Image.asset(
-                        'assets/images/kiko_happy.png',
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.support_agent_rounded,
-                                color: Color(0xFF10B981), size: 20),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Kiko AI Assistant',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: AppColors.textHeadline,
-                        ),
-                      ),
-                      Text(
-                        'Online • Ready to help',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: const Color(0xFF10B981),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: widget.embedMode ? null : _buildAppBar(),
       body: SafeArea(
         child: Column(
           children: [
-            if (widget.embedMode)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border(
-                    bottom: BorderSide(color: Colors.grey.shade100, width: 1.5),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.01),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFDCFCE7),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4.0),
-                        child: Image.asset(
-                          'assets/images/kiko_happy.png',
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.support_agent_rounded,
-                                  color: Color(0xFF10B981), size: 22),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Kiko AI Assistant',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                            color: AppColors.textHeadline,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF10B981),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Online • Ready to help',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: const Color(0xFF10B981),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+            if (widget.embedMode) _buildEmbedHeader(),
+
+            // Chat Message List
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
-                padding: const EdgeInsets.all(16),
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                 itemCount: _messages.length + (_isTyping ? 1 : 0),
                 itemBuilder: (context, index) {
                   if (index == _messages.length && _isTyping) {
-                    return Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Kiko is typing...',
-                              style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSubtle),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                    return _buildTypingIndicator();
                   }
 
                   final msg = _messages[index];
                   final bool isUser = msg['isUser'] as bool;
+                  final followUps = msg['followUps'] as List<String>?;
 
-                  return Align(
-                    alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
-                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
-                      padding: const EdgeInsets.all(14),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: isUser ? AppColors.primary : Colors.white,
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(18),
-                          topRight: const Radius.circular(18),
-                          bottomLeft: Radius.circular(isUser ? 18 : 4),
-                          bottomRight: Radius.circular(isUser ? 4 : 18),
+                  return _buildMessageBubble(
+                    text: msg['text'].toString(),
+                    time: msg['time'].toString(),
+                    isUser: isUser,
+                    followUps: followUps,
+                  );
+                },
+              ),
+            ),
+
+            // Discovery Topic Horizontal Carousel (if not typing)
+            if (!_isTyping) _buildTopicCarousel(),
+
+            // Message Input Bar
+            _buildInputComposer(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 1. APP BAR & EMBED HEADER
+  // ===========================================================================
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(color: const Color(0xFFE2E8F0), height: 1),
+      ),
+      leading: IconButton(
+        icon: const Icon(
+          Icons.arrow_back_ios_new_rounded,
+          color: Color(0xFF0F172A),
+          size: 18,
+        ),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Row(
+        children: [
+          // Dynamic Kiko Avatar
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFECFDF5),
+              border: Border.all(
+                color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                width: 1.5,
+              ),
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                _currentKikoMood,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.smart_toy_rounded,
+                  color: Color(0xFF059669),
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Kiko AI Assistant',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          color: const Color(0xFF0F172A),
                         ),
-                        border: isUser ? null : Border.all(color: const Color(0xFFE2E8F0)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.02),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      child: Column(
-                        crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'AI',
+                        style: GoogleFonts.inter(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF059669),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  _isTyping ? 'Thinking...' : 'Online • Ready to help',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: _isTyping ? const Color(0xFFD97706) : const Color(0xFF059669),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(
+            Icons.delete_outline_rounded,
+            color: Color(0xFF64748B),
+            size: 20,
+          ),
+          tooltip: 'Clear Chat',
+          onPressed: () {
+            setState(() {
+              _messages.clear();
+              final nowStr = DateFormat('h:mm a').format(DateTime.now());
+              _messages.add({
+                'isUser': false,
+                'text':
+                    'Moo! Chat reset. How can I help you today? Pick a topic below or type your inquiry!',
+                'time': nowStr,
+              });
+            });
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmbedHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFFECFDF5),
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                _currentKikoMood,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.smart_toy_rounded,
+                  color: Color(0xFF059669),
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Kiko AI Carabao Assistant',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                Text(
+                  'Online 24/7 • Agricultural & Market Intelligence',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: const Color(0xFF059669),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 2. MESSAGE BUBBLE BUILDER
+  // ===========================================================================
+  Widget _buildMessageBubble({
+    required String text,
+    required String time,
+    required bool isUser,
+    List<String>? followUps,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment:
+            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment:
+                isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (!isUser) ...[
+                Container(
+                  width: 32,
+                  height: 32,
+                  margin: const EdgeInsets.only(right: 8, bottom: 2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFECFDF5),
+                    border: Border.all(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: ClipOval(
+                    child: Image.asset(
+                      _currentKikoMood,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.smart_toy_rounded,
+                        color: Color(0xFF059669),
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+
+              // Bubble Card
+              Flexible(
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.78,
+                  ),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: isUser
+                        ? const LinearGradient(
+                            colors: [Color(0xFF059669), Color(0xFF047857)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    color: isUser ? null : Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(20),
+                      topRight: const Radius.circular(20),
+                      bottomLeft: Radius.circular(isUser ? 20 : 4),
+                      bottomRight: Radius.circular(isUser ? 4 : 20),
+                    ),
+                    border: isUser
+                        ? null
+                        : Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF0F172A).withValues(
+                          alpha: isUser ? 0.08 : 0.03,
+                        ),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: isUser
+                        ? CrossAxisAlignment.end
+                        : CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        text,
+                        style: GoogleFonts.inter(
+                          color: isUser ? Colors.white : const Color(0xFF1E293B),
+                          fontSize: 13.5,
+                          height: 1.45,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        time,
+                        style: GoogleFonts.inter(
+                          color: isUser
+                              ? Colors.white.withValues(alpha: 0.75)
+                              : const Color(0xFF94A3B8),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Follow-up suggestion action chips
+          if (!isUser && followUps != null && followUps.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 40),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: followUps.map((chipText) {
+                  return InkWell(
+                    onTap: () => _sendMessage(chipText),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            msg['text'].toString(),
-                            style: GoogleFonts.plusJakartaSans(
-                              color: isUser ? Colors.white : AppColors.textHeadline,
-                              fontSize: 13.5,
-                              height: 1.45,
+                            chipText,
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFF059669),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            msg['time'].toString(),
-                            style: GoogleFonts.inter(
-                              color: isUser ? Colors.white70 : AppColors.textSubtle,
-                              fontSize: 10,
-                            ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 12,
+                            color: Color(0xFF059669),
                           ),
                         ],
                       ),
                     ),
                   );
-                },
-              ),
-            ),
-
-            // Quick Prompt Chips
-            Container(
-              height: 40,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _quickPrompts.length,
-                itemBuilder: (context, index) {
-                  final prompt = _quickPrompts[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ActionChip(
-                      elevation: 0,
-                      backgroundColor: Colors.white,
-                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
-                      label: Text(
-                        prompt,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      onPressed: () => _sendMessage(prompt),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // Message Input bar with ViewInsets padding for keyboard
-            Container(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                10,
-                16,
-                MediaQuery.of(context).viewInsets.bottom + 12,
-              ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: TextField(
-                        controller: _messageController,
-                        onSubmitted: (_) => _sendMessage(),
-                        decoration: InputDecoration(
-                          hintText: 'Ask Kiko anything...',
-                          hintStyle: GoogleFonts.inter(fontSize: 13, color: AppColors.textSubtle),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: () => _sendMessage(),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-                    ),
-                  ),
-                ],
+                }).toList(),
               ),
             ),
           ],
-        ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 3. BOUNCING DOTS TYPING INDICATOR
+  // ===========================================================================
+  Widget _buildTypingIndicator() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            margin: const EdgeInsets.only(right: 8, bottom: 2),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFECFDF5),
+              border: Border.all(
+                color: const Color(0xFF10B981).withValues(alpha: 0.3),
+              ),
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/images/kiko_cloudy.png',
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+                bottomLeft: Radius.circular(4),
+                bottomRight: Radius.circular(20),
+              ),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF059669),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Kiko is thinking…',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 4. TOPIC DISCOVERY CAROUSEL
+  // ===========================================================================
+  Widget _buildTopicCarousel() {
+    final categories = _discoveryCategories;
+
+    return Container(
+      height: 38,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        itemCount: categories.expand((c) => c['prompts'] as List<String>).length,
+        itemBuilder: (context, idx) {
+          final allPrompts =
+              categories.expand((c) => c['prompts'] as List<String>).toList();
+          final prompt = allPrompts[idx];
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                onTap: () => _sendMessage(prompt),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Text(
+                    prompt,
+                    style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF334155),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 5. INPUT COMPOSER
+  // ===========================================================================
+  Widget _buildInputComposer() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: TextField(
+                controller: _messageController,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _sendMessage(),
+                style: GoogleFonts.inter(
+                  fontSize: 13.5,
+                  color: const Color(0xFF0F172A),
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Ask Kiko anything…',
+                  hintStyle: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF059669), Color(0xFF047857)],
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _sendMessage(),
+                borderRadius: BorderRadius.circular(22),
+                child: const Icon(
+                  Icons.send_rounded,
+                  color: Colors.white,
+                  size: 19,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

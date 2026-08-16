@@ -273,27 +273,24 @@ class _CartScreenState extends State<CartScreen> {
               ),
             ),
             const SizedBox(width: 2),
-            Hero(
-              tag: 'product_image_${item.productId}',
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: CachedNetworkImage(
-                    imageUrl: item.imageUrl,
-                    width: 72,
-                    height: 72,
-                    fit: BoxFit.cover,
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: CachedNetworkImage(
+                  imageUrl: item.imageUrl,
+                  width: 72,
+                  height: 72,
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
@@ -349,7 +346,7 @@ class _CartScreenState extends State<CartScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          'â‚±${item.priceValue.toStringAsFixed(2)}',
+                          '₱${item.priceValue.toStringAsFixed(2)}',
                           style: AppTextStyles.headline3.copyWith(
                             color: AppColors.primary,
                             fontSize: 15,
@@ -479,7 +476,7 @@ class _CartScreenState extends State<CartScreen> {
                   ],
                 ),
                 Text(
-                  'â‚±${total.toStringAsFixed(2)}',
+                  '₱${total.toStringAsFixed(2)}',
                   style: AppTextStyles.headline1.copyWith(
                     color: AppColors.primary,
                     fontSize: 26,
@@ -1534,7 +1531,7 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                     ),
                     subtitle: Text(
-                      'Min Spend â‚±${minSpend.toStringAsFixed(0)} Â· ${type == 'flat' ? 'â‚±${val.toStringAsFixed(0)}' : '${val.toStringAsFixed(0)}%'} OFF',
+                      'Min Spend ₱${minSpend.toStringAsFixed(0)} · ${type == 'flat' ? '₱${val.toStringAsFixed(0)}' : '${val.toStringAsFixed(0)}%'} OFF',
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         color: AppColors.textSubtle,

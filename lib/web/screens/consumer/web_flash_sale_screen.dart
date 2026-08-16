@@ -21,6 +21,17 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
   late Timer _timer;
   Duration _timeLeft = const Duration();
   String _searchQuery = '';
+  String _selectedCategory = 'All Deals';
+  String _sortBy = 'highest_discount';
+
+  final List<String> _categories = [
+    'All Deals',
+    '🔥 30%+ Off',
+    'Vegetables',
+    'Fruits',
+    'Meat & Poultry',
+    'Rice & Grains',
+  ];
 
   @override
   void initState() {
@@ -58,8 +69,11 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
     super.dispose();
   }
 
-  void _addToCart(ProductItem product) async {
-    final result = await CartService().addItem(product);
+  void _addToCart(ProductItem product, double salePrice) async {
+    final discountedProduct = product.copyWith(
+      price: '₱${salePrice.toStringAsFixed(0)}',
+    );
+    final result = await CartService().addItem(discountedProduct);
     if (!mounted) return;
 
     if (result != null) {
@@ -77,9 +91,13 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
                 size: 20,
               ),
               const SizedBox(width: 10),
-              Text(
-                'Added ${product.name} to Cart!',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+              Expanded(
+                child: Text(
+                  'Added ${product.name} (Flash Deal ₱${salePrice.toStringAsFixed(0)}) to Cart!',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -101,6 +119,9 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SingleChildScrollView(
@@ -113,17 +134,19 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
                   setState(() => _searchQuery = q.toLowerCase()),
             ),
             _buildHeroBanner(),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1350),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildSectionHeader(),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
+                      _buildFilterBar(),
+                      const SizedBox(height: 20),
                       _buildProductGrid(),
                       const SizedBox(height: 80),
                     ],
@@ -138,6 +161,9 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
   }
 
   Widget _buildHeroBanner() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final hours = twoDigits(_timeLeft.inHours);
     final minutes = twoDigits(_timeLeft.inMinutes.remainder(60));
@@ -150,9 +176,9 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF7F1D1D), // Dark wine red
-            Color(0xFF991B1B), // Crimson
-            Color(0xFFDC2626), // Vivid red
+            Color(0xFF7F1D1D),
+            Color(0xFF991B1B),
+            Color(0xFFDC2626),
           ],
         ),
         boxShadow: [
@@ -193,27 +219,25 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1350),
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 48,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 16 : 32,
+                  vertical: isMobile ? 20 : 40,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Back button
                     InkWell(
                       onTap: () => context.pop(),
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
+                            horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.2),
-                          ),
+                              color: Colors.white.withValues(alpha: 0.2)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -236,7 +260,9 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 36),
+                    SizedBox(height: isMobile ? 16 : 28),
+
+                    // Main Titles + Timer Block
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -246,17 +272,13 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 6,
-                                ),
+                                    horizontal: 12, vertical: 5),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFEF3C7),
                                   borderRadius: BorderRadius.circular(20),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.1,
-                                      ),
+                                      color: Colors.black.withValues(alpha: 0.1),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -266,16 +288,16 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const Icon(
-                                      Icons.bolt_rounded,
-                                      size: 16,
-                                      color: Color(0xFF78350F),
+                                      Icons.flash_on_rounded,
+                                      size: 14,
+                                      color: Color(0xFFB45309),
                                     ),
-                                    const SizedBox(width: 6),
+                                    const SizedBox(width: 5),
                                     Text(
-                                      'LIMITED TIME DEALS · UP TO 50% OFF',
+                                      'LIMITED TIME HARVEST SALE',
                                       style: GoogleFonts.inter(
-                                        color: const Color(0xFF78350F),
-                                        fontSize: 11,
+                                        color: const Color(0xFFB45309),
+                                        fontSize: isMobile ? 9.5 : 11,
                                         fontWeight: FontWeight.w800,
                                         letterSpacing: 1.1,
                                       ),
@@ -283,47 +305,81 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 12),
                               Text(
-                                'Flash Deals',
+                                'Flash Harvest Deals ⚡',
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
-                                  fontSize: 42,
+                                  fontSize: isMobile ? 26 : 38,
                                   fontWeight: FontWeight.w800,
-                                  height: 1.1,
+                                  height: 1.15,
                                   letterSpacing: -0.5,
                                 ),
                               ),
-                              Text(
-                                'Ends in $hours:$minutes:$seconds ⚡',
-                                style: GoogleFonts.playfairDisplay(
-                                  color: const Color(0xFFFCA5A5),
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.w700,
-                                  fontStyle: FontStyle.italic,
-                                  height: 1.15,
+                              const SizedBox(height: 8),
+                              // Live countdown badge
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isMobile ? 12 : 16,
+                                  vertical: isMobile ? 6 : 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.35),
+                                  borderRadius: BorderRadius.circular(30),
+                                  border: Border.all(
+                                    color: const Color(0xFFFBBF24),
+                                    width: 1.2,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.timer_outlined,
+                                      size: 16,
+                                      color: Color(0xFFFBBF24),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'ENDS IN ',
+                                      style: GoogleFonts.inter(
+                                        color: const Color(0xFFFBBF24),
+                                        fontSize: isMobile ? 11 : 12,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                    Text(
+                                      '$hours : $minutes : $seconds',
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.white,
+                                        fontSize: isMobile ? 13 : 15,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 1.0,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 10),
                               ConstrainedBox(
                                 constraints: const BoxConstraints(
                                   maxWidth: 620,
                                 ),
                                 child: Text(
-                                  'Snag surplus farm harvests at deeply discounted wholesale prices before the timer runs out!',
+                                  'Snag farm fresh crops and surplus harvest at live discounted flash prices before midnight!',
                                   style: GoogleFonts.inter(
                                     color: Colors.white.withValues(alpha: 0.9),
-                                    fontSize: 15,
-                                    height: 1.6,
+                                    fontSize: isMobile ? 12.5 : 14.5,
+                                    height: 1.4,
                                   ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        if (MediaQuery.of(context).size.width > 768) ...[
+                        if (!isMobile) ...[
                           const SizedBox(width: 48),
-                          // Countdown Boxes
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 24,
@@ -416,32 +472,146 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
   }
 
   Widget _buildSectionHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text(
-          'Hot Deals Right Now',
-          style: GoogleFonts.poppins(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF0F172A),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Hot Deals Right Now',
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Discounted farm harvests with live remaining claim stock',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterBar() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
+    return Row(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _categories.map((cat) {
+                final isSelected = _selectedCategory == cat;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: InkWell(
+                    onTap: () => setState(() => _selectedCategory = cat),
+                    borderRadius: BorderRadius.circular(20),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFFDC2626) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFFDC2626)
+                              : const Color(0xFFE2E8F0),
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: const Color(0xFFDC2626)
+                                      .withValues(alpha: 0.25),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                )
+                              ]
+                            : null,
+                      ),
+                      child: Text(
+                        cat,
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Discounted fresh items with limited stock available today',
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            color: const Color(0xFF64748B),
+        if (!isMobile) ...[
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _sortBy,
+                icon: const Icon(Icons.arrow_drop_down,
+                    color: Color(0xFF64748B)),
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF1E293B),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12.5,
+                ),
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _sortBy = val);
+                  }
+                },
+                items: const [
+                  DropdownMenuItem(
+                      value: 'highest_discount',
+                      child: Text('Highest Discount')),
+                  DropdownMenuItem(
+                      value: 'price_low', child: Text('Price: Low to High')),
+                  DropdownMenuItem(
+                      value: 'price_high', child: Text('Price: High to Low')),
+                ],
+              ),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
 
   Widget _buildProductGrid() {
     final sw = MediaQuery.of(context).size.width;
-    int crossAxisCount = sw < 640 ? 1 : (sw < 960 ? 2 : (sw < 1200 ? 3 : 4));
+    int crossAxisCount = sw < 600 ? 2 : (sw < 960 ? 3 : (sw < 1200 ? 4 : 5));
+    double childAspectRatio = sw < 480
+        ? 0.58
+        : (sw < 640
+            ? 0.63
+            : (sw < 960
+                ? 0.68
+                : 0.72));
 
     return FutureBuilder<List<ProductItem>>(
       future: _productsFuture,
@@ -452,12 +622,13 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              mainAxisSpacing: 20,
-              crossAxisSpacing: 20,
-              childAspectRatio: 0.72,
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+              childAspectRatio: childAspectRatio,
             ),
-            itemCount: 8,
-            itemBuilder: (context, index) => const AppShimmerLoader(height: 280),
+            itemCount: 6,
+            itemBuilder: (context, index) =>
+                const AppShimmerLoader(height: 260),
           );
         }
 
@@ -470,10 +641,53 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
                     (p.description?.toLowerCase().contains(_searchQuery) ??
                         false) ||
                     (p.categoryName?.toLowerCase().contains(_searchQuery) ??
-                        false),
+                        false) ||
+                    p.farm.toLowerCase().contains(_searchQuery),
               )
               .toList();
         }
+
+        if (_selectedCategory == '🔥 30%+ Off') {
+          products = products.where((p) {
+            final discount = p.discountPercent ?? 30.0;
+            return discount >= 30.0;
+          }).toList();
+        } else if (_selectedCategory != 'All Deals') {
+          products = products
+              .where((p) =>
+                  p.categoryName?.toLowerCase().contains(_selectedCategory.toLowerCase()) ??
+                  false)
+              .toList();
+        }
+
+        if (_sortBy == 'highest_discount') {
+          products.sort((a, b) {
+            final dA = a.discountPercent ?? 0.0;
+            final dB = b.discountPercent ?? 0.0;
+            return dB.compareTo(dA);
+          });
+        } else if (_sortBy == 'price_low') {
+          products.sort((a, b) {
+            final pA = double.tryParse(
+                    a.price.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+                0;
+            final pB = double.tryParse(
+                    b.price.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+                0;
+            return pA.compareTo(pB);
+          });
+        } else if (_sortBy == 'price_high') {
+          products.sort((a, b) {
+            final pA = double.tryParse(
+                    a.price.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+                0;
+            final pB = double.tryParse(
+                    b.price.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+                0;
+            return pB.compareTo(pA);
+          });
+        }
+
         if (products.isEmpty) {
           return Center(
             child: Container(
@@ -525,15 +739,30 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            mainAxisSpacing: 20,
-            crossAxisSpacing: 20,
-            childAspectRatio: 0.84,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: childAspectRatio,
           ),
           itemCount: products.length,
           itemBuilder: (context, index) {
+            final product = products[index];
+            final double discount = product.discountPercent ?? 30.0;
+            final rawPrice = product.price.replaceAll(RegExp(r'[^0-9.]'), '');
+            final double salePrice = double.tryParse(rawPrice) ?? 100.0;
+            final double originalPrice = double.tryParse(
+                  product.originalPrice?.replaceAll(RegExp(r'[^0-9.]'), '') ?? '',
+                ) ??
+                (salePrice / (1.0 - (discount / 100.0)));
+
+            final double claimPercentage = product.claimPercentage ?? 65.0;
+
             return _WebFlashSaleCard(
-              product: products[index],
-              onAddToCart: () => _addToCart(products[index]),
+              product: product,
+              discount: discount,
+              originalPrice: originalPrice,
+              salePrice: salePrice,
+              claimPercentage: claimPercentage,
+              onAddToCart: () => _addToCart(product, salePrice),
             );
           },
         );
@@ -544,9 +773,20 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
 
 class _WebFlashSaleCard extends StatefulWidget {
   final ProductItem product;
+  final double discount;
+  final double originalPrice;
+  final double salePrice;
+  final double claimPercentage;
   final VoidCallback onAddToCart;
 
-  const _WebFlashSaleCard({required this.product, required this.onAddToCart});
+  const _WebFlashSaleCard({
+    required this.product,
+    required this.discount,
+    required this.originalPrice,
+    required this.salePrice,
+    required this.claimPercentage,
+    required this.onAddToCart,
+  });
 
   @override
   State<_WebFlashSaleCard> createState() => _WebFlashSaleCardState();
@@ -555,33 +795,26 @@ class _WebFlashSaleCard extends StatefulWidget {
 class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
   bool _isHovered = false;
 
-  int _stableSeed(String? id) {
-    if (id == null) return 0;
-    int hash = 0;
-    for (int i = 0; i < id.length; i++) {
-      hash = 31 * hash + id.codeUnitAt(i);
-    }
-    return hash.abs();
-  }
-
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
-    final int seed = _stableSeed(product.productId);
+    final farmDisplayName = (product.farm.isNotEmpty && product.farm != 'Farm')
+        ? product.farm
+        : ((product.farmerName != null && product.farmerName!.isNotEmpty)
+            ? product.farmerName!
+            : 'Direct Farm Harvest');
 
-    final double discount = 15.0 + (seed % 36); // 15% to 50% off
-    final rawPrice = product.price.replaceAll(RegExp(r'[^0-9.]'), '');
-    final double salePrice = double.tryParse(rawPrice) ?? 100.0;
-    final double originalPrice = salePrice / (1 - (discount / 100));
+    final String unitLabel =
+        product.unit.isNotEmpty ? ' / ${product.unit}' : '';
 
-    final double stockClaimed = 35.0 + (seed % 60);
-    final bool isAlmostGone = stockClaimed > 80;
+    final double stockClaimed = widget.claimPercentage;
+    final bool isAlmostGone = stockClaimed >= 80;
 
-    final String unitLabel = product.unit.isNotEmpty
-        ? ' / ${product.unit}'
-        : '';
+    final rawRating = double.tryParse(product.rating ?? '') ?? 5.0;
+    final ratingStr = rawRating > 0 ? rawRating.toStringAsFixed(1) : '5.0';
 
     return MouseRegion(
+      cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: GestureDetector(
@@ -592,7 +825,7 @@ class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          transform: Matrix4.translationValues(0, _isHovered ? -6 : 0, 0),
+          transform: Matrix4.translationValues(0, _isHovered ? -4 : 0, 0),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -618,12 +851,11 @@ class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
               Stack(
                 children: [
                   Container(
-                    height: 155,
+                    height: 125,
                     width: double.infinity,
                     decoration: const BoxDecoration(
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(15),
-                      ),
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(15)),
                       color: Color(0xFFF8FAFC),
                     ),
                     child: ClipRRect(
@@ -651,18 +883,18 @@ class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
 
                   // Discount Badge
                   Positioned(
-                    top: 10,
-                    right: 10,
+                    top: 8,
+                    left: 8,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                        horizontal: 7,
+                        vertical: 3,
                       ),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
                         ),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
                             color: const Color(
@@ -678,13 +910,13 @@ class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
                         children: [
                           const Icon(
                             Icons.bolt_rounded,
-                            size: 12,
+                            size: 11,
                             color: Colors.white,
                           ),
                           Text(
-                            '-${discount.toInt()}%',
+                            '-${widget.discount.toInt()}%',
                             style: GoogleFonts.inter(
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: FontWeight.w900,
                               color: Colors.white,
                             ),
@@ -693,159 +925,187 @@ class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
                       ),
                     ),
                   ),
+                  if (farmDisplayName.isNotEmpty)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.92),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.verified_rounded,
+                            size: 12, color: Color(0xFF059669)),
+                      ),
+                    ),
                 ],
               ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        product.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF1E293B),
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-
-                      // Location & Rating
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on_rounded,
-                            size: 11,
-                            color: Color(0xFF10B981),
-                          ),
-                          const SizedBox(width: 2),
-                          Expanded(
-                            child: Text(
-                              (product.farmerName != null && product.farmerName!.isNotEmpty)
-                                  ? product.farmerName!
-                                  : 'Direct Farm Harvest',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: const Color(0xFF64748B),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const Icon(
-                            Icons.star_rounded,
-                            size: 13,
-                            color: Color(0xFFF59E0B),
-                          ),
-                          Text(
-                            ' 4.9',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF475569),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-
-                      // Price section
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '₱${salePrice.toStringAsFixed(0)}',
+                            product.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFFDC2626),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1E293B),
                             ),
                           ),
-                          Text(
-                            unitLabel,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF94A3B8),
-                            ),
+                          const SizedBox(height: 2),
+
+                          // Farm Name & Rating
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.storefront_rounded,
+                                size: 11,
+                                color: Color(0xFF10B981),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  farmDisplayName,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    color: const Color(0xFF64748B),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const Icon(
+                                Icons.star_rounded,
+                                size: 12,
+                                color: Color(0xFFF59E0B),
+                              ),
+                              Text(
+                                ' $ratingStr',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF475569),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '₱${originalPrice.toStringAsFixed(0)}',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: const Color(0xFF94A3B8),
-                              decoration: TextDecoration.lineThrough,
-                            ),
+                          const SizedBox(height: 4),
+
+                          // Price section
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                '\u20B1${widget.salePrice.toStringAsFixed(0)}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFFDC2626),
+                                ),
+                              ),
+                              Text(
+                                unitLabel,
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF94A3B8),
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                '\u20B1${widget.originalPrice.toStringAsFixed(0)}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.5,
+                                  color: const Color(0xFF94A3B8),
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      const Spacer(),
 
-                      // Progress Bar for claimed stock
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      // Progress and Button section
+                      Column(
                         children: [
-                          Text(
-                            '${stockClaimed.toInt()}% claimed',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF64748B),
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${stockClaimed.toInt()}% claimed',
+                                style: GoogleFonts.inter(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                              if (isAlmostGone)
+                                Text(
+                                  'Almost Gone!',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFFDC2626),
+                                  ),
+                                ),
+                            ],
                           ),
-                          if (isAlmostGone)
-                            Text(
-                              'Almost Gone!',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFFDC2626),
+                          const SizedBox(height: 3),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: LinearProgressIndicator(
+                              value: (stockClaimed / 100).clamp(0.05, 1.0),
+                              minHeight: 4,
+                              backgroundColor: const Color(0xFFF1F5F9),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                isAlmostGone
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFFF59E0B),
                               ),
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: stockClaimed / 100,
-                          minHeight: 5,
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            isAlmostGone
-                                ? const Color(0xFFDC2626)
-                                : const Color(0xFFF59E0B),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
+                          const SizedBox(height: 6),
 
-                      // Add to Cart Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: widget.onAddToCart,
-                          icon: const Icon(Icons.flash_on_rounded, size: 14),
-                          label: const Text('Buy Deal'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFDC2626),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 9),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            textStyle: GoogleFonts.inter(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
+                          // Add to Cart Button
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: widget.onAddToCart,
+                              icon: const Icon(Icons.flash_on_rounded, size: 13),
+                              label: const Text('Buy Deal'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFDC2626),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                textStyle: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11.5,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),

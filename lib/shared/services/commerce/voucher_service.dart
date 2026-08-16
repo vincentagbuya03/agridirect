@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class VoucherService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  /// Create a new store voucher
+  /// Create a new store voucher matching the Supabase SQL schema precisely
   Future<Map<String, dynamic>?> createVoucher({
     required String farmerId,
     required String code,
@@ -12,22 +12,63 @@ class VoucherService {
     required double discountValue,
     required double minSpend,
     double? maxDiscount,
-    required int usageLimit,
+    int usageLimit = 100,
     required DateTime startDate,
     required DateTime endDate,
+    String? title,
+    String? description,
   }) async {
     try {
-      final response = await _supabase.from('vouchers').insert({
-        'farmer_id': farmerId,
-        'code': code.toUpperCase().trim(),
+      // 1. Resolve farmer profile & ID from farmers table
+      String resolvedFarmerId = farmerId;
+      String farmName = 'Farm Store';
+
+      try {
+        final farmerRecord = await _supabase
+            .from('farmers')
+            .select('farmer_id, user_id, farm_name')
+            .or('user_id.eq.$farmerId,farmer_id.eq.$farmerId')
+            .maybeSingle();
+
+        if (farmerRecord != null) {
+          resolvedFarmerId = farmerRecord['farmer_id']?.toString() ??
+              farmerRecord['user_id']?.toString() ??
+              farmerId;
+          farmName = farmerRecord['farm_name']?.toString() ?? farmName;
+        }
+      } catch (e) {
+        debugPrint('Farmer resolution notice (non-fatal): $e');
+      }
+
+      final cleanCode = code.toUpperCase().trim();
+      final defaultTitle = title ??
+          (discountType == 'flat'
+              ? '₱${discountValue.toStringAsFixed(0)} OFF'
+              : (discountType == 'free_shipping'
+                  ? 'Free Delivery Voucher'
+                  : '${discountValue.toStringAsFixed(0)}% OFF Fresh Produce'));
+      final defaultDesc = description ??
+          'Direct farm discount from $farmName (Min. spend ₱${minSpend.toStringAsFixed(0)})';
+
+      // Precise Postgres schema payload for public.vouchers table
+      final payload = {
+        'farmer_id': resolvedFarmerId,
+        'code': cleanCode,
+        'title': defaultTitle,
+        'description': defaultDesc,
         'discount_type': discountType,
-        'discount_value': discountValue,
+        'discount_percentage': discountValue,
         'min_spend': minSpend,
-        'max_discount': maxDiscount,
-        'usage_limit': usageLimit,
-        'start_date': startDate.toIso8601String(),
-        'end_date': endDate.toIso8601String(),
-      }).select().single();
+        'max_discount': ?maxDiscount,
+        'valid_until': endDate.toIso8601String(),
+        'is_active': true,
+      };
+
+      final response = await _supabase
+          .from('vouchers')
+          .insert(payload)
+          .select()
+          .single();
 
       return response;
     } catch (e) {
@@ -36,18 +77,66 @@ class VoucherService {
     }
   }
 
-  /// Get all vouchers created by a specific farmer
-  Future<List<Map<String, dynamic>>> getFarmerVouchers(String farmerId) async {
+  /// Get all vouchers created by a specific farmer (resolving both user_id & farmer_id)
+  Future<List<Map<String, dynamic>>> getFarmerVouchers(
+      String farmerIdOrUserId) async {
     try {
+      String targetUserId = farmerIdOrUserId;
+      String targetFarmerId = farmerIdOrUserId;
+
+      try {
+        final farmerRecord = await _supabase
+            .from('farmers')
+            .select('farmer_id, user_id')
+            .or('user_id.eq.$farmerIdOrUserId,farmer_id.eq.$farmerIdOrUserId')
+            .maybeSingle();
+
+        if (farmerRecord != null) {
+          targetFarmerId =
+              farmerRecord['farmer_id']?.toString() ?? targetFarmerId;
+          targetUserId = farmerRecord['user_id']?.toString() ?? targetUserId;
+        }
+      } catch (_) {}
+
       final response = await _supabase
           .from('vouchers')
           .select()
-          .eq('farmer_id', farmerId)
+          .or('farmer_id.eq.$targetFarmerId,farmer_id.eq.$targetUserId')
           .order('created_at', ascending: false);
 
       return List<Map<String, dynamic>>.from(response as List);
     } catch (e) {
       debugPrint('Error fetching farmer vouchers: $e');
+      return [];
+    }
+  }
+
+  /// Get all active farmer-issued vouchers enriched with farmer profiles for public hubs
+  Future<List<Map<String, dynamic>>> getAllActiveFarmerVouchers() async {
+    try {
+      final now = DateTime.now().toIso8601String();
+      final response = await _supabase
+          .from('vouchers')
+          .select('*, farmers(farm_name, image_url, face_photo_path, location, residential_address)')
+          .eq('is_active', true)
+          .or('valid_until.gte.$now,valid_until.is.null')
+          .order('created_at', ascending: false);
+
+      final List<Map<String, dynamic>> vouchers =
+          List<Map<String, dynamic>>.from(response as List);
+
+      for (var v in vouchers) {
+        final farmer = v['farmers'] as Map<String, dynamic>? ?? {};
+        v['farm_name'] = farmer['farm_name'] ?? 'Local Verified Farm';
+        v['avatar_url'] = farmer['image_url'] ?? farmer['face_photo_path'];
+        v['location'] = farmer['location'] ??
+            farmer['residential_address'] ??
+            'San Carlos City';
+      }
+
+      return vouchers;
+    } catch (e) {
+      debugPrint('Error fetching all active farmer vouchers: $e');
       return [];
     }
   }
@@ -62,12 +151,13 @@ class VoucherService {
     }
   }
 
-  /// Claim a voucher for a user
+  /// Claim a voucher for a user into user_vouchers
   Future<bool> claimVoucher(String userId, String voucherId) async {
     try {
-      await _supabase.from('user_claimed_vouchers').insert({
+      await _supabase.from('user_vouchers').insert({
         'user_id': userId,
         'voucher_id': voucherId,
+        'status': 'available',
       });
       return true;
     } catch (e) {
@@ -80,60 +170,53 @@ class VoucherService {
   Future<List<Map<String, dynamic>>> getUserClaimedVouchers(String userId) async {
     try {
       final response = await _supabase
-          .from('user_claimed_vouchers')
-          .select('*, vouchers(*)')
+          .from('user_vouchers')
+          .select('*, vouchers(*, farmers(farm_name, image_url, face_photo_path))')
           .eq('user_id', userId)
-          .eq('is_used', false);
+          .eq('status', 'available')
+          .order('claimed_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(response as List);
+      final list = List<Map<String, dynamic>>.from(response as List);
+      return list.map((item) {
+        final map = Map<String, dynamic>.from(item);
+        final voucher = map['vouchers'] as Map<String, dynamic>? ?? {};
+        final farmer = voucher['farmers'] as Map<String, dynamic>? ?? {};
+        map['claim_id'] = map['id'];
+        map['vouchers'] = {
+          ...voucher,
+          'farm_name': farmer['farm_name'] ?? 'Local Farm',
+          'avatar_url': farmer['image_url'] ?? farmer['face_photo_path'],
+        };
+        return map;
+      }).toList();
     } catch (e) {
       debugPrint('Error fetching claimed vouchers: $e');
       return [];
     }
   }
 
-  /// Get all claimed vouchers for a user (both used and unused) enriched with farmer profiles
+  /// Get all claimed vouchers for a user (history) enriched with farmer profiles
   Future<List<Map<String, dynamic>>> getUserClaimedVouchersHistory(String userId) async {
     try {
       final response = await _supabase
-          .from('user_claimed_vouchers')
-          .select('*, vouchers(*)')
-          .eq('user_id', userId);
+          .from('user_vouchers')
+          .select('*, vouchers(*, farmers(farm_name, image_url, face_photo_path))')
+          .eq('user_id', userId)
+          .order('claimed_at', ascending: false);
 
-      final List<Map<String, dynamic>> claimedList = List<Map<String, dynamic>>.from(response as List);
-      if (claimedList.isEmpty) return [];
-
-      // Collect unique farmer IDs
-      final farmerIds = claimedList
-          .map((item) => (item['vouchers'] as Map?)?['farmer_id']?.toString())
-          .where((id) => id != null && id.isNotEmpty)
-          .cast<String>()
-          .toSet()
-          .toList();
-
-      if (farmerIds.isEmpty) return claimedList;
-
-      // Query farm names
-      final farmersResponse = await _supabase
-          .from('farmers')
-          .select('user_id, farm_name')
-          .inFilter('user_id', farmerIds);
-
-      final farmNames = {
-        for (var f in farmersResponse as List)
-          f['user_id'].toString(): f['farm_name'].toString()
-      };
-
-      // Enrich claimed vouchers list with farm_name
-      for (var item in claimedList) {
-        final voucher = item['vouchers'] as Map<String, dynamic>?;
-        if (voucher != null) {
-          final fId = voucher['farmer_id']?.toString() ?? '';
-          voucher['farm_name'] = farmNames[fId] ?? 'Partner Farm';
-        }
-      }
-
-      return claimedList;
+      final list = List<Map<String, dynamic>>.from(response as List);
+      return list.map((item) {
+        final map = Map<String, dynamic>.from(item);
+        final voucher = map['vouchers'] as Map<String, dynamic>? ?? {};
+        final farmer = voucher['farmers'] as Map<String, dynamic>? ?? {};
+        map['claim_id'] = map['id'];
+        map['vouchers'] = {
+          ...voucher,
+          'farm_name': farmer['farm_name'] ?? 'Local Farm',
+          'avatar_url': farmer['image_url'] ?? farmer['face_photo_path'],
+        };
+        return map;
+      }).toList();
     } catch (e) {
       debugPrint('Error fetching claimed vouchers history: $e');
       return [];
@@ -145,41 +228,41 @@ class VoucherService {
     required String userId,
   }) async {
     try {
-      // Resolve farmer profile ID to user ID if needed
       String targetUserId = farmerId;
       final farmerData = await _supabase
           .from('farmers')
-          .select('user_id')
-          .eq('farmer_id', farmerId)
+          .select('farmer_id, user_id')
+          .or('user_id.eq.$farmerId,farmer_id.eq.$farmerId')
           .maybeSingle();
-      if (farmerData != null && farmerData['user_id'] != null) {
-        targetUserId = farmerData['user_id'].toString();
+
+      if (farmerData != null) {
+        targetUserId = farmerData['farmer_id']?.toString() ??
+            farmerData['user_id']?.toString() ??
+            farmerId;
       }
 
-      // 1. Fetch all active vouchers for this farmer
       final now = DateTime.now().toIso8601String();
       final activeVouchers = await _supabase
           .from('vouchers')
           .select()
           .eq('farmer_id', targetUserId)
-          .gte('end_date', now)
-          .lte('start_date', now);
+          .eq('is_active', true)
+          .or('valid_until.gte.$now,valid_until.is.null');
 
       final vouchersList = List<Map<String, dynamic>>.from(activeVouchers as List);
 
-      // 2. Fetch claimed vouchers for this user
       final claimedResponse = await _supabase
-          .from('user_claimed_vouchers')
+          .from('user_vouchers')
           .select('voucher_id')
           .eq('user_id', userId);
 
       final claimedIds = List<Map<String, dynamic>>.from(claimedResponse as List)
-          .map((item) => item['voucher_id'].toString())
+          .map((item) => item['voucher_id']?.toString())
           .toSet();
 
-      // 3. Flag claimed status
       for (var voucher in vouchersList) {
-        voucher['is_claimed'] = claimedIds.contains(voucher['voucher_id'].toString());
+        voucher['is_claimed'] =
+            claimedIds.contains(voucher['voucher_id']?.toString());
       }
 
       return vouchersList;
@@ -202,13 +285,13 @@ class VoucherService {
       for (var item in claimed) {
         final voucher = item['vouchers'] as Map<String, dynamic>?;
         if (voucher != null) {
-          final vFarmerId = voucher['farmer_id'].toString();
-          final minSpend = (voucher['min_spend'] as num).toDouble();
-          
-          if (vFarmerId == farmerId && cartAmount >= minSpend) {
-            // Include claim ID for applying
+          final vFarmerId = voucher['farmer_id']?.toString() ?? '';
+          final minSpend = (voucher['min_spend'] as num?)?.toDouble() ?? 0.0;
+
+          if ((vFarmerId == farmerId || vFarmerId.isEmpty) &&
+              cartAmount >= minSpend) {
             final Map<String, dynamic> enriched = Map.from(voucher);
-            enriched['claim_id'] = item['claim_id'];
+            enriched['claim_id'] = item['claim_id'] ?? item['id'];
             valid.add(enriched);
           }
         }
@@ -220,29 +303,13 @@ class VoucherService {
     }
   }
 
-  /// Mark a claimed voucher as used and increment its used count
+  /// Mark a claimed voucher as used
   Future<void> markVoucherAsUsed(String claimId, String voucherId) async {
     try {
-      // 1. Mark as used
       await _supabase
-          .from('user_claimed_vouchers')
-          .update({'is_used': true})
-          .eq('claim_id', claimId);
-
-      // 2. Fetch current voucher used_count
-      final voucher = await _supabase
-          .from('vouchers')
-          .select('used_count')
-          .eq('voucher_id', voucherId)
-          .single();
-
-      final currentUsed = (voucher['used_count'] as num).toInt();
-
-      // 3. Increment used_count
-      await _supabase
-          .from('vouchers')
-          .update({'used_count': currentUsed + 1})
-          .eq('voucher_id', voucherId);
+          .from('user_vouchers')
+          .update({'status': 'used'})
+          .eq('id', claimId);
     } catch (e) {
       debugPrint('Error marking voucher as used: $e');
     }

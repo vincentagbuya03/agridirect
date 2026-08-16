@@ -553,7 +553,7 @@ class _WebFarmerPublicProfileScreenState
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      type == 'flat' ? 'â‚±${val.toStringAsFixed(0)}' : '${val.toStringAsFixed(0)}%',
+                                      type == 'flat' ? '₱${val.toStringAsFixed(0)}' : '${val.toStringAsFixed(0)}%',
                                       style: GoogleFonts.plusJakartaSans(
                                         fontWeight: FontWeight.w800,
                                         fontSize: 18,
@@ -595,7 +595,7 @@ class _WebFarmerPublicProfileScreenState
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        'Min. Spend â‚±${minSpend.toStringAsFixed(0)}',
+                                        'Min. Spend ₱${minSpend.toStringAsFixed(0)}',
                                         style: GoogleFonts.inter(fontSize: 11, color: _muted),
                                       ),
                                       const Spacer(),

@@ -451,20 +451,30 @@ class WebAboutUsScreen extends StatelessWidget {
     return Container(
       color: const Color(0xFFF1FDF4),
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 20 : 48,
-        vertical: isMobile ? 40 : 60,
+        horizontal: isMobile ? 16 : 48,
+        vertical: isMobile ? 32 : 56,
       ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _stat('200+', 'Verified Local Farmers'),
-              _stat('5,000+', 'Crates Delivered'),
-              _stat('100%', 'Direct Farm-Gate Return'),
-            ],
-          ),
+          child: isMobile
+              ? Column(
+                  children: [
+                    _stat('200+', 'Verified Local Farmers'),
+                    const SizedBox(height: 20),
+                    _stat('5,000+', 'Crates Delivered'),
+                    const SizedBox(height: 20),
+                    _stat('100%', 'Direct Farm-Gate Return'),
+                  ],
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    Expanded(child: _stat('200+', 'Verified Local Farmers')),
+                    Expanded(child: _stat('5,000+', 'Crates Delivered')),
+                    Expanded(child: _stat('100%', 'Direct Farm-Gate Return')),
+                  ],
+                ),
         ),
       ),
     );

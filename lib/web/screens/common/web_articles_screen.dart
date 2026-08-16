@@ -273,13 +273,17 @@ class _WebArticlesScreenState extends State<WebArticlesScreen> {
                         children: [
                           const Icon(Icons.verified_rounded, color: AgriColors.gold300, size: 14),
                           const SizedBox(width: 6),
-                          Text(
-                            'DEPARTMENT OF AGRICULTURE (DA) KNOWLEDGE HUB',
-                            style: GoogleFonts.inter(
-                              color: AgriColors.gold200,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.0,
+                          Flexible(
+                            child: Text(
+                              'DEPARTMENT OF AGRICULTURE (DA) KNOWLEDGE HUB',
+                              style: GoogleFonts.inter(
+                                color: AgriColors.gold200,
+                                fontSize: isMobile ? 9.5 : 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: isMobile ? 0.4 : 1.0,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],

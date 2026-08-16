@@ -109,39 +109,55 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
   late Future<List<Map<String, dynamic>>> _productsFuture;
   late Future<List<Map<String, dynamic>>> _farmersFuture;
   late Future<List<ForumPostItem>> _communityPostsFuture;
+  late Future<List<ProductItem>> _flashSaleFuture;
 
   @override
   void initState() {
     super.initState();
-    _fadeCtrl = AnimationController(
-      duration: const Duration(milliseconds: 700),
-      vsync: this,
-    )..forward();
-    _floatingCtrl = AnimationController(
-      duration: const Duration(seconds: 3),
-      vsync: this,
-    )..repeat(reverse: true);
-    _waveController = AnimationController(
-      duration: const Duration(seconds: 8),
-      vsync: this,
-    )..repeat();
+    final now = DateTime.now();
+    final midnight = DateTime(now.year, now.month, now.day + 1);
+    _flashRemaining = midnight.difference(now);
 
     _bannerController = PageController();
+    _fadeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..forward();
+    _floatingCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat(reverse: true);
+    _waveController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+
     _bannerTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted) return;
       if (_bannerController.hasClients) {
-        final next = (_bannerIndex + 1) % _promoBanners.length;
+        final nextPage = (_bannerIndex + 1) % _promoBanners.length;
         _bannerController.animateToPage(
-          next,
+          nextPage,
           duration: const Duration(milliseconds: 600),
-          curve: Curves.easeInOutCubic,
+          curve: Curves.easeInOut,
         );
+        setState(() {
+          _bannerIndex = nextPage;
+        });
       }
     });
 
     _flashTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && _flashRemaining.inSeconds > 0) {
+      if (!mounted) return;
+      if (_flashRemaining.inSeconds > 0) {
         setState(() {
           _flashRemaining = _flashRemaining - const Duration(seconds: 1);
+        });
+      } else {
+        final now = DateTime.now();
+        final midnight = DateTime(now.year, now.month, now.day + 1);
+        setState(() {
+          _flashRemaining = midnight.difference(now);
         });
       }
     });
@@ -151,7 +167,8 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
       limit: 8,
       onlyFeatured: true,
     );
-    _farmersFuture = SupabaseDatabase.getFarmerSpotlight(limit: 6);
+    _flashSaleFuture = SupabaseDataService().getFlashSaleProducts();
+    _farmersFuture = SupabaseDataService().getFeaturedFarmers();
     _communityPostsFuture = SupabaseDataService().getForumPosts();
   }
 
@@ -208,53 +225,90 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
     context.go(AppRoutes.farmerProfile(farmerId));
   }
 
+  String? _resolveImageUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.trim().isEmpty || rawUrl == 'null') {
+      return null;
+    }
+    final trimmed = rawUrl.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('assets/')) {
+      return trimmed;
+    }
+    String cleanPath = trimmed;
+    if (cleanPath.startsWith('uploads/')) {
+      cleanPath = cleanPath.substring('uploads/'.length);
+    } else if (cleanPath.startsWith('/uploads/')) {
+      cleanPath = cleanPath.substring('/uploads/'.length);
+    }
+    return SupabaseConfig.client.storage
+        .from('uploads')
+        .getPublicUrl(cleanPath);
+  }
+
   ProductItem _productFromMap(Map<String, dynamic> raw) {
     final farmerObj =
         raw['farmer'] as Map<String, dynamic>? ??
         raw['farmers'] as Map<String, dynamic>?;
 
-    final String extractedFarm = (raw['farm_name'] != null &&
-            raw['farm_name'].toString().isNotEmpty)
+    final String extractedFarm =
+        (raw['farm_name'] != null && raw['farm_name'].toString().isNotEmpty)
         ? raw['farm_name'].toString()
         : ((farmerObj?['farm_name'] != null &&
-                farmerObj!['farm_name'].toString().isNotEmpty)
-            ? farmerObj['farm_name'].toString()
-            : ((raw['farmer_name'] != null &&
-                    raw['farmer_name'].toString().isNotEmpty)
-                ? raw['farmer_name'].toString()
-                : ((farmerObj?['users']?['name'] != null &&
-                        farmerObj!['users']!['name'].toString().isNotEmpty)
-                    ? farmerObj['users']!['name'].toString()
-                    : ((farmerObj?['user']?['name'] != null &&
-                            farmerObj!['user']!['name'].toString().isNotEmpty)
-                        ? farmerObj['user']!['name'].toString()
-                        : 'Local Farm'))));
+                  farmerObj!['farm_name'].toString().isNotEmpty)
+              ? farmerObj['farm_name'].toString()
+              : ((raw['farmer_name'] != null &&
+                        raw['farmer_name'].toString().isNotEmpty)
+                    ? raw['farmer_name'].toString()
+                    : ((farmerObj?['users']?['name'] != null &&
+                              farmerObj!['users']!['name']
+                                  .toString()
+                                  .isNotEmpty)
+                          ? farmerObj['users']!['name'].toString()
+                          : ((farmerObj?['user']?['name'] != null &&
+                                    farmerObj!['user']!['name']
+                                        .toString()
+                                        .isNotEmpty)
+                                ? farmerObj['user']!['name'].toString()
+                                : 'Local Farm'))));
 
-    final String? ratingStr = (raw['average_rating'] != null &&
+    final String? ratingStr =
+        (raw['average_rating'] != null &&
             raw['average_rating'].toString() != '0' &&
             raw['average_rating'].toString() != '0.0')
         ? raw['average_rating'].toString()
         : ((raw['rating'] != null &&
-                raw['rating'].toString() != '0' &&
-                raw['rating'].toString() != '0.0')
-            ? raw['rating'].toString()
-            : null);
+                  raw['rating'].toString() != '0' &&
+                  raw['rating'].toString() != '0.0')
+              ? raw['rating'].toString()
+              : null);
+
+    final rawFarmerAvatar =
+        raw['farmer_avatar_url']?.toString() ??
+        raw['farmer_image_url']?.toString() ??
+        farmerObj?['image_url']?.toString() ??
+        farmerObj?['avatar_url']?.toString() ??
+        farmerObj?['users']?['avatar_url']?.toString() ??
+        farmerObj?['user']?['avatar_url']?.toString();
+
+    final resolvedFarmerAvatar = _resolveImageUrl(rawFarmerAvatar);
 
     return ProductItem(
       productId: raw['product_id']?.toString(),
       farmerId:
           raw['farmer_id']?.toString() ?? farmerObj?['farmer_id']?.toString(),
-      farmerName: raw['farmer_name']?.toString() ??
+      farmerName:
+          raw['farmer_name']?.toString() ??
           farmerObj?['users']?['name']?.toString() ??
           farmerObj?['user']?['name']?.toString() ??
           extractedFarm,
-      farmerAvatarUrl: raw['farmer_avatar_url']?.toString() ??
-          farmerObj?['users']?['avatar_url']?.toString() ??
-          farmerObj?['user']?['avatar_url']?.toString(),
+      farmerAvatarUrl: resolvedFarmerAvatar,
       name: raw['name']?.toString() ?? 'Product',
       farm: extractedFarm,
       price: 'P${raw['price']?.toString() ?? '0'}',
-      unit: raw['unit_name']?.toString() ??
+      unit:
+          raw['unit_name']?.toString() ??
           raw['unit_abbr']?.toString() ??
           raw['unit']?.toString() ??
           'kg',
@@ -282,7 +336,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
           child: isMobile
               ? Column(
                   children: [
-                    _buildMegaBannerCarousel(height: 220),
+                    _buildMegaBannerCarousel(height: 270),
                     const SizedBox(height: 12),
                     _buildAppPerksCard(isFullWidth: true),
                   ],
@@ -307,6 +361,9 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
   }
 
   Widget _buildMegaBannerCarousel({required double height}) {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     return SizedBox(
       height: height,
       child: Stack(
@@ -372,9 +429,9 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                           ),
                           // Content
                           Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 28,
-                              vertical: 24,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 18 : 28,
+                              vertical: isMobile ? 14 : 24,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -866,9 +923,6 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // LAZADA-STYLE FLASH SALE WITH LIVE COUNTDOWN TIMER
-  // ─────────────────────────────────────────────────────────────
   Widget _buildLazadaFlashSaleSection() {
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 768;
@@ -891,97 +945,195 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header Row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Flash Sale',
-                        style: GoogleFonts.poppins(
-                          fontSize: isMobile ? 18 : 22,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFFDC2626),
+              isMobile
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Flash Sale',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFFDC2626),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF2F2),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: const Color(0xFFFCA5A5),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'On Sale Now',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFFDC2626),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            OutlinedButton(
+                              onPressed: () =>
+                                  context.push(AppRoutes.flashSale),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFFDC2626),
+                                side: const BorderSide(
+                                  color: Color(0xFFDC2626),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                'SEE ALL',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 14),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Text(
+                              'Ending in ',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            _buildTimerBlock(hours),
+                            const Text(
+                              ' : ',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFDC2626),
+                              ),
+                            ),
+                            _buildTimerBlock(minutes),
+                            const Text(
+                              ' : ',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFDC2626),
+                              ),
+                            ),
+                            _buildTimerBlock(seconds),
+                          ],
                         ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF2F2),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: const Color(0xFFFCA5A5)),
-                        ),
-                        child: Text(
-                          'On Sale Now',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFFDC2626),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      if (!isMobile) ...[
-                        Text(
-                          'Ending in',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: const Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
                       ],
-                      _buildTimerBlock(hours),
-                      const Text(
-                        ' : ',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFDC2626),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Flash Sale',
+                              style: GoogleFonts.poppins(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFFDC2626),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF2F2),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: const Color(0xFFFCA5A5),
+                                ),
+                              ),
+                              child: Text(
+                                'On Sale Now',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFFDC2626),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Ending in',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _buildTimerBlock(hours),
+                            const Text(
+                              ' : ',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFDC2626),
+                              ),
+                            ),
+                            _buildTimerBlock(minutes),
+                            const Text(
+                              ' : ',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFDC2626),
+                              ),
+                            ),
+                            _buildTimerBlock(seconds),
+                          ],
                         ),
-                      ),
-                      _buildTimerBlock(minutes),
-                      const Text(
-                        ' : ',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFDC2626),
+                        OutlinedButton.icon(
+                          onPressed: () => context.push(AppRoutes.flashSale),
+                          icon: const Icon(Icons.bolt_rounded, size: 14),
+                          label: Text(
+                            'SHOP ALL PRODUCTS',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFDC2626),
+                            side: const BorderSide(color: Color(0xFFDC2626)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
                         ),
-                      ),
-                      _buildTimerBlock(seconds),
-                    ],
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => context.push(AppRoutes.flashSale),
-                    icon: const Icon(Icons.bolt_rounded, size: 14),
-                    label: Text(
-                      'SHOP ALL PRODUCTS',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      ],
                     ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFDC2626),
-                      side: const BorderSide(color: Color(0xFFDC2626)),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 20),
               // Horizontal Flash Sale Product Shelf
-              FutureBuilder<List<Map<String, dynamic>>>(
-                future: _productsFuture,
+              FutureBuilder<List<ProductItem>>(
+                future: _flashSaleFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
@@ -1002,13 +1154,12 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     height: 270,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      itemCount: products.length.clamp(0, 6),
+                      itemCount: products.length.clamp(0, 8),
                       separatorBuilder: (context, index) =>
                           const SizedBox(width: 14),
                       itemBuilder: (context, i) {
-                        final p = products[i];
-                        final item = _productFromMap(p);
-                        return _buildFlashSaleCard(item);
+                        final product = products[i];
+                        return _buildFlashSaleCard(product);
                       },
                     ),
                   );
@@ -1042,7 +1193,16 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
   Widget _buildFlashSaleCard(ProductItem product) {
     final rawPrice = product.price.replaceAll(RegExp(r'[^0-9.]'), '');
     final double price = double.tryParse(rawPrice) ?? 0.0;
-    final double origPrice = price * 1.35;
+    final int discount = (product.discountPercent ?? 30).toInt();
+    final double origPrice = double.tryParse(
+          product.originalPrice?.replaceAll(RegExp(r'[^0-9.]'), '') ?? '',
+        ) ??
+        (price / (1.0 - (discount / 100.0)));
+
+    final double claimProgress =
+        ((product.claimPercentage ?? 60.0) / 100.0).clamp(0.1, 0.95);
+    final int sold = product.soldCount ??
+        (10 + (product.name.hashCode.abs() % 25));
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -1106,7 +1266,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        '-35%',
+                        '-$discount%',
                         style: GoogleFonts.inter(
                           fontSize: 9,
                           fontWeight: FontWeight.w900,
@@ -1136,7 +1296,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     Row(
                       children: [
                         Text(
-                          '₱${price.toStringAsFixed(0)}',
+                          '\u20B1${price.toStringAsFixed(0)}',
                           style: GoogleFonts.poppins(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -1145,7 +1305,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '₱${origPrice.toStringAsFixed(0)}',
+                          '\u20B1${origPrice.toStringAsFixed(0)}',
                           style: GoogleFonts.inter(
                             fontSize: 10,
                             color: const Color(0xFF94A3B8),
@@ -1158,18 +1318,18 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     // Progress Bar
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
-                      child: const LinearProgressIndicator(
-                        value: 0.8,
+                      child: LinearProgressIndicator(
+                        value: claimProgress,
                         minHeight: 5,
-                        backgroundColor: Color(0xFFFEE2E2),
-                        valueColor: AlwaysStoppedAnimation<Color>(
+                        backgroundColor: const Color(0xFFFEE2E2),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
                           Color(0xFFDC2626),
                         ),
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '🔥 18 Sold',
+                      '🔥 $sold Sold',
                       style: GoogleFonts.inter(
                         fontSize: 9,
                         fontWeight: FontWeight.bold,
@@ -1535,59 +1695,62 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFECFDF5),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFA7F3D0)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.eco_rounded,
-                            size: 13,
-                            color: Color(0xFF059669),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            'HARVESTED TODAY',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF059669),
-                              letterSpacing: 0.8,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.eco_rounded,
+                              size: 13,
+                              color: Color(0xFF059669),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 5),
+                            Text(
+                              'HARVESTED TODAY',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF059669),
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Featured Farm Products',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: isMobile ? 20 : 24,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Featured Farm Products',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: isMobile ? 20 : 24,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Support local growers — 100% farm-direct produce delivered in 24 hours',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: const Color(0xFF64748B),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Support local growers — 100% farm-direct produce delivered in 24 hours',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF64748B),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 InkWell(
                   onTap: () => widget.onNavigate(1),
                   borderRadius: BorderRadius.circular(10),
@@ -1626,7 +1789,9 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                   return const Center(
                     child: Padding(
                       padding: EdgeInsets.all(40),
-                      child: CircularProgressIndicator(color: Color(0xFF059669)),
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF059669),
+                      ),
                     ),
                   );
                 }
@@ -1649,7 +1814,9 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                       ),
                       child: Text(
                         'No featured farm products available right now.',
-                        style: GoogleFonts.inter(color: const Color(0xFF64748B)),
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFF64748B),
+                        ),
                       ),
                     ),
                   );
@@ -1664,10 +1831,8 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     int crossAxisCount = width < 550
                         ? 2
                         : (width < 800
-                            ? 3
-                            : (width < 1100
-                                ? 4
-                                : (width < 1350 ? 5 : 6)));
+                              ? 3
+                              : (width < 1100 ? 4 : (width < 1350 ? 5 : 6)));
 
                     return GridView.builder(
                       shrinkWrap: true,
@@ -1676,7 +1841,11 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                         crossAxisCount: crossAxisCount,
                         mainAxisSpacing: 14,
                         crossAxisSpacing: 14,
-                        childAspectRatio: 0.82,
+                        childAspectRatio: width < 550
+                            ? 0.70
+                            : (width < 800
+                                  ? 0.74
+                                  : (width < 1100 ? 0.78 : 0.82)),
                       ),
                       itemCount: displayProducts.length,
                       itemBuilder: (context, i) {
@@ -1733,11 +1902,12 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Stack(
                 children: [
                   Container(
-                    height: 125,
+                    height: 110,
                     width: double.infinity,
                     decoration: const BoxDecoration(
                       borderRadius: BorderRadius.vertical(
@@ -1838,169 +2008,165 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     ),
                 ],
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF0F172A),
-                        ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      product.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF0F172A),
                       ),
-                      const SizedBox(height: 2),
+                    ),
+                    const SizedBox(height: 2),
 
-                      // Farmer / Origin
-                      GestureDetector(
-                        onTap: () {
-                          if (product.farmerId != null) {
-                            _openFarmerProfile(product.farmerId);
-                          }
-                        },
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.storefront_rounded,
-                              size: 11,
-                              color: Color(0xFF059669),
-                            ),
-                            const SizedBox(width: 3),
-                            Expanded(
-                              child: Text(
-                                farmTitle,
-                                style: GoogleFonts.inter(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                  color: const Color(0xFF059669),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (product.rating != null &&
-                                product.rating != '0' &&
-                                product.rating != '0.0') ...[
-                              const Icon(
-                                Icons.star_rounded,
-                                size: 12,
-                                color: Color(0xFFF59E0B),
-                              ),
-                              Text(
-                                ' ${product.rating}',
-                                style: GoogleFonts.inter(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF475569),
-                                ),
-                              ),
-                            ] else
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 5,
-                                  vertical: 1,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFECFDF5),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  'Direct',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF059669),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-
-                      // Price Section
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
+                    // Farmer / Origin
+                    GestureDetector(
+                      onTap: () {
+                        if (product.farmerId != null) {
+                          _openFarmerProfile(product.farmerId);
+                        }
+                      },
+                      child: Row(
                         children: [
-                          Text(
-                            '₱${price.toStringAsFixed(0)}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF059669),
-                            ),
+                          const Icon(
+                            Icons.storefront_rounded,
+                            size: 11,
+                            color: Color(0xFF059669),
                           ),
-                          Text(
-                            unitLabel,
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF94A3B8),
-                            ),
-                          ),
-                          if (raw['original_price'] != null) ...[
-                            const SizedBox(width: 4),
-                            Text(
-                              '₱${raw['original_price']}',
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              farmTitle,
                               style: GoogleFonts.inter(
                                 fontSize: 10,
-                                color: const Color(0xFF94A3B8),
-                                decoration: TextDecoration.lineThrough,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF059669),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (product.rating != null &&
+                              product.rating != '0' &&
+                              product.rating != '0.0') ...[
+                            const Icon(
+                              Icons.star_rounded,
+                              size: 12,
+                              color: Color(0xFFF59E0B),
+                            ),
+                            Text(
+                              ' ${product.rating}',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF475569),
                               ),
                             ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Add to Cart Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            CartService().addItem(product);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Added ${product.name} to Cart!'),
-                                backgroundColor: const Color(0xFF059669),
-                                behavior: SnackBarBehavior.floating,
-                                duration: const Duration(seconds: 2),
-                                action: SnackBarAction(
-                                  label: 'VIEW CART',
-                                  textColor: Colors.white,
-                                  onPressed: () => context.push(AppRoutes.cart),
+                          ] else
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFECFDF5),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Direct',
+                                style: GoogleFonts.inter(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF059669),
                                 ),
                               ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.shopping_bag_outlined,
-                            size: 13,
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+
+                    // Price Section
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          '₱${price.toStringAsFixed(0)}',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF059669),
                           ),
-                          label: const Text('Add to Cart'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF059669),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 7),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                        ),
+                        Text(
+                          unitLabel,
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                        ),
+                        if (raw['original_price'] != null) ...[
+                          const SizedBox(width: 4),
+                          Text(
+                            '₱${raw['original_price']}',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              color: const Color(0xFF94A3B8),
+                              decoration: TextDecoration.lineThrough,
                             ),
-                            textStyle: GoogleFonts.inter(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 11,
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Add to Cart Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          CartService().addItem(product);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Added ${product.name} to Cart!'),
+                              backgroundColor: const Color(0xFF059669),
+                              behavior: SnackBarBehavior.floating,
+                              duration: const Duration(seconds: 2),
+                              action: SnackBarAction(
+                                label: 'VIEW CART',
+                                textColor: Colors.white,
+                                onPressed: () => context.push(AppRoutes.cart),
+                              ),
                             ),
+                          );
+                        },
+                        icon: const Icon(Icons.shopping_bag_outlined, size: 13),
+                        label: const Text('Add to Cart'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF059669),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          textStyle: GoogleFonts.inter(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -2031,59 +2197,62 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFBEB),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFFDE68A)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.verified_user_rounded,
-                            size: 13,
-                            color: Color(0xFFD97706),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            'PROMOTED GROWERS',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFFD97706),
-                              letterSpacing: 0.8,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.verified_user_rounded,
+                              size: 13,
+                              color: Color(0xFFD97706),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 5),
+                            Text(
+                              'PROMOTED GROWERS',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFFD97706),
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Meet Our Featured Farmers',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: isMobile ? 20 : 24,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Meet Our Featured Farmers',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: isMobile ? 20 : 24,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Direct partnerships with accredited Filipino agricultural cooperatives and farms',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: const Color(0xFF64748B),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Direct partnerships with accredited Filipino agricultural cooperatives and farms',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF64748B),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 InkWell(
                   onTap: () => context.push(AppRoutes.localShops),
                   borderRadius: BorderRadius.circular(10),
@@ -2122,7 +2291,9 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                   return const Center(
                     child: Padding(
                       padding: EdgeInsets.all(40),
-                      child: CircularProgressIndicator(color: Color(0xFF059669)),
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF059669),
+                      ),
                     ),
                   );
                 }
@@ -2134,8 +2305,9 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 return LayoutBuilder(
                   builder: (context, constraints) {
                     final width = constraints.maxWidth;
-                    int crossAxisCount =
-                        width < 650 ? 1 : (width < 1050 ? 2 : 3);
+                    int crossAxisCount = width < 650
+                        ? 1
+                        : (width < 1050 ? 2 : 3);
 
                     return GridView.builder(
                       shrinkWrap: true,
@@ -2149,7 +2321,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                       itemCount: farmers.take(6).length,
                       itemBuilder: (context, i) {
                         final f = farmers[i];
-                        return _buildPromotedFarmerCard(f);
+                        return _buildPromotedFarmerCard(f, i);
                       },
                     );
                   },
@@ -2162,17 +2334,72 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
     );
   }
 
-  Widget _buildPromotedFarmerCard(Map<String, dynamic> farmer) {
-    final farmName = farmer['farm_name'] ?? farmer['full_name'] ?? 'Local Farm';
-    final ownerName = farmer['full_name'] ?? 'Accredited Farmer';
+  Widget _buildPromotedFarmerCard(
+    Map<String, dynamic> farmer, [
+    int index = 0,
+  ]) {
+    final farmName =
+        (farmer['farm_name'] ??
+                farmer['shop_name'] ??
+                farmer['name'] ??
+                'Local Farm')
+            .toString()
+            .trim();
+
+    final ownerName =
+        (farmer['full_name'] ??
+                farmer['owner_name'] ??
+                farmer['farmer_name'] ??
+                farmer['user']?['name'] ??
+                '')
+            .toString()
+            .trim();
+
     final location =
-        farmer['farm_address'] ?? farmer['location'] ?? 'San Carlos City, Pangasinan';
-    final specialty = farmer['farming_type'] ?? 'Organic Vegetables & Rice';
-    final farmerId = farmer['farmer_id'] ?? farmer['id'] ?? '';
-    final avatarUrl = farmer['avatar_url'] ?? farmer['profile_picture'] ?? '';
-    final coverUrl = farmer['cover_image_url'] ??
-        farmer['farm_image_url'] ??
-        'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=600&q=80';
+        (farmer['location'] ??
+                farmer['farm_address'] ??
+                farmer['residential_address'] ??
+                farmer['address'] ??
+                'San Carlos City, Pangasinan')
+            .toString()
+            .trim();
+
+    final specialty =
+        (farmer['specialty'] ?? farmer['farming_type'] ?? 'Fresh Produce')
+            .toString()
+            .trim();
+
+    final farmerId = (farmer['farmer_id'] ?? farmer['id'] ?? '').toString();
+
+    final rawAvatar =
+        (farmer['avatar_url'] ??
+                farmer['face_photo_path'] ??
+                farmer['profile_picture'] ??
+                farmer['user']?['avatar_url'] ??
+                '')
+            .toString()
+            .trim();
+    final avatarUrl = _resolveImageUrl(rawAvatar) ?? '';
+
+    final rawCover =
+        (farmer['image_url'] ??
+                farmer['cover_image_url'] ??
+                farmer['farm_image_url'] ??
+                farmer['farm_banner_url'] ??
+                farmer['banner_url'] ??
+                '')
+            .toString()
+            .trim();
+    final coverUrl = _resolveImageUrl(rawCover) ?? '';
+
+    final rawRating = (farmer['average_rating'] ?? farmer['rating'])
+        ?.toString();
+    final double ratingVal = double.tryParse(rawRating ?? '') ?? 5.0;
+    final String ratingStr = ratingVal > 0
+        ? ratingVal.toStringAsFixed(1)
+        : '5.0';
+
+    final badge = (farmer['badge'] ?? 'Verified Grower').toString().trim();
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -2203,16 +2430,24 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     clipBehavior: Clip.none,
                     children: [
                       Positioned.fill(
-                        child: CachedNetworkImage(
-                          imageUrl: coverUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (ctx, url) => Container(
-                            color: const Color(0xFFE2E8F0),
-                          ),
-                          errorWidget: (ctx, url, err) => Container(
-                            color: const Color(0xFF064E3B),
-                          ),
-                        ),
+                        child: coverUrl.isNotEmpty
+                            ? (coverUrl.startsWith('assets/')
+                                  ? Image.asset(
+                                      coverUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (ctx, err, stack) =>
+                                          _buildCoverFallback(farmName),
+                                    )
+                                  : CachedNetworkImage(
+                                      imageUrl: coverUrl,
+                                      fit: BoxFit.cover,
+                                      placeholder: (ctx, url) => Container(
+                                        color: const Color(0xFFE2E8F0),
+                                      ),
+                                      errorWidget: (ctx, url, err) =>
+                                          _buildCoverFallback(farmName),
+                                    ))
+                            : _buildCoverFallback(farmName),
                       ),
                       Positioned.fill(
                         child: Container(
@@ -2222,7 +2457,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                               end: Alignment.bottomCenter,
                               colors: [
                                 Colors.transparent,
-                                Colors.black.withValues(alpha: 0.6),
+                                Colors.black.withValues(alpha: 0.55),
                               ],
                             ),
                           ),
@@ -2285,7 +2520,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                               ),
                               const SizedBox(width: 3),
                               Text(
-                                'Verified Grower',
+                                badge.isNotEmpty ? badge : 'Verified Grower',
                                 style: GoogleFonts.inter(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w800,
@@ -2306,23 +2541,26 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                             color: Colors.white,
                             shape: BoxShape.circle,
                             boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 6,
-                              ),
+                              BoxShadow(color: Colors.black26, blurRadius: 6),
                             ],
                           ),
                           child: CircleAvatar(
                             radius: 18,
                             backgroundColor: const Color(0xFFDCFCE7),
-                            backgroundImage: avatarUrl.isNotEmpty
-                                ? NetworkImage(avatarUrl)
+                            backgroundImage:
+                                (avatarUrl.isNotEmpty && avatarUrl != 'null')
+                                ? (avatarUrl.startsWith('assets/')
+                                      ? AssetImage(avatarUrl) as ImageProvider
+                                      : CachedNetworkImageProvider(avatarUrl))
                                 : null,
-                            child: avatarUrl.isEmpty
+                            child: (avatarUrl.isEmpty || avatarUrl == 'null')
                                 ? Text(
-                                    ownerName.isNotEmpty
-                                        ? ownerName[0].toUpperCase()
-                                        : 'F',
+                                    (ownerName.isNotEmpty
+                                            ? ownerName[0]
+                                            : (farmName.isNotEmpty
+                                                  ? farmName[0]
+                                                  : 'F'))
+                                        .toUpperCase(),
                                     style: GoogleFonts.inter(
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
@@ -2365,7 +2603,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                                   color: Color(0xFFF59E0B),
                                 ),
                                 Text(
-                                  ' 4.9',
+                                  ' $ratingStr',
                                   style: GoogleFonts.inter(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
@@ -2376,16 +2614,18 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                             ),
                           ],
                         ),
-                        const SizedBox(height: 1),
-                        Text(
-                          'Owner: $ownerName',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: const Color(0xFF64748B),
+                        if (ownerName.isNotEmpty) ...[
+                          const SizedBox(height: 1),
+                          Text(
+                            'Owner: $ownerName',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: const Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        ],
                         const SizedBox(height: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -2442,6 +2682,25 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCoverFallback(String farmName) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF065F46), Color(0xFF047857), Color(0xFF059669)],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.agriculture_rounded,
+          size: 32,
+          color: Colors.white.withValues(alpha: 0.25),
         ),
       ),
     );
@@ -2641,4 +2900,3 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
     return parts.map((part) => part[0].toUpperCase()).join();
   }
 }
-

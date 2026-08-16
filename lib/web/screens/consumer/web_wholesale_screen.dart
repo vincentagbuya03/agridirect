@@ -45,6 +45,9 @@ class _WebWholesaleScreenState extends State<WebWholesaleScreen>
 
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SingleChildScrollView(
@@ -61,7 +64,7 @@ class _WebWholesaleScreenState extends State<WebWholesaleScreen>
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1350),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -83,6 +86,9 @@ class _WebWholesaleScreenState extends State<WebWholesaleScreen>
   }
 
   Widget _buildHeroBanner() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -134,8 +140,10 @@ class _WebWholesaleScreenState extends State<WebWholesaleScreen>
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1350),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 16 : 32,
+                  vertical: isMobile ? 24 : 48,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -202,7 +210,7 @@ class _WebWholesaleScreenState extends State<WebWholesaleScreen>
                                       'BULK DISCOUNTS · FOR RESELLERS & BUSINESSES',
                                       style: GoogleFonts.inter(
                                         color: const Color(0xFF78350F),
-                                        fontSize: 11,
+                                        fontSize: isMobile ? 9.5 : 11,
                                         fontWeight: FontWeight.w800,
                                         letterSpacing: 1.1,
                                       ),
@@ -210,12 +218,12 @@ class _WebWholesaleScreenState extends State<WebWholesaleScreen>
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 16),
                               Text(
                                 'Wholesale Hub',
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
-                                  fontSize: 42,
+                                  fontSize: isMobile ? 30 : 42,
                                   fontWeight: FontWeight.w800,
                                   height: 1.1,
                                   letterSpacing: -0.5,
@@ -225,13 +233,13 @@ class _WebWholesaleScreenState extends State<WebWholesaleScreen>
                                 'Bulk Savings Made Easy 📦',
                                 style: GoogleFonts.playfairDisplay(
                                   color: const Color(0xFF93C5FD),
-                                  fontSize: 48,
+                                  fontSize: isMobile ? 32 : 48,
                                   fontWeight: FontWeight.w700,
                                   fontStyle: FontStyle.italic,
                                   height: 1.15,
                                 ),
                               ),
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 12),
                               ConstrainedBox(
                                 constraints:
                                     const BoxConstraints(maxWidth: 620),
@@ -240,15 +248,15 @@ class _WebWholesaleScreenState extends State<WebWholesaleScreen>
                                   style: GoogleFonts.inter(
                                     color: Colors.white
                                         .withValues(alpha: 0.85),
-                                    fontSize: 15,
-                                    height: 1.6,
+                                    fontSize: isMobile ? 13 : 15,
+                                    height: 1.5,
                                   ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        if (MediaQuery.of(context).size.width > 768) ...[
+                        if (!isMobile) ...[
                           const SizedBox(width: 48),
                           ScaleTransition(
                             scale: _pulseAnimation,
@@ -301,6 +309,9 @@ class _WebWholesaleScreenState extends State<WebWholesaleScreen>
   }
 
   Widget _buildWholesaleBenefits() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     final benefits = [
       {
         'icon': Icons.trending_down_rounded,
@@ -326,7 +337,10 @@ class _WebWholesaleScreenState extends State<WebWholesaleScreen>
     ];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 32,
+        vertical: isMobile ? 16 : 24,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -338,57 +352,107 @@ class _WebWholesaleScreenState extends State<WebWholesaleScreen>
           ),
         ],
       ),
-      child: Row(
-        children: benefits.map((b) {
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: b['bg'] as Color,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      b['icon'] as IconData,
-                      color: b['color'] as Color,
-                      size: 26,
-                    ),
+      child: isMobile
+          ? Column(
+              children: benefits.map((b) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: b['bg'] as Color,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          b['icon'] as IconData,
+                          color: b['color'] as Color,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              b['title'] as String,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E293B),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              b['desc'] as String,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: const Color(0xFF64748B),
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                );
+              }).toList(),
+            )
+          : Row(
+              children: benefits.map((b) {
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
                       children: [
-                        Text(
-                          b['title'] as String,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1E293B),
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: b['bg'] as Color,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            b['icon'] as IconData,
+                            color: b['color'] as Color,
+                            size: 26,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          b['desc'] as String,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: const Color(0xFF64748B),
-                            height: 1.4,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                b['title'] as String,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                b['desc'] as String,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: const Color(0xFF64748B),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
+                );
+              }).toList(),
             ),
-          );
-        }).toList(),
-      ),
     );
   }
 

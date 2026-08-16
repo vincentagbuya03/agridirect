@@ -112,6 +112,12 @@ flutter:
   assets:
     - assets/icon/logo_v3.png
     - assets/images/
+    - assets/images/farmer_1.jpg
+    - assets/images/farmer_2.jpg
+    - assets/images/san_carlos_farming_1.jpg
+    - assets/images/san_carlos_farming_2.jpg
+    - assets/images/san_carlos_farming_3.jpg
+    - assets/images/farmer images/
     - assets/images/fresh_organic_hero.png
     - assets/lottie/Face Scan.json
     - assets/lottie/Scan User ID.json

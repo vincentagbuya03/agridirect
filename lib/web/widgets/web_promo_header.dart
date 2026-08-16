@@ -74,6 +74,7 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
   Widget build(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
     final isCompact = sw < 960;
+    final isMobile = sw < 650;
 
     return Container(
       width: double.infinity,
@@ -97,7 +98,10 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1350),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 12 : 24,
+                  vertical: isMobile ? 8 : 12,
+                ),
                 child: Row(
                   children: [
                     // Brand Logo
@@ -107,7 +111,13 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
                         onTap: () => context.go(AppRoutes.marketplace),
                         child: Row(
                           children: [
-                            const BrandLogo(size: BrandLogoSize.small),
+                            BrandLogo(
+                              size: isMobile
+                                  ? BrandLogoSize.small
+                                  : (isCompact
+                                      ? BrandLogoSize.small
+                                      : BrandLogoSize.medium),
+                            ),
                             if (!isCompact) ...[
                               const SizedBox(width: 8),
                               Container(
@@ -132,12 +142,12 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 24),
+                    SizedBox(width: isMobile ? 8 : 24),
 
                     // Search Bar (Shopee / Lazada Style)
                     Expanded(
                       child: Container(
-                        height: 42,
+                        height: isMobile ? 38 : 42,
                         decoration: BoxDecoration(
                           color: const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(10),
@@ -145,29 +155,31 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
                         ),
                         child: Row(
                           children: [
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 12),
+                            Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: isMobile ? 8 : 12),
                               child: Icon(Icons.search_rounded,
-                                  color: Color(0xFF94A3B8), size: 20),
+                                  color: const Color(0xFF94A3B8),
+                                  size: isMobile ? 18 : 20),
                             ),
                             Expanded(
                               child: TextField(
                                 controller: _searchController,
                                 onChanged: widget.onSearchChanged,
                                 style: GoogleFonts.inter(
-                                  fontSize: 13,
+                                  fontSize: isMobile ? 12 : 13,
                                   color: const Color(0xFF1E293B),
                                 ),
                                 decoration: InputDecoration(
                                   hintText: widget.searchPlaceholder,
                                   hintStyle: GoogleFonts.inter(
-                                    fontSize: 13,
+                                    fontSize: isMobile ? 12 : 13,
                                     color: const Color(0xFF94A3B8),
                                   ),
                                   border: InputBorder.none,
                                   isDense: true,
-                                  contentPadding:
-                                      const EdgeInsets.symmetric(vertical: 10),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      vertical: isMobile ? 8 : 10),
                                 ),
                               ),
                             ),
@@ -181,31 +193,32 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
                                   setState(() {});
                                 },
                               ),
-                            Container(
-                              height: 42,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF059669),
-                                borderRadius: BorderRadius.horizontal(
-                                    right: Radius.circular(9)),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  'Search',
-                                  style: GoogleFonts.inter(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
+                            if (!isMobile)
+                              Container(
+                                height: 42,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF059669),
+                                  borderRadius: BorderRadius.horizontal(
+                                      right: Radius.circular(9)),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Search',
+                                    style: GoogleFonts.inter(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(width: 20),
+                    SizedBox(width: isMobile ? 6 : 20),
 
                     // Vouchers Shortcut
                     if (!isCompact)
@@ -317,8 +330,10 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
                             backgroundColor: const Color(0xFF059669),
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 10 : 16,
+                              vertical: isMobile ? 8 : 10,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -326,7 +341,9 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
                           child: Text(
                             'Sign In',
                             style: GoogleFonts.inter(
-                                fontWeight: FontWeight.w700, fontSize: 12),
+                              fontWeight: FontWeight.w700,
+                              fontSize: isMobile ? 11 : 12,
+                            ),
                           ),
                         );
                       },
@@ -347,7 +364,8 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: isMobile ? 12 : 24),
                     child: Row(
                       children: _channels.map((ch) {
                         final isActive = widget.activeTab == ch['id'];
@@ -360,8 +378,10 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
                             }
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 12 : 16,
+                              vertical: isMobile ? 8 : 10,
+                            ),
                             decoration: BoxDecoration(
                               border: Border(
                                 bottom: BorderSide(
@@ -373,7 +393,7 @@ class _WebPromoHeaderState extends State<WebPromoHeader> {
                             child: Text(
                               ch['label'] as String,
                               style: GoogleFonts.inter(
-                                fontSize: 13,
+                                fontSize: isMobile ? 12 : 13,
                                 fontWeight: isActive
                                     ? FontWeight.w800
                                     : FontWeight.w500,

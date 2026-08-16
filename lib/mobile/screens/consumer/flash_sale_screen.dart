@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
@@ -479,7 +479,7 @@ class _FlashSaleScreenState extends State<FlashSaleScreen> {
                     const Spacer(),
                     
                     Text(
-                      'â‚±${originalPrice.toStringAsFixed(0)}',
+                      '₱${originalPrice.toStringAsFixed(0)}',
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         color: const Color(0xFF9CA3AF),
@@ -491,7 +491,7 @@ class _FlashSaleScreenState extends State<FlashSaleScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'â‚±${salePrice.toStringAsFixed(0)}',
+                          '₱${salePrice.toStringAsFixed(0)}',
                           style: GoogleFonts.poppins(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,

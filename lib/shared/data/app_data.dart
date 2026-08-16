@@ -24,11 +24,17 @@ class ProductItem {
   final double? stockQuantity;
   final double? latitude;
   final double? longitude;
+  final String? originalPrice;
+  final double? discountPercent;
+  final int? soldCount;
+  final double? claimPercentage;
   final bool isFeatured;
   final bool isPreorder;
   final bool isFreeShipping;
   final bool isWholesale;
   final bool isFlashSale;
+  final DateTime? flashSaleStart;
+  final DateTime? flashSaleEnd;
   final DateTime? createdAt;
 
   const ProductItem({
@@ -53,13 +59,89 @@ class ProductItem {
     this.stockQuantity,
     this.latitude,
     this.longitude,
+    this.originalPrice,
+    this.discountPercent,
+    this.soldCount,
+    this.claimPercentage,
     this.isFeatured = false,
     this.isPreorder = false,
     this.isFreeShipping = false,
     this.isWholesale = false,
     this.isFlashSale = false,
+    this.flashSaleStart,
+    this.flashSaleEnd,
     this.createdAt,
   });
+
+  ProductItem copyWith({
+    String? productId,
+    String? farmerId,
+    String? farmerName,
+    String? farmerAvatarUrl,
+    String? farmerImageUrl,
+    String? name,
+    String? farm,
+    String? price,
+    String? unit,
+    String? imageUrl,
+    List<String>? imageUrls,
+    String? categoryName,
+    String? rating,
+    String? reviews,
+    String? harvestDays,
+    String? description,
+    double? reservedQuantity,
+    double? targetQuantity,
+    double? stockQuantity,
+    double? latitude,
+    double? longitude,
+    String? originalPrice,
+    double? discountPercent,
+    int? soldCount,
+    double? claimPercentage,
+    bool? isFeatured,
+    bool? isPreorder,
+    bool? isFreeShipping,
+    bool? isWholesale,
+    bool? isFlashSale,
+    DateTime? createdAt,
+  }) {
+    return ProductItem(
+      productId: productId ?? this.productId,
+      farmerId: farmerId ?? this.farmerId,
+      farmerName: farmerName ?? this.farmerName,
+      farmerAvatarUrl: farmerAvatarUrl ?? this.farmerAvatarUrl,
+      farmerImageUrl: farmerImageUrl ?? this.farmerImageUrl,
+      name: name ?? this.name,
+      farm: farm ?? this.farm,
+      price: price ?? this.price,
+      unit: unit ?? this.unit,
+      imageUrl: imageUrl ?? this.imageUrl,
+      imageUrls: imageUrls ?? this.imageUrls,
+      categoryName: categoryName ?? this.categoryName,
+      rating: rating ?? this.rating,
+      reviews: reviews ?? this.reviews,
+      harvestDays: harvestDays ?? this.harvestDays,
+      description: description ?? this.description,
+      reservedQuantity: reservedQuantity ?? this.reservedQuantity,
+      targetQuantity: targetQuantity ?? this.targetQuantity,
+      stockQuantity: stockQuantity ?? this.stockQuantity,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      originalPrice: originalPrice ?? this.originalPrice,
+      discountPercent: discountPercent ?? this.discountPercent,
+      soldCount: soldCount ?? this.soldCount,
+      claimPercentage: claimPercentage ?? this.claimPercentage,
+      isFeatured: isFeatured ?? this.isFeatured,
+      isPreorder: isPreorder ?? this.isPreorder,
+      isFreeShipping: isFreeShipping ?? this.isFreeShipping,
+      isWholesale: isWholesale ?? this.isWholesale,
+      isFlashSale: isFlashSale ?? this.isFlashSale,
+      flashSaleStart: flashSaleStart ?? this.flashSaleStart,
+      flashSaleEnd: flashSaleEnd ?? this.flashSaleEnd,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }
 
 class VoucherItem {
@@ -69,8 +151,13 @@ class VoucherItem {
   final String? description;
   final double? discountPercentage;
   final double? minSpend;
+  final double? maxDiscount;
   final DateTime? validUntil;
   final String status; // 'available', 'used', 'expired'
+  final String? farmerId;
+  final String? farmName;
+  final String? farmerAvatarUrl;
+  final String? discountType; // 'percentage', 'flat', 'free_shipping'
 
   const VoucherItem({
     required this.id,
@@ -79,8 +166,13 @@ class VoucherItem {
     this.description,
     this.discountPercentage,
     this.minSpend,
+    this.maxDiscount,
     this.validUntil,
     this.status = 'available',
+    this.farmerId,
+    this.farmName,
+    this.farmerAvatarUrl,
+    this.discountType = 'percentage',
   });
 }
 

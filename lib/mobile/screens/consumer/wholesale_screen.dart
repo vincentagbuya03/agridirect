@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/commerce/cart_service.dart';
@@ -325,7 +325,7 @@ class _WholesaleScreenState extends State<WholesaleScreen> {
         ),
         const SizedBox(height: 2),
         Text(
-          'â‚±${price.toStringAsFixed(0)}',
+          '₱${price.toStringAsFixed(0)}',
           style: GoogleFonts.poppins(
             fontSize: isBest ? 16 : 14, 
             fontWeight: FontWeight.bold, 

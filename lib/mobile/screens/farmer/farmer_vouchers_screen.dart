@@ -52,10 +52,9 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
   int get _activeVouchersCount {
     final now = DateTime.now();
     return _vouchers.where((v) {
-      final endDate = DateTime.tryParse(v['end_date'] ?? '') ?? now;
-      final used = (v['used_count'] as num?)?.toInt() ?? 0;
-      final limit = (v['usage_limit'] as num?)?.toInt() ?? 1;
-      return endDate.isAfter(now) && used < limit;
+      final endDate = DateTime.tryParse(v['valid_until'] ?? v['end_date'] ?? '') ?? now;
+      final isActive = v['is_active'] != false;
+      return isActive && (endDate.isAfter(now) || v['valid_until'] == null);
     }).length;
   }
 
@@ -69,7 +68,8 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
   int get _expiredCount {
     final now = DateTime.now();
     return _vouchers.where((v) {
-      final endDate = DateTime.tryParse(v['end_date'] ?? '') ?? now;
+      final endDate = DateTime.tryParse(v['valid_until'] ?? v['end_date'] ?? '');
+      if (endDate == null) return false;
       return endDate.isBefore(now);
     }).length;
   }
@@ -446,20 +446,30 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
   Widget _buildVoucherCard(Map<String, dynamic> voucher) {
     final now = DateTime.now();
     final code = voucher['code'] ?? '';
-    final discValue = (voucher['discount_value'] as num?)?.toDouble() ?? 0.0;
-    final type = voucher['discount_type'] ?? 'flat';
+    final discValue = (voucher['discount_percentage'] as num?)?.toDouble() ??
+        (voucher['discount_value'] as num?)?.toDouble() ??
+        0.0;
+    final type = voucher['discount_type'] ?? 'percentage';
     final minSpend = (voucher['min_spend'] as num?)?.toDouble() ?? 0.0;
     final limit = (voucher['usage_limit'] as num?)?.toInt() ?? 100;
     final used = (voucher['used_count'] as num?)?.toInt() ?? 0;
-    final endDate = DateTime.tryParse(voucher['end_date'] ?? '') ?? now;
+    final endDate = DateTime.tryParse(voucher['valid_until'] ?? voucher['end_date'] ?? '');
 
-    final isExpired = endDate.isBefore(now);
-    final isFullyClaimed = used >= limit;
-    final isActive = !isExpired && !isFullyClaimed;
+    final isExpired = endDate != null && endDate.isBefore(now);
+    final isFullyClaimed = used >= limit && limit > 0;
+    final isActive = (voucher['is_active'] != false) && !isExpired;
 
-    final discountStr = type == 'percentage'
-        ? '${discValue.toStringAsFixed(0)}%'
-        : '₱${discValue.toStringAsFixed(0)}';
+    final isFreeShipping = type == 'free_shipping';
+    final isFlat = type == 'flat';
+
+    final discountMain = isFreeShipping
+        ? 'FREE'
+        : (isFlat
+            ? '₱${discValue.toStringAsFixed(0)}'
+            : '${discValue.toStringAsFixed(0)}%');
+    final discountSub = isFreeShipping
+        ? 'DELIVERY'
+        : (isFlat ? 'DISCOUNT' : 'OFF HARVEST');
 
     final statusLabel = isExpired
         ? 'Expired'
@@ -477,205 +487,299 @@ class _FarmerVouchersScreenState extends State<FarmerVouchersScreen> {
 
     final progress = limit > 0 ? (used / limit).clamp(0.0, 1.0) : 0.0;
 
+    final List<Color> stubGradient = !isActive
+        ? [Colors.grey.shade400, Colors.grey.shade600]
+        : (isFreeShipping
+            ? [const Color(0xFF0F766E), const Color(0xFF0D9488)]
+            : (isFlat
+                ? [const Color(0xFF9A3412), const Color(0xFFEA580C)]
+                : [const Color(0xFF064E3B), const Color(0xFF059669)]));
+
+    final Color accentColor = stubGradient.last;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isActive
-              ? AppColors.primary.withValues(alpha: 0.15)
-              : Colors.grey.shade200,
-          width: 1.5,
-        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: isActive
+                ? accentColor.withValues(alpha: 0.16)
+                : Colors.black.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
+        border: Border.all(
+          color: isActive
+              ? accentColor.withValues(alpha: 0.3)
+              : Colors.grey.shade200,
+          width: 1.2,
+        ),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: IntrinsicHeight(
-          child: Row(
-            children: [
-              // ── Left Discount Badge ──
-              Container(
-                width: 90,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isActive
-                        ? [
-                            AppColors.primary.withValues(alpha: 0.12),
-                            AppColors.primary.withValues(alpha: 0.04),
-                          ]
-                        : [Colors.grey.shade100, Colors.grey.shade50],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      discountStr,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
-                        color: isActive ? AppColors.primary : Colors.grey.shade500,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
+        borderRadius: BorderRadius.circular(19),
+        child: Stack(
+          children: [
+            IntrinsicHeight(
+              child: Row(
+                children: [
+                  // ── Left Ticket Stub ──
+                  Container(
+                    width: 100,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: stubGradient,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'OFF',
-                      style: GoogleFonts.inter(
-                        color: isActive
-                            ? AppColors.primary.withValues(alpha: 0.7)
-                            : Colors.grey.shade400,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // ── Dashed Divider ──
-              CustomPaint(
-                size: const Size(1, double.infinity),
-                painter: _DashedLinePainter(color: Colors.grey.shade300),
-              ),
-
-              // ── Right Details ──
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Code + Status Row
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isActive
-                                  ? AppColors.primary.withValues(alpha: 0.1)
-                                  : Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              code,
-                              style: GoogleFonts.inter(
-                                color: isActive ? AppColors.primary : Colors.grey.shade600,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 11,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Positioned(
+                          right: -10,
+                          bottom: -10,
+                          child: Icon(
+                            isFreeShipping
+                                ? Icons.local_shipping_rounded
+                                : (isFlat
+                                    ? Icons.savings_rounded
+                                    : Icons.eco_rounded),
+                            size: 65,
+                            color: Colors.white.withValues(alpha: 0.12),
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: statusBgColor,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              statusLabel,
-                              style: GoogleFonts.inter(
-                                color: statusColor,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 10,
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          // Delete button
-                          GestureDetector(
-                            onTap: () => _handleDeleteVoucher(voucher['voucher_id']),
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: AppColors.error.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.delete_outline_rounded,
-                                color: AppColors.error,
-                                size: 16,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Min Spend & Expiry
-                      Row(
-                        children: [
-                          Icon(Icons.shopping_bag_outlined, size: 13, color: AppColors.textSubtle),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Min ₱${minSpend.toStringAsFixed(0)}',
-                            style: GoogleFonts.inter(
-                              color: AppColors.textBody,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.textSubtle),
-                          const SizedBox(width: 4),
-                          Text(
-                            DateFormat('MMM d, yyyy').format(endDate),
-                            style: GoogleFonts.inter(
-                              color: isExpired ? AppColors.error : AppColors.textSubtle,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Usage progress
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: LinearProgressIndicator(
-                                value: progress,
-                                backgroundColor: Colors.grey.shade100,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  isActive ? AppColors.primary : Colors.grey.shade400,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 14),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
                                 ),
-                                minHeight: 6,
+                                child: Icon(
+                                  isFreeShipping
+                                      ? Icons.local_shipping_rounded
+                                      : (isFlat
+                                          ? Icons.payments_rounded
+                                          : Icons.percent_rounded),
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 5),
+                              Text(
+                                discountMain,
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.5,
+                                  height: 1.0,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                discountSub,
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.inter(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 10),
-                          Text(
-                            '$used/$limit',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textSubtle,
-                            ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Dashed Divider ──
+                  CustomPaint(
+                    size: const Size(1, double.infinity),
+                    painter: _DashedLinePainter(color: const Color(0xFFCBD5E1)),
+                  ),
+
+                  // ── Right Details ──
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Code + Status + Delete Row
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(7),
+                                  border: Border.all(
+                                      color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: Text(
+                                  code,
+                                  style: GoogleFonts.inter(
+                                    color: const Color(0xFF1E293B),
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 11,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: statusBgColor,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  statusLabel,
+                                  style: GoogleFonts.inter(
+                                    color: statusColor,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 9.5,
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              // Delete button
+                              GestureDetector(
+                                onTap: () => _handleDeleteVoucher(
+                                    voucher['voucher_id']),
+                                child: Container(
+                                  padding: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.error
+                                        .withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: AppColors.error,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Min Spend & Expiry
+                          Row(
+                            children: [
+                              Icon(Icons.shopping_bag_outlined,
+                                  size: 13, color: AppColors.textSubtle),
+                              const SizedBox(width: 4),
+                              Text(
+                                minSpend > 0
+                                    ? 'Min ₱${minSpend.toStringAsFixed(0)}'
+                                    : 'No Min Spend',
+                                style: GoogleFonts.inter(
+                                  color: AppColors.textBody,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Icon(Icons.calendar_today_rounded,
+                                  size: 12, color: AppColors.textSubtle),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  endDate != null
+                                      ? DateFormat('MMM d, yyyy')
+                                          .format(endDate)
+                                      : 'No Expiry',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(
+                                    color: isExpired
+                                        ? AppColors.error
+                                        : AppColors.textSubtle,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Usage progress
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: LinearProgressIndicator(
+                                    value: progress,
+                                    backgroundColor: Colors.grey.shade100,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      isActive ? accentColor : Colors.grey.shade400,
+                                    ),
+                                    minHeight: 5,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '$used / $limit claimed',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textSubtle,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
+                ],
+              ),
+            ),
+
+            // ── Top & Bottom Notch Cutouts ──
+            Positioned(
+              left: 100 - 7,
+              top: -8,
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF6F8F6), // Mobile scaffold background
+                  shape: BoxShape.circle,
                 ),
               ),
-            ],
-          ),
+            ),
+            Positioned(
+              left: 100 - 7,
+              bottom: -8,
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF6F8F6), // Mobile scaffold background
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -845,18 +949,23 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.88,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
-      padding: EdgeInsets.only(
-        top: 0,
-        left: 24,
-        right: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 28,
-      ),
-      child: SingleChildScrollView(
-        child: Form(
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            top: 0,
+            left: 24,
+            right: 24,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 28,
+          ),
+          child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1140,8 +1249,9 @@ class _CreateVoucherBottomSheetState extends State<_CreateVoucherBottomSheet> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildLabel(String text) {
     return Text(

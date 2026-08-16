@@ -783,6 +783,19 @@ class SupabaseDatabase {
     bool onlyFeatured = false,
   }) async {
     try {
+      final currentUserId = _client.auth.currentUser?.id;
+      String? currentFarmerId;
+      if (currentUserId != null) {
+        final farmerRes = await _client
+            .from('farmers')
+            .select('farmer_id')
+            .eq('user_id', currentUserId)
+            .maybeSingle();
+        if (farmerRes != null) {
+          currentFarmerId = farmerRes['farmer_id']?.toString();
+        }
+      }
+
       dynamic query = _client.from('v_products').select('''
         *,
         farmer:farmers (
@@ -799,7 +812,18 @@ class SupabaseDatabase {
       query = query.limit(limit);
 
       final response = await query;
-      return List<Map<String, dynamic>>.from(response);
+      final list = List<Map<String, dynamic>>.from(response);
+
+      if (currentFarmerId != null || currentUserId != null) {
+        list.removeWhere((item) {
+          final fId = item['farmer_id']?.toString() ??
+              (item['farmer'] as Map?)?['farmer_id']?.toString();
+          return (currentFarmerId != null && fId == currentFarmerId) ||
+              (currentUserId != null && fId == currentUserId);
+        });
+      }
+
+      return list;
     } catch (e) {
       debugPrint('Error fetching products: $e');
       return [];
@@ -808,20 +832,38 @@ class SupabaseDatabase {
 
   /// Marketplace: Get verified farmers for spotlight
   static Future<List<Map<String, dynamic>>> getFarmerSpotlight({
-    int limit = 5,
+    int limit = 6,
   }) async {
     try {
-      final response = await _client
-          .from('farmers')
-          .select('''
-            farmer_id,
-            farm_name,
-            specialty,
-            user:users (name, avatar_url)
-          ''')
-          .eq('is_verified', true)
-          .limit(limit);
-      return List<Map<String, dynamic>>.from(response);
+      try {
+        final response = await _client
+            .from('v_farmer_profiles')
+            .select()
+            .eq('is_verified', true)
+            .eq('is_active', true)
+            .order('average_rating', ascending: false)
+            .limit(limit);
+        return List<Map<String, dynamic>>.from(response);
+      } catch (_) {
+        final response = await _client
+            .from('farmers')
+            .select('''
+              farmer_id,
+              user_id,
+              farm_name,
+              full_name,
+              specialty,
+              location,
+              residential_address,
+              image_url,
+              face_photo_path,
+              badge,
+              user:users (name, avatar_url)
+            ''')
+            .eq('is_verified', true)
+            .limit(limit);
+        return List<Map<String, dynamic>>.from(response);
+      }
     } catch (e) {
       debugPrint('Error fetching farmer spotlight: $e');
       return [];

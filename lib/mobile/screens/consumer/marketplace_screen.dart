@@ -1062,7 +1062,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       farmerName: product.farmName,
       name: product.name,
       farm: product.farmName ?? 'Farm',
-      price: 'â‚±${product.price.toStringAsFixed(2)}',
+      price: '₱${product.price.toStringAsFixed(2)}',
       unit: normalizedUnit.isEmpty ? 'kg' : normalizedUnit,
       imageUrl: product.imageUrl ?? '',
       categoryName: product.category,
@@ -1109,7 +1109,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             if (_priceFilterEnabled) ...[
               _buildInlineFilterChip(
                 Icons.sell_rounded,
-                'â‚±${_minPrice.toInt()} - â‚±${_maxPrice.toInt()}',
+                '₱${_minPrice.toInt()} - ₱${_maxPrice.toInt()}',
                 () => setState(() {
                   _priceFilterEnabled = false;
                   _minPrice = 0.0;

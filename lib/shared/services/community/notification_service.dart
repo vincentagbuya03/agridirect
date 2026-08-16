@@ -680,8 +680,37 @@ class NotificationService {
       return;
     }
 
-    if (linkType == 'conversation' && linkId.isNotEmpty) {
-      final isFarmer = AuthService().isViewingAsFarmer;
+    final normalized = linkType.toLowerCase();
+    if ((normalized == 'conversation' ||
+            normalized == 'chat' ||
+            normalized == 'message' ||
+            normalized == 'messages') &&
+        linkId.isNotEmpty) {
+      bool isFarmer = AuthService().isViewingAsFarmer;
+      try {
+        final currentUserId = supabase.auth.currentUser?.id;
+        if (currentUserId != null) {
+          final farmer = await supabase
+              .from('farmers')
+              .select('farmer_id')
+              .eq('user_id', currentUserId)
+              .maybeSingle();
+          final farmerId = farmer?['farmer_id']?.toString();
+
+          final conv = await supabase
+              .from('conversations')
+              .select('farmer_id, customer_id')
+              .eq('conversation_id', linkId)
+              .maybeSingle();
+
+          if (conv != null && farmerId != null && conv['farmer_id']?.toString() == farmerId) {
+            isFarmer = true;
+          } else if (conv != null) {
+            isFarmer = false;
+          }
+        }
+      } catch (_) {}
+
       final ctx = appNavigatorKey.currentContext;
       if (ctx != null && ctx.mounted) {
         GoRouter.of(ctx).go(
@@ -849,6 +878,15 @@ class NotificationService {
     }
   }
 
+
+  // Watch unread notification count
+  Stream<int> watchUnreadCount({String? userId}) {
+    final uid = userId ?? supabase.auth.currentUser?.id;
+    if (uid == null || uid.isEmpty) {
+      return Stream.value(0);
+    }
+    return Stream.fromFuture(getUnreadNotificationCount(uid)).asBroadcastStream();
+  }
 
   // Get unread notification count
   Future<int> getUnreadNotificationCount(String userId) async {

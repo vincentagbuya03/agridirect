@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
 import '../../widgets/web_promo_header.dart';
@@ -60,6 +61,9 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SingleChildScrollView(
@@ -76,7 +80,7 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1350),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -100,6 +104,9 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
   }
 
   Widget _buildHeroBanner() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -150,8 +157,10 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1350),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 16 : 32,
+                  vertical: isMobile ? 24 : 48,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -218,7 +227,7 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
                                       '100% DIRECT · SUPPORT LOCAL AGRICULTURE',
                                       style: GoogleFonts.inter(
                                         color: const Color(0xFF78350F),
-                                        fontSize: 11,
+                                        fontSize: isMobile ? 9.5 : 11,
                                         fontWeight: FontWeight.w800,
                                         letterSpacing: 1.1,
                                       ),
@@ -226,12 +235,12 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 16),
                               Text(
                                 'Local Farms & Shops',
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
-                                  fontSize: 42,
+                                  fontSize: isMobile ? 30 : 42,
                                   fontWeight: FontWeight.w800,
                                   height: 1.1,
                                   letterSpacing: -0.5,
@@ -241,13 +250,13 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
                                 'Meet Your Growers 🏡',
                                 style: GoogleFonts.playfairDisplay(
                                   color: const Color(0xFF6EE7B7),
-                                  fontSize: 48,
+                                  fontSize: isMobile ? 32 : 48,
                                   fontWeight: FontWeight.w700,
                                   fontStyle: FontStyle.italic,
                                   height: 1.15,
                                 ),
                               ),
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 12),
                               ConstrainedBox(
                                 constraints:
                                     const BoxConstraints(maxWidth: 620),
@@ -256,15 +265,15 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
                                   style: GoogleFonts.inter(
                                     color: Colors.white
                                         .withValues(alpha: 0.85),
-                                    fontSize: 15,
-                                    height: 1.6,
+                                    fontSize: isMobile ? 13 : 15,
+                                    height: 1.5,
                                   ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        if (MediaQuery.of(context).size.width > 768) ...[
+                        if (!isMobile) ...[
                           const SizedBox(width: 48),
                           ScaleTransition(
                             scale: _pulseAnimation,
@@ -317,6 +326,9 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
   }
 
   Widget _buildCommunityValues() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     final values = [
       {
         'icon': Icons.location_on_rounded,
@@ -342,7 +354,10 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
     ];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 32,
+        vertical: isMobile ? 16 : 24,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -354,57 +369,107 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
           ),
         ],
       ),
-      child: Row(
-        children: values.map((v) {
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: v['bg'] as Color,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      v['icon'] as IconData,
-                      color: v['color'] as Color,
-                      size: 26,
-                    ),
+      child: isMobile
+          ? Column(
+              children: values.map((v) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: v['bg'] as Color,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          v['icon'] as IconData,
+                          color: v['color'] as Color,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              v['title'] as String,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E293B),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              v['desc'] as String,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: const Color(0xFF64748B),
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                );
+              }).toList(),
+            )
+          : Row(
+              children: values.map((v) {
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
                       children: [
-                        Text(
-                          v['title'] as String,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1E293B),
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: v['bg'] as Color,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            v['icon'] as IconData,
+                            color: v['color'] as Color,
+                            size: 26,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          v['desc'] as String,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: const Color(0xFF64748B),
-                            height: 1.4,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                v['title'] as String,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                v['desc'] as String,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: const Color(0xFF64748B),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
+                );
+              }).toList(),
             ),
-          );
-        }).toList(),
-      ),
     );
   }
 
@@ -485,8 +550,8 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
 
   Widget _buildShopGrid() {
     final sw = MediaQuery.of(context).size.width;
-    int crossAxisCount =
-        sw < 640 ? 1 : (sw < 960 ? 2 : (sw < 1200 ? 3 : 4));
+    int crossAxisCount = sw < 600 ? 1 : (sw < 960 ? 2 : (sw < 1200 ? 3 : 4));
+    double childAspectRatio = sw < 480 ? 1.05 : (sw < 640 ? 1.18 : (sw < 960 ? 1.08 : 1.18));
 
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _shopsFuture,
@@ -497,9 +562,9 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              mainAxisSpacing: 20,
-              crossAxisSpacing: 20,
-              childAspectRatio: 0.85,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: childAspectRatio,
             ),
             itemCount: 4,
             itemBuilder: (context, index) =>
@@ -615,11 +680,9 @@ class _WebShopCardState extends State<_WebShopCard> {
   bool _isHovered = false;
 
   static const List<String> _defaultFarmPhotos = [
-    'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=600&q=80',
-    'https://images.unsplash.com/photo-1592417817098-8f3d6eb22509?w=600&q=80',
-    'https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?w=600&q=80',
-    'https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=600&q=80',
-    'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&q=80',
+    'assets/images/farmer images/Pangasinan-farmers.jpg',
+    'assets/images/farmer images/images (1).jpg',
+    'assets/images/farmer images/images.jpg',
   ];
 
   double _safeDouble(dynamic val, [double fallback = 0.0]) {
@@ -653,20 +716,52 @@ class _WebShopCardState extends State<_WebShopCard> {
     final dynamic rawDist = farmer['distance_km'];
     final double? distance = rawDist != null ? _safeDouble(rawDist, 0.0) : null;
     
-    // Check multiple possible image fields
+    String? resolveImg(String? rawUrl) {
+      if (rawUrl == null || rawUrl.trim().isEmpty || rawUrl == 'null') {
+        return null;
+      }
+      final trimmed = rawUrl.trim();
+      if (trimmed.startsWith('assets/')) {
+        return trimmed;
+      }
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        return trimmed;
+      }
+      String cleanPath = trimmed;
+      if (cleanPath.startsWith('uploads/')) {
+        cleanPath = cleanPath.substring('uploads/'.length);
+      } else if (cleanPath.startsWith('/uploads/')) {
+        cleanPath = cleanPath.substring('/uploads/'.length);
+      }
+      return SupabaseConfig.client.storage.from('uploads').getPublicUrl(cleanPath);
+    }
+
+    final rawAvatar = (farmer['image_url'] ??
+            farmer['imageUrl'] ??
+            farmer['avatar_url'] ??
+            farmer['profile_picture'] ??
+            farmer['users']?['avatar_url'] ??
+            '')
+        .toString()
+        .trim();
+    final avatarUrl = resolveImg(rawAvatar) ?? '';
+
+    // Check multiple possible image fields for cover banner
     String rawImg = (farmer['cover_image_url'] ??
             farmer['farm_image_url'] ??
             farmer['farm_banner_url'] ??
             farmer['banner_url'] ??
             farmer['image_url'] ??
+            farmer['imageUrl'] ??
             '')
         .toString()
         .trim();
-    if (rawImg.isEmpty || rawImg == 'null') {
+    String? resolvedBanner = resolveImg(rawImg);
+    if (resolvedBanner == null || resolvedBanner.isEmpty) {
       rawImg = _defaultFarmPhotos[widget.index % _defaultFarmPhotos.length];
+    } else {
+      rawImg = resolvedBanner;
     }
-
-    final avatarUrl = (farmer['avatar_url'] ?? farmer['profile_picture'] ?? '').toString().trim();
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -709,15 +804,22 @@ class _WebShopCardState extends State<_WebShopCard> {
                       child: Stack(
                         children: [
                           Positioned.fill(
-                            child: CachedNetworkImage(
-                              imageUrl: rawImg,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                color: const Color(0xFFE2E8F0),
-                              ),
-                              errorWidget: (context, url, error) =>
-                                  _buildDefaultBanner(),
-                            ),
+                            child: rawImg.startsWith('assets/')
+                                ? Image.asset(
+                                    rawImg,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        _buildDefaultBanner(),
+                                  )
+                                : CachedNetworkImage(
+                                    imageUrl: rawImg,
+                                    fit: BoxFit.cover,
+                                    placeholder: (context, url) => Container(
+                                      color: const Color(0xFFE2E8F0),
+                                    ),
+                                    errorWidget: (context, url, error) =>
+                                        _buildDefaultBanner(),
+                                  ),
                           ),
                           Positioned.fill(
                             child: Container(
@@ -756,11 +858,19 @@ class _WebShopCardState extends State<_WebShopCard> {
                         ),
                         child: ClipOval(
                           child: (avatarUrl.isNotEmpty && avatarUrl != 'null')
-                              ? CachedNetworkImage(
-                                  imageUrl: avatarUrl,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) => _buildAvatarFallback(shopName),
-                                )
+                              ? (avatarUrl.startsWith('assets/')
+                                  ? Image.asset(
+                                      avatarUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) =>
+                                          _buildAvatarFallback(shopName),
+                                    )
+                                  : CachedNetworkImage(
+                                      imageUrl: avatarUrl,
+                                      fit: BoxFit.cover,
+                                      errorWidget: (context, url, error) =>
+                                          _buildAvatarFallback(shopName),
+                                    ))
                               : _buildAvatarFallback(shopName),
                         ),
                       ),
@@ -933,11 +1043,17 @@ class _WebShopCardState extends State<_WebShopCard> {
 
   Widget _buildDefaultBanner() {
     return Image.asset(
-      'assets/images/banner_1.jpg',
+      'assets/images/farmer images/Pangasinan-farmers.jpg',
       fit: BoxFit.cover,
-      errorBuilder: (ctx, err, stack) => CachedNetworkImage(
-        imageUrl: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=600&q=80',
+      errorBuilder: (ctx, err, stack) => Image.asset(
+        'assets/images/san_carlos_farming_1.jpg',
         fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: const Color(0xFF005A36),
+          child: const Center(
+            child: Icon(Icons.agriculture_rounded, color: Colors.white38, size: 36),
+          ),
+        ),
       ),
     );
   }

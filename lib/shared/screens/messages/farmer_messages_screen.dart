@@ -311,6 +311,19 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant FarmerMessagesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialConversationId != null &&
+        widget.initialConversationId != oldWidget.initialConversationId) {
+      setState(() {
+        _selectedConversationId = widget.initialConversationId;
+        _isKikoSelected = false;
+      });
+      NotificationService().setActiveConversation(widget.initialConversationId);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 900;
     return PopScope(
@@ -326,133 +339,87 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: isWide || _selectedConversationId != null
-            ? null
-            : AppBar(
-                backgroundColor: Colors.white,
-                surfaceTintColor: Colors.white,
-                elevation: 0,
-                centerTitle: false,
-                leading: context.canPop()
-                    ? IconButton(
-                        icon: const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          size: 20,
-                        ),
-                        onPressed: () => context.pop(),
-                      )
-                    : null,
-                title: Text(
-                  'Messages',
-                  style: AppTextStyles.headline1.copyWith(fontSize: 24),
-                ),
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(1),
-                  child: Container(
-                    color: AppColors.textSubtle.withValues(alpha: 0.1),
-                    height: 1,
-                  ),
-                ),
-                actions: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: _buildAsFarmerBadge(),
-                  ),
-                ],
-              ),
-        body: Column(
-          children: [
-            if (_errorText != null) _buildErrorBanner(),
-            Expanded(
-              child: StreamBuilder<List<MessageConversation>>(
-                stream: _inboxStream,
-                builder: (context, snapshot) {
-                  if (_startingInitialConversation) {
-                    return const Center(child: AppShimmerLoader());
-                  }
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              if (_errorText != null) _buildErrorBanner(),
+              Expanded(
+                child: StreamBuilder<List<MessageConversation>>(
+                  stream: _inboxStream,
+                  builder: (context, snapshot) {
+                    if (_startingInitialConversation) {
+                      return const Center(child: AppShimmerLoader());
+                    }
 
-                  if (snapshot.connectionState == ConnectionState.waiting &&
-                      !snapshot.hasData) {
-                    return const Center(child: AppShimmerLoader());
-                  }
+                    if (snapshot.connectionState == ConnectionState.waiting &&
+                        !snapshot.hasData) {
+                      return const Center(child: AppShimmerLoader());
+                    }
 
-                  if (snapshot.hasError) {
-                    return _buildEmptyState(
-                      title: 'Something went wrong',
-                      subtitle:
-                          'We couldn\'t load your messages. Please try again.',
-                      actionLabel: 'Retry',
-                      onPressed: _refreshInbox,
-                    );
-                  }
+                    if (snapshot.hasError) {
+                      return _buildEmptyState(
+                        title: 'Something went wrong',
+                        subtitle:
+                            'We couldn\'t load your messages. Please try again.',
+                        actionLabel: 'Retry',
+                        onPressed: _refreshInbox,
+                      );
+                    }
 
-                  final conversations =
-                      snapshot.data ?? const <MessageConversation>[];
+                    final conversations =
+                        snapshot.data ?? const <MessageConversation>[];
 
-                  if (conversations.isEmpty) {
-                    _selectedConversationId = null;
-                    return Scaffold(
-                      backgroundColor: AppColors.background,
-                      body: _buildEmptyState(
+                    if (conversations.isEmpty) {
+                      _selectedConversationId = null;
+                      return _buildEmptyState(
                         title: 'Your inbox is empty',
                         subtitle:
                             'Customer inquiries will show up here when they message your farm.',
                         actionLabel: 'Refresh Inbox',
                         onPressed: _refreshInbox,
-                      ),
-                    );
-                  }
-
-                  final hasSelectedConversation = conversations.any(
-                    (conversation) =>
-                        conversation.conversationId == _selectedConversationId,
-                  );
-
-                  if (!hasSelectedConversation &&
-                      !_startingInitialConversation) {
-                    if (isWide && conversations.isNotEmpty) {
-                      _selectedConversationId =
-                          conversations.first.conversationId;
-                      NotificationService().setActiveConversation(
-                        _selectedConversationId,
                       );
-                    } else if (!isWide) {
-                      _selectedConversationId = null;
                     }
-                  }
 
-                  MessageConversation? current;
-                  if (_selectedConversationId != null) {
-                    final found = conversations.where(
-                      (c) => c.conversationId == _selectedConversationId,
-                    );
-                    if (found.isNotEmpty) {
-                      current = found.first;
+                    MessageConversation? current;
+                    if (_selectedConversationId != null) {
+                      final found = conversations.where(
+                        (c) =>
+                            c.conversationId == _selectedConversationId ||
+                            c.otherUserId == _selectedConversationId,
+                      );
+                      if (found.isNotEmpty) {
+                        current = found.first;
+                        _selectedConversationId = current.conversationId;
+                      }
                     }
-                  }
 
-                  if (current == null && isWide && conversations.isNotEmpty && !_isKikoSelected) {
-                    current = conversations.first;
-                    _selectedConversationId = current.conversationId;
-                  }
+                    if (current == null &&
+                        isWide &&
+                        conversations.isNotEmpty &&
+                        !_isKikoSelected) {
+                      current = conversations.first;
+                      _selectedConversationId = current.conversationId;
+                    }
 
-                  if (isWide) {
-                    return _buildWebMessengerLayout(conversations, current);
-                  }
+                    if (isWide) {
+                      return _buildWebMessengerLayout(conversations, current);
+                    }
 
-                  if (current == null && _selectedConversationId == null) {
-                    return _buildConversationList(conversations);
-                  }
+                    if (current == null && _selectedConversationId == null) {
+                      return _buildConversationList(conversations);
+                    }
 
-                  if (current == null && _selectedConversationId != null) {
-                    return const Center(child: AppShimmerLoader());
-                  }
+                    if (current == null && _selectedConversationId != null) {
+                      return _buildConversationList(conversations);
+                    }
 
-                  return _buildChatPanel(current!);
-                },
+                    return _buildChatPanel(current!);
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1377,8 +1344,45 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
 
     return Column(
       children: [
+        // Mobile Header
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: [
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 18,
+                  color: AppColors.textHeadline,
+                ),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go(AppRoutes.home);
+                  }
+                },
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Messages',
+                style: GoogleFonts.poppins(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textHeadline,
+                ),
+              ),
+              const Spacer(),
+              _buildAsFarmerBadge(),
+            ],
+          ),
+        ),
+
+        // Search Bar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
           child: Container(
             height: 44,
             decoration: BoxDecoration(
@@ -1388,11 +1392,11 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.03),
                   blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  offset: const Offset(0, 3),
                 ),
               ],
               border: Border.all(
-                color: AppColors.textSubtle.withValues(alpha: 0.1),
+                color: const Color(0xFFE2E8F0),
               ),
             ),
             child: TextField(
@@ -1400,13 +1404,13 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                   setState(() => _conversationSearchQuery = val),
               decoration: InputDecoration(
                 hintText: 'Search conversations...',
-                hintStyle: AppTextStyles.bodyMedium.copyWith(
-                  color: Colors.grey.shade400,
-                  fontSize: 14,
+                hintStyle: GoogleFonts.inter(
+                  color: const Color(0xFF94A3B8),
+                  fontSize: 13.5,
                 ),
-                prefixIcon: Icon(
+                prefixIcon: const Icon(
                   Icons.search_rounded,
-                  color: Colors.grey.shade400,
+                  color: Color(0xFF94A3B8),
                   size: 20,
                 ),
                 border: InputBorder.none,
@@ -1417,13 +1421,153 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
             ),
           ),
         ),
+
+        // Pinned Kiko VIP AI Support Card
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFECFDF5), Color(0xFFD1FAE5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFF10B981).withValues(alpha: 0.3),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF059669).withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const KikoAiChatScreen(embedMode: false),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(18),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
+                  child: Row(
+                    children: [
+                      Stack(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: ClipOval(
+                              child: Image.asset(
+                                'assets/images/kiko_happy.png',
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            right: 1,
+                            bottom: 1,
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Kiko AI Assistant',
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                    color: const Color(0xFF064E3B),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 5,
+                                    vertical: 1.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF059669),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'VIP AI',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Moo! Ask 24/7 about farming, orders, or support!',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                color: const Color(0xFF047857),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 13,
+                        color: Color(0xFF059669),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // Conversations List
         Expanded(
           child: RefreshIndicator(
             onRefresh: _refreshInbox,
             displacement: 20,
             color: AppColors.primary,
             child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               itemBuilder: (context, index) {
                 final conversation = filtered[index];
                 final isSelected =
@@ -1431,30 +1575,27 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
 
                 return InkWell(
                   onTap: () => _openConversation(conversation),
-                  borderRadius: BorderRadius.circular(20),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.all(16),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.white : Colors.transparent,
-                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
                       border: Border.all(
                         color: isSelected
                             ? AppColors.primary.withValues(alpha: 0.3)
-                            : Colors.transparent,
-                        width: 1.5,
+                            : const Color(0xFFE2E8F0),
+                        width: 1.2,
                       ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: AppColors.textHeadline.withValues(
-                                  alpha: 0.05,
-                                ),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ]
-                          : [],
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0F172A).withValues(
+                            alpha: 0.02,
+                          ),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
@@ -1462,21 +1603,18 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                           children: [
                             SafeCircleAvatar(
                               imageUrl: conversation.otherAvatarUrl,
-                              radius: 28,
+                              radius: 26,
                               defaultBucket: 'uploads',
-                              backgroundColor: isSelected
-                                  ? AppColors.primaryLight
-                                  : AppColors.textSubtle.withValues(alpha: 0.1),
+                              backgroundColor: AppColors.primaryLight,
                               child: Text(
                                 conversation.otherDisplayName.isNotEmpty
                                     ? conversation.otherDisplayName[0]
                                           .toUpperCase()
                                     : '?',
-                                style: AppTextStyles.headline3.copyWith(
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : AppColors.textSubtle,
-                                  fontSize: 20,
+                                style: GoogleFonts.poppins(
+                                  color: AppColors.primary,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
@@ -1497,10 +1635,10 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                                       color: Colors.white,
                                       shape: BoxShape.circle,
                                     ),
-                                    padding: const EdgeInsets.all(2.5),
+                                    padding: const EdgeInsets.all(2),
                                     child: PulsingStatusIndicator(
                                       isOnline: true,
-                                      size: 11,
+                                      size: 10,
                                     ),
                                   ),
                                 );
@@ -1508,7 +1646,7 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1520,24 +1658,24 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                                       conversation.otherDisplayName,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: AppTextStyles.bodyLarge.copyWith(
+                                      style: GoogleFonts.poppins(
                                         fontWeight: FontWeight.w700,
-                                        color: AppColors.textHeadline,
+                                        fontSize: 15,
+                                        color: const Color(0xFF0F172A),
                                       ),
                                     ),
                                   ),
                                   Text(
                                     _formatTime(conversation.lastMessageAt),
-                                    style: AppTextStyles.labelSmall.copyWith(
+                                    style: GoogleFonts.inter(
                                       fontSize: 11,
-                                      color: isSelected
-                                          ? AppColors.primary
-                                          : AppColors.textSubtle,
+                                      fontWeight: FontWeight.w500,
+                                      color: const Color(0xFF94A3B8),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 4),
                               Row(
                                 children: [
                                   Expanded(
@@ -1545,13 +1683,14 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                                       _getDisplayText(conversation.lastMessage),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: AppTextStyles.bodyMedium.copyWith(
-                                        color: isSelected
-                                            ? AppColors.textHeadline
-                                            : AppColors.textSubtle,
+                                      style: GoogleFonts.inter(
+                                        color: conversation.unreadCount > 0
+                                            ? const Color(0xFF0F172A)
+                                            : const Color(0xFF64748B),
                                         fontWeight: conversation.unreadCount > 0
                                             ? FontWeight.w700
                                             : FontWeight.w400,
+                                        fontSize: 13,
                                       ),
                                     ),
                                   ),
@@ -1559,8 +1698,8 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                                     Container(
                                       margin: const EdgeInsets.only(left: 8),
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
+                                        horizontal: 7,
+                                        vertical: 3,
                                       ),
                                       decoration: BoxDecoration(
                                         color: AppColors.primary,
@@ -1568,7 +1707,7 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                                       ),
                                       child: Text(
                                         '${conversation.unreadCount}',
-                                        style: const TextStyle(
+                                        style: GoogleFonts.inter(
                                           color: Colors.white,
                                           fontSize: 10,
                                           fontWeight: FontWeight.w800,
@@ -1611,7 +1750,7 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
           child: SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               child: Row(
                 children: [
                   if (MediaQuery.of(context).size.width < 900)
@@ -1622,11 +1761,10 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                       }),
                       icon: const Icon(
                         Icons.arrow_back_ios_new_rounded,
-                        size: 20,
+                        size: 18,
                       ),
                       color: AppColors.textHeadline,
                     ),
-                  const SizedBox(width: 4),
                   Hero(
                     tag: 'avatar_${conversation.conversationId}',
                     child: SafeCircleAvatar(
@@ -1638,14 +1776,15 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                         conversation.otherDisplayName.isNotEmpty
                             ? conversation.otherDisplayName[0].toUpperCase()
                             : '?',
-                        style: AppTextStyles.headline3.copyWith(
+                        style: GoogleFonts.poppins(
                           color: AppColors.primary,
                           fontSize: 18,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1654,9 +1793,9 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                           conversation.otherDisplayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.bodyLarge.copyWith(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 17,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15.5,
                             color: AppColors.textHeadline,
                           ),
                         ),
@@ -1675,7 +1814,7 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                                 );
                               },
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 5),
                             Expanded(
                               child: ValueListenableBuilder<Set<String>>(
                                 valueListenable:
@@ -1689,7 +1828,7 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                                       'Active now',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: AppTextStyles.labelSmall.copyWith(
+                                      style: GoogleFonts.inter(
                                         color: AppColors.success,
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
@@ -1715,7 +1854,7 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                                     statusText,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: AppTextStyles.labelSmall.copyWith(
+                                    style: GoogleFonts.inter(
                                       color: AppColors.textSubtle,
                                       fontSize: 11,
                                     ),
@@ -1728,37 +1867,69 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
                       ],
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => _showCallDialog(
-                      conversation.otherDisplayName,
-                      conversation.otherAvatarUrl,
-                      conversation.otherUserId,
-                      isVideo: false,
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
                     ),
-                    icon: const Icon(
-                      Icons.phone_rounded,
-                      color: AppColors.primary,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => _showCallDialog(
+                        conversation.otherDisplayName,
+                        conversation.otherAvatarUrl,
+                        conversation.otherUserId,
+                        isVideo: false,
+                      ),
+                      icon: const Icon(
+                        Icons.phone_rounded,
+                        color: AppColors.primary,
+                        size: 18,
+                      ),
+                      tooltip: 'Voice Call',
                     ),
-                    tooltip: 'Voice Call',
                   ),
-                  IconButton(
-                    onPressed: () => _showCallDialog(
-                      conversation.otherDisplayName,
-                      conversation.otherAvatarUrl,
-                      conversation.otherUserId,
-                      isVideo: true,
+                  const SizedBox(width: 6),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
                     ),
-                    icon: const Icon(
-                      Icons.videocam_rounded,
-                      color: AppColors.primary,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => _showCallDialog(
+                        conversation.otherDisplayName,
+                        conversation.otherAvatarUrl,
+                        conversation.otherUserId,
+                        isVideo: true,
+                      ),
+                      icon: const Icon(
+                        Icons.videocam_rounded,
+                        color: Color(0xFF2563EB),
+                        size: 19,
+                      ),
+                      tooltip: 'Video Call',
                     ),
-                    tooltip: 'Video Call',
                   ),
-                  IconButton(
-                    onPressed: () => _showConversationInfo(conversation),
-                    icon: const Icon(
-                      Icons.info_outline_rounded,
-                      color: AppColors.textSubtle,
+                  const SizedBox(width: 6),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => _showConversationInfo(conversation),
+                      icon: const Icon(
+                        Icons.info_outline_rounded,
+                        color: Color(0xFF64748B),
+                        size: 18,
+                      ),
                     ),
                   ),
                 ],
@@ -2614,16 +2785,16 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
 
   Widget _buildQuickReplies() {
     final replies = [
-      'Sure, the order is confirmed!',
-      'We are packing your items now.',
-      'Your order is ready for pick-up.',
-      'We will ship this tomorrow morning.',
-      'Thank you for supporting our local farm!',
+      '🌾 Sure, the order is confirmed!',
+      '📦 We are packing your items now.',
+      '🚚 Your order is ready for pick-up.',
+      '🌱 We will ship this tomorrow morning.',
+      '💚 Thank you for supporting our local farm!',
     ];
 
     return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       child: ScrollConfiguration(
         behavior: ScrollConfiguration.of(context).copyWith(
           dragDevices: {
@@ -2643,15 +2814,18 @@ class _FarmerMessagesScreenState extends State<FarmerMessagesScreen> {
               child: ActionChip(
                 label: Text(
                   reply,
-                  style: AppTextStyles.bodySmall.copyWith(
+                  style: GoogleFonts.inter(
                     fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
+                    fontSize: 11.5,
+                    color: const Color(0xFF059669),
                   ),
                 ),
-                backgroundColor: AppColors.primaryLight.withValues(alpha: 0.5),
-                side: BorderSide.none,
+                backgroundColor: const Color(0xFFECFDF5),
+                side: BorderSide(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 onPressed: () {
                   _composerController.text = reply;

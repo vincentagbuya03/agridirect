@@ -362,13 +362,28 @@ class MessageService {
         .update({'last_message_at': DateTime.now().toIso8601String()})
         .eq('conversation_id', conversationId);
 
-    final senderName = await _resolveSenderDisplayName(senderContext: context);
+    // Resolve whether sender is acting as Customer or Farmer in this conversation
+    final conversation = await _client
+        .from('conversations')
+        .select('customer_id, farmer_id')
+        .eq('conversation_id', conversationId)
+        .maybeSingle();
+
+    final customerId = conversation?['customer_id']?.toString();
+    final isSenderCustomer =
+        context.customerId != null && context.customerId == customerId;
+
+    final senderName = await _resolveSenderDisplayName(
+      senderContext: context,
+      isActingAsCustomer: isSenderCustomer,
+    );
 
     await _sendMessagePushNotification(
       conversationId: conversationId,
       senderContext: context,
       senderName: senderName,
       messageText: trimmed,
+      conversation: conversation,
     );
   }
 
@@ -377,36 +392,63 @@ class MessageService {
     required _ActorContext senderContext,
     required String senderName,
     required String messageText,
+    Map<String, dynamic>? conversation,
   }) async {
     try {
-      final conversation = await _client
+      final conv = await _client
           .from('conversations')
-          .select('customer_id, farmer_id')
+          .select('''
+            customer_id,
+            farmer_id,
+            customer:customers (
+              customer_id,
+              user_id,
+              user:users (user_id, name, email)
+            ),
+            farmer:farmers (
+              farmer_id,
+              farm_name,
+              user_id
+            )
+          ''')
           .eq('conversation_id', conversationId)
           .maybeSingle();
 
-      final customerId = conversation?['customer_id']?.toString();
-      final farmerId = conversation?['farmer_id']?.toString();
+      final customerId = conv?['customer_id']?.toString();
+      final farmerId = conv?['farmer_id']?.toString();
 
       if (customerId == null || farmerId == null) {
         return;
       }
 
+      final customerData = conv?['customer'] as Map<String, dynamic>?;
+      final customerUserData = customerData?['user'] as Map<String, dynamic>?;
+      final farmerData = conv?['farmer'] as Map<String, dynamic>?;
+
+      final customerName =
+          (customerUserData?['name'] as String?)?.trim().isNotEmpty == true
+              ? customerUserData!['name'].toString().trim()
+              : (senderName.isNotEmpty ? senderName : 'Customer');
+
+      final farmName =
+          (farmerData?['farm_name'] as String?)?.trim().isNotEmpty == true
+              ? farmerData!['farm_name'].toString().trim()
+              : 'Farmer';
+
+      final farmerUserId = farmerData?['user_id']?.toString();
+      final customerUserId = customerUserData?['user_id']?.toString();
+
       String? targetUserId;
+      String resolvedSenderName;
+
       if (senderContext.customerId == customerId) {
-        final farmer = await _client
-            .from('farmers')
-            .select('user_id')
-            .eq('farmer_id', farmerId)
-            .maybeSingle();
-        targetUserId = farmer?['user_id']?.toString();
-      } else if (senderContext.farmerId == farmerId) {
-        final customer = await _client
-            .from('customers')
-            .select('user_id')
-            .eq('customer_id', customerId)
-            .maybeSingle();
-        targetUserId = customer?['user_id']?.toString();
+        // Sender is Customer -> target is Farmer!
+        targetUserId = farmerUserId;
+        resolvedSenderName = customerName;
+      } else {
+        // Sender is Farmer -> target is Customer!
+        targetUserId = customerUserId;
+        resolvedSenderName = farmName;
       }
 
       if (targetUserId == null || targetUserId.isEmpty) {
@@ -421,7 +463,7 @@ class MessageService {
         'send-push-notification',
         body: {
           'targetUserId': targetUserId,
-          'title': 'New message from $senderName',
+          'title': 'New message from $resolvedSenderName',
           'body': preview,
           'notificationCode': 'new_message',
           'linkType': 'conversation',
@@ -429,7 +471,8 @@ class MessageService {
           'data': {
             'conversation_id': conversationId,
             'sender_id': senderContext.userId,
-            'sender_name': senderName,
+            'sender_name': resolvedSenderName,
+            'as_farmer': (senderContext.customerId == customerId) ? 'true' : 'false',
           },
         },
       );
@@ -494,9 +537,10 @@ class MessageService {
 
   Future<String> _resolveSenderDisplayName({
     required _ActorContext senderContext,
+    bool isActingAsCustomer = false,
   }) async {
-    // Prefer farm name for farmer senders; otherwise use user profile display name.
-    if (senderContext.farmerId != null) {
+    // If not acting as customer and sender has a farm, use farm name
+    if (!isActingAsCustomer && senderContext.farmerId != null) {
       final farmer = await _client
           .from('farmers')
           .select('farm_name')
@@ -509,6 +553,7 @@ class MessageService {
       }
     }
 
+    // Otherwise use user profile display name
     final user = await _client
         .from('users')
         .select('name, email')

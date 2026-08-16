@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -845,7 +845,7 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    type == 'flat' ? 'â‚±${val.toStringAsFixed(0)}' : '${val.toStringAsFixed(0)}%',
+                                    type == 'flat' ? '₱${val.toStringAsFixed(0)}' : '${val.toStringAsFixed(0)}%',
                                     style: GoogleFonts.plusJakartaSans(
                                       fontWeight: FontWeight.w900,
                                       fontSize: 14,
@@ -894,7 +894,7 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      'Min Spend â‚±${minSpend.toStringAsFixed(0)}',
+                                      'Min Spend ₱${minSpend.toStringAsFixed(0)}',
                                       style: GoogleFonts.inter(
                                         fontSize: 9,
                                         fontWeight: FontWeight.w600,

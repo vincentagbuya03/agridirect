@@ -179,7 +179,6 @@ class ProductService {
           .select()
           .single();
 
-      // Convert snake_case database response to camelCase for Product model
       final product = Product.fromJson({
         'productId': response['product_id'],
         'name': response['name'],
@@ -550,10 +549,12 @@ class ProductService {
       final review = _reviewFromDatabase(response);
 
       // Trigger push notification to farmer
-      unawaited(NotificationService().notifyFarmerNewProductReview(
-        productId: productId,
-        rating: rating,
-      ));
+      unawaited(
+        NotificationService().notifyFarmerNewProductReview(
+          productId: productId,
+          rating: rating,
+        ),
+      );
 
       return review;
     } catch (e) {
@@ -742,7 +743,9 @@ class ProductService {
             .inFilter('status_code', ['PENDING', 'CONFIRMED'])
             .eq('order_items.product_id', productId);
 
-        final reservationList = List<Map<String, dynamic>>.from(reservations as List);
+        final reservationList = List<Map<String, dynamic>>.from(
+          reservations as List,
+        );
 
         // 3. Send push notification + DB entry to each reserving customer
         for (final reservation in reservationList) {
@@ -753,7 +756,8 @@ class ProductService {
           await NotificationService().insertNotification(
             userId: customerId,
             title: '🌱 Pre-order Update: $cropName',
-            content: 'A new growth update was posted: "$title". Check your orders for details!',
+            content:
+                'A new growth update was posted: "$title". Check your orders for details!',
             type: 'system',
             linkType: 'orders',
             linkId: orderId,

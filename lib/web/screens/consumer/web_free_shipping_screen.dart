@@ -167,6 +167,9 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SingleChildScrollView(
@@ -183,7 +186,7 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1350),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -209,6 +212,9 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
   }
 
   Widget _buildHeroBanner() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -216,10 +222,9 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF064E3B), // Emerald dark
-            Color(0xFF047857), // Forest green
-            Color(0xFF059669), // Emerald 600
-            Color(0xFF10B981), // Mint emerald
+            Color(0xFF064E3B),
+            Color(0xFF047857),
+            Color(0xFF0D9488),
           ],
         ),
         boxShadow: [
@@ -260,7 +265,10 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1350),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 16 : 32,
+                  vertical: isMobile ? 24 : 48,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -294,7 +302,7 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                         ),
                       ),
                     ),
-                    const SizedBox(height: 36),
+                    SizedBox(height: isMobile ? 20 : 36),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -306,7 +314,7 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 14, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFEF3C7),
+                                  color: const Color(0xFFFBBF24),
                                   borderRadius: BorderRadius.circular(20),
                                   boxShadow: [
                                     BoxShadow(
@@ -326,7 +334,7 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                                       'ZERO MINIMUM SPEND · SITEWIDE',
                                       style: GoogleFonts.inter(
                                         color: const Color(0xFF78350F),
-                                        fontSize: 11,
+                                        fontSize: isMobile ? 9.5 : 11,
                                         fontWeight: FontWeight.w800,
                                         letterSpacing: 1.1,
                                       ),
@@ -334,12 +342,12 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 16),
                               Text(
                                 'Free Shipping',
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
-                                  fontSize: 42,
+                                  fontSize: isMobile ? 30 : 42,
                                   fontWeight: FontWeight.w800,
                                   height: 1.1,
                                   letterSpacing: -0.5,
@@ -349,28 +357,28 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                                 'On Us! 🌿',
                                 style: GoogleFonts.playfairDisplay(
                                   color: const Color(0xFF6EE7B7),
-                                  fontSize: 48,
+                                  fontSize: isMobile ? 32 : 48,
                                   fontWeight: FontWeight.w700,
                                   fontStyle: FontStyle.italic,
                                   height: 1.15,
                                 ),
                               ),
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 12),
                               ConstrainedBox(
                                 constraints: const BoxConstraints(maxWidth: 620),
                                 child: Text(
                                   'Claim your free delivery vouchers below and shop straight from local farms without paying extra delivery fees on qualified orders.',
                                   style: GoogleFonts.inter(
                                     color: Colors.white.withValues(alpha: 0.9),
-                                    fontSize: 15,
-                                    height: 1.6,
+                                    fontSize: isMobile ? 13 : 15,
+                                    height: 1.5,
                                   ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        if (MediaQuery.of(context).size.width > 768) ...[
+                        if (!isMobile) ...[
                           const SizedBox(width: 48),
                           ScaleTransition(
                             scale: _pulseAnimation,
@@ -422,6 +430,9 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
   }
 
   Widget _buildHowItWorksSection() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     final steps = [
       {
         'icon': Icons.card_giftcard_rounded,
@@ -447,7 +458,10 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
     ];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 32,
+        vertical: isMobile ? 16 : 24,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -459,57 +473,107 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
           ),
         ],
       ),
-      child: Row(
-        children: steps.map((step) {
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: step['bg'] as Color,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      step['icon'] as IconData,
-                      color: step['color'] as Color,
-                      size: 26,
-                    ),
+      child: isMobile
+          ? Column(
+              children: steps.map((step) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: step['bg'] as Color,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          step['icon'] as IconData,
+                          color: step['color'] as Color,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              step['title'] as String,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E293B),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              step['desc'] as String,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: const Color(0xFF64748B),
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                );
+              }).toList(),
+            )
+          : Row(
+              children: steps.map((step) {
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
                       children: [
-                        Text(
-                          step['title'] as String,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1E293B),
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: step['bg'] as Color,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            step['icon'] as IconData,
+                            color: step['color'] as Color,
+                            size: 26,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          step['desc'] as String,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: const Color(0xFF64748B),
-                            height: 1.4,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                step['title'] as String,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                step['desc'] as String,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: const Color(0xFF64748B),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
+                );
+              }).toList(),
             ),
-          );
-        }).toList(),
-      ),
     );
   }
 
@@ -903,7 +967,14 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
 
   Widget _buildProductGrid() {
     final sw = MediaQuery.of(context).size.width;
-    int crossAxisCount = sw < 640 ? 1 : (sw < 960 ? 2 : (sw < 1200 ? 3 : 4));
+    int crossAxisCount = sw < 480 ? 2 : (sw < 768 ? 2 : (sw < 1100 ? 3 : 4));
+    double childAspectRatio = sw < 480
+        ? 0.54
+        : (sw < 640
+            ? 0.58
+            : (sw < 960
+                ? 0.68
+                : 0.74));
 
     return FutureBuilder<List<ProductItem>>(
       future: _productsFuture,
@@ -914,9 +985,9 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              mainAxisSpacing: 20,
-              crossAxisSpacing: 20,
-              childAspectRatio: 0.72,
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+              childAspectRatio: childAspectRatio,
             ),
             itemCount: 8,
             itemBuilder: (context, index) => const AppShimmerLoader(height: 280),
@@ -974,7 +1045,7 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
+                      color: const Color(0xFF059669).withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.local_shipping_outlined,
@@ -1006,9 +1077,9 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            mainAxisSpacing: 20,
-            crossAxisSpacing: 20,
-            childAspectRatio: 0.82,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: childAspectRatio,
           ),
           itemCount: products.length,
           itemBuilder: (context, index) {
@@ -1041,18 +1112,23 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
 
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     final product = widget.product;
+    final farmDisplayName = (product.farm.isNotEmpty && product.farm != 'Farm')
+        ? product.farm
+        : ((product.farmerName != null && product.farmerName!.isNotEmpty)
+            ? product.farmerName!
+            : 'Local Farm');
 
     final rawPrice = product.price.replaceAll(RegExp(r'[^0-9.]'), '');
-    final double? numPrice = double.tryParse(rawPrice);
-    final String formattedPrice = numPrice != null
-        ? '₱${numPrice.toStringAsFixed(numPrice.truncateToDouble() == numPrice ? 0 : 2)}'
-        : '₱${product.price}';
-
-    final String unitLabel =
-        product.unit.isNotEmpty ? ' / ${product.unit}' : '';
+    final double price = double.tryParse(rawPrice) ?? 0.0;
+    final String formattedPrice = '₱${price.toStringAsFixed(0)}';
+    final String unitLabel = product.unit.isNotEmpty ? ' / ${product.unit}' : '';
 
     return MouseRegion(
+      cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: GestureDetector(
@@ -1063,17 +1139,17 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          transform: Matrix4.translationValues(0, _isHovered ? -6 : 0, 0),
+          transform: Matrix4.translationValues(0, _isHovered ? -4 : 0, 0),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
                 color: _isHovered
                     ? const Color(0xFF059669).withValues(alpha: 0.15)
                     : Colors.black.withValues(alpha: 0.04),
-                blurRadius: _isHovered ? 24 : 12,
-                offset: Offset(0, _isHovered ? 10 : 4),
+                blurRadius: _isHovered ? 20 : 10,
+                offset: Offset(0, _isHovered ? 8 : 3),
               ),
             ],
             border: Border.all(
@@ -1089,7 +1165,7 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
               Stack(
                 children: [
                   Container(
-                    height: 155,
+                    height: isMobile ? 120 : 140,
                     width: double.infinity,
                     decoration: const BoxDecoration(
                       borderRadius:
@@ -1115,16 +1191,19 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
                     ),
                   ),
                   Positioned(
-                    top: 10,
-                    left: 10,
+                    top: 8,
+                    left: 8,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                          horizontal: 7, vertical: 3),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF059669), Color(0xFF10B981)],
+                          colors: [
+                            Color(0xFF059669),
+                            Color(0xFF10B981),
+                          ],
                         ),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
                             color: const Color(0xFF059669)
@@ -1137,31 +1216,33 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.local_shipping_rounded,
-                              size: 12, color: Colors.white),
-                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.local_shipping_rounded,
+                            size: 10,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 3),
                           Text(
-                            'FREE DELIVERY',
+                            'FREE SHIPPING',
                             style: GoogleFonts.inter(
                               fontSize: 9,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
-                              letterSpacing: 0.5,
+                              letterSpacing: 0.2,
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  if (product.farmerName != null &&
-                      product.farmerName!.isNotEmpty)
+                  if (farmDisplayName.isNotEmpty)
                     Positioned(
-                      top: 10,
-                      right: 10,
+                      top: 8,
+                      right: 8,
                       child: Container(
-                        padding: const EdgeInsets.all(5),
+                        padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: Colors.white.withValues(alpha: 0.92),
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
@@ -1171,120 +1252,143 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
                           ],
                         ),
                         child: const Icon(Icons.verified_rounded,
-                            size: 13, color: Color(0xFF059669)),
+                            size: 12, color: Color(0xFF059669)),
                       ),
                     ),
                 ],
               ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        product.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF1E293B),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 9,
-                            backgroundColor: const Color(0xFFE2E8F0),
-                            backgroundImage: product.farmerAvatarUrl != null &&
-                                    product.farmerAvatarUrl!.isNotEmpty
-                                ? CachedNetworkImageProvider(
-                                    product.farmerAvatarUrl!)
-                                : null,
-                            child: product.farmerAvatarUrl == null ||
-                                    product.farmerAvatarUrl!.isEmpty
-                                ? const Icon(Icons.person,
-                                    size: 10, color: Color(0xFF64748B))
-                                : null,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              product.farmerName ?? 'Local Farmer',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: const Color(0xFF64748B),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            formattedPrice,
+                            product.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF059669),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1E293B),
                             ),
                           ),
-                          Text(
-                            unitLabel,
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF94A3B8),
-                            ),
-                          ),
-                          const Spacer(),
+                          const SizedBox(height: 3),
                           Row(
                             children: [
-                              const Icon(Icons.star_rounded,
-                                  size: 16, color: Color(0xFFF59E0B)),
-                              const SizedBox(width: 2),
-                              Text(
-                                product.rating ?? '5.0',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF475569),
+                              Container(
+                                width: 18,
+                                height: 18,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFFE2E8F0),
+                                ),
+                                child: ClipOval(
+                                  child: (product.farmerAvatarUrl != null &&
+                                          product.farmerAvatarUrl!.isNotEmpty)
+                                      ? CachedNetworkImage(
+                                          imageUrl: product.farmerAvatarUrl!,
+                                          fit: BoxFit.cover,
+                                          errorWidget: (context, url, error) =>
+                                              const Icon(
+                                            Icons.storefront_rounded,
+                                            size: 10,
+                                            color: Color(0xFF059669),
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.storefront_rounded,
+                                          size: 10,
+                                          color: Color(0xFF059669),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  farmDisplayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    color: const Color(0xFF64748B),
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: widget.onAddToCart,
-                          icon: const Icon(Icons.add_shopping_cart_rounded,
-                              size: 16),
-                          label: const Text('Add to Cart'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF059669),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            textStyle: GoogleFonts.inter(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                formattedPrice,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF059669),
+                                ),
+                              ),
+                              Text(
+                                unitLabel,
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF94A3B8),
+                                ),
+                              ),
+                              const Spacer(),
+                              Row(
+                                children: [
+                                  const Icon(Icons.star_rounded,
+                                      size: 13, color: Color(0xFFF59E0B)),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    product.rating ?? '5.0',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF475569),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: widget.onAddToCart,
+                              icon: const Icon(Icons.add_shopping_cart_rounded,
+                                  size: 13),
+                              label: const Text('Add to Cart'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF059669),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                textStyle: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11.5,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
