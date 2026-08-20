@@ -142,11 +142,13 @@ class AdminUi {
   static InputDecoration inputDecoration({
     String? hintText,
     Widget? prefixIcon,
+    Widget? suffixIcon,
   }) {
     return InputDecoration(
       hintText: hintText,
       hintStyle: label(color: textMuted, weight: FontWeight.w400),
       prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
       filled: true,
       fillColor: const Color(0xFFF3F4F6),
       border: OutlineInputBorder(
@@ -194,69 +196,152 @@ class AdminHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: AdminUi.cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 640;
+
+        return Container(
+          padding: EdgeInsets.all(isMobile ? 18 : 28),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE2E9E4), width: 1.2),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x06000000),
+                blurRadius: 12,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Column(
+              if (isMobile) ...[
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (eyebrow != null) ...[
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                         decoration: BoxDecoration(
                           color: AdminUi.brandSoft,
-                          borderRadius: AdminUi.radiusFull,
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           eyebrow!.toUpperCase(),
-                          style: AdminUi.label(
+                          style: GoogleFonts.plusJakartaSans(
                             color: AdminUi.brand,
-                            weight: FontWeight.w800,
-                            size: 10,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 9,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                     ],
-                    Text(title, style: AdminUi.display(context, size: 28)),
-                    const SizedBox(height: 8),
+                    Text(
+                      title,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: AdminUi.textPrimary,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                     Text(
                       description,
-                      style: AdminUi.body(
-                        size: 15,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
                         color: AdminUi.textSecondary,
                       ),
                     ),
+                    if (actions.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: actions,
+                      ),
+                    ],
                   ],
                 ),
-              ),
-              if (actions.isNotEmpty)
-                Wrap(
-                  spacing: 12,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: actions,
+              ] else ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (eyebrow != null) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AdminUi.brandSoft,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                eyebrow!.toUpperCase(),
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: AdminUi.brand,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          Text(
+                            title,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: AdminUi.textPrimary,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            description,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: AdminUi.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (actions.isNotEmpty) ...[
+                      const SizedBox(width: 16),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 10,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: actions,
+                      ),
+                    ],
+                  ],
                 ),
+              ],
+              if (metrics.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                const Divider(height: 1, color: Color(0xFFE6EDE8)),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: isMobile ? 16 : 24,
+                  runSpacing: 16,
+                  children: metrics.where((m) => m is! SizedBox).toList(),
+                ),
+              ],
             ],
           ),
-          if (metrics.isNotEmpty) ...[
-            const SizedBox(height: 32),
-            const Divider(height: 1, color: AdminUi.border),
-            const SizedBox(height: 24),
-            Wrap(spacing: 32, runSpacing: 24, children: metrics),
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -313,7 +398,7 @@ class AdminMiniMetric extends StatelessWidget {
   }
 }
 
-/// New Hero Component for the "Overview" section
+/// Modern Hero Component for the Admin Overview section
 class AdminDashboardHeader extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -328,29 +413,148 @@ class AdminDashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 768;
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 32),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(
-            child: Column(
+      padding: EdgeInsets.only(bottom: isMobile ? 20 : 28),
+      child: isMobile
+          ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AdminUi.display(context, size: 32)),
-                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AdminUi.brand.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: AdminUi.brand,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'LIVE CONTROL',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: AdminUi.brand,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: AdminUi.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: AdminUi.body(color: AdminUi.textSecondary),
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: AdminUi.textSecondary,
+                  ),
                 ),
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: actions,
+                  ),
+                ],
+              ],
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AdminUi.brand.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: AdminUi.brand,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'LIVE EXECUTIVE CONTROL',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: AdminUi.brand,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        title,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: AdminUi.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: AdminUi.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(width: 16),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: actions,
+                  ),
+                ],
               ],
             ),
-          ),
-          if (actions.isNotEmpty)
-            Wrap(spacing: 12, runSpacing: 12, children: actions),
-        ],
-      ),
     );
   }
 }

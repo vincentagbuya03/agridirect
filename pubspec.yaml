@@ -41,6 +41,7 @@ dependencies:
   fl_chart: ^1.1.1
   supabase_flutter: ^2.0.0
   firebase_core: ^4.6.0
+  firebase_auth: ^6.1.4
   firebase_messaging: ^16.1.3
   flutter_local_notifications: ^17.1.0
   camera: ^0.11.4
@@ -119,6 +120,11 @@ flutter:
     - assets/images/san_carlos_farming_3.jpg
     - assets/images/farmer images/
     - assets/images/fresh_organic_hero.png
+    - assets/images/nick_vincent_agbuya.jpg
+    - assets/images/john_carlo_banaag.jpg
+    - assets/developer/
+    - assets/developer/nick_vincent_agbuya.jpg
+    - assets/developer/john_carlo_banaag.jpg
     - assets/lottie/Face Scan.json
     - assets/lottie/Scan User ID.json
     - assets/lottie/Security.json

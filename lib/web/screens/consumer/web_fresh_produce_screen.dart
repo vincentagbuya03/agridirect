@@ -642,12 +642,14 @@ class _WebFreshProduceScreenState extends State<WebFreshProduceScreen>
     final sw = MediaQuery.of(context).size.width;
     int crossAxisCount = sw < 480 ? 2 : (sw < 768 ? 2 : (sw < 1100 ? 3 : 4));
     double childAspectRatio = sw < 480
-        ? 0.70
+        ? 0.66
         : (sw < 640
-            ? 0.72
+            ? 0.70
             : (sw < 960
-                ? 0.75
-                : 0.78));
+                ? 0.76
+                : (sw < 1280
+                    ? 0.82
+                    : 0.85)));
 
     return FutureBuilder<List<ProductItem>>(
       future: _productsFuture,
@@ -836,220 +838,232 @@ class _WebFreshProduceCardState extends State<_WebFreshProduceCard> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Stack(
-                children: [
-                  Container(
-                    height: 110,
-                    width: double.infinity,
-                    decoration: const BoxDecoration(
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(15)),
-                      color: Color(0xFFF8FAFC),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(15)),
-                      child: CachedNetworkImage(
-                        imageUrl: product.imageUrls.isNotEmpty
-                            ? product.imageUrls.first
-                            : product.imageUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        errorWidget: (context, url, error) => const Center(
-                          child: Icon(Icons.eco_rounded,
-                              size: 36, color: Color(0xFF94A3B8)),
+              AspectRatio(
+                aspectRatio: 1.25,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      decoration: const BoxDecoration(
+                        borderRadius:
+                            BorderRadius.vertical(top: Radius.circular(15)),
+                        color: Color(0xFFF8FAFC),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(15)),
+                        child: CachedNetworkImage(
+                          imageUrl: product.imageUrls.isNotEmpty
+                              ? product.imageUrls.first
+                              : product.imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          errorWidget: (context, url, error) => const Center(
+                            child: Icon(Icons.eco_rounded,
+                                size: 36, color: Color(0xFF94A3B8)),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: harvestedToday
-                              ? [
-                                  const Color(0xFF059669),
-                                  const Color(0xFF10B981)
-                                ]
-                              : [
-                                  const Color(0xFFD97706),
-                                  const Color(0xFFF59E0B)
-                                ],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (harvestedToday
-                                    ? const Color(0xFF059669)
-                                    : const Color(0xFFD97706))
-                                .withValues(alpha: 0.3),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            harvestedToday ? Icons.eco : Icons.calendar_today,
-                            size: 10,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            harvestedToday
-                                ? 'Harvested Today'
-                                : 'Harvested $daysSinceHarvest d ago',
-                            style: GoogleFonts.inter(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (farmDisplayName.isNotEmpty)
                     Positioned(
                       top: 8,
-                      right: 8,
+                      left: 8,
                       child: Container(
-                        padding: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3.5),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.92),
-                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: harvestedToday
+                                ? [
+                                    const Color(0xFF059669),
+                                    const Color(0xFF10B981)
+                                  ]
+                                : [
+                                    const Color(0xFFD97706),
+                                    const Color(0xFFF59E0B)
+                                  ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
+                              color: (harvestedToday
+                                      ? const Color(0xFF059669)
+                                      : const Color(0xFFD97706))
+                                  .withValues(alpha: 0.3),
                               blurRadius: 6,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.verified_rounded,
-                            size: 12, color: Color(0xFF059669)),
-                      ),
-                    ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      product.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1E293B),
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        Container(
-                          width: 18,
-                          height: 18,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Color(0xFFE2E8F0),
-                          ),
-                          child: ClipOval(
-                            child: (product.farmerAvatarUrl != null &&
-                                    product.farmerAvatarUrl!.isNotEmpty)
-                                ? CachedNetworkImage(
-                                    imageUrl: product.farmerAvatarUrl!,
-                                    fit: BoxFit.cover,
-                                    errorWidget: (context, url, error) =>
-                                        const Icon(
-                                      Icons.storefront_rounded,
-                                      size: 10,
-                                      color: Color(0xFF059669),
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.storefront_rounded,
-                                    size: 10,
-                                    color: Color(0xFF059669),
-                                  ),
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              harvestedToday ? Icons.eco : Icons.calendar_today,
+                              size: 10,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 3.5),
+                            Text(
+                              harvestedToday
+                                  ? 'Harvested Today'
+                                  : 'Harvested $daysSinceHarvest d ago',
+                              style: GoogleFonts.inter(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            farmDisplayName,
+                      ),
+                    ),
+                    if (farmDisplayName.isNotEmpty)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(4.5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(Icons.verified_rounded,
+                              size: 12, color: Color(0xFF059669)),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 10.5,
-                              color: const Color(0xFF64748B),
-                              fontWeight: FontWeight.w500,
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1E293B),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          formattedPrice,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF059669),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Container(
+                                width: 17,
+                                height: 17,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFFE2E8F0),
+                                ),
+                                child: ClipOval(
+                                  child: (product.farmerAvatarUrl != null &&
+                                          product.farmerAvatarUrl!.isNotEmpty)
+                                      ? CachedNetworkImage(
+                                          imageUrl: product.farmerAvatarUrl!,
+                                          fit: BoxFit.cover,
+                                          errorWidget: (context, url, error) =>
+                                              const Icon(
+                                            Icons.storefront_rounded,
+                                            size: 10,
+                                            color: Color(0xFF059669),
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.storefront_rounded,
+                                          size: 10,
+                                          color: Color(0xFF059669),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  farmDisplayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    color: const Color(0xFF64748B),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        Text(
-                          unitLabel,
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF94A3B8),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: widget.onAddToCart,
-                        icon: const Icon(Icons.add_shopping_cart_rounded,
-                            size: 13),
-                        label: const Text('Add to Cart'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF059669),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          textStyle: GoogleFonts.inter(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11,
-                          ),
-                        ),
+                        ],
                       ),
-                    ),
-                  ],
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                formattedPrice,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF059669),
+                                ),
+                              ),
+                              Text(
+                                unitLabel,
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 7),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: widget.onAddToCart,
+                              icon: const Icon(Icons.add_shopping_cart_rounded,
+                                  size: 13),
+                              label: const Text('Add to Cart'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF059669),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 7),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                textStyle: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

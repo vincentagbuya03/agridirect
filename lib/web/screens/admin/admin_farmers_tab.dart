@@ -83,7 +83,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // METRIC CARDS (matches reference: Total Farmers, Pending, Top Specialty, Avg Yield)
+  // METRIC CARDS (Responsive 2x2 on Mobile, 4 columns on Desktop)
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildMetricsRow() {
     return FutureBuilder<List<Map<String, dynamic>>>(
@@ -99,31 +99,64 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
               future: widget.adminService.getFarmerMetrics(),
               builder: (context, mSnap) {
                 final metrics = mSnap.data;
-                return Row(
-                  children: [
-                    _metricCard('TOTAL FARMERS', '$total', null, null),
-                    const SizedBox(width: 16),
-                    _metricCard(
-                      'PENDING VERIFICATION',
-                      '$pending',
-                      null,
-                      'Action Req.',
-                    ),
-                    const SizedBox(width: 16),
-                    _metricCard(
-                      'TOP SPECIALTY',
-                      metrics?['top_specialty'] ?? 'Calculating...',
-                      null,
-                      null,
-                    ),
-                    const SizedBox(width: 16),
-                    _metricCard(
-                      'AVG. YIELD SCORE',
-                      metrics?['avg_yield'] ?? '0.0',
-                      null,
-                      '/10',
-                    ),
-                  ],
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth;
+                    final isMobile = width < 640;
+                    final isTablet = width >= 640 && width < 1100;
+                    final double metricWidth;
+                    if (isMobile) {
+                      metricWidth = (width - 12) / 2;
+                    } else if (isTablet) {
+                      metricWidth = (width - 16) / 2;
+                    } else {
+                      metricWidth = (width - 48) / 4;
+                    }
+
+                    return Wrap(
+                      spacing: isMobile ? 12 : 16,
+                      runSpacing: isMobile ? 12 : 16,
+                      children: [
+                        SizedBox(
+                          width: metricWidth,
+                          child: _metricCard('TOTAL FARMERS', '$total', Icons.agriculture_rounded, null, null, AdminUi.brand),
+                        ),
+                        SizedBox(
+                          width: metricWidth,
+                          child: _metricCard(
+                            'PENDING VERIFICATION',
+                            '$pending',
+                            Icons.verified_user_rounded,
+                            pending > 0 ? 'Action Req.' : 'All Clear',
+                            null,
+                            pending > 0 ? AdminUi.warning : AdminUi.success,
+                          ),
+                        ),
+                        SizedBox(
+                          width: metricWidth,
+                          child: _metricCard(
+                            'TOP SPECIALTY',
+                            metrics?['top_specialty'] ?? 'Calculating...',
+                            Icons.eco_rounded,
+                            null,
+                            null,
+                            AdminUi.brandSecondary,
+                          ),
+                        ),
+                        SizedBox(
+                          width: metricWidth,
+                          child: _metricCard(
+                            'AVG. YIELD SCORE',
+                            metrics?['avg_yield'] ?? '0.0',
+                            Icons.trending_up_rounded,
+                            null,
+                            '/10',
+                            AdminUi.info,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 );
               },
             );
@@ -136,72 +169,114 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
   Widget _metricCard(
     String label,
     String value,
-    String? trend,
+    IconData icon,
+    String? badgeText,
     String? suffix,
+    Color accentColor,
   ) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: AdminUi.cardDecoration(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: AdminUi.label(
-                size: 10,
-                color: AdminUi.textMuted,
-                weight: FontWeight.w700,
-                letterSpacing: 0.5,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 240;
+
+        return Container(
+          padding: EdgeInsets.all(isCompact ? 14 : 18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E9E4), width: 1.2),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x06000000),
+                blurRadius: 10,
+                offset: Offset(0, 3),
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Flexible(
-                  child: Text(
-                    value,
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: isCompact ? 32 : 36,
+                    height: isCompact ? 32 : 36,
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: isCompact ? 18 : 20, color: accentColor),
+                  ),
+                  if (badgeText != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        badgeText,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: isCompact ? 9 : 10,
+                          fontWeight: FontWeight.w800,
+                          color: accentColor,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              SizedBox(height: isCompact ? 10 : 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: value.length > 12 ? 18 : 32,
+                      fontSize: isCompact ? 9 : 10,
                       fontWeight: FontWeight.w800,
-                      color: AdminUi.textPrimary,
-                      letterSpacing: -0.5,
+                      color: AdminUi.textMuted,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                ),
-                if (trend != null) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    trend,
-                    style: AdminUi.label(
-                      size: 13,
-                      color: AdminUi.success,
-                      weight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-                if (suffix != null) ...[
-                  const SizedBox(width: 4),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      suffix,
-                      style: AdminUi.label(
-                        size: 13,
-                        color: AdminUi.textMuted,
-                        weight: FontWeight.w600,
+                  const SizedBox(height: 2),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          value,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: isCompact ? (value.length > 10 ? 15 : 20) : (value.length > 10 ? 18 : 26),
+                            fontWeight: FontWeight.w800,
+                            color: AdminUi.textPrimary,
+                          ),
+                        ),
                       ),
-                    ),
+                      if (suffix != null) ...[
+                        const SizedBox(width: 3),
+                        Text(
+                          suffix,
+                          style: GoogleFonts.inter(
+                            fontSize: isCompact ? 10 : 12,
+                            color: AdminUi.textMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
-              ],
-            ),
-          ],
-        ),
-      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -209,32 +284,47 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
   // FILTER ROW (Specialty: All, Status: Pending) + Onboard New Farmer button
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildFilterRow() {
-    return Row(
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        _filterChip(Icons.tune_rounded, 'Specialty: $_filterSpecialty', () {}),
-        const SizedBox(width: 12),
-        _filterChip(
-          Icons.verified_user_outlined,
-          'Status: ${_filterStatus == 'all' ? 'All' : _filterStatus.substring(0, 1).toUpperCase() + _filterStatus.substring(1)}',
-          () {
-            setState(() {
-              if (_filterStatus == 'all') {
-                _filterStatus = 'pending';
-              } else if (_filterStatus == 'pending') {
-                _filterStatus = 'verified';
-              } else {
-                _filterStatus = 'all';
-              }
-              _loadData();
-            });
-          },
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _filterChip(Icons.tune_rounded, 'Specialty: $_filterSpecialty', () {}),
+            _filterChip(
+              Icons.verified_user_outlined,
+              'Status: ${_filterStatus == 'all' ? 'All' : _filterStatus.substring(0, 1).toUpperCase() + _filterStatus.substring(1)}',
+              () {
+                setState(() {
+                  if (_filterStatus == 'all') {
+                    _filterStatus = 'pending';
+                  } else if (_filterStatus == 'pending') {
+                    _filterStatus = 'verified';
+                  } else {
+                    _filterStatus = 'all';
+                  }
+                  _loadData();
+                });
+              },
+            ),
+          ],
         ),
-        const Spacer(),
         ElevatedButton.icon(
           onPressed: () => _showOnboardingDialog(),
-          style: AdminUi.primaryButton,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AdminUi.brand,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
           icon: const Icon(Icons.add_rounded, size: 18),
-          label: const Text('Onboard New Farmer'),
+          label: Text('Onboard New Farmer', style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700)),
         ),
       ],
     );
@@ -243,25 +333,28 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
   Widget _filterChip(IconData icon, String label, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: AdminUi.radiusFull,
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: AdminUi.radiusFull,
-          border: Border.all(color: AdminUi.border),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE2E9E4)),
+          boxShadow: const [
+            BoxShadow(color: Color(0x04000000), blurRadius: 4, offset: Offset(0, 1)),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: AdminUi.textSecondary),
-            const SizedBox(width: 8),
+            Icon(icon, size: 15, color: AdminUi.textSecondary),
+            const SizedBox(width: 7),
             Text(
               label,
-              style: AdminUi.label(
-                size: 13,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
                 color: AdminUi.textPrimary,
-                weight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -274,80 +367,103 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
   // DATA TABLE (Farm & Owner, Specialty, Location, Status, Joined Date, Actions)
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildDataTable() {
-    return Container(
-      decoration: AdminUi.cardDecoration(),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          // Table Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            decoration: BoxDecoration(
-              color: AdminUi.panelAlt,
-              border: Border(bottom: BorderSide(color: AdminUi.border)),
-            ),
-            child: Row(
-              children: [
-                _headerCell('FARM & OWNER', flex: 3),
-                _headerCell('SPECIALTY', flex: 2),
-                _headerCell('LOCATION', flex: 2),
-                _headerCell('STATUS', flex: 2),
-                _headerCell('JOINED DATE', flex: 2),
-                _headerCell('ACTIONS', flex: 2, align: TextAlign.right),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tableWidth = constraints.maxWidth < 980 ? 980.0 : constraints.maxWidth;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE2E9E4), width: 1.2),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x06000000),
+                blurRadius: 12,
+                offset: Offset(0, 3),
+              ),
+            ],
           ),
-          // Table Body
-          FutureBuilder<List<Map<String, dynamic>>>(
-            future: _farmersFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.all(60),
-                  child: Center(child: AppShimmerLoader(color: AdminUi.brand)),
-                );
-              }
-
-              var farmers = snapshot.data ?? [];
-              farmers = _getFilteredFarmers(farmers);
-
-              if (farmers.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.all(60),
-                  child: Center(
-                    child: Column(
+          clipBehavior: Clip.antiAlias,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: tableWidth,
+              child: Column(
+                children: [
+                  // Table Header
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF7FAF8),
+                      border: const Border(bottom: BorderSide(color: Color(0xFFE6EDE8))),
+                    ),
+                    child: Row(
                       children: [
-                        Icon(
-                          Icons.person_search_rounded,
-                          size: 48,
-                          color: AdminUi.border,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No farmers found.',
-                          style: AdminUi.body(color: AdminUi.textMuted),
-                        ),
+                        _headerCell('FARM & OWNER', flex: 3),
+                        _headerCell('SPECIALTY', flex: 2),
+                        _headerCell('LOCATION', flex: 2),
+                        _headerCell('STATUS', flex: 2),
+                        _headerCell('JOINED DATE', flex: 2),
+                        _headerCell('ACTIONS', flex: 2, align: TextAlign.right),
                       ],
                     ),
                   ),
-                );
-              }
+                  // Table Body
+                  FutureBuilder<List<Map<String, dynamic>>>(
+                    future: _farmersFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Padding(
+                          padding: EdgeInsets.all(60),
+                          child: Center(child: AppShimmerLoader(color: AdminUi.brand)),
+                        );
+                      }
 
-              final paginatedFarmers = _getPaginatedFarmers(farmers);
+                      var farmers = snapshot.data ?? [];
+                      farmers = _getFilteredFarmers(farmers);
 
-              return ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: paginatedFarmers.length,
-                separatorBuilder: (_, _) =>
-                    const Divider(height: 1, color: AdminUi.border),
-                itemBuilder: (context, index) =>
-                    _buildFarmerRow(paginatedFarmers[index]),
-              );
-            },
+                      if (farmers.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.all(60),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.person_search_rounded,
+                                  size: 48,
+                                  color: AdminUi.border,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No farmers found.',
+                                  style: AdminUi.body(color: AdminUi.textMuted),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      final paginatedFarmers = _getPaginatedFarmers(farmers);
+
+                      return ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: paginatedFarmers.length,
+                        separatorBuilder: (_, _) =>
+                            const Divider(height: 1, color: Color(0xFFEBEFEA)),
+                        itemBuilder: (context, index) =>
+                            _buildFarmerRow(paginatedFarmers[index]),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -382,7 +498,7 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
         farmer['applicant_name'] ??
         farmer['farmer_name'] ??
         'Unknown';
-    final specialty = farmer['specialty'] ?? 'General';
+    final specialty = (farmer['specialty'] ?? '').toString().trim();
     final location =
         farmer['location'] ?? farmer['residential_address'] ?? 'N/A';
     final date = farmer['created_at'] != null
@@ -457,30 +573,31 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
               // Specialty badge
               Expanded(
                 flex: 2,
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AdminUi.brandSoft,
-                        borderRadius: AdminUi.radiusSm,
-                        border: Border.all(
-                          color: AdminUi.brand.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: Text(
-                        specialty,
-                        style: AdminUi.label(
-                          size: 11,
-                          color: AdminUi.brand,
-                          weight: FontWeight.w700,
-                        ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AdminUi.brandSoft,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: AdminUi.brand.withValues(alpha: 0.2),
                       ),
                     ),
-                  ],
+                    child: Text(
+                      specialty.isEmpty ? 'General' : specialty,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AdminUi.label(
+                        size: 11,
+                        color: AdminUi.brand,
+                        weight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               // Location
@@ -627,14 +744,18 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
 
         final pages = _buildVisiblePageItems(totalPages, safeCurrentPage);
 
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return Wrap(
+          spacing: 12,
+          runSpacing: 10,
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Text(
               'Showing $startIndex to $endIndex of $total farmers',
               style: AdminUi.body(size: 13, color: AdminUi.textMuted),
             ),
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 _pageButton(
                   '<',
@@ -783,170 +904,195 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
   // BOTTOM INSIGHTS (Farmer Onboarding Insights + Verification Queue)
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildBottomInsights() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Farmer Onboarding Insights Card
-        Expanded(
-          flex: 1,
-          child: Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AdminUi.brand, const Color(0xFF0D7C5F)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isStacked = constraints.maxWidth < 880;
+
+        final insightsCard = Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF092B1D), Color(0xFF0E3D2A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFF1E523A), width: 1.2),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14000000),
+                blurRadius: 16,
+                offset: Offset(0, 4),
               ),
-              borderRadius: AdminUi.radiusLg,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Farmer Onboarding\nInsights',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Platform verification throughput remains stable. Real-time monitoring of document submission trends is active.',
-                  style: AdminUi.body(
-                    size: 13,
-                    color: Colors.white.withValues(alpha: 0.9),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                OutlinedButton(
-                  onPressed: () {},
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 10,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AdminUi.radiusSm,
-                    ),
-                  ),
-                  child: Text(
-                    'REVIEW REPORT',
-                    style: AdminUi.label(
-                      size: 11,
-                      color: Colors.white,
-                      weight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
-        ),
-        const SizedBox(width: 24),
-        Expanded(
-          flex: 1,
-          child: Container(
-            padding: const EdgeInsets.all(28),
-            decoration: AdminUi.cardDecoration(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Verification Queue', style: AdminUi.title(size: 18)),
-                    InkWell(
-                      onTap: () {
-                        setState(() {
-                          _filterStatus = 'pending';
-                          _loadData();
-                        });
-                      },
-                      borderRadius: AdminUi.radiusSm,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 4,
-                        ),
-                        child: Text(
-                          'View All',
-                          style: AdminUi.label(
-                            size: 12,
-                            color: AdminUi.brand,
-                            weight: FontWeight.w700,
-                          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Farmer Onboarding Insights',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Platform verification throughput remains stable. Real-time monitoring of document submission trends is active.',
+                style: AdminUi.body(
+                  size: 12,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton(
+                onPressed: () {},
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFF388E3C)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 9,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  'REVIEW REPORT',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+
+        final queueCard = Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE2E9E4), width: 1.2),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x06000000),
+                blurRadius: 12,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Verification Queue', style: AdminUi.title(size: 16)),
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _filterStatus = 'pending';
+                        _loadData();
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      child: Text(
+                        'View All →',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: AdminUi.brand,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
-                  ],
-                ),
-                Text(
-                  'High priority requests waiting for approval',
-                  style: AdminUi.body(size: 12, color: AdminUi.textSecondary),
-                ),
-                const SizedBox(height: 20),
-                FutureBuilder<List<Map<String, dynamic>>>(
-                  future: _pendingFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: AppShimmerLoader(strokeWidth: 2),
-                      );
-                    }
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'High priority requests waiting for approval',
+                style: AdminUi.body(size: 11, color: AdminUi.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              FutureBuilder<List<Map<String, dynamic>>>(
+                future: _pendingFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: AppShimmerLoader(strokeWidth: 2));
+                  }
 
-                    final pending = snapshot.data ?? const [];
-                    if (pending.isEmpty) {
-                      return Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AdminUi.panelAlt,
-                          borderRadius: AdminUi.radiusMd,
+                  final pending = snapshot.data ?? const [];
+                  if (pending.isEmpty) {
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF7FAF8),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE6EDE8)),
+                      ),
+                      child: Text(
+                        'No pending verification requests.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: AdminUi.textSecondary,
                         ),
-                        child: Text(
-                          'No pending verification requests.',
-                          style: AdminUi.body(
-                            size: 12,
-                            color: AdminUi.textSecondary,
-                          ),
-                        ),
-                      );
-                    }
-
-                    final queueItems = pending.take(3).toList();
-                    return Column(
-                      children: [
-                        for (var i = 0; i < queueItems.length; i++) ...[
-                          _queueItem(
-                            Icons.verified_user_rounded,
-                            AdminUi.warning,
-                            (queueItems[i]['full_name'] ??
-                                    queueItems[i]['applicant_name'] ??
-                                    queueItems[i]['name'] ??
-                                    'Pending Applicant')
-                                .toString(),
-                            (queueItems[i]['farm_name'] ?? 'Pending Farm')
-                                .toString(),
-                            _formatQueueTime(queueItems[i]['created_at']),
-                          ),
-                          if (i != queueItems.length - 1)
-                            const SizedBox(height: 12),
-                        ],
-                      ],
+                      ),
                     );
-                  },
-                ),
-              ],
-            ),
+                  }
+
+                  final queueItems = pending.take(3).toList();
+                  return Column(
+                    children: [
+                      for (var i = 0; i < queueItems.length; i++) ...[
+                        _queueItem(
+                          Icons.verified_user_rounded,
+                          AdminUi.warning,
+                          (queueItems[i]['full_name'] ??
+                                  queueItems[i]['applicant_name'] ??
+                                  queueItems[i]['name'] ??
+                                  'Pending Applicant')
+                              .toString(),
+                          (queueItems[i]['farm_name'] ?? 'Pending Farm').toString(),
+                          _formatQueueTime(queueItems[i]['created_at']),
+                        ),
+                        if (i != queueItems.length - 1) const SizedBox(height: 10),
+                      ],
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
-        ),
-      ],
+        );
+
+        return isStacked
+            ? Column(
+                children: [
+                  insightsCard,
+                  const SizedBox(height: 16),
+                  queueCard,
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 1, child: insightsCard),
+                  const SizedBox(width: 20),
+                  Expanded(flex: 1, child: queueCard),
+                ],
+              );
+      },
     );
   }
 

@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-
-import 'package:share_plus/share_plus.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/data/app_data.dart';
@@ -16,6 +13,7 @@ import '../../../shared/services/commerce/voucher_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/utils/share_util.dart';
 import '../../../shared/widgets/app_open_banner.dart';
+import '../../../shared/widgets/share_bottom_sheet.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class WebProductDetails extends StatefulWidget {
@@ -670,108 +668,30 @@ class _WebProductDetailsState extends State<WebProductDetails> {
       children: [
         Expanded(child: _buildActionButtonsSection()),
         const SizedBox(width: 12),
-        MenuAnchor(
-          style: MenuStyle(
-            shape: WidgetStateProperty.all(
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+        IconButton.outlined(
+          onPressed: _openShareDialog,
+          icon: const Icon(Icons.ios_share_rounded, color: _primary),
+          style: IconButton.styleFrom(
+            padding: const EdgeInsets.all(22),
+            backgroundColor: _surface,
+            shape: const CircleBorder(),
           ),
-          builder: (context, controller, child) {
-            return IconButton.outlined(
-              onPressed: () {
-                if (controller.isOpen) {
-                  controller.close();
-                } else {
-                  controller.open();
-                }
-              },
-              icon: const Icon(Icons.ios_share_rounded, color: _primary),
-              style: IconButton.styleFrom(
-                padding: const EdgeInsets.all(22),
-                backgroundColor: _surface,
-                shape: const CircleBorder(),
-              ),
-              tooltip: 'Share Product',
-            );
-          },
-          menuChildren: [
-            MenuItemButton(
-              leadingIcon: const Icon(Icons.share_rounded, size: 20, color: _primary),
-              onPressed: () async {
-                if (_product?.productId == null) return;
-                final shareUrl = ShareUtil.generateProductShareLink(_product!.productId!);
-                // ignore: deprecated_member_use
-                await Share.share(shareUrl, subject: 'Check out ${_product!.name} on AgriDirect!');
-              },
-              child: Text('Share Link', style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-            ),
-            MenuItemButton(
-              leadingIcon: const Icon(Icons.qr_code_2_rounded, size: 20, color: _primary),
-              onPressed: () {
-                if (_product?.productId == null) return;
-                final shareUrl = ShareUtil.generateProductShareLink(_product!.productId!);
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text(
-                      'Product QR Code',
-                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
-                      textAlign: TextAlign.center,
-                    ),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Scan to view this product',
-                          style: GoogleFonts.inter(color: Colors.grey[600]),
-                        ),
-                        const SizedBox(height: 24),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: QrImageView(
-                            data: shareUrl,
-                            version: QrVersions.auto,
-                            size: 200.0,
-                            eyeStyle: const QrEyeStyle(
-                              eyeShape: QrEyeShape.square,
-                              color: Color(0xFF0F172A),
-                            ),
-                            dataModuleStyle: const QrDataModuleStyle(
-                              dataModuleShape: QrDataModuleShape.square,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: Text(
-                          'Close',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF16A34A),
-                          ),
-                        ),
-                      ),
-                    ],
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                );
-              },
-              child: Text('Show QR Code', style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-            ),
-          ],
+          tooltip: 'Share Product & QR Code',
         ),
       ],
+    );
+  }
+
+  void _openShareDialog() {
+    final product = _product ?? widget.initialProduct;
+    if (product?.productId == null) return;
+    final shareUrl = ShareUtil.generateProductShareLink(product!.productId!);
+    ShareBottomSheet.show(
+      context: context,
+      shareUrl: shareUrl,
+      title: 'Share Product',
+      subtitle: 'Scan QR code with your camera or copy the link below',
+      shareSubject: 'Check out ${product.name} on AgriDirect!',
     );
   }
 
@@ -1186,6 +1106,26 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                   color: _dark.withValues(alpha: 0.8),
                   height: 1.6,
                 ),
+              ),
+            ],
+            if (review.images.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: review.images.map((img) {
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: SizedBox(
+                      width: 72,
+                      height: 72,
+                      child: SafeNetworkImage(
+                        imageUrl: img,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
             ],
           ],

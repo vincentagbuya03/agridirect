@@ -18,7 +18,7 @@ class _ConsumerRadarViewState extends State<ConsumerRadarView> {
   void initState() {
     super.initState();
     final url =
-        'https://embed.windy.com/embed2.html?lat=${widget.lat}&lon=${widget.lon}&detailLat=${widget.lat}&detailLon=${widget.lon}&zoom=10&level=surface&overlay=rain&product=ecmwf&menu=&message=&marker=true&calendar=now&pressure=&type=map&location=coordinates&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1';
+        'https://embed.windy.com/embed2.html?lat=${widget.lat}&lon=${widget.lon}&detailLat=${widget.lat}&detailLon=${widget.lon}&zoom=10&level=surface&overlay=rain&product=ecmwf&menu=&message=&calendar=now&pressure=&type=map&location=coordinates&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1';
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -28,7 +28,7 @@ class _ConsumerRadarViewState extends State<ConsumerRadarView> {
             _controller.runJavaScript('''
               try {
                 var style = document.createElement('style');
-                style.innerHTML = '#logo, .logo, #windy-logo, a[href*="windy.com"] { display: none !important; }';
+                style.innerHTML = '#logo, .logo, #windy-logo, a[href*="windy.com"], .leaflet-control-attribution { display: none !important; }';
                 document.head.appendChild(style);
               } catch(e) {}
             ''');
@@ -44,52 +44,24 @@ class _ConsumerRadarViewState extends State<ConsumerRadarView> {
       child: Stack(
         children: [
           Positioned.fill(child: WebViewWidget(controller: _controller)),
-          // ── Cover: Windy.com logo — AgriDirect badge ─────────────────
+
+          // ── Bottom Cover: Cover Windy footer attribution ───
           Positioned(
-            top: 12,
-            left: 12,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 24,
             child: IgnorePointer(
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 6,
-                ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A).withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.12),
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      const Color(0xFF070E1B).withValues(alpha: 0.95),
+                      const Color(0xFF070E1B).withValues(alpha: 0.0),
+                    ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF22C55E),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'AgriDirect Radar',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ),

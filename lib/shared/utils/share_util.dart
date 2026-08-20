@@ -25,19 +25,19 @@ class ShareUtil {
     return webDomain;
   }
 
-  /// Generates a rich share link for a product using the Vercel Serverless Function
+  /// Generates a rich share link for a product
   static String generateProductShareLink(String productId) {
-    return '$webDomain/api/share?id=$productId';
+    return '$baseDomain/product/$productId';
   }
 
   /// Generates a share link for a farmer profile
   static String generateFarmerShareLink(String farmerId) {
-    return '$webDomain/farmer/$farmerId';
+    return '$baseDomain/farmer/$farmerId';
   }
 
   /// Generates a share link for a community post or article
   static String generatePostShareLink(String postId) {
-    return '$webDomain/article/$postId';
+    return '$baseDomain/article/$postId';
   }
 
   /// Builds a link specifically designed to launch the installed APK directly.

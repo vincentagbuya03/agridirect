@@ -64,10 +64,37 @@ class _WebShopScreenState extends State<WebShopScreen>
   String _searchQuery = '';
   final _searchController = TextEditingController();
   double _priceRange = 500.0;
+  bool _verifiedOnly = false;
   int _currentPage = 1;
   final int _itemsPerPage = 12;
 
   List<String> _categories = ['All'];
+
+  bool get _hasActiveFilters =>
+      _selectedCategory != 'All' ||
+      _priceRange < 500 ||
+      _searchQuery.isNotEmpty ||
+      _verifiedOnly;
+
+  int get _activeFiltersCount {
+    int count = 0;
+    if (_selectedCategory != 'All') count++;
+    if (_priceRange < 500) count++;
+    if (_searchQuery.isNotEmpty) count++;
+    if (_verifiedOnly) count++;
+    return count;
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _selectedCategory = 'All';
+      _priceRange = 500.0;
+      _searchQuery = '';
+      _searchController.clear();
+      _verifiedOnly = false;
+    });
+    _filterProducts();
+  }
 
   @override
   void initState() {
@@ -213,15 +240,23 @@ class _WebShopScreenState extends State<WebShopScreen>
         final matchesSearch =
             _searchQuery.isEmpty ||
             p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            p.farm.toLowerCase().contains(_searchQuery.toLowerCase());
+            p.farm.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            (p.description?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
 
+        final priceVal =
+            double.tryParse(p.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
         final matchesPrice =
-            (double.tryParse(p.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0) <=
-            _priceRange;
+            _priceRange >= 500 || priceVal <= _priceRange;
+
+        final matchesVerified =
+            !_verifiedOnly ||
+            (p.farmerName != null && p.farmerName!.isNotEmpty) ||
+            (p.farm.isNotEmpty && p.farm != 'Farm');
 
         return matchesCategory &&
             matchesSearch &&
-            (_priceRange >= 500 || matchesPrice);
+            matchesPrice &&
+            matchesVerified;
       }).toList();
 
       // Sort logic
@@ -240,6 +275,12 @@ class _WebShopScreenState extends State<WebShopScreen>
           final pb =
               double.tryParse(b.price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
           return pb.compareTo(pa);
+        });
+      } else if (_sortBy == 'Popular') {
+        _filteredProducts.sort((a, b) {
+          final ra = double.tryParse(a.rating ?? '0') ?? 0.0;
+          final rb = double.tryParse(b.rating ?? '0') ?? 0.0;
+          return rb.compareTo(ra);
         });
       }
 
@@ -308,7 +349,7 @@ class _WebShopScreenState extends State<WebShopScreen>
             ),
           ),
           // Main content
-          FadeTransition(
+FadeTransition(
             opacity: CurvedAnimation(
               parent: _fadeInController,
               curve: Curves.easeOut,
@@ -340,13 +381,21 @@ class _WebShopScreenState extends State<WebShopScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildBreadcrumb(),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 16),
                               _buildToolbar(),
-                              const SizedBox(height: 40),
+                              if (sw < 768) ...[
+                                const SizedBox(height: 14),
+                                _buildMobileCategoryChips(),
+                              ],
+                              if (_hasActiveFilters) ...[
+                                const SizedBox(height: 14),
+                                _buildActiveFilterChips(),
+                              ],
+                              const SizedBox(height: 24),
                               // Featured section on home category
-                              if (_selectedCategory == 'All') ...[
+                              if (_selectedCategory == 'All' && _searchQuery.isEmpty) ...[
                                 _buildFeaturedSection(),
-                                const SizedBox(height: 48),
+                                const SizedBox(height: 36),
                               ],
                               _isLoading
                                   ? _buildLoadingGrid()
@@ -415,7 +464,7 @@ class _WebShopScreenState extends State<WebShopScreen>
   }
 
   // ─────────────────────────────────────────────
-  // SIDEBAR (modern)
+  // SIDEBAR (modern & rich)
   // ─────────────────────────────────────────────
   Widget _buildSidebar() {
     final sw = MediaQuery.of(context).size.width;
@@ -433,21 +482,80 @@ class _WebShopScreenState extends State<WebShopScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Category section
-            Text(
-              'Categories',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: _dark,
-                letterSpacing: -0.2,
+            // Search Input inside sidebar
+            Container(
+              decoration: BoxDecoration(
+                color: _surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _border),
+              ),
+              child: TextField(
+                controller: _searchController,
+                style: GoogleFonts.inter(fontSize: 13, color: _dark),
+                onChanged: (val) {
+                  setState(() => _searchQuery = val);
+                  _filterProducts();
+                },
+                decoration: InputDecoration(
+                  hintText: 'Search produce or farms...',
+                  hintStyle: GoogleFonts.inter(fontSize: 12.5, color: _mutedLight),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 18, color: _muted),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 16, color: _muted),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                            _filterProducts();
+                          },
+                        )
+                      : null,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
+
+            // Category section header with Reset
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Categories',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: _dark,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                if (_hasActiveFilters)
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: _resetFilters,
+                      child: Text(
+                        'Reset All',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFDC2626),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
             ..._categories.map((cat) {
               final isSelected = _selectedCategory == cat;
+              final catCount = cat == 'All'
+                  ? _allProducts.length
+                  : _allProducts.where((p) => p.categoryName == cat).length;
+
               return Padding(
-                padding: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.only(bottom: 3),
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
@@ -456,9 +564,9 @@ class _WebShopScreenState extends State<WebShopScreen>
                       _filterProducts();
                     },
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
+                      duration: const Duration(milliseconds: 180),
                       padding: const EdgeInsets.symmetric(
-                        vertical: 8,
+                        vertical: 7,
                         horizontal: 10,
                       ),
                       decoration: BoxDecoration(
@@ -466,36 +574,57 @@ class _WebShopScreenState extends State<WebShopScreen>
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Checkbox style
-                          Container(
-                            width: 18,
-                            height: 18,
-                            decoration: BoxDecoration(
-                              color: isSelected ? _primary : _white,
-                              borderRadius: BorderRadius.circular(5),
-                              border: Border.all(
-                                color: isSelected ? _primary : _border,
-                                width: 1.5,
+                          Row(
+                            children: [
+                              Container(
+                                width: 17,
+                                height: 17,
+                                decoration: BoxDecoration(
+                                  color: isSelected ? _primary : _white,
+                                  borderRadius: BorderRadius.circular(4.5),
+                                  border: Border.all(
+                                    color: isSelected ? _primary : _border,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: isSelected
+                                    ? const Icon(
+                                        Icons.check,
+                                        size: 11,
+                                        color: Colors.white,
+                                      )
+                                    : null,
                               ),
-                            ),
-                            child: isSelected
-                                ? const Icon(
-                                    Icons.check,
-                                    size: 12,
-                                    color: Colors.white,
-                                  )
-                                : null,
+                              const SizedBox(width: 9),
+                              Text(
+                                cat,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.5,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: isSelected ? _primary : const Color(0xFF334155),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 10),
-                          Text(
-                            cat,
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: isSelected
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: isSelected ? _primary : _muted,
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? _primary.withValues(alpha: 0.15)
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$catCount',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected ? _primary : _muted,
+                              ),
                             ),
                           ),
                         ],
@@ -506,38 +635,31 @@ class _WebShopScreenState extends State<WebShopScreen>
               );
             }),
 
-            const SizedBox(height: 28),
-            Container(
-              height: 1.5,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [_border, _border.withValues(alpha: 0.1)],
-                ),
-              ),
-            ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
+            const Divider(height: 1, color: _border),
+            const SizedBox(height: 20),
 
             // Price Range
             Text(
               'Price Range',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.w800,
                 color: _dark,
                 letterSpacing: -0.2,
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             SliderTheme(
               data: SliderThemeData(
                 activeTrackColor: _primary,
                 inactiveTrackColor: _border,
                 thumbColor: _primary,
                 overlayColor: _primary.withValues(alpha: 0.1),
-                trackHeight: 5,
+                trackHeight: 4,
                 thumbShape: const RoundSliderThumbShape(
-                  enabledThumbRadius: 8,
-                  elevation: 4,
+                  enabledThumbRadius: 7,
+                  elevation: 3,
                 ),
               ),
               child: Slider(
@@ -558,27 +680,27 @@ class _WebShopScreenState extends State<WebShopScreen>
                   Text(
                     '₱0',
                     style: GoogleFonts.inter(
-                      fontSize: 12,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w500,
                       color: _mutedLight,
                     ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+                      horizontal: 10,
+                      vertical: 4,
                     ),
                     decoration: BoxDecoration(
                       color: _primaryLight,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                       border: Border.all(
                         color: _primary.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Text(
-                      '₱${_priceRange.toInt()}',
+                      _priceRange >= 500 ? 'All Prices' : 'Up to ₱${_priceRange.toInt()}',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w800,
                         color: _primary,
                       ),
@@ -587,7 +709,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                   Text(
                     '₱500+',
                     style: GoogleFonts.inter(
-                      fontSize: 12,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w500,
                       color: _mutedLight,
                     ),
@@ -596,31 +718,69 @@ class _WebShopScreenState extends State<WebShopScreen>
               ),
             ),
 
-            const SizedBox(height: 28),
-            Container(
-              height: 1.5,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [_border, _border.withValues(alpha: 0.1)],
+            const SizedBox(height: 24),
+            const Divider(height: 1, color: _border),
+            const SizedBox(height: 20),
+
+            // Verified Farmers Only Toggle
+            InkWell(
+              onTap: () {
+                setState(() => _verifiedOnly = !_verifiedOnly);
+                _filterProducts();
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 17,
+                      height: 17,
+                      decoration: BoxDecoration(
+                        color: _verifiedOnly ? _primary : _white,
+                        borderRadius: BorderRadius.circular(4.5),
+                        border: Border.all(
+                          color: _verifiedOnly ? _primary : _border,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: _verifiedOnly
+                          ? const Icon(
+                              Icons.check,
+                              size: 11,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 9),
+                    const Icon(Icons.verified_rounded, size: 14, color: _primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Verified Farms Only',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: _verifiedOnly ? FontWeight.w700 : FontWeight.w500,
+                        color: _verifiedOnly ? _primary : const Color(0xFF334155),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+
             const SizedBox(height: 28),
 
-            // Farm-to-Table info card (modernized)
+            // Farm-to-Table Assurance Card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _primaryLight,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _primary.withValues(alpha: 0.2)),
-                boxShadow: [
-                  BoxShadow(
-                    color: _primary.withValues(alpha: 0.1),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                border: Border.all(color: _primary.withValues(alpha: 0.25)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -628,43 +788,35 @@ class _WebShopScreenState extends State<WebShopScreen>
                   Row(
                     children: [
                       Container(
-                        width: 32,
-                        height: 32,
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          gradient: AgriColors.primaryGradient,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _primary.withValues(alpha: 0.2),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
+                          color: _primary,
+                          shape: BoxShape.circle,
                         ),
                         child: const Icon(
                           Icons.local_shipping_rounded,
-                          size: 16,
+                          size: 14,
                           color: Colors.white,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Text(
-                        'Farm-to-Table',
+                        'Direct Farm Delivery',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.w800,
-                          color: _primary,
+                          color: const Color(0xFF14532D),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Text(
-                    'Direct from verified farms. Fresh produce delivered within 24 hours.',
+                    'Harvested and packed fresh from verified local growers. 100% freshness guarantee.',
                     style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: _primary.withValues(alpha: 0.8),
-                      height: 1.6,
+                      fontSize: 11.5,
+                      color: const Color(0xFF166534),
+                      height: 1.5,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -678,41 +830,266 @@ class _WebShopScreenState extends State<WebShopScreen>
   }
 
   // ─────────────────────────────────────────────
-  // BREADCRUMB
+  // MOBILE CATEGORY CHIPS
   // ─────────────────────────────────────────────
-  Widget _buildBreadcrumb() {
-    return Row(
-      children: [
-        MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            onTap: () => widget.onNavigate(0),
-            child: Text(
-              'Home',
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: _primary,
-                fontWeight: FontWeight.w500,
+  Widget _buildMobileCategoryChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: _categories.map((cat) {
+          final isSelected = _selectedCategory == cat;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () {
+                setState(() => _selectedCategory = cat);
+                _filterProducts();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isSelected ? _primary : _white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? _primary : _border,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: _primary.withValues(alpha: 0.25),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : [],
+                ),
+                child: Text(
+                  cat,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? Colors.white : const Color(0xFF475569),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Icon(Icons.chevron_right, size: 16, color: _muted),
-        ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // ACTIVE FILTER CHIPS
+  // ─────────────────────────────────────────────
+  Widget _buildActiveFilterChips() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
         Text(
-          _selectedCategory == 'All'
-              ? (_showPreOrders ? 'Pre-Orders' : 'Fresh Produce')
-              : _selectedCategory,
-          style: GoogleFonts.inter(fontSize: 13, color: _muted),
+          'Active Filters:',
+          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: _muted),
+        ),
+        if (_selectedCategory != 'All')
+          _buildFilterChip('Category: $_selectedCategory', () {
+            setState(() => _selectedCategory = 'All');
+            _filterProducts();
+          }),
+        if (_priceRange < 500)
+          _buildFilterChip('Max: ₱${_priceRange.toInt()}', () {
+            setState(() => _priceRange = 500.0);
+            _filterProducts();
+          }),
+        if (_searchQuery.isNotEmpty)
+          _buildFilterChip('Search: "$_searchQuery"', () {
+            _searchController.clear();
+            setState(() => _searchQuery = '');
+            _filterProducts();
+          }),
+        if (_verifiedOnly)
+          _buildFilterChip('Verified Only', () {
+            setState(() => _verifiedOnly = false);
+            _filterProducts();
+          }),
+        GestureDetector(
+          onTap: _resetFilters,
+          child: Text(
+            'Clear All',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFFDC2626),
+              decoration: TextDecoration.underline,
+            ),
+          ),
         ),
       ],
     );
   }
 
+  Widget _buildFilterChip(String label, VoidCallback onRemove) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: _primaryLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _primary.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: _primary),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(Icons.close_rounded, size: 13, color: _primary),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ─────────────────────────────────────────────
-  // TOOLBAR (modern)
+  // MOBILE FILTER BOTTOM SHEET
+  // ─────────────────────────────────────────────
+  void _showMobileFilterSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (modalContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(24),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.8,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Filter Products',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: _dark,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(modalContext),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Categories',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: _dark),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _categories.map((c) {
+                        final isSel = _selectedCategory == c;
+                        return ChoiceChip(
+                          label: Text(c),
+                          selected: isSel,
+                          onSelected: (selected) {
+                            setModalState(() => _selectedCategory = c);
+                            setState(() => _selectedCategory = c);
+                            _filterProducts();
+                          },
+                          selectedColor: _primaryLight,
+                          labelStyle: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                            color: isSel ? _primary : _muted,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Max Price: ${_priceRange >= 500 ? 'All Prices' : '₱${_priceRange.toInt()}'}',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: _dark),
+                    ),
+                    Slider(
+                      value: _priceRange,
+                      min: 0,
+                      max: 500,
+                      activeColor: _primary,
+                      onChanged: (val) {
+                        setModalState(() => _priceRange = val);
+                        setState(() => _priceRange = val);
+                        _filterProducts();
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'Verified Farmers Only',
+                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: _dark),
+                      ),
+                      value: _verifiedOnly,
+                      activeThumbColor: _primary,
+                      onChanged: (val) {
+                        setModalState(() => _verifiedOnly = val);
+                        setState(() => _verifiedOnly = val);
+                        _filterProducts();
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              _resetFilters();
+                              Navigator.pop(modalContext);
+                            },
+                            child: const Text('Reset All'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.pop(modalContext),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _primary,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: Text('Apply (${_filteredProducts.length})'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // FEATURED SECTION (dynamic spotlight & grid)
   // ─────────────────────────────────────────────
   Widget _buildFeaturedSection() {
     if (_showPreOrders) return const SizedBox.shrink();
@@ -742,77 +1119,99 @@ class _WebShopScreenState extends State<WebShopScreen>
       children: [
         // Featured header with icon
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              width: 4,
-              height: 28,
-              decoration: BoxDecoration(
-                gradient: AgriColors.goldGradient,
-                borderRadius: BorderRadius.circular(2),
-              ),
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    gradient: AgriColors.goldGradient,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    gradient: AgriColors.goldGradient,
+                    borderRadius: BorderRadius.circular(7),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AgriColors.gold400.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.star_rounded,
+                    size: 15,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Featured This Week',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _dark,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
             Container(
-              width: 28,
-              height: 28,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                gradient: AgriColors.goldGradient,
-                borderRadius: BorderRadius.circular(7),
-                boxShadow: [
-                  BoxShadow(
-                    color: AgriColors.gold400.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.verified_rounded, size: 12, color: Color(0xFFD97706)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Handpicked',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFB45309),
+                    ),
                   ),
                 ],
-              ),
-              child: const Icon(
-                Icons.star_rounded,
-                size: 16,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'Featured This Week',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: _dark,
-                letterSpacing: -0.3,
               ),
             ),
           ],
         ),
         const SizedBox(height: 4),
         Text(
-          'Top-rated picks handpicked from our finest farms',
+          'Top-rated produce handpicked from our verified local partner farms',
           style: GoogleFonts.inter(
-            fontSize: 13,
+            fontSize: 12.5,
             color: _muted,
             fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 24),
-        // Featured grid/scroll
+        const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, constraints) {
             final isMobileView = constraints.maxWidth < 600;
             if (isMobileView) {
-              // On mobile: horizontal scroll strip
               return SizedBox(
-                height: 260,
+                height: 250,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  itemCount: featuredProducts.take(4).length,
+                  itemCount: featuredProducts.length,
                   itemBuilder: (context, index) {
                     return SizedBox(
-                      width: constraints.maxWidth * 0.72,
+                      width: constraints.maxWidth * 0.78,
                       child: Padding(
-                        padding: EdgeInsets.only(
-                          right: 14,
-                          left: index == 0 ? 0 : 0,
-                        ),
+                        padding: const EdgeInsets.only(right: 14),
                         child: _buildFeaturedCard(featuredProducts[index]),
                       ),
                     );
@@ -820,29 +1219,25 @@ class _WebShopScreenState extends State<WebShopScreen>
                 ),
               );
             }
-            final crossAxisCount = constraints.maxWidth > 1200
-                ? 4
-                : constraints.maxWidth > 900
-                ? 3
-                : 2;
+
+            if (featuredProducts.length == 1) {
+              return _buildFeaturedSpotlight(featuredProducts.first);
+            }
+
+            final count = constraints.maxWidth > 1100
+                ? featuredProducts.length.clamp(2, 4)
+                : (constraints.maxWidth > 700 ? featuredProducts.length.clamp(2, 3) : 2);
+
             return GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 20,
-                mainAxisSpacing: 20,
-                mainAxisExtent: 330,
+                crossAxisCount: count,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.84,
               ),
-              itemCount: featuredProducts
-                  .take(
-                    crossAxisCount == 4
-                        ? 4
-                        : crossAxisCount == 3
-                        ? 3
-                        : 2,
-                  )
-                  .length,
+              itemCount: featuredProducts.length,
               itemBuilder: (context, index) {
                 return _buildFeaturedCard(featuredProducts[index]);
               },
@@ -853,188 +1248,177 @@ class _WebShopScreenState extends State<WebShopScreen>
     );
   }
 
-  Widget _buildFeaturedCard(ProductItem product) {
-    final productKey = product.hashCode;
-    final isHovered = _hoveredProducts.contains(productKey);
+  Widget _buildFeaturedSpotlight(ProductItem product) {
+    final rawPrice = product.price.replaceAll(RegExp(r'[^0-9.]'), '');
+    final double price = double.tryParse(rawPrice) ?? 0.0;
+    final String formattedPrice = '₱${price.toStringAsFixed(0)}';
+    final String unitLabel = product.unit.isNotEmpty ? ' / ${product.unit}' : '';
+    final farmDisplayName = (product.farm.isNotEmpty && product.farm != 'Farm')
+        ? product.farm
+        : 'Verified Local Farm';
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hoveredProducts.add(productKey)),
-      onExit: (_) => setState(() => _hoveredProducts.remove(productKey)),
       child: GestureDetector(
         onTap: () => _openProduct(product),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 350),
-          transform: Matrix4.translationValues(0, isHovered ? -6 : 0, 0),
+        child: Container(
           decoration: BoxDecoration(
-            color: _white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: isHovered ? _primary.withValues(alpha: 0.3) : _border,
-              width: isHovered ? 2 : 1,
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFFFDF5), Color(0xFFFEF3C7)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFFDE68A), width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: _primary.withValues(alpha: 0.1),
-                blurRadius: isHovered ? 32 : 0,
-                offset: const Offset(0, 0),
-                spreadRadius: isHovered ? 4 : 0,
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: isHovered ? 20 : 10,
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+                blurRadius: 18,
                 offset: const Offset(0, 6),
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Image
-              Expanded(
-                flex: 3,
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(18),
-                      ),
-                      child: Container(
-                        width: double.infinity,
-                        color: _surface,
-                        child: product.imageUrl.isNotEmpty
-                            ? SafeNetworkImage(
-                                imageUrl: product.imageUrl,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                height: double.infinity,
-                                placeholder: _buildImagePlaceholder(),
-                                errorWidget: _buildImagePlaceholder(),
-                              )
-                            : _buildImagePlaceholder(),
-                      ),
-                    ),
-                    Positioned(
-                      top: 10,
-                      left: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xFFF59E0B),
-                              const Color(0xFFF59E0B).withValues(alpha: 0.7),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '✨ Featured',
-                          style: GoogleFonts.inter(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Details
-              Expanded(
-                flex: 2,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: SizedBox(
+                  width: 220,
+                  height: 150,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            product.name,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: _dark,
-                              height: 1.2,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.store_rounded, size: 10, color: _primary),
-                              const SizedBox(width: 3),
-                              Flexible(
-                                child: Text(
-                                  product.farm,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: _primary,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                      product.imageUrl.isNotEmpty
+                          ? SafeNetworkImage(
+                              imageUrl: product.imageUrl,
+                              fit: BoxFit.cover,
+                              placeholder: _buildImagePlaceholder(),
+                              errorWidget: _buildImagePlaceholder(),
+                            )
+                          : _buildImagePlaceholder(),
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            gradient: AgriColors.goldGradient,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 4,
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            product.price,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 15,
+                          child: Text(
+                            '⭐ TOP PICK',
+                            style: GoogleFonts.inter(
+                              fontSize: 9.5,
                               fontWeight: FontWeight.w900,
-                              color: _primary,
-                              letterSpacing: -0.3,
+                              color: Colors.white,
                             ),
                           ),
-                          GestureDetector(
-                            onTap: () => _addToCart(product),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: isHovered ? _primary : _primaryLight,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: _primary.withValues(alpha: 0.3),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.shopping_bag,
-                                    size: 12,
-                                    color: isHovered ? _white : _primary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Add',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: isHovered ? _white : _primary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
+                ),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            product.categoryName ?? 'Fresh Produce',
+                            style: GoogleFonts.inter(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: _primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Icon(Icons.star_rounded, size: 15, color: Color(0xFFF59E0B)),
+                        Text(
+                          ' ${product.rating ?? '5.0'}',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: _dark),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      product.name,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: _dark,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.storefront_rounded, size: 14, color: _primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          farmDisplayName,
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: _muted),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              formattedPrice,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                color: _primary,
+                              ),
+                            ),
+                            Text(
+                              unitLabel,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _mutedLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () => _addToCart(product),
+                          icon: const Icon(Icons.add_shopping_cart_rounded, size: 15),
+                          label: const Text('Add to Cart'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1044,55 +1428,82 @@ class _WebShopScreenState extends State<WebShopScreen>
     );
   }
 
+  Widget _buildBreadcrumb() {
+    return Row(
+      children: [
+        GestureDetector(
+          onTap: () => Navigator.pushReplacementNamed(context, '/'),
+          child: Text(
+            'Home',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: _muted,
+            ),
+          ),
+        ),
+        Icon(Icons.chevron_right, size: 14, color: _mutedLight),
+        Text(
+          _selectedCategory == 'All' ? 'Shop' : _selectedCategory,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: _primary,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildToolbar() {
     final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 750;
+    final isMobile = sw < 768;
 
     final titleColumn = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Heading with gradient effect
-        ShaderMask(
-          shaderCallback: (bounds) => LinearGradient(
-            colors: [_dark, _primary],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ).createShader(bounds),
-          child: Text(
-            _selectedCategory == 'All'
-                ? (_showPreOrders ? 'Upcoming Harvests' : "Today's Harvest")
-                : _selectedCategory,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: -0.8,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
         Row(
           children: [
-            Container(
-              width: 4,
-              height: 4,
-              decoration: BoxDecoration(
-                color: _primary,
-                borderRadius: BorderRadius.circular(2),
+            Text(
+              _selectedCategory == 'All'
+                  ? (_showPreOrders ? "Upcoming Harvests" : "Today's Harvest")
+                  : _selectedCategory,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: isMobile ? 22 : 26,
+                fontWeight: FontWeight.w800,
+                color: _dark,
+                letterSpacing: -0.5,
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              _showPreOrders
-                  ? '${_filteredProducts.length} pre-orders available'
-                  : '${_filteredProducts.length} fresh items available',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                color: _muted,
-                fontWeight: FontWeight.w500,
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: _primaryLight,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _primary.withValues(alpha: 0.2)),
+              ),
+              child: Text(
+                '${_filteredProducts.length} items',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: _primary,
+                ),
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _showPreOrders
+              ? 'Reserve early directly from farmers before harvest'
+              : 'Direct-from-farm produce harvested in the last 24-48 hours',
+          style: GoogleFonts.inter(
+            fontSize: 12.5,
+            color: _muted,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ],
     );
@@ -1100,15 +1511,15 @@ class _WebShopScreenState extends State<WebShopScreen>
     final controls = [
       // Available Now / Pre-orders switcher
       Container(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: _white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: _border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 6,
               offset: const Offset(0, 2),
             ),
           ],
@@ -1137,19 +1548,27 @@ class _WebShopScreenState extends State<WebShopScreen>
           ],
         ),
       ),
-      // Grid/List toggle with premium style
+      if (isMobile)
+        ElevatedButton.icon(
+          onPressed: () => _showMobileFilterSheet(context),
+          icon: const Icon(Icons.tune_rounded, size: 15),
+          label: Text(_activeFiltersCount > 0 ? 'Filters ($_activeFiltersCount)' : 'Filters'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _activeFiltersCount > 0 ? _primary : _white,
+            foregroundColor: _activeFiltersCount > 0 ? Colors.white : _dark,
+            elevation: 0,
+            side: BorderSide(color: _activeFiltersCount > 0 ? _primary : _border),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            textStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+        ),
+      // Grid/List toggle
       Container(
         decoration: BoxDecoration(
           color: _white,
-          borderRadius: BorderRadius.circular(11),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: _border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1159,15 +1578,15 @@ class _WebShopScreenState extends State<WebShopScreen>
               child: GestureDetector(
                 onTap: () => setState(() => _isGridView = true),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.all(10),
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: _isGridView ? _primaryLight : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.grid_view_rounded,
-                    size: 17,
+                    size: 16,
                     color: _isGridView ? _primary : _mutedLight,
                   ),
                 ),
@@ -1178,15 +1597,15 @@ class _WebShopScreenState extends State<WebShopScreen>
               child: GestureDetector(
                 onTap: () => setState(() => _isGridView = false),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.all(10),
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: !_isGridView ? _primaryLight : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.view_list_rounded,
-                    size: 17,
+                    size: 16,
                     color: !_isGridView ? _primary : _mutedLight,
                   ),
                 ),
@@ -1195,44 +1614,34 @@ class _WebShopScreenState extends State<WebShopScreen>
           ],
         ),
       ),
-      // Sort dropdown with premium styling
+      // Sort dropdown
       Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
           color: _white,
-          borderRadius: BorderRadius.circular(11),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: _border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.sort_rounded, size: 17, color: _muted),
-            const SizedBox(width: 8),
+            Icon(Icons.swap_vert_rounded, size: 16, color: _muted),
+            const SizedBox(width: 6),
             DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: _sortBy,
                 isDense: true,
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w600,
                   color: _dark,
                 ),
-                items:
-                    [
-                          'Newest',
-                          'Price: Low to High',
-                          'Price: High to Low',
-                          'Popular',
-                        ]
-                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                        .toList(),
+                items: [
+                  'Newest',
+                  'Price: Low to High',
+                  'Price: High to Low',
+                  'Popular',
+                ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
                 onChanged: (val) {
                   if (val != null) {
                     setState(() => _sortBy = val);
@@ -1241,7 +1650,6 @@ class _WebShopScreenState extends State<WebShopScreen>
                 },
               ),
             ),
-            Icon(Icons.unfold_more, size: 16, color: _muted),
           ],
         ),
       ),
@@ -1252,10 +1660,10 @@ class _WebShopScreenState extends State<WebShopScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               titleColumn,
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               Wrap(
-                spacing: 12,
-                runSpacing: 12,
+                spacing: 10,
+                runSpacing: 10,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: controls,
               ),
@@ -1268,9 +1676,9 @@ class _WebShopScreenState extends State<WebShopScreen>
               Row(
                 children: [
                   controls[0],
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   controls[1],
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   controls[2],
                 ],
               ),
@@ -1289,7 +1697,7 @@ class _WebShopScreenState extends State<WebShopScreen>
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: isSelected ? _primaryLight : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
@@ -1307,8 +1715,192 @@ class _WebShopScreenState extends State<WebShopScreen>
     );
   }
 
+  Widget _buildFeaturedCard(ProductItem product) {
+    final productKey = product.hashCode;
+    final isHovered = _hoveredProducts.contains(productKey);
+    final rawPrice = product.price.replaceAll(RegExp(r'[^0-9.]'), '');
+    final double price = double.tryParse(rawPrice) ?? 0.0;
+    final String formattedPrice = '₱${price.toStringAsFixed(0)}';
+    final String unitLabel = product.unit.isNotEmpty ? ' / ${product.unit}' : '';
+    final farmDisplayName = (product.farm.isNotEmpty && product.farm != 'Farm') ? product.farm : 'Local Farm';
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hoveredProducts.add(productKey)),
+      onExit: (_) => setState(() => _hoveredProducts.remove(productKey)),
+      child: GestureDetector(
+        onTap: () => _openProduct(product),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          transform: Matrix4.translationValues(0, isHovered ? -5 : 0, 0),
+          decoration: BoxDecoration(
+            color: _white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isHovered ? const Color(0xFFF59E0B).withValues(alpha: 0.4) : const Color(0xFFFDE68A),
+              width: isHovered ? 1.5 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFF59E0B).withValues(alpha: isHovered ? 0.12 : 0.04),
+                blurRadius: isHovered ? 18 : 8,
+                offset: Offset(0, isHovered ? 6 : 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: 1.50,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      decoration: const BoxDecoration(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
+                        color: _surface,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                        child: product.imageUrl.isNotEmpty
+                            ? SafeNetworkImage(
+                                imageUrl: product.imageUrl,
+                                fit: BoxFit.cover,
+                                placeholder: _buildImagePlaceholder(),
+                                errorWidget: _buildImagePlaceholder(),
+                              )
+                            : _buildImagePlaceholder(),
+                      ),
+                    ),
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                        decoration: BoxDecoration(
+                          gradient: AgriColors.goldGradient,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '⭐ Featured',
+                          style: GoogleFonts.inter(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(11, 8, 11, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.name,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: _dark,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(Icons.storefront_rounded, size: 11, color: _primary),
+                              const SizedBox(width: 3),
+                              Expanded(
+                                child: Text(
+                                  farmDisplayName,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: _muted,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                formattedPrice,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: _primary,
+                                ),
+                              ),
+                              Text(
+                                unitLabel,
+                                style: GoogleFonts.inter(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: _mutedLight,
+                                ),
+                              ),
+                            ],
+                          ),
+                          GestureDetector(
+                            onTap: () => _addToCart(product),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: _primary,
+                                borderRadius: BorderRadius.circular(7),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.add_shopping_cart_rounded, size: 12, color: Colors.white),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'Add',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ─────────────────────────────────────────────
-  // PRODUCT GRID (enhanced with animations)
+  // PRODUCT GRID (responsive & modern)
   // ─────────────────────────────────────────────
   Widget _buildProductGrid() {
     final products = _paginatedProducts;
@@ -1319,7 +1911,7 @@ class _WebShopScreenState extends State<WebShopScreen>
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: products.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            separatorBuilder: (context, index) => const SizedBox(height: 14),
             itemBuilder: (context, index) {
               final globalIndex = (_currentPage - 1) * _itemsPerPage + index;
               return globalIndex < _productControllers.length
@@ -1334,19 +1926,26 @@ class _WebShopScreenState extends State<WebShopScreen>
 
         final crossAxisCount = constraints.maxWidth > 1200
             ? 4
-            : constraints.maxWidth > 900
+            : constraints.maxWidth > 850
             ? 3
-            : constraints.maxWidth > 500
-            ? 2
             : 2;
+
+        final double childAspectRatio = constraints.maxWidth < 480
+            ? (_showPreOrders ? 0.62 : 0.70)
+            : (constraints.maxWidth < 700
+                ? (_showPreOrders ? 0.68 : 0.75)
+                : (constraints.maxWidth < 1100
+                    ? (_showPreOrders ? 0.74 : 0.81)
+                    : (_showPreOrders ? 0.76 : 0.83)));
+
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            mainAxisExtent: _showPreOrders ? 390 : 350,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+            childAspectRatio: childAspectRatio,
           ),
           itemCount: products.length,
           itemBuilder: (context, index) {
@@ -1373,7 +1972,7 @@ class _WebShopScreenState extends State<WebShopScreen>
         end: 1,
       ).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut)),
       child: SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero)
+        position: Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
             .animate(
               CurvedAnimation(parent: controller, curve: Curves.easeOutCubic),
             ),
@@ -1392,7 +1991,7 @@ class _WebShopScreenState extends State<WebShopScreen>
         end: 1,
       ).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut)),
       child: SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0.05, 0), end: Offset.zero)
+        position: Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero)
             .animate(
               CurvedAnimation(parent: controller, curve: Curves.easeOutCubic),
             ),
@@ -1405,6 +2004,14 @@ class _WebShopScreenState extends State<WebShopScreen>
     final isHovered = _hoveredProducts.contains(product.hashCode);
     final badgeIndex = product.hashCode.abs() % _badgeData.length;
     final badge = _badgeData[badgeIndex];
+    final farmDisplayName = (product.farm.isNotEmpty && product.farm != 'Farm')
+        ? product.farm
+        : 'Local Farm';
+
+    final rawPrice = product.price.replaceAll(RegExp(r'[^0-9.]'), '');
+    final double price = double.tryParse(rawPrice) ?? 0.0;
+    final String formattedPrice = '₱${price.toStringAsFixed(0)}';
+    final String unitLabel = product.unit.isNotEmpty ? ' / ${product.unit}' : '';
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -1413,36 +2020,29 @@ class _WebShopScreenState extends State<WebShopScreen>
       child: GestureDetector(
         onTap: () => _openProduct(product),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 350),
-          transform: Matrix4.translationValues(isHovered ? 8 : 0, 0, 0),
-          padding: const EdgeInsets.all(16),
+          duration: const Duration(milliseconds: 250),
+          transform: Matrix4.translationValues(isHovered ? 4 : 0, 0, 0),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: _white,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isHovered ? _border.withValues(alpha: 0.5) : _border,
+              color: isHovered ? _primary.withValues(alpha: 0.3) : const Color(0xFFF1F5F9),
               width: isHovered ? 1.5 : 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: _primary.withValues(alpha: 0.08),
-                blurRadius: isHovered ? 24 : 0,
-                offset: const Offset(0, 0),
-                spreadRadius: isHovered ? 2 : 0,
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: isHovered ? 16 : 8,
-                offset: const Offset(0, 4),
+                color: isHovered ? _primary.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.03),
+                blurRadius: isHovered ? 16 : 6,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
           child: Row(
             children: [
-              // Image
               Container(
-                width: 120,
-                height: 120,
+                width: 110,
+                height: 110,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   color: _surface,
@@ -1461,23 +2061,18 @@ class _WebShopScreenState extends State<WebShopScreen>
                             )
                           : _buildImagePlaceholder(),
                       Positioned(
-                        top: 8,
-                        left: 8,
+                        top: 6,
+                        left: 6,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                           decoration: BoxDecoration(
-                            color: (badge['color'] as Color).withValues(
-                              alpha: 0.15,
-                            ),
+                            color: (badge['color'] as Color).withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             badge['label'] as String,
                             style: GoogleFonts.inter(
-                              fontSize: 9,
+                              fontSize: 8.5,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
                             ),
@@ -1488,8 +2083,7 @@ class _WebShopScreenState extends State<WebShopScreen>
                   ),
                 ),
               ),
-              const SizedBox(width: 20),
-              // Details
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1498,238 +2092,81 @@ class _WebShopScreenState extends State<WebShopScreen>
                     Text(
                       product.name,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w800,
                         color: _dark,
                       ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: () => _openFarmerProfile(product.farmerId),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _primaryLight,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: _primary.withValues(alpha: 0.2),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.storefront_rounded, size: 12, color: _primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          farmDisplayName,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: _muted,
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.store_rounded,
-                              size: 12,
-                              color: _primary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              product.farm,
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: _primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (product.rating != null) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          ...List.generate(5, (s) {
-                            final rating =
-                                double.tryParse(product.rating!) ?? 0;
-                            return Icon(
-                              s < rating.floor()
-                                  ? Icons.star_rounded
-                                  : Icons.star_outline_rounded,
-                              size: 13,
-                              color: s < rating.floor()
-                                  ? const Color(0xFFFCA5A5)
-                                  : _border,
-                            );
-                          }),
-                          const SizedBox(width: 6),
+                        if (product.rating != null) ...[
+                          const SizedBox(width: 8),
+                          const Icon(Icons.star_rounded, size: 13, color: Color(0xFFF59E0B)),
                           Text(
-                            product.rating!,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: _dark,
-                            ),
+                            ' ${product.rating!}',
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: _dark),
                           ),
                         ],
-                      ),
-                    ],
-                    if (_showPreOrders && product.harvestDays != null) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.calendar_today_rounded,
-                            size: 13,
-                            color: const Color(0xFFEA580C),
-                          ),
-                          const SizedBox(width: 5),
-                          Builder(
-                            builder: (context) {
-                              final totalDays = int.tryParse(product.harvestDays ?? '') ?? 0;
-                              final remainingDays = product.createdAt == null
-                                  ? totalDays
-                                  : product.createdAt!.add(Duration(days: totalDays)).difference(DateTime.now()).inDays + 1; // +1 to account for current partial day
-                              final harvestLabel = remainingDays > 0
-                                  ? 'Harvest in $remainingDays days'
-                                  : (remainingDays == 0 ? 'Harvesting today' : 'Harvested');
-                              return Text(
-                                harvestLabel,
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFFEA580C),
-                                ),
-                              );
-                            }
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (_showPreOrders) ...[
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: 240,
-                        child: LayoutBuilder(
-                          builder: (context, boxConstraints) {
-                            final target = product.targetQuantity ?? 100.0;
-                            final reserved = product.reservedQuantity ?? 0.0;
-                            final percent = (reserved / (target > 0 ? target : 1)).clamp(0.0, 1.0);
-                            final displayUnit = product.unit.split('/').last.trim();
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Reserved: ${reserved.toStringAsFixed(0)}/${target.toStringAsFixed(0)} $displayUnit',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: _muted,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${(percent * 100).toStringAsFixed(0)}%',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        color: _primary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(4),
-                                  child: LinearProgressIndicator(
-                                    value: percent,
-                                    backgroundColor: _primaryLight,
-                                    valueColor: AlwaysStoppedAnimation<Color>(_primary),
-                                    minHeight: 6,
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: 20),
-              // Price and Actions
+              const SizedBox(width: 16),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    product.price,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: _primary,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  Text(
-                    product.unit,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: _mutedLight,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    child: GestureDetector(
-                      onTap: () => _addToCart(product),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: isHovered
-                              ? LinearGradient(
-                                  colors: [
-                                    _primary,
-                                    _primary.withValues(alpha: 0.7),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                )
-                              : LinearGradient(
-                                  colors: [_primaryLight, _primaryLight],
-                                ),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: isHovered
-                                ? _primary
-                                : _primary.withValues(alpha: 0.2),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _showPreOrders ? Icons.calendar_today_rounded : Icons.shopping_bag,
-                              size: 15,
-                              color: isHovered ? _white : _primary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _showPreOrders ? 'Reserve Now' : 'Add to Cart',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: isHovered ? _white : _primary,
-                              ),
-                            ),
-                          ],
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        formattedPrice,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: _primary,
                         ),
                       ),
+                      Text(
+                        unitLabel,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _mutedLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => _addToCart(product),
+                    icon: Icon(
+                      _showPreOrders ? Icons.calendar_today_rounded : Icons.add_shopping_cart_rounded,
+                      size: 13,
+                    ),
+                    label: Text(_showPreOrders ? 'Reserve' : 'Add to Cart'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      textStyle: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ],
@@ -1755,6 +2192,14 @@ class _WebShopScreenState extends State<WebShopScreen>
     final isHovered = _hoveredProducts.contains(product.hashCode);
     final badgeIndex = product.hashCode.abs() % _badgeData.length;
     final badge = _badgeData[badgeIndex];
+    final farmDisplayName = (product.farm.isNotEmpty && product.farm != 'Farm')
+        ? product.farm
+        : 'Local Farm';
+
+    final rawPrice = product.price.replaceAll(RegExp(r'[^0-9.]'), '');
+    final double price = double.tryParse(rawPrice) ?? 0.0;
+    final String formattedPrice = '₱${price.toStringAsFixed(0)}';
+    final String unitLabel = product.unit.isNotEmpty ? ' / ${product.unit}' : '';
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -1763,129 +2208,96 @@ class _WebShopScreenState extends State<WebShopScreen>
       child: GestureDetector(
         onTap: () => _openProduct(product),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 350),
-          transform: Matrix4.translationValues(0, isHovered ? -8 : 0, 0),
+          duration: const Duration(milliseconds: 250),
+          transform: Matrix4.translationValues(0, isHovered ? -5 : 0, 0),
           decoration: BoxDecoration(
             color: _white,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isHovered ? _border.withValues(alpha: 0.5) : _border,
+              color: isHovered ? _primary.withValues(alpha: 0.35) : const Color(0xFFF1F5F9),
               width: isHovered ? 1.5 : 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: _primary.withValues(alpha: 0.1),
-                blurRadius: isHovered ? 32 : 0,
-                offset: const Offset(0, 0),
-                spreadRadius: isHovered ? 4 : 0,
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: isHovered
+                    ? _primary.withValues(alpha: 0.12)
+                    : Colors.black.withValues(alpha: 0.04),
                 blurRadius: isHovered ? 20 : 10,
-                offset: const Offset(0, 6),
+                offset: Offset(0, isHovered ? 8 : 3),
               ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                flex: 2,
+              // 1. Top Image - Enlarged & Prominent
+              AspectRatio(
+                aspectRatio: 1.25,
                 child: Stack(
+                  fit: StackFit.expand,
                   children: [
                     Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(18),
-                        ),
+                      decoration: const BoxDecoration(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
                         color: _surface,
                       ),
                       child: ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(18),
-                        ),
-                        child: Stack(
-                          children: [
-                            product.imageUrl.isNotEmpty
-                                ? SafeNetworkImage(
-                                    imageUrl: product.imageUrl,
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                    placeholder: _buildImagePlaceholder(),
-                                    errorWidget: _buildImagePlaceholder(),
-                                  )
-                                : _buildImagePlaceholder(),
-                            if (isHovered)
-                              AnimatedOpacity(
-                                opacity: 0.1,
-                                duration: const Duration(milliseconds: 300),
-                                child: Container(color: _primary),
-                              ),
-                          ],
-                        ),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                        child: product.imageUrl.isNotEmpty
+                            ? SafeNetworkImage(
+                                imageUrl: product.imageUrl,
+                                fit: BoxFit.cover,
+                                placeholder: _buildImagePlaceholder(),
+                                errorWidget: _buildImagePlaceholder(),
+                              )
+                            : _buildImagePlaceholder(),
                       ),
                     ),
                     Positioned(
-                      top: 12,
-                      left: 12,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 11,
-                          vertical: 6,
-                        ),
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
                         decoration: BoxDecoration(
-                          color: (badge['color'] as Color).withValues(
-                            alpha: 0.15,
-                          ),
-                          borderRadius: BorderRadius.circular(9),
+                          color: (badge['color'] as Color).withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: (badge['color'] as Color).withValues(
-                                alpha: 0.3,
-                              ),
-                              blurRadius: isHovered ? 16 : 8,
-                              offset: const Offset(0, 3),
+                              color: (badge['color'] as Color).withValues(alpha: 0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
                         child: Text(
                           badge['label'] as String,
                           style: GoogleFonts.inter(
-                            fontSize: 10,
+                            fontSize: 9,
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
-                            letterSpacing: 0.5,
+                            letterSpacing: 0.3,
                           ),
                         ),
                       ),
                     ),
                     Positioned(
-                      top: 12,
-                      right: 12,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        width: 38,
-                        height: 38,
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
                         decoration: BoxDecoration(
-                          color: _white.withValues(alpha: 0.8),
-                          borderRadius: BorderRadius.circular(11),
-                          border: Border.all(
-                            color: _border.withValues(alpha: 0.5),
-                          ),
+                          color: Colors.white.withValues(alpha: 0.9),
+                          shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: isHovered ? 12 : 6,
-                              offset: const Offset(0, 2),
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 4,
                             ),
                           ],
                         ),
                         child: Icon(
-                          Icons.favorite_outline,
-                          size: 17,
+                          Icons.favorite_border_rounded,
+                          size: 14,
                           color: isHovered ? _primary : _muted,
                         ),
                       ),
@@ -1893,10 +2305,11 @@ class _WebShopScreenState extends State<WebShopScreen>
                   ],
                 ),
               ),
+
+              // 2. Bottom Details - Tightly Budgeted Spacing
               Expanded(
-                flex: 3,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1907,255 +2320,139 @@ class _WebShopScreenState extends State<WebShopScreen>
                           Text(
                             product.name,
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 15,
+                              fontSize: 14,
                               fontWeight: FontWeight.w800,
                               color: _dark,
-                              height: 1.3,
+                              height: 1.2,
                             ),
-                            maxLines: 2,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 5),
-                          GestureDetector(
-                            onTap: () => _openFarmerProfile(product.farmerId),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    _primaryLight,
-                                    _primaryLight.withValues(alpha: 0.7),
-                                  ],
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Container(
+                                width: 17,
+                                height: 17,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFFE2E8F0),
                                 ),
-                                borderRadius: BorderRadius.circular(7),
-                                border: Border.all(
-                                  color: _primary.withValues(alpha: 0.2),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.store_rounded,
-                                    size: 12,
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.storefront_rounded,
+                                    size: 10,
                                     color: _primary,
                                   ),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      product.farm,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: _primary,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
-                          ),
-                          if (product.rating != null) ...[
-                            const SizedBox(height: 7),
-                            Row(
-                              children: [
-                                ...List.generate(5, (s) {
-                                  final rating =
-                                      double.tryParse(product.rating!) ?? 0;
-                                  return Icon(
-                                    s < rating.floor()
-                                        ? Icons.star_rounded
-                                        : Icons.star_outline_rounded,
-                                    size: 13,
-                                    color: s < rating.floor()
-                                        ? const Color(0xFFFCA5A5)
-                                        : _border,
-                                  );
-                                }),
-                                const SizedBox(width: 5),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => _openFarmerProfile(product.farmerId),
+                                  child: Text(
+                                    farmDisplayName,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: _muted,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                              if (product.rating != null) ...[
+                                const Icon(Icons.star_rounded, size: 12, color: Color(0xFFF59E0B)),
                                 Text(
-                                  product.rating!,
+                                  ' ${product.rating!}',
                                   style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
                                     color: _dark,
                                   ),
                                 ),
                               ],
-                            ),
-                          ],
-                          if (_showPreOrders && product.harvestDays != null) ...[
-                            const SizedBox(height: 7),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today_rounded,
-                                  size: 13,
-                                  color: const Color(0xFFEA580C),
-                                ),
-                                const SizedBox(width: 5),
-                                Builder(
-                                  builder: (context) {
-                                    final totalDays = int.tryParse(product.harvestDays ?? '') ?? 0;
-                                    final remainingDays = product.createdAt == null
-                                        ? totalDays
-                                        : product.createdAt!.add(Duration(days: totalDays)).difference(DateTime.now()).inDays + 1; // +1 to account for current partial day
-                                    final harvestLabel = remainingDays > 0
-                                        ? 'Harvest in $remainingDays days'
-                                        : (remainingDays == 0 ? 'Harvesting today' : 'Harvested');
-                                    return Text(
-                                      harvestLabel,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: const Color(0xFFEA580C),
-                                      ),
-                                    );
-                                  }
-                                ),
-                              ],
-                            ),
-                          ],
-                          if (_showPreOrders) ...[
-                            const SizedBox(height: 10),
-                            LayoutBuilder(
-                              builder: (context, boxConstraints) {
-                                final target = product.targetQuantity ?? 100.0;
-                                final reserved = product.reservedQuantity ?? 0.0;
-                                final percent = (reserved / (target > 0 ? target : 1)).clamp(0.0, 1.0);
-                                final displayUnit = product.unit.split('/').last.trim();
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          'Reserved: ${reserved.toStringAsFixed(0)}/${target.toStringAsFixed(0)} $displayUnit',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: _muted,
-                                          ),
-                                        ),
-                                        Text(
-                                          '${(percent * 100).toStringAsFixed(0)}%',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w800,
-                                            color: _primary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(4),
-                                      child: LinearProgressIndicator(
-                                        value: percent,
-                                        backgroundColor: _primaryLight,
-                                        valueColor: AlwaysStoppedAnimation<Color>(_primary),
-                                        minHeight: 6,
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ],
+                            ],
+                          ),
                         ],
                       ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            product.price,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                              color: _primary,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          Text(
-                            product.unit,
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              color: _mutedLight,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 11),
-                          SizedBox(
-                            width: double.infinity,
-                            child: MouseRegion(
-                              cursor: SystemMouseCursors.click,
-                              child: GestureDetector(
-                                onTap: () => _addToCart(product),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 250),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: isHovered
-                                        ? LinearGradient(
-                                            colors: [
-                                              _primary,
-                                              _primary.withValues(alpha: 0.7),
-                                            ],
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                          )
-                                        : LinearGradient(
-                                            colors: [
-                                              _primaryLight,
-                                              _primaryLight,
-                                            ],
-                                          ),
-                                    borderRadius: BorderRadius.circular(11),
-                                    border: Border.all(
-                                      color: isHovered
-                                          ? _primary
-                                          : _primary.withValues(alpha: 0.2),
-                                      width: 1.5,
-                                    ),
-                                    boxShadow: isHovered
-                                        ? [
-                                            BoxShadow(
-                                              color: _primary.withValues(
-                                                alpha: 0.1,
-                                              ),
-                                              blurRadius: 16,
-                                              offset: const Offset(0, 6),
-                                            ),
-                                          ]
-                                        : [],
-                                  ),
+                          if (_showPreOrders) ...[
+                            Builder(
+                              builder: (context) {
+                                final totalDays = int.tryParse(product.harvestDays ?? '') ?? 0;
+                                final remainingDays = product.createdAt == null
+                                    ? totalDays
+                                    : product.createdAt!.add(Duration(days: totalDays)).difference(DateTime.now()).inDays + 1;
+                                final harvestLabel = remainingDays > 0
+                                    ? 'Harvest in $remainingDays d'
+                                    : (remainingDays == 0 ? 'Harvesting today' : 'Harvested');
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
                                   child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(
-                                        _showPreOrders ? Icons.calendar_today_rounded : Icons.shopping_bag,
-                                        size: 16,
-                                        color: isHovered ? _white : _primary,
-                                      ),
-                                      const SizedBox(width: 7),
+                                      const Icon(Icons.schedule_rounded, size: 11, color: Color(0xFFEA580C)),
+                                      const SizedBox(width: 4),
                                       Text(
-                                        _showPreOrders ? 'Reserve Now' : 'Add to Cart',
+                                        harvestLabel,
                                         style: GoogleFonts.inter(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w800,
-                                          color: isHovered ? _white : _primary,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: const Color(0xFFEA580C),
                                         ),
                                       ),
                                     ],
                                   ),
+                                );
+                              },
+                            ),
+                          ],
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                formattedPrice,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: _primary,
+                                ),
+                              ),
+                              Text(
+                                unitLabel,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: _mutedLight,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _addToCart(product),
+                              icon: Icon(
+                                _showPreOrders ? Icons.calendar_today_rounded : Icons.add_shopping_cart_rounded,
+                                size: 13.5,
+                              ),
+                              label: Text(_showPreOrders ? 'Reserve' : 'Add to Cart'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                textStyle: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11.5,
                                 ),
                               ),
                             ),

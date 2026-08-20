@@ -606,12 +606,14 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
     final sw = MediaQuery.of(context).size.width;
     int crossAxisCount = sw < 600 ? 2 : (sw < 960 ? 3 : (sw < 1200 ? 4 : 5));
     double childAspectRatio = sw < 480
-        ? 0.58
+        ? 0.62
         : (sw < 640
-            ? 0.63
+            ? 0.66
             : (sw < 960
-                ? 0.68
-                : 0.72));
+                ? 0.72
+                : (sw < 1280
+                    ? 0.78
+                    : 0.82)));
 
     return FutureBuilder<List<ProductItem>>(
       future: _productsFuture,
@@ -848,108 +850,110 @@ class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Stack(
-                children: [
-                  Container(
-                    height: 125,
-                    width: double.infinity,
-                    decoration: const BoxDecoration(
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(15)),
-                      color: Color(0xFFF8FAFC),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(15),
+              AspectRatio(
+                aspectRatio: 1.25,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      decoration: const BoxDecoration(
+                        borderRadius:
+                            BorderRadius.vertical(top: Radius.circular(15)),
+                        color: Color(0xFFF8FAFC),
                       ),
-                      child: CachedNetworkImage(
-                        imageUrl: product.imageUrls.isNotEmpty
-                            ? product.imageUrls.first
-                            : product.imageUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(15),
                         ),
-                        errorWidget: (context, url, error) => const Center(
-                          child: Icon(
-                            Icons.eco_rounded,
-                            size: 40,
-                            color: Color(0xFF94A3B8),
+                        child: CachedNetworkImage(
+                          imageUrl: product.imageUrls.isNotEmpty
+                              ? product.imageUrls.first
+                              : product.imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Discount Badge
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(
-                              0xFFDC2626,
-                            ).withValues(alpha: 0.35),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.bolt_rounded,
-                            size: 11,
-                            color: Colors.white,
-                          ),
-                          Text(
-                            '-${widget.discount.toInt()}%',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
+                          errorWidget: (context, url, error) => const Center(
+                            child: Icon(
+                              Icons.eco_rounded,
+                              size: 40,
+                              color: Color(0xFF94A3B8),
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                  if (farmDisplayName.isNotEmpty)
+
+                    // Discount Badge
                     Positioned(
                       top: 8,
-                      right: 8,
+                      left: 8,
                       child: Container(
-                        padding: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3.5,
+                        ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.92),
-                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
+                              color: const Color(
+                                0xFFDC2626,
+                              ).withValues(alpha: 0.35),
                               blurRadius: 6,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.verified_rounded,
-                            size: 12, color: Color(0xFF059669)),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.bolt_rounded,
+                              size: 11,
+                              color: Colors.white,
+                            ),
+                            Text(
+                              '-${widget.discount.toInt()}%',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                ],
+                    if (farmDisplayName.isNotEmpty)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(4.5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(Icons.verified_rounded,
+                              size: 12, color: Color(0xFF059669)),
+                        ),
+                      ),
+                  ],
+                ),
               ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                  padding: const EdgeInsets.fromLTRB(11, 8, 11, 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -982,7 +986,7 @@ class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
                                 child: Text(
                                   farmDisplayName,
                                   style: GoogleFonts.inter(
-                                    fontSize: 11,
+                                    fontSize: 10.5,
                                     color: const Color(0xFF64748B),
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -1015,7 +1019,7 @@ class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
                               Text(
                                 '\u20B1${widget.salePrice.toStringAsFixed(0)}',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 16,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.w800,
                                   color: const Color(0xFFDC2626),
                                 ),
@@ -1023,7 +1027,7 @@ class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
                               Text(
                                 unitLabel,
                                 style: GoogleFonts.inter(
-                                  fontSize: 10.5,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w600,
                                   color: const Color(0xFF94A3B8),
                                 ),
@@ -1032,7 +1036,7 @@ class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
                               Text(
                                 '\u20B1${widget.originalPrice.toStringAsFixed(0)}',
                                 style: GoogleFonts.inter(
-                                  fontSize: 10.5,
+                                  fontSize: 10,
                                   color: const Color(0xFF94A3B8),
                                   decoration: TextDecoration.lineThrough,
                                 ),
@@ -1044,6 +1048,7 @@ class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
 
                       // Progress and Button section
                       Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1094,13 +1099,13 @@ class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
                                 backgroundColor: const Color(0xFFDC2626),
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                padding: const EdgeInsets.symmetric(vertical: 7),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 textStyle: GoogleFonts.inter(
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 11.5,
+                                  fontSize: 11,
                                 ),
                               ),
                             ),

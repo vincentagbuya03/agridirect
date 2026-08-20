@@ -841,11 +841,59 @@ class NotificationService {
     final ctx = appNavigatorKey.currentContext;
     if (ctx != null && ctx.mounted) {
       if (linkType == 'weather') {
-        GoRouter.of(ctx).go(AppRoutes.home);
+        final isFarmer = AuthService().isViewingAsFarmer;
+        if (kIsWeb) {
+          if (isFarmer) {
+            GoRouter.of(ctx).go(AppRoutes.farmerDashboard);
+          } else {
+            GoRouter.of(ctx).go(AppRoutes.weatherRadar);
+          }
+        } else {
+          if (isFarmer) {
+            GoRouter.of(ctx).go(AppRoutes.farmerDashboard);
+          } else {
+            GoRouter.of(ctx).go(AppRoutes.home);
+          }
+        }
+        return;
+      }
+
+      if (linkType == 'flash_sale' || linkType == 'flash_harvest' || linkType == 'promo') {
+        GoRouter.of(ctx).go(AppRoutes.flashSale);
+        return;
+      }
+
+      if (linkType == 'radar' || linkType == 'weather_radar') {
+        GoRouter.of(ctx).go(AppRoutes.weatherRadar);
+        return;
+      }
+
+      if (linkType == 'farmer_dashboard') {
+        AuthService().switchToFarmerMode();
+        GoRouter.of(ctx).go(AppRoutes.farmerDashboard);
+        return;
+      }
+
+      if (linkType == 'announcement' || linkType == 'community') {
+        GoRouter.of(ctx).go(AppRoutes.community);
+        return;
+      }
+
+      if (linkType == 'preorder' && linkId.isNotEmpty) {
+        GoRouter.of(ctx).go(AppRoutes.preorder(linkId));
         return;
       }
 
       if (linkType == 'product') {
+        if (linkId.isNotEmpty) {
+          GoRouter.of(ctx).go(AppRoutes.product(linkId));
+        } else {
+          GoRouter.of(ctx).go(AppRoutes.marketplace);
+        }
+        return;
+      }
+
+      if (linkType == 'marketplace' || linkType == 'shop') {
         GoRouter.of(ctx).go(AppRoutes.marketplace);
         return;
       }

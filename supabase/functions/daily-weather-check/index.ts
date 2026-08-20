@@ -23,18 +23,31 @@ type WeatherAlertPayload = {
   severity: number
 }
 
-function getCropLabel(specialty?: string | null) {
-  const cleaned = specialty?.trim()
-  return cleaned && cleaned.length > 0 ? cleaned.toLowerCase() : 'crops'
+function getCropLabel(specialty?: string | null): string {
+  const cleaned = specialty?.trim()?.toLowerCase()
+  if (!cleaned) return 'crops'
+  if (
+    cleaned.includes('crop') ||
+    cleaned.includes('produce') ||
+    cleaned.includes('plant') ||
+    cleaned.includes('vegetable')
+  ) {
+    return cleaned
+  }
+  if (cleaned === 'organic') {
+    return 'organic crops'
+  }
+  return `${cleaned} crops`
 }
 
-function getTimeLabel(targetDt: number) {
+function getTimeLabel(targetDt: number): string {
   const diffMs = targetDt * 1000 - Date.now()
   const hours = Math.max(1, Math.round(diffMs / (1000 * 60 * 60)))
-  if (hours < 24) return `within ${hours} hours`
+  if (hours <= 1) return 'within the next hour'
+  if (hours < 24) return `in ${hours} hours`
 
   const days = Math.max(1, Math.round(hours / 24))
-  return days == 1 ? 'tomorrow' : `in ${days} days`
+  return days === 1 ? 'tomorrow' : `in ${days} days`
 }
 
 function buildWeatherAlerts(
@@ -42,7 +55,6 @@ function buildWeatherAlerts(
   farmName: string,
   specialty?: string | null,
 ): WeatherAlertPayload[] {
-  const alerts: WeatherAlertPayload[] = []
   const cropLabel = getCropLabel(specialty)
   const now = Date.now()
   const next72Hours = forecastList.filter((entry) => {
@@ -50,43 +62,12 @@ function buildWeatherAlerts(
     return hoursAhead >= 0 && hoursAhead <= 72
   })
 
-  // 1. Daily Summary (Always sent)
+  if (next72Hours.length === 0) return []
+
   const next24h = next72Hours.filter((entry) => {
     const hoursAhead = ((entry.dt || 0) * 1000 - now) / (1000 * 60 * 60)
     return hoursAhead <= 24
   })
-
-  if (next24h.length > 0) {
-    const mainCondition = next24h[0].weather?.[0]?.description || 'clear'
-    const highTemp = next24h.reduce((max, e) => Math.max(max, Number(e.main?.temp || -999)), -999)
-    const maxPop = Math.max(...next24h.map((e) => Number(e.pop || 0)))
-
-    alerts.push({
-      title: 'Daily Weather Update',
-      body: `Forecast for ${farmName}: ${mainCondition} with a high of ${highTemp.toFixed(0)}°C. ${
-        maxPop > 0.1 ? `Rain chance: ${(maxPop * 100).toFixed(0)}%.` : 'Clear skies expected.'
-      } Happy farming!`,
-      notificationCode: 'weather_daily_summary',
-      severity: 0.5,
-    })
-  }
-
-  // 2. Severe Alerts
-  const rainCandidate = next72Hours.find((entry) => {
-    const weatherId = entry.weather?.[0]?.id || 0
-    const pop = Number(entry.pop || 0)
-    const rainVolume = Number(entry.rain?.['3h'] || 0)
-    return rainVolume >= 2 || pop >= 0.65 || ((weatherId >= 500 && weatherId <= 531) && pop >= 0.5)
-  })
-
-  if (rainCandidate) {
-    alerts.push({
-      title: 'Farm Rain Alert',
-      body: `Heavy rainfall expected ${getTimeLabel(rainCandidate.dt)} near ${farmName}. Protect your ${cropLabel} and keep drainage clear.`,
-      notificationCode: 'weather_rain',
-      severity: 0.78,
-    })
-  }
 
   const stormCandidate = next72Hours.find((entry) => {
     const weatherId = entry.weather?.[0]?.id || 0
@@ -94,14 +75,16 @@ function buildWeatherAlerts(
     return (weatherId >= 200 && weatherId <= 232) || windSpeed >= 35
   })
 
-  if (stormCandidate) {
-    alerts.push({
-      title: 'Storm Warning',
-      body: `Storm conditions expected ${getTimeLabel(stormCandidate.dt)} near ${farmName}. Secure structures, tools, and exposed produce.`,
-      notificationCode: 'weather_storm',
-      severity: 0.92,
-    })
-  }
+  const rainCandidate = next72Hours.find((entry) => {
+    const weatherId = entry.weather?.[0]?.id || 0
+    const pop = Number(entry.pop || 0)
+    const rainVolume = Number(entry.rain?.['3h'] || 0)
+    return (
+      rainVolume >= 2 ||
+      pop >= 0.65 ||
+      ((weatherId >= 500 && weatherId <= 531) && pop >= 0.5)
+    )
+  })
 
   const maxTemp = next72Hours.reduce(
     (max, entry) => Math.max(max, Number(entry.main?.temp || -999)),
@@ -112,45 +95,77 @@ function buildWeatherAlerts(
     999,
   )
 
+  // Priority 1: Severe Storm Warning
+  if (stormCandidate) {
+    return [
+      {
+        title: '⚠️ Storm Warning',
+        body: `Storm conditions expected ${getTimeLabel(stormCandidate.dt)} near ${farmName}. Secure loose farm structures, equipment, and protect mature ${cropLabel}.`,
+        notificationCode: 'weather_storm',
+        severity: 0.95,
+      },
+    ]
+  }
+
+  // Priority 2: Consolidated Rain & Harvest Advisory
+  if (rainCandidate) {
+    const popPercent = Math.round(Number(rainCandidate.pop || 0) * 100)
+    const rainDesc = rainCandidate.weather?.[0]?.description || 'heavy rain'
+    return [
+      {
+        title: '🌧️ Farm Rain Advisory',
+        body: `Expect ${rainDesc} (${popPercent}% chance) ${getTimeLabel(rainCandidate.dt)} near ${farmName}. Check field drainage and harvest ripe ${cropLabel} early.`,
+        notificationCode: 'weather_rain',
+        severity: 0.85,
+      },
+    ]
+  }
+
+  // Priority 3: Extreme Heat / Cold Advisory
   if (maxTemp >= 36) {
-    alerts.push({
-      title: 'Temperature Monitoring',
-      body: `High temperatures up to ${maxTemp.toFixed(1)}C are expected near ${farmName}. Watch for heat stress on your ${cropLabel}.`,
-      notificationCode: 'weather_temperature',
-      severity: maxTemp >= 39 ? 0.85 : 0.7,
-    })
-  } else if (minTemp <= 6) {
-    alerts.push({
-      title: 'Temperature Monitoring',
-      body: `Low temperatures near ${minTemp.toFixed(1)}C are expected around ${farmName}. Protect sensitive ${cropLabel} if needed.`,
-      notificationCode: 'weather_temperature',
-      severity: minTemp <= 3 ? 0.85 : 0.7,
-    })
+    return [
+      {
+        title: '☀️ Heat Advisory',
+        body: `High temperatures up to ${maxTemp.toFixed(0)}°C expected near ${farmName}. Water early and monitor ${cropLabel} for heat stress.`,
+        notificationCode: 'weather_temperature',
+        severity: 0.75,
+      },
+    ]
+  } else if (minTemp <= 10) {
+    return [
+      {
+        title: '❄️ Low Temperature Advisory',
+        body: `Temperatures dropping near ${minTemp.toFixed(0)}°C expected around ${farmName}. Protect sensitive ${cropLabel} against cold shock.`,
+        notificationCode: 'weather_temperature',
+        severity: 0.75,
+      },
+    ]
   }
 
-  const harvestRiskCandidate = next72Hours.find((entry) => {
-    const weatherId = entry.weather?.[0]?.id || 0
-    const pop = Number(entry.pop || 0)
-    const rainVolume = Number(entry.rain?.['3h'] || 0)
-    const windSpeed = Number(entry.wind?.speed || 0)
-    return rainVolume >= 2 || pop >= 0.65 || windSpeed >= 28 || (weatherId >= 200 && weatherId <= 232)
-  })
+  // Priority 4: Standard Daily Weather Briefing
+  if (next24h.length > 0) {
+    const mainCondition = next24h[0].weather?.[0]?.description || 'clear skies'
+    const highTemp = next24h.reduce(
+      (max, e) => Math.max(max, Number(e.main?.temp || -999)),
+      -999,
+    )
+    const maxPop = Math.max(...next24h.map((e) => Number(e.pop || 0)))
+    const rainText =
+      maxPop > 0.2
+        ? `${Math.round(maxPop * 100)}% rain chance`
+        : 'clear conditions'
 
-  if (harvestRiskCandidate) {
-    alerts.push({
-      title: 'Harvest Risk Alert',
-      body: `Harvest conditions may worsen ${getTimeLabel(harvestRiskCandidate.dt)} near ${farmName}. Prioritize mature ${cropLabel} first.`,
-      notificationCode: 'weather_harvest_risk',
-      severity: 0.8,
-    })
+    return [
+      {
+        title: '🌾 Daily Weather Update',
+        body: `Forecast for ${farmName}: ${mainCondition} with a high of ${highTemp.toFixed(0)}°C (${rainText}). Wishing you a productive farming day!`,
+        notificationCode: 'weather_daily_summary',
+        severity: 0.5,
+      },
+    ]
   }
 
-  const deduped = new Map<string, WeatherAlertPayload>()
-  for (const alert of alerts) {
-    deduped.set(alert.notificationCode, alert)
-  }
-
-  return Array.from(deduped.values()).sort((a, b) => b.severity - a.severity)
+  return []
 }
 
 Deno.serve(async (request: Request) => {

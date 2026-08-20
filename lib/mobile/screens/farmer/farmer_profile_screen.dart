@@ -53,7 +53,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
     try {
       final farmer = await SupabaseConfig.client
           .from('farmers')
-          .select('farmer_id, rating')
+          .select('farmer_id')
           .eq('user_id', userId)
           .maybeSingle();
 
@@ -690,10 +690,18 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
           _buildListAction(
             Icons.description_outlined,
             'Terms of Service',
-            () {},
+            () => context.push(AppRoutes.termsOfService),
           ),
-          _buildListAction(Icons.privacy_tip_outlined, 'Privacy Policy', () {}),
-          _buildListAction(Icons.policy_outlined, 'Community Rules', () {}),
+          _buildListAction(
+            Icons.privacy_tip_outlined,
+            'Privacy Policy',
+            () => context.push(AppRoutes.privacyPolicy),
+          ),
+          _buildListAction(
+            Icons.policy_outlined,
+            'Community Rules',
+            () => context.push(AppRoutes.communityRules),
+          ),
           const Divider(height: 24, color: Color(0xFFF1F5F9)),
           InkWell(
             onTap: _confirmLogout,

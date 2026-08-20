@@ -29,6 +29,9 @@ import '../../mobile/screens/profile/app_settings_screen.dart';
 import '../../mobile/screens/profile/change_password_screen.dart';
 import '../../mobile/screens/profile/account_activity_screen.dart';
 import '../../mobile/screens/profile/manage_device_screen.dart';
+import '../../mobile/screens/legal/terms_of_service_screen.dart';
+import '../../mobile/screens/legal/privacy_policy_screen.dart';
+import '../../mobile/screens/legal/community_rules_screen.dart';
 import '../../web/web_navigation.dart';
 import '../../web/screens/auth/web_login_screen.dart';
 import '../../web/screens/auth/web_registration_screen.dart';
@@ -88,6 +91,182 @@ import 'app_routes.dart';
 export 'app_routes.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
+Widget _buildFarmerProfileRoute(BuildContext context, GoRouterState state) {
+  final farmerId = state.pathParameters['farmerId'] ?? '';
+
+  final view = View.of(context);
+  final width = view.physicalSize.width / view.devicePixelRatio;
+  final isMobile = (width <= 800);
+
+  if (isMobile) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: SupabaseDataService().getFarmerProfileByFarmerId(
+        farmerId,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator(color: Color(0xFF16A34A))),
+          );
+        }
+        if (snapshot.hasError || snapshot.data == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Farmer Profile')),
+            body: const Center(
+              child: Text('Farmer not found or offline.'),
+            ),
+          );
+        }
+
+        final dbProfile = snapshot.data!;
+        final mappedProfile = <String, dynamic>{
+          ...dbProfile,
+          'farmerId': dbProfile['farmer_id'],
+          'farmerUserId': dbProfile['user_id'],
+          'name':
+              dbProfile['farm_name'] ??
+              dbProfile['full_name'] ??
+              'Farm',
+          'specialty': dbProfile['specialty'],
+          'location': dbProfile['location'],
+          'imageUrl': dbProfile['image_url'],
+          'avatarUrl': dbProfile['avatar_url'],
+          'badge':
+              dbProfile['badge'] ??
+              (dbProfile['is_verified'] == true ? 'VERIFIED' : null),
+          'farmingHistory': dbProfile['farming_history'],
+          'isVerified': dbProfile['is_verified'],
+          'yearsOfExperience': dbProfile['years_of_experience'],
+          'latitude': dbProfile['farm_latitude'],
+          'longitude': dbProfile['farm_longitude'],
+        };
+
+        return FarmerPublicProfileScreen(farmer: mappedProfile);
+      },
+    );
+  }
+
+  return WebFarmerPublicProfileScreen(farmerId: farmerId);
+}
+
+Widget _buildPreorderDetailsRoute(BuildContext context, GoRouterState state) {
+  final product = state.extra is ProductItem ? state.extra as ProductItem : null;
+  final productId = state.pathParameters['id'] ?? state.uri.queryParameters['id'];
+
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final isMobile = !kIsWeb && constraints.maxWidth <= 800;
+
+      if (product != null) {
+        if (isMobile) {
+          return PreOrderDetailsScreen(initialProduct: product);
+        }
+        return WebPreorderDetails(initialProduct: product);
+      }
+
+      if (productId != null && productId.isNotEmpty) {
+        return FutureBuilder<ProductItem?>(
+          future: SupabaseDataService().getProductById(productId),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+                ),
+              );
+            }
+            final fetchedProduct = snapshot.data;
+            if (isMobile) {
+              return PreOrderDetailsScreen(initialProduct: fetchedProduct);
+            }
+            return WebPreorderDetails(initialProduct: fetchedProduct);
+          },
+        );
+      }
+
+      if (isMobile) {
+        return const PreOrderDetailsScreen(initialProduct: null);
+      }
+      return const WebPreorderDetails(initialProduct: null);
+    },
+  );
+}
+
+Widget _buildProductDetailsRoute(BuildContext context, GoRouterState state) {
+  final productId = state.pathParameters['id'] ?? state.uri.queryParameters['id'];
+  final ProductItem? productFromExtra = state.extra is ProductItem
+      ? state.extra as ProductItem
+      : null;
+
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final isMobile = !kIsWeb && constraints.maxWidth <= 800;
+
+      // If we have a fully populated product from navigation, use it directly
+      if (productFromExtra != null && productFromExtra.name.isNotEmpty) {
+        if (isMobile) {
+          return ProductViewScreen(product: productFromExtra);
+        }
+        return WebProductDetails(initialProduct: productFromExtra);
+      }
+
+      // Otherwise fetch by ID (deep link case or /product/:id direct navigation)
+      if (productId == null || productId.isEmpty) {
+        if (isMobile) {
+          return const Scaffold(
+            body: Center(child: Text('Product not found')),
+          );
+        }
+        return const WebProductDetails(initialProduct: null);
+      }
+
+      return FutureBuilder<ProductItem?>(
+        future: SupabaseDataService().getProductById(productId),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+              ),
+            );
+          }
+          final product = snapshot.data;
+          if (product == null) {
+            return Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.search_off_rounded,
+                      size: 64,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Product not found or no longer available.',
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => GoRouter.of(context).go(AppRoutes.home),
+                      child: const Text('Go to Marketplace'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          if (isMobile) {
+            return ProductViewScreen(product: product);
+          }
+          return WebProductDetails(initialProduct: product);
+        },
+      );
+    },
+  );
+}
 
 /// Creates and configures the GoRouter instance for the app.
 GoRouter createAppRouter({String? initialRoute}) {
@@ -459,63 +638,11 @@ GoRouter createAppRouter({String? initialRoute}) {
       ),
       GoRoute(
         path: '${AppRoutes.farmerProfileBase}/:farmerId',
-        builder: (context, state) {
-          final farmerId = state.pathParameters['farmerId'] ?? '';
-
-          final view = View.of(context);
-          final width = view.physicalSize.width / view.devicePixelRatio;
-          final isMobile = (width <= 800);
-
-          if (isMobile) {
-            return FutureBuilder<Map<String, dynamic>?>(
-              future: SupabaseDataService().getFarmerProfileByFarmerId(
-                farmerId,
-              ),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                if (snapshot.hasError || snapshot.data == null) {
-                  return Scaffold(
-                    appBar: AppBar(title: const Text('Farmer Profile')),
-                    body: const Center(
-                      child: Text('Farmer not found or offline.'),
-                    ),
-                  );
-                }
-
-                final dbProfile = snapshot.data!;
-                final mappedProfile = <String, dynamic>{
-                  ...dbProfile,
-                  'farmerId': dbProfile['farmer_id'],
-                  'farmerUserId': dbProfile['user_id'],
-                  'name':
-                      dbProfile['farm_name'] ??
-                      dbProfile['full_name'] ??
-                      'Farm',
-                  'specialty': dbProfile['specialty'],
-                  'location': dbProfile['location'],
-                  'imageUrl': dbProfile['image_url'],
-                  'avatarUrl': dbProfile['avatar_url'],
-                  'badge':
-                      dbProfile['badge'] ??
-                      (dbProfile['is_verified'] == true ? 'VERIFIED' : null),
-                  'farmingHistory': dbProfile['farming_history'],
-                  'isVerified': dbProfile['is_verified'],
-                  'yearsOfExperience': dbProfile['years_of_experience'],
-                  'latitude': dbProfile['farm_latitude'],
-                  'longitude': dbProfile['farm_longitude'],
-                };
-
-                return FarmerPublicProfileScreen(farmer: mappedProfile);
-              },
-            );
-          }
-
-          return WebFarmerPublicProfileScreen(farmerId: farmerId);
-        },
+        builder: (context, state) => _buildFarmerProfileRoute(context, state),
+      ),
+      GoRoute(
+        path: '/farmer/:farmerId',
+        builder: (context, state) => _buildFarmerProfileRoute(context, state),
       ),
 
       // â”€â”€ Wallet (shared) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -817,22 +944,14 @@ GoRouter createAppRouter({String? initialRoute}) {
         ),
       ),
 
-      // â”€â”€ Preorder Details â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Preorder Details ──────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.preorderDetails,
-        builder: (context, state) => LayoutBuilder(
-          builder: (context, constraints) {
-            final product = state.extra is ProductItem
-                ? state.extra as ProductItem
-                : null;
-
-            if (!kIsWeb && constraints.maxWidth <= 800) {
-              return PreOrderDetailsScreen(initialProduct: product);
-            }
-
-            return WebPreorderDetails(initialProduct: product);
-          },
-        ),
+        builder: (context, state) => _buildPreorderDetailsRoute(context, state),
+      ),
+      GoRoute(
+        path: '/preorder/:id',
+        builder: (context, state) => _buildPreorderDetailsRoute(context, state),
       ),
       GoRoute(
         path: AppRoutes.farmerPreorderDetail,
@@ -843,74 +962,15 @@ GoRouter createAppRouter({String? initialRoute}) {
       ),
       GoRoute(
         path: AppRoutes.productDetails,
-        builder: (context, state) => LayoutBuilder(
-          builder: (context, constraints) {
-            final productId = state.uri.queryParameters['id'];
-            final ProductItem? productFromExtra = state.extra is ProductItem
-                ? state.extra as ProductItem
-                : null;
-
-            // If we have a fully populated product from navigation, use it directly
-            if (productFromExtra != null && productFromExtra.name.isNotEmpty) {
-              if (!kIsWeb && constraints.maxWidth <= 800) {
-                return ProductViewScreen(product: productFromExtra);
-              }
-              return WebProductDetails(initialProduct: productFromExtra);
-            }
-
-            // Otherwise fetch by ID (deep link case)
-            if (productId == null || productId.isEmpty) {
-              if (!kIsWeb && constraints.maxWidth <= 800) {
-                return const Scaffold(
-                  body: Center(child: Text('Product not found')),
-                );
-              }
-              return WebProductDetails(initialProduct: null);
-            }
-
-            return FutureBuilder<ProductItem?>(
-              future: SupabaseDataService().getProductById(productId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                final product = snapshot.data;
-                if (!kIsWeb && constraints.maxWidth <= 800) {
-                  if (product == null) {
-                    return Scaffold(
-                      body: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.search_off_rounded,
-                              size: 64,
-                              color: Colors.grey,
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Product not found or no longer available.',
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: () =>
-                                  GoRouter.of(context).go(AppRoutes.home),
-                              child: const Text('Go to Marketplace'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-                  return ProductViewScreen(product: product);
-                }
-                return WebProductDetails(initialProduct: product);
-              },
-            );
-          },
-        ),
+        builder: (context, state) => _buildProductDetailsRoute(context, state),
+      ),
+      GoRoute(
+        path: '/product/:id',
+        builder: (context, state) => _buildProductDetailsRoute(context, state),
+      ),
+      GoRoute(
+        path: '/marketplace/product/:id',
+        builder: (context, state) => _buildProductDetailsRoute(context, state),
       ),
       GoRoute(
         path: AppRoutes.articleDetails,
@@ -1114,6 +1174,18 @@ GoRouter createAppRouter({String? initialRoute}) {
       GoRoute(
         path: AppRoutes.kikoAiChat,
         builder: (context, state) => const KikoAiChatScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.termsOfService,
+        builder: (context, state) => const TermsOfServiceScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.privacyPolicy,
+        builder: (context, state) => const PrivacyPolicyScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.communityRules,
+        builder: (context, state) => const CommunityRulesScreen(),
       ),
 
       // â”€â”€ Auth Callback (Google OAuth) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

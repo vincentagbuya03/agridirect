@@ -969,12 +969,14 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
     final sw = MediaQuery.of(context).size.width;
     int crossAxisCount = sw < 480 ? 2 : (sw < 768 ? 2 : (sw < 1100 ? 3 : 4));
     double childAspectRatio = sw < 480
-        ? 0.54
+        ? 0.66
         : (sw < 640
-            ? 0.58
+            ? 0.70
             : (sw < 960
-                ? 0.68
-                : 0.74));
+                ? 0.76
+                : (sw < 1280
+                    ? 0.82
+                    : 0.85)));
 
     return FutureBuilder<List<ProductItem>>(
       future: _productsFuture,
@@ -1112,9 +1114,6 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
 
   @override
   Widget build(BuildContext context) {
-    final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 768;
-
     final product = widget.product;
     final farmDisplayName = (product.farm.isNotEmpty && product.farm != 'Farm')
         ? product.farm
@@ -1162,34 +1161,35 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Stack(
-                children: [
-                  Container(
-                    height: isMobile ? 120 : 140,
-                    width: double.infinity,
-                    decoration: const BoxDecoration(
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(15)),
-                      color: Color(0xFFF8FAFC),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(15)),
-                      child: CachedNetworkImage(
-                        imageUrl: product.imageUrls.isNotEmpty
-                            ? product.imageUrls.first
-                            : product.imageUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        errorWidget: (context, url, error) => const Center(
-                          child: Icon(Icons.eco_rounded,
-                              size: 40, color: Color(0xFF94A3B8)),
+              AspectRatio(
+                aspectRatio: 1.25,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      decoration: const BoxDecoration(
+                        borderRadius:
+                            BorderRadius.vertical(top: Radius.circular(15)),
+                        color: Color(0xFFF8FAFC),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(15)),
+                        child: CachedNetworkImage(
+                          imageUrl: product.imageUrls.isNotEmpty
+                              ? product.imageUrls.first
+                              : product.imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          errorWidget: (context, url, error) => const Center(
+                            child: Icon(Icons.eco_rounded,
+                                size: 40, color: Color(0xFF94A3B8)),
+                          ),
                         ),
                       ),
                     ),
-                  ),
                   Positioned(
                     top: 8,
                     left: 8,
@@ -1257,6 +1257,7 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
                     ),
                 ],
               ),
+            ),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),

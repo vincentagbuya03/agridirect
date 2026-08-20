@@ -6,10 +6,7 @@ class AboutUsDialog extends StatelessWidget {
   const AboutUsDialog({super.key});
 
   static void show(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const AboutUsDialog(),
-    );
+    showDialog(context: context, builder: (context) => const AboutUsDialog());
   }
 
   @override
@@ -45,7 +42,10 @@ class AboutUsDialog extends StatelessWidget {
             children: [
               // Header
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 20,
+                ),
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     colors: [Color(0xFF044E38), Color(0xFF065F46)],
@@ -59,7 +59,11 @@ class AboutUsDialog extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.eco_rounded, color: AgriColors.lime300, size: 24),
+                      child: const Icon(
+                        Icons.eco_rounded,
+                        color: AgriColors.lime300,
+                        size: 24,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -85,7 +89,10 @@ class AboutUsDialog extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white70,
+                      ),
                       onPressed: () => Navigator.pop(context),
                       hoverColor: Colors.white10,
                       splashRadius: 20,
@@ -112,7 +119,11 @@ class AboutUsDialog extends StatelessWidget {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.handshake_rounded, color: AgriColors.emerald700, size: 28),
+                            const Icon(
+                              Icons.handshake_rounded,
+                              color: AgriColors.emerald700,
+                              size: 28,
+                            ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
@@ -155,23 +166,67 @@ class AboutUsDialog extends StatelessWidget {
                       const SizedBox(height: 16),
                       _buildPillar(
                         icon: Icons.verified_user_rounded,
-                        title: '1. Department of Agriculture (DA) Quality Standards',
-                        description: 'We adhere to DA technical guidelines on food safety, organic certifications, and sustainable soil stewardship.',
+                        title:
+                            '1. Department of Agriculture (DA) Quality Standards',
+                        description:
+                            'We adhere to DA technical guidelines on food safety, organic certifications, and sustainable soil stewardship.',
                       ),
                       const SizedBox(height: 12),
                       _buildPillar(
                         icon: Icons.price_check_rounded,
                         title: '2. Transparent Fair Trade Pricing',
-                        description: 'Farmers set their own fair harvest prices. 100% of product pricing goes directly to the growers and their community cooperatives.',
+                        description:
+                            'Farmers set their own fair harvest prices. 100% of product pricing goes directly to the growers and their community cooperatives.',
                       ),
                       const SizedBox(height: 12),
                       _buildPillar(
                         icon: Icons.local_shipping_rounded,
                         title: '3. Farm-to-Table Freshness & Pre-Orders',
-                        description: 'Crops are harvested only after confirmed customer orders and delivered with optimal cold-chain and ventilated care within 24 hours.',
+                        description:
+                            'Crops are harvested only after confirmed customer orders and delivered with optimal cold-chain and ventilated care within 24 hours.',
                       ),
 
                       const SizedBox(height: 28),
+                      // DA & PSU Institutional Signatories
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.account_balance_rounded,
+                                  color: Color(0xFF047857),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Department of Agriculture Leadership',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            _buildSignatoryMini(
+                              name: 'ESTRILLITA B. JACABAN, MDM',
+                              role: 'Department Head',
+                              institution:
+                                  'Department of Agriculture – San Carlos City',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
                       // DA Collaboration note
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -182,7 +237,11 @@ class AboutUsDialog extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.military_tech_rounded, color: Color(0xFFCA8A04), size: 24),
+                            const Icon(
+                              Icons.military_tech_rounded,
+                              color: Color(0xFFCA8A04),
+                              size: 24,
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
@@ -204,7 +263,10 @@ class AboutUsDialog extends StatelessWidget {
 
               // Footer
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
                 decoration: const BoxDecoration(
                   color: Color(0xFFF8FAFC),
                   border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
@@ -217,12 +279,19 @@ class AboutUsDialog extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF044E38),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: Text(
                         'Close',
-                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -281,6 +350,51 @@ class AboutUsDialog extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSignatoryMini({
+    required String name,
+    required String role,
+    required String institution,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            name,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            role,
+            style: GoogleFonts.inter(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF047857),
+            ),
+          ),
+          Text(
+            institution,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              color: const Color(0xFF64748B),
             ),
           ),
         ],

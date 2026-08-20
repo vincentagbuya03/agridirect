@@ -1088,6 +1088,26 @@ class _WebPreorderDetailsState extends State<WebPreorderDetails> {
                 style: const TextStyle(fontSize: 14, color: _dark, height: 1.7),
               ),
             ],
+            if (review.images.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: review.images.map((img) {
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: SizedBox(
+                      width: 72,
+                      height: 72,
+                      child: SafeNetworkImage(
+                        imageUrl: img,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
           ],
         ),
       ),

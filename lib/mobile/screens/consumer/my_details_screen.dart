@@ -12,6 +12,7 @@ import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/integration/reverse_geocoding_service.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../shared/widgets/phone_verification_dialog.dart';
 import '../../widgets/skeleton_loaders.dart';
 
 /// Displays and allows editing of user/farmer details.
@@ -57,15 +58,18 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   void initState() {
     super.initState();
     _auth = AuthService();
+    final authUser = SupabaseConfig.client.auth.currentUser;
+    final initialPhone = (authUser?.phone ?? authUser?.userMetadata?['phone'] ?? '').toString().trim();
+
     _nameController = TextEditingController();
-    _emailController = TextEditingController();
+    _emailController = TextEditingController(text: authUser?.email ?? _auth.userEmail);
     _locationController = TextEditingController();
     _addressController = TextEditingController();
     _latitudeController = TextEditingController();
     _longitudeController = TextEditingController();
     _freeDeliveryMinAmountController = TextEditingController();
     _bioController = TextEditingController();
-    _phoneController = TextEditingController();
+    _phoneController = TextEditingController(text: initialPhone);
     _imageUrlController = TextEditingController();
     _loadDetails();
   }
@@ -100,13 +104,12 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     try {
       setState(() => _isLoading = true);
 
-      _emailController.text = _auth.userEmail;
+      final authUser = SupabaseConfig.client.auth.currentUser;
+      _emailController.text = authUser?.email ?? _auth.userEmail;
 
-      final userId = _auth.userId.isEmpty
-          ? SupabaseConfig.currentUser?.id
-          : _auth.userId;
+      final userId = (authUser?.id ?? _auth.userId).trim();
 
-      if (userId == null || userId.isEmpty) {
+      if (userId.isEmpty) {
         debugPrint('⚠️ Cannot load details: userId is empty');
         return;
       }
@@ -192,9 +195,6 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             final user = users[0] as Map<String, dynamic>?;
             if (user != null) {
               _bioController.text = user['bio'] ?? '';
-              _phoneController.text =
-                  (user['phone'] ?? user['phone_number'] ?? '').toString();
-
               final rawImageUrl =
                   (user['image_url'] ?? user['avatar_url'] ?? '').toString();
               _imageUrlController.text = rawImageUrl;
@@ -207,9 +207,42 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           }
         } catch (e) {
           debugPrint('Error loading customer details: $e');
-          // Continue with just name loaded
         }
       }
+
+      // Always load verified phone from users table or Supabase auth
+      String loadedPhone = (authUser?.phone ?? authUser?.userMetadata?['phone'] ?? '').toString().trim();
+
+      try {
+        final users = await SupabaseConfig.client
+            .from('users')
+            .select('phone')
+            .eq('user_id', userId)
+            .limit(1);
+        if (users.isNotEmpty) {
+          final u = users[0] as Map<String, dynamic>?;
+          if (u != null) {
+            final tablePhone = (u['phone'] ?? '').toString().trim();
+            if (tablePhone.isNotEmpty) {
+              loadedPhone = tablePhone;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading phone: $e');
+      }
+
+      if (loadedPhone.isNotEmpty) {
+        // Sync to users table if missing
+        try {
+          await SupabaseConfig.client
+              .from('users')
+              .update({'phone': loadedPhone})
+              .eq('user_id', userId);
+        } catch (_) {}
+      }
+
+      _phoneController.text = loadedPhone;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -543,7 +576,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Phone field
+                    // Phone field (Verified SMS OTP for both Farmer & Customer)
+                    _buildPhoneField(),
+                    const SizedBox(height: 16),
+
                     if (!isFarmer) ...[
                       _buildTextField(
                         controller: _bioController,
@@ -552,25 +588,6 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
                         enabled: _isEditing,
                         maxLines: 3,
                         isRequired: false,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildTextField(
-                        controller: _phoneController,
-                        label: 'Phone Number',
-                        icon: Icons.phone,
-                        enabled: _isEditing,
-                        keyboardType: TextInputType.phone,
-                        isRequired: false,
-                        validator: (value) {
-                          final text = value?.trim() ?? '';
-                          if (text.isEmpty) return null;
-
-                          final phoneRegex = RegExp(r'^[+0-9()\-\s]{7,20}$');
-                          if (!phoneRegex.hasMatch(text)) {
-                            return 'Please enter a valid phone number';
-                          }
-                          return null;
-                        },
                       ),
                       const SizedBox(height: 28),
                     ],
@@ -926,6 +943,116 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           }
           return null;
         },
+      ),
+    );
+  }
+
+  Widget _buildPhoneField() {
+    final authUser = SupabaseConfig.client.auth.currentUser;
+    var phone = _phoneController.text.trim();
+    if (phone.isEmpty) {
+      phone = (authUser?.phone ?? authUser?.userMetadata?['phone'] ?? '').toString().trim();
+    }
+    final hasPhone = phone.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.phone_iphone_rounded,
+              color: Color(0xFF059669),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mobile Number',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  hasPhone
+                      ? () {
+                          final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
+                          if (digits.length >= 10) {
+                            final last10 = digits.substring(digits.length - 10);
+                            return '+63 ${last10.substring(0, 3)} ${last10.substring(3, 6)} ${last10.substring(6)}';
+                          }
+                          return phone;
+                        }()
+                      : 'No phone linked',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: hasPhone
+                        ? const Color(0xFF0F172A)
+                        : const Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final success = await PhoneVerificationDialog.show(
+                context,
+                initialPhone: _phoneController.text,
+                onVerified: (verifiedPhone) {
+                  setState(() {
+                    _phoneController.text = verifiedPhone;
+                  });
+                },
+              );
+              if (success && mounted) {
+                _loadDetails();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFECFDF5),
+              foregroundColor: const Color(0xFF059669),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: const BorderSide(color: Color(0xFFA7F3D0)),
+              ),
+            ),
+            child: Text(
+              hasPhone ? 'Update' : 'Verify',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

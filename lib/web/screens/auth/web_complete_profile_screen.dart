@@ -3,8 +3,9 @@ import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../shared/widgets/phone_verification_input_widget.dart';
 
-/// Web profile completion screen shown after manual email verification.
+/// Web profile completion screen with professional phone verification and password setup.
 class WebCompleteProfileScreen extends StatefulWidget {
   final String userId;
   final String email;
@@ -25,29 +26,33 @@ class WebCompleteProfileScreen extends StatefulWidget {
 }
 
 class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
-  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  String _verifiedPhone = '';
+  bool _isPhoneVerified = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
   Future<void> _handleComplete() async {
-    final phone = _phoneController.text.trim();
+    if (!_isPhoneVerified || _verifiedPhone.isEmpty) {
+      _showSnackBar('Please verify your Philippine mobile number via SMS first');
+      return;
+    }
+
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    if (phone.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
-      _showSnackBar('Please fill in all fields');
+    if (password.isEmpty || confirmPassword.isEmpty) {
+      _showSnackBar('Please create and confirm your password');
       return;
     }
 
@@ -66,7 +71,7 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
 
     try {
       final success = await AuthService().updateUserPasswordAndPhone(
-        phoneNumber: phone,
+        phoneNumber: _verifiedPhone,
         password: password,
       );
 
@@ -81,10 +86,9 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        _showSnackBar('Error: $e');
-      }
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showSnackBar('Error: $e');
     }
   }
 
@@ -142,7 +146,7 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'Your email is verified. Add your phone number and password to complete setup.',
+                          'Your email is verified. Verify your mobile phone and create your password to activate your account.',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.inter(
                             fontSize: 15,
@@ -161,7 +165,7 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Container(
-                  constraints: const BoxConstraints(maxWidth: 480),
+                  constraints: const BoxConstraints(maxWidth: 500),
                   padding: EdgeInsets.all(isCompact ? 24 : 36),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -206,7 +210,7 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Welcome, ${widget.name}. Add the remaining details to activate your account.',
+                        'Welcome, ${widget.name}. Verify your mobile phone number and set your password to complete setup.',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
                           fontSize: 14,
@@ -215,60 +219,68 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 18),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FBF8),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: const Color(0xFFCCE4D0)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.verified_rounded,
-                              color: Color(0xFF15803D),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                widget.email,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF14532D),
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FBF8),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: const Color(0xFFCCE4D0)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.verified_rounded,
+                                color: Color(0xFF15803D),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  widget.email,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF14532D),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 28),
-                      _buildLabel('Phone Number *'),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        style: GoogleFonts.inter(fontSize: 14),
-                        decoration: _inputDecoration(
-                          hintText: 'Enter your phone number',
-                          prefixIcon: Icons.phone_outlined,
-                        ),
+
+                      // Step 1: Phone Verification Widget
+                      PhoneVerificationInputWidget(
+                        onVerified: (verifiedPhone) {
+                          setState(() {
+                            _verifiedPhone = verifiedPhone;
+                            _isPhoneVerified = true;
+                          });
+                        },
+                        onVerificationStateChanged: (isVerified) {
+                          setState(() {
+                            _isPhoneVerified = isVerified;
+                          });
+                        },
                       ),
-                      const SizedBox(height: 18),
-                      _buildLabel('Password *'),
+                      const SizedBox(height: 24),
+
+                      // Step 2: Password Inputs
+                      _buildLabel('Account Password *'),
                       const SizedBox(height: 8),
                       TextField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
                         style: GoogleFonts.inter(fontSize: 14),
                         decoration: _inputDecoration(
-                          hintText: 'Create a password',
+                          hintText: 'Create a password (min. 6 characters)',
                           prefixIcon: Icons.lock_outline_rounded,
                           suffixIcon: IconButton(
                             icon: Icon(
@@ -282,7 +294,7 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 16),
                       TextField(
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
@@ -304,8 +316,10 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 28),
+
+                      // Finalize CTA
                       SizedBox(
-                        height: 54,
+                        height: 52,
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _handleComplete,
                           style: ElevatedButton.styleFrom(
@@ -384,4 +398,3 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
     );
   }
 }
-

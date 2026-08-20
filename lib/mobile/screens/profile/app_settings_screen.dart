@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/auto_update_service.dart';
 import '../../../shared/services/offline/offline_cache_service.dart';
@@ -12,6 +11,7 @@ import '../../../shared/styles/app_theme.dart';
 import '../../../web/widgets/web_consumer_nav_bar.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../widgets/auth/mobile_two_factor_sheet.dart';
+import '../../../shared/widgets/phone_verification_dialog.dart';
 
 class AppSettingsScreen extends StatefulWidget {
   const AppSettingsScreen({super.key});
@@ -347,130 +347,41 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   }
 
   Future<void> _openUpdatePhoneDialog() async {
-    final formKey = GlobalKey<FormState>();
-    final phoneController = TextEditingController(text: _userPhone);
-    bool isSaving = false;
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            Future<void> submit() async {
-              if (!formKey.currentState!.validate()) return;
-              setModalState(() => isSaving = true);
-              
-              final newPhone = phoneController.text.trim();
-              try {
-                final user = SupabaseConfig.client.auth.currentUser;
-                if (user != null) {
-                  // Update auth user metadata
-                  await SupabaseConfig.client.auth.updateUser(
-                    UserAttributes(data: {'phone_number': newPhone}),
-                  );
-                  // Update users table
-                  await SupabaseConfig.client
-                      .from('users')
-                      .update({'phone': newPhone, 'phone_number': newPhone})
-                      .eq('user_id', user.id);
-                      
-                  if (!mounted) return;
-                  setState(() {
-                    _userPhone = newPhone;
-                  });
-                }
-                
-                if (!dialogContext.mounted) return;
-                Navigator.of(dialogContext).pop();
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Phone number updated successfully.'),
-                    backgroundColor: AppColors.success,
-                    behavior: SnackBarBehavior.floating,
+    final success = await PhoneVerificationDialog.show(
+      context,
+      initialPhone: _userPhone,
+      title: 'Update Mobile Number',
+      subtitle: 'Verify ownership with a 6-digit SMS code sent directly to your SIM.',
+      onVerified: (verifiedPhone) {
+        if (!mounted) return;
+        setState(() {
+          _userPhone = verifiedPhone;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Mobile number verified and updated to $verifiedPhone',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
                   ),
-                );
-              } catch (e) {
-                if (!dialogContext.mounted) return;
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  SnackBar(
-                    content: Text('Failed to update phone number: $e'),
-                    backgroundColor: AppColors.error,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              } finally {
-                setModalState(() => isSaving = false);
-              }
-            }
-
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.phone_outlined, color: AppColors.primary, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text('Update Phone', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              content: SizedBox(
-                width: 380,
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Enter your new phone number. This will be used for your account profile.',
-                        style: TextStyle(fontSize: 13, color: Colors.grey, height: 1.4),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: phoneController,
-                        keyboardType: TextInputType.phone,
-                        decoration: InputDecoration(
-                          labelText: 'Phone Number',
-                          prefixIcon: const Icon(Icons.phone_android_rounded, size: 20),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Please enter a phone number.';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: isSaving ? null : () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: isSaving ? null : submit,
-                  child: Text(isSaving ? 'Updating...' : 'Save'),
                 ),
               ],
-            );
-          },
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
         );
       },
     );
-    phoneController.dispose();
+
+    if (success && mounted) {
+      _loadUserData();
+    }
   }
 
   Future<void> _clearAutoCache() async {

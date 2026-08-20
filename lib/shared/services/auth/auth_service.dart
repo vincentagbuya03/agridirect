@@ -1333,6 +1333,46 @@ class AuthService extends ChangeNotifier {
     return 'Google Sign-In failed.';
   }
 
+  /// Checks whether a mobile number is already registered to another account
+  static Future<bool> isPhoneAlreadyRegistered(
+    String phoneNumber, {
+    String? excludeUserId,
+  }) async {
+    final clean = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '').trim();
+    if (clean.isEmpty) return false;
+
+    String e164 = clean;
+    if (clean.startsWith('09') && clean.length == 11) {
+      e164 = '+63${clean.substring(1)}';
+    } else if (clean.startsWith('9') && clean.length == 10) {
+      e164 = '+63$clean';
+    } else if (clean.startsWith('63') && !clean.startsWith('+')) {
+      e164 = '+$clean';
+    }
+
+    final raw09 = e164.startsWith('+63') ? '0${e164.substring(3)}' : e164;
+
+    try {
+      final response = await SupabaseConfig.client
+          .from('users')
+          .select('user_id, phone')
+          .or('phone.eq.$e164,phone.eq.$raw09');
+
+      if (response.isNotEmpty) {
+        for (var row in response) {
+          final existingUserId = row['user_id']?.toString();
+          if (excludeUserId != null && existingUserId == excludeUserId) {
+            continue; // Same user
+          }
+          return true; // Already taken by another user
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking phone uniqueness: $e');
+    }
+    return false;
+  }
+
   Future<bool> completeProfile({
     required String phoneNumber,
     required String password,
@@ -1344,6 +1384,18 @@ class AuthService extends ChangeNotifier {
     try {
       if (password.trim().isEmpty) {
         _errorMessage = 'Please create a password';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      final isTaken = await isPhoneAlreadyRegistered(
+        phoneNumber,
+        excludeUserId: _pendingUserId.isNotEmpty ? _pendingUserId : _userId,
+      );
+
+      if (isTaken) {
+        _errorMessage = 'This mobile number is already linked to another account.';
         _isLoading = false;
         notifyListeners();
         return false;

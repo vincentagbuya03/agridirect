@@ -272,26 +272,6 @@ class WeatherForecast {
 
     if (upcoming.isEmpty) return const [];
 
-    final rainCandidate = _firstMatching(upcoming, _isMeaningfulRainForecast);
-    if (rainCandidate != null) {
-      final rawPop = (rainCandidate.rainProbability ?? 0.0).clamp(0.0, 1.0);
-      // OpenWeather sometimes returns pop=1.0; show as 99% to avoid implying certainty.
-      var rainChance = (rawPop * 100).round().clamp(0, 99);
-      final rainVolume = rainCandidate.rainVolume ?? 0;
-      alerts.add(
-        WeatherAlert(
-          title: 'Rain Alert',
-          description:
-              'Heavy rainfall is possible ${_timeUntilLabel(now, rainCandidate.dateTime)} with a $rainChance% chance of rain.',
-          type: 'rain',
-          severity: (rainChance >= 80 || rainVolume >= 4) ? 0.85 : 0.72,
-          timestamp: rainCandidate.dateTime.toIso8601String(),
-          recommendation:
-              'Protect low-lying crops, clear drainage, and reschedule spraying before the rain arrives.',
-        ),
-      );
-    }
-
     final stormCandidate = _firstMatching(upcoming, _isStormForecast);
     if (stormCandidate != null) {
       alerts.add(
@@ -300,10 +280,29 @@ class WeatherForecast {
           description:
               'Storm conditions may arrive ${_timeUntilLabel(now, stormCandidate.dateTime)}. Strong winds and lightning could disrupt field work.',
           type: 'storm',
-          severity: 0.9,
+          severity: 0.95,
           timestamp: stormCandidate.dateTime.toIso8601String(),
           recommendation:
-              'Secure loose farm materials and move exposed produce or tools into shelter.',
+              'Secure loose farm materials, tools, and move exposed produce into shelter immediately.',
+        ),
+      );
+    }
+
+    final rainCandidate = _firstMatching(upcoming, _isMeaningfulRainForecast);
+    if (rainCandidate != null) {
+      final rawPop = (rainCandidate.rainProbability ?? 0.0).clamp(0.0, 1.0);
+      final rainChance = (rawPop * 100).round().clamp(0, 99);
+      final rainVolume = rainCandidate.rainVolume ?? 0;
+      alerts.add(
+        WeatherAlert(
+          title: 'Rain & Field Advisory',
+          description:
+              'Significant rainfall expected ${_timeUntilLabel(now, rainCandidate.dateTime)} ($rainChance% chance, ${rainVolume > 0 ? '${rainVolume.toStringAsFixed(1)}mm' : 'moderate to heavy'}).',
+          type: 'rain',
+          severity: (rainChance >= 80 || rainVolume >= 4) ? 0.85 : 0.72,
+          timestamp: rainCandidate.dateTime.toIso8601String(),
+          recommendation:
+              'Clear field drainage, protect low-lying beds, and prioritize harvesting mature crops before the rain.',
         ),
       );
     }
@@ -322,39 +321,39 @@ class WeatherForecast {
       final isHeat = highTemp >= 36;
       alerts.add(
         WeatherAlert(
-          title: 'Temperature Monitoring',
+          title: isHeat ? 'Heat Stress Advisory' : 'Cold Temperature Advisory',
           description: isHeat
-              ? 'Temperatures may reach ${highTemp.toStringAsFixed(1)}C within the next 3 days. Heat stress can affect crops and workers.'
-              : 'Temperatures may drop to ${lowTemp.toStringAsFixed(1)}C within the next 3 days. Sensitive crops may need protection.',
+              ? 'Temperatures may reach ${highTemp.toStringAsFixed(1)}°C within the next 3 days. High heat can stress crops and field workers.'
+              : 'Temperatures may drop to ${lowTemp.toStringAsFixed(1)}°C within the next 3 days. Sensitive crops may require protection.',
           type: 'temperature',
           severity: isHeat
               ? (highTemp >= 39 ? 0.86 : 0.68)
               : (lowTemp <= 3 ? 0.85 : 0.68),
           timestamp: now.toIso8601String(),
           recommendation: isHeat
-              ? 'Water early, reduce midday field work, and monitor crops for heat stress.'
-              : 'Cover sensitive crops and avoid exposing seedlings during the coldest hours.',
+              ? 'Irrigate early morning, provide shade netting where possible, and avoid peak midday field labor.'
+              : 'Cover sensitive seedlings and ensure proper mulching to insulate roots.',
         ),
       );
     }
 
-    final harvestRiskCandidate = _firstMatching(
-      upcoming,
-      _isHarvestRiskForecast,
-    );
-    if (harvestRiskCandidate != null) {
-      alerts.add(
-        WeatherAlert(
-          title: 'Harvest Risk Alert',
-          description:
-              'Harvest conditions may worsen ${_timeUntilLabel(now, harvestRiskCandidate.dateTime)} because of wet or windy weather.',
-          type: 'harvest',
-          severity: 0.78,
-          timestamp: harvestRiskCandidate.dateTime.toIso8601String(),
-          recommendation:
-              'Prioritize mature crops now and postpone tasks that depend on dry soil conditions.',
-        ),
-      );
+    // Only add dedicated wind alert if not already covered by storm
+    if (stormCandidate == null) {
+      final windCandidate = _firstMatching(upcoming, (f) => f.windSpeed >= 28);
+      if (windCandidate != null) {
+        alerts.add(
+          WeatherAlert(
+            title: 'High Wind Advisory',
+            description:
+                'Strong gusts (${windCandidate.windSpeed.toStringAsFixed(0)} km/h) expected ${_timeUntilLabel(now, windCandidate.dateTime)}.',
+            type: 'harvest',
+            severity: 0.75,
+            timestamp: windCandidate.dateTime.toIso8601String(),
+            recommendation:
+                'Stake tall plants, support fruit-bearing branches, and secure temporary trellises.',
+          ),
+        );
+      }
     }
 
     return _deduplicateAlerts(alerts);
@@ -386,12 +385,6 @@ class WeatherForecast {
     return description.contains('thunderstorm') ||
         forecast.windSpeed >= 35 ||
         (description.contains('storm') && forecast.windSpeed >= 25);
-  }
-
-  static bool _isHarvestRiskForecast(ForecastData forecast) {
-    return _isMeaningfulRainForecast(forecast) ||
-        _isStormForecast(forecast) ||
-        forecast.windSpeed >= 28;
   }
 
   static String _timeUntilLabel(DateTime now, DateTime target) {

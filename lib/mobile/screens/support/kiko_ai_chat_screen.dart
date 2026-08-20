@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'dart:async';
+import 'package:image_picker/image_picker.dart';
+import '../../../shared/services/ai/ai_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
 
 class KikoAiChatScreen extends StatefulWidget {
@@ -16,12 +18,15 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ImagePicker _imagePicker = ImagePicker();
+  final AuthService _auth = AuthService();
+  final AiService _aiService = AiService();
 
   late final List<Map<String, dynamic>> _messages;
   bool _isTyping = false;
   String _currentKikoMood = 'assets/images/kiko_happy.png';
-
-  final AuthService _auth = AuthService();
+  Uint8List? _selectedImageBytes;
+  String? _selectedImageName;
 
   // Categorized Discovery Prompts
   List<Map<String, dynamic>> get _discoveryCategories {
@@ -32,22 +37,21 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
           'category': 'FARMING',
           'icon': Icons.eco_rounded,
           'color': const Color(0xFF059669),
-          'bg': const Color(0xFFECFDF5),
           'prompts': [
-            '🌾 How to list & price new crops?',
-            '🌱 Best weather window for planting?',
-            '🌧️ How to protect crops from heavy rain?',
+            '🌾 Paano mag-list at mag-presyo ng bagong ani?',
+            '🌱 Kailan ang tamang planting window para sa kamatis?',
+            '🌧️ Paano protektahan ang pananim sa malakas na ulan?',
+            '🐛 Paano puksain ang uod at pests gamit ang organic spray?',
           ],
         },
         {
           'category': 'SALES & ORDERS',
           'icon': Icons.receipt_long_rounded,
           'color': const Color(0xFF2563EB),
-          'bg': const Color(0xFFEFF6FF),
           'prompts': [
-            '📊 How to view my daily & monthly sales?',
-            '📦 How do harvest pre-orders work?',
-            '🎟️ How to create shop vouchers for fans?',
+            '📊 Paano tingnan ang aking daily at monthly sales?',
+            '📦 Paano gumagana ang pre-orders at harvest milestones?',
+            '🎟️ Paano gumawa ng shop discount vouchers?',
           ],
         },
       ];
@@ -57,22 +61,21 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
           'category': 'SHOPPING',
           'icon': Icons.shopping_basket_rounded,
           'color': const Color(0xFF059669),
-          'bg': const Color(0xFFECFDF5),
           'prompts': [
-            '🛒 How to order fresh produce directly?',
-            '🎟️ How to claim discount vouchers?',
-            '🚚 How do pre-orders work?',
+            '🛒 Paano mag-order ng sariwang gulay direkta sa magsasaka?',
+            '🎟️ Paano mag-claim ng exclusive discount vouchers?',
+            '🌾 Paano mag-preorder ng paparating na ani?',
+            '🥬 Paano tamang pag-imbak ng leafy greens para tumagal?',
           ],
         },
         {
-          'category': 'PAYMENT & SUPPORT',
+          'category': 'PAYMENT & TRACKING',
           'icon': Icons.payments_rounded,
           'color': const Color(0xFF7C3AED),
-          'bg': const Color(0xFFF5F3FF),
           'prompts': [
-            '💳 Supported payment & delivery methods?',
-            '📍 How to track my order status?',
-            '🎧 Contact direct customer support',
+            '💳 Ano ang mga supported payment methods (COD/COP)?',
+            '📍 Paano i-track ang status ng aking order?',
+            '🎧 Paano kumontak sa direct customer support?',
           ],
         },
       ];
@@ -83,17 +86,34 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
   void initState() {
     super.initState();
     final nowStr = DateFormat('h:mm a').format(DateTime.now());
+    final isFarmer = _auth.isViewingAsFarmer;
+
     _messages = [
       {
         'isUser': false,
-        'text':
-            'Moo! Hello! I\'m Kiko, your official AgriDirect Carabao AI Assistant 🌾.\n\nAsk me anything about farming schedules, weather advisories, marketplace orders, or voucher discounts!',
+        'text': isFarmer
+            ? 'Moo! 🌾 Mabuhay! Ako si **Kiko**, ang inyong opisyal na AgriDirect Carabao AI Advisor 🐮.\n\n'
+                'Handa akong tumulong sa:\n'
+                '• **Pest & Crop Diagnosis**: Mag-upload ng photo ng dahon o pananim gamit ang camera icon 📷.\n'
+                '• **Farming Advice**: Tamang pataba, irrigation schedule, at weather advisories.\n'
+                '• **Marketplace & Sales**: Pag-presyo ng ani, pre-orders, at voucher promotions.'
+            : 'Moo! 🛒 Hello! Ako si **Kiko**, ang inyong official AgriDirect AI Assistant 🐮.\n\n'
+                'Maaari mo akong tanungin tungkol sa:\n'
+                '• Pag-order ng sariwang ani direkta sa local farmers 🥬.\n'
+                '• Pag-preorder ng paparating na harvest 🌾.\n'
+                '• Tips sa pag-imbak at pagluluto ng sariwang gulay at prutas!',
         'time': nowStr,
-        'followUps': <String>[
-          '🌾 How to list new crops?',
-          '🌦️ Weather & Rain Advice',
-          '🎟️ Vouchers & Discounts',
-        ],
+        'followUps': isFarmer
+            ? <String>[
+                '🌾 Paano mag-presyo ng ani?',
+                '📷 I-diagnose ang pananim ko',
+                '🌧️ Weather & Rain Advice',
+              ]
+            : <String>[
+                '🛒 Paano mag-order?',
+                '🎟️ Vouchers & Discounts',
+                '📍 Paano mag-track ng order?',
+              ],
       },
     ];
   }
@@ -105,9 +125,65 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
     super.dispose();
   }
 
+  /// Pick image from camera or gallery for crop diagnosis
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _selectedImageBytes = bytes;
+          _selectedImageName = image.name;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load image: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeSelectedImage() {
+    setState(() {
+      _selectedImageBytes = null;
+      _selectedImageName = null;
+    });
+  }
+
+  /// Build conversation history for multi-turn LLM context
+  List<Map<String, String>> _buildConversationHistory() {
+    final List<Map<String, String>> history = [];
+    // Only take the last 8 messages to keep tokens optimal
+    final recentMessages = _messages.length > 8
+        ? _messages.sublist(_messages.length - 8)
+        : _messages;
+
+    for (final msg in recentMessages) {
+      final isUser = msg['isUser'] as bool;
+      final text = msg['text'] as String;
+      history.add({
+        'role': isUser ? 'user' : 'assistant',
+        'content': text,
+      });
+    }
+    return history;
+  }
+
   void _sendMessage([String? promptText]) async {
     final text = promptText ?? _messageController.text.trim();
-    if (text.isEmpty) return;
+    final imageBytes = _selectedImageBytes;
+
+    if (text.isEmpty && imageBytes == null) return;
 
     if (promptText == null) {
       _messageController.clear();
@@ -115,183 +191,105 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
 
     final nowStr = DateFormat('h:mm a').format(DateTime.now());
 
+    // Add user message to UI
     setState(() {
       _messages.add({
         'isUser': true,
-        'text': text,
+        'text': text.isNotEmpty ? text : '📷 [Attached Photo for Crop Diagnosis]',
         'time': nowStr,
+        'imageBytes': imageBytes,
       });
       _isTyping = true;
       _currentKikoMood = 'assets/images/kiko_cloudy.png'; // Thinking state
+      _selectedImageBytes = null;
+      _selectedImageName = null;
     });
 
     _scrollToBottom();
 
-    await Future<void>.delayed(const Duration(milliseconds: 900));
+    String replyText;
+    List<String> followUps = [];
+
+    try {
+      if (imageBytes != null) {
+        // Vision AI diagnosis call
+        replyText = await _aiService.diagnoseCropImage(
+          imageBytes: imageBytes,
+          additionalNotes: text.isNotEmpty ? text : null,
+        );
+        followUps = [
+          '🌾 Paano gamutin ito nang organic?',
+          '🌧️ Mag-spray ba bago umulan?',
+          '📍 Kumontak sa Farm Support',
+        ];
+      } else {
+        // Multi-turn Conversational AI call
+        final history = _buildConversationHistory();
+        replyText = await _aiService.getChatResponse(
+          conversationHistory: history,
+          userPrompt: text,
+        );
+
+        // Derive helpful quick chips based on context
+        followUps = _generateContextualFollowUps(text, replyText);
+      }
+    } catch (e) {
+      // Offline / Error fallback
+      final fallback = _generateKikoFallbackReply(text);
+      replyText = fallback['text'] as String;
+      followUps = fallback['followUps'] as List<String>? ?? [];
+    }
+
     if (!mounted) return;
 
-    final Map<String, dynamic> replyData = _generateKikoAiReply(text);
     final replyTimeStr = DateFormat('h:mm a').format(DateTime.now());
 
     setState(() {
       _isTyping = false;
-      _currentKikoMood = replyData['mood'] as String? ?? 'assets/images/kiko_happy.png';
+      _currentKikoMood = 'assets/images/kiko_happy.png';
       _messages.add({
         'isUser': false,
-        'text': replyData['text'] as String,
+        'text': replyText,
         'time': replyTimeStr,
-        'followUps': replyData['followUps'] as List<String>?,
+        'followUps': followUps,
       });
     });
 
     _scrollToBottom();
   }
 
-  Map<String, dynamic> _generateKikoAiReply(String userQuery) {
+  List<String> _generateContextualFollowUps(String query, String response) {
+    final lower = query.toLowerCase();
+    if (lower.contains('pest') || lower.contains('uod') || lower.contains('sakit')) {
+      return ['🌿 Organic pest spray recipe', '🌧️ Weather spraying advisory', '🌾 Crop care tips'];
+    }
+    if (lower.contains('presyo') || lower.contains('price') || lower.contains('benta')) {
+      return ['📊 View my sales', '🎟️ Create shop vouchers', '📦 How pre-orders work'];
+    }
+    if (lower.contains('order') || lower.contains('bili') || lower.contains('cart')) {
+      return ['🎟️ Claim discount vouchers', '💳 Payment options', '📍 Track my order'];
+    }
+    return ['🌾 Farming advice', '🌦️ Weather Advisory', '🛒 Marketplace Guide'];
+  }
+
+  Map<String, dynamic> _generateKikoFallbackReply(String userQuery) {
     final lower = userQuery.toLowerCase();
-
-    // 1. Greetings
-    if (lower.contains('hello') ||
-        lower.contains('hi') ||
-        lower.contains('kumusta') ||
-        lower.contains('kamusta') ||
-        lower.contains('gandang') ||
-        lower.contains('sino ka') ||
-        lower.contains('hey') ||
-        lower.contains('oy') ||
-        lower.contains('morning') ||
-        lower.contains('afternoon')) {
+    if (lower.contains('crop') || lower.contains('sell') || lower.contains('benta')) {
       return {
         'text':
-            'Moo! 🐮 Magandang araw po! Ako si Kiko, ang inyong opisyal na AgriDirect Carabao AI Assistant 🌾.\n\nHanda akong tumulong sa inyo—mula sa pag-order ng sariwang gulay at prutas, pag-preorder ng ani, hanggang sa pagbebenta at pag-track ng inyong orders.',
-        'mood': 'assets/images/kiko_happy.png',
-        'followUps': ['🌾 How to list crops?', '🛒 How to order?', '🌦️ Weather tips'],
+            'Moo! 🌱 Para mag-list ng ani sa AgriDirect:\n\n'
+            '1. I-switch ang app sa **Farmer Mode**.\n'
+            '2. I-tap ang **"+ Add Product"** sa dashboard.\n'
+            '3. Ilagay ang malinaw na litrato, presyo, at stock.\n'
+            '4. I-tap ang **Publish**!',
+        'followUps': ['📊 View my sales', '🎟️ Create vouchers'],
       };
     }
-
-    // 2. Listing Crops & Selling (Farmer Support)
-    if (lower.contains('list') ||
-        lower.contains('crop') ||
-        lower.contains('sell') ||
-        lower.contains('magbenta') ||
-        lower.contains('product') ||
-        lower.contains('tindahan') ||
-        lower.contains('upload') ||
-        lower.contains('gulay')) {
-      return {
-        'text':
-            'Moo! 🌱 Para mag-list at magbenta ng ani bilang magsasaka:\n\n'
-            '1️⃣ Pumunta sa Profile o gamitin ang top toggle para mag-switch sa **Farmer Mode**.\n'
-            '2️⃣ I-tap ang **"+ Add Product"** button sa inyong dashboard.\n'
-            '3️⃣ Mag-upload ng malinaw na larawan ng ani, ilagay ang presyo (per kg/bundle), at ilagay ang dami ng stock.\n'
-            '4️⃣ Kung paparating pa lang ang ani, maaari mong i-toggle ang **Pre-Order** at ilagay ang estimated harvest date.\n'
-            '5️⃣ I-tap ang **Publish** para makita agad ng mga buyers sa marketplace!',
-        'mood': 'assets/images/kiko_happy.png',
-        'followUps': ['📊 How to view my sales?', '🎟️ Create shop vouchers'],
-      };
-    }
-
-    // 3. Buying & How to Order (Consumer Support)
-    if (lower.contains('order') ||
-        lower.contains('buy') ||
-        lower.contains('bumili') ||
-        lower.contains('cart') ||
-        lower.contains('checkout') ||
-        lower.contains('pabili')) {
-      return {
-        'text':
-            'Moo! 🛒 Madali lang bumili ng sariwang ani sa AgriDirect:\n\n'
-            '• Pumunta sa **Marketplace** tab para mag-browse ng fresh produce mula sa ating local farmers.\n'
-            '• I-tap ang item na gusto mo at piliin ang **Add to Cart** o **Buy Now**.\n'
-            '• Sa checkout, piliin ang inyong delivery address at payment method (Cash on Delivery / Pickup).\n'
-            '• Maaari ring mag-preorder ng mga aning paparating pa lang sa ilalim ng **Pre-Orders** hub!',
-        'mood': 'assets/images/kiko_happy.png',
-        'followUps': ['💳 Payment methods?', '🎟️ Claim discount vouchers'],
-      };
-    }
-
-    // 4. Pre-Orders & Harvest Schedules
-    if (lower.contains('pre-order') ||
-        lower.contains('preorder') ||
-        lower.contains('reserve') ||
-        lower.contains('ani') ||
-        lower.contains('harvest')) {
-      return {
-        'text':
-            'Moo! 🌾 Ang **Pre-Orders** ay paraan para ma-reserve mo ang ani habang tinatanim pa lang ng magsasaka!\n\n'
-            '• Siguradong sariwa dahil diretsong ihaharvest para sa order mo.\n'
-            '• Maaari mong i-track ang growth milestones ng tanim under **Orders -> Track Order**.\n'
-            '• Pagka-harvest, diretso itong ipadadala sa inyong tahanan o pickup point.',
-        'mood': 'assets/images/kiko_happy.png',
-        'followUps': ['🛒 Browse Marketplace', '📍 Track existing orders'],
-      };
-    }
-
-    // 5. Vouchers & Discounts
-    if (lower.contains('voucher') ||
-        lower.contains('discount') ||
-        lower.contains('tipid') ||
-        lower.contains('code') ||
-        lower.contains('claim') ||
-        lower.contains('promo') ||
-        lower.contains('sale')) {
-      return {
-        'text':
-            'Moo! 🎟️ Gusto mo ba ng karagdagang bawas sa presyo?\n\n'
-            '• Bisitahin ang pampublikong profile ng inyong paboritong magsasaka para mag-claim ng exclusive shop vouchers.\n'
-            '• Tingnan ang inyong claimed codes sa **Profile -> My Vouchers**.\n'
-            '• Awtomatikong ma-a-apply ang discount code kapag nag-checkout ka!',
-        'mood': 'assets/images/kiko_happy.png',
-        'followUps': ['🛒 Go to Marketplace', '🌾 List new crops'],
-      };
-    }
-
-    // 6. Weather & Climate Advisories
-    if (lower.contains('weather') ||
-        lower.contains('rain') ||
-        lower.contains('ulan') ||
-        lower.contains('bagyo') ||
-        lower.contains('panahon') ||
-        lower.contains('init') ||
-        lower.contains('forecast') ||
-        lower.contains('spraying')) {
-      return {
-        'text':
-            'Moo! 🌧️ Narito ang live agronomic weather guidance mula kay Kiko:\n\n'
-            '• **Spraying Advisory**: Kung may banta ng ulan o hangin higit sa 15 km/h, ipagpaliban ang pag-spray ng foliar fertilizers para maiwasan ang wash-off.\n'
-            '• **Irrigation Window**: Sa mainit na araw (higit sa 30°C), magdilig nang maaga sa umaga (5:30–7:30 AM) para mabawasan ang evaporation.\n'
-            '• Buksan ang **Weather & Farm Intelligence** screen para sa live radar map at 24-hour temperature curve!',
-        'mood': 'assets/images/kiko_rainy.jpg',
-        'followUps': ['🌾 Crop care tips', '📦 Pre-orders status'],
-      };
-    }
-
-    // 7. Payment Methods & Shipping
-    if (lower.contains('payment') ||
-        lower.contains('cod') ||
-        lower.contains('cop') ||
-        lower.contains('bayad') ||
-        lower.contains('deliver') ||
-        lower.contains('shipping') ||
-        lower.contains('gcash')) {
-      return {
-        'text':
-            'Moo! 💳 Suportado ng AgriDirect ang dalawang ligtas na paraan ng pagbabayad:\n\n'
-            '1️⃣ **Cash on Delivery (COD)** – Magbayad pagkarating ng sariwang gulay at prutas sa inyong pintuan.\n'
-            '2️⃣ **Cash on Pickup (COP)** – Magbayad kapag kinuha ang order sa mismong farm hub ng magsasaka.\n\n'
-            'Maaari mong i-manage ang inyong addresses sa **Profile -> Address Book**.',
-        'mood': 'assets/images/kiko_happy.png',
-        'followUps': ['🛒 Start Shopping', '🎟️ Claim Vouchers'],
-      };
-    }
-
-    // Default Friendly Response
     return {
       'text':
-          'Moo! 🌾 Salamat sa pagtatanong tungkol sa "$userQuery"!\n\n'
-          'Maaari mong i-explore ang **Marketplace** para sa mga sariwang gulay, tingnan ang **Weather & Farm Intelligence** para sa agronomic forecasts, o mag-reach out sa **Contact Support** para sa direktang tulong.',
-      'mood': 'assets/images/kiko_happy.png',
-      'followUps': ['🌾 Listing crops guide', '🌦️ Weather Advisory', '🛒 How to order'],
+          'Moo! 🌾 Nandito ako para tumulong sa inyong pagsasaka at pamimili sa AgriDirect.\n\n'
+          'Pumili ng tanong sa ibaba o subukang mag-upload ng larawan ng inyong pananim!',
+      'followUps': ['🌾 Crop care guide', '🌦️ Weather Advisory', '🛒 How to order'],
     };
   }
 
@@ -305,6 +303,25 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
         );
       }
     });
+  }
+
+  void _copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+            SizedBox(width: 8),
+            Text('Copied response to clipboard'),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF059669),
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   @override
@@ -332,19 +349,24 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
                   final msg = _messages[index];
                   final bool isUser = msg['isUser'] as bool;
                   final followUps = msg['followUps'] as List<String>?;
+                  final imageBytes = msg['imageBytes'] as Uint8List?;
 
                   return _buildMessageBubble(
                     text: msg['text'].toString(),
                     time: msg['time'].toString(),
                     isUser: isUser,
                     followUps: followUps,
+                    imageBytes: imageBytes,
                   );
                 },
               ),
             ),
 
+            // Image Preview Badge (if photo is selected)
+            if (_selectedImageBytes != null) _buildImagePreviewBar(),
+
             // Discovery Topic Horizontal Carousel (if not typing)
-            if (!_isTyping) _buildTopicCarousel(),
+            if (!_isTyping && _selectedImageBytes == null) _buildTopicCarousel(),
 
             // Message Input Bar
             _buildInputComposer(),
@@ -409,7 +431,7 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
                   children: [
                     Flexible(
                       child: Text(
-                        'Kiko AI Assistant',
+                        'Kiko AI Carabao',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
@@ -423,22 +445,24 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF10B981), Color(0xFF059669)],
+                        ),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        'AI',
+                        'AI PRO',
                         style: GoogleFonts.inter(
                           fontSize: 9,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xFF059669),
+                          color: Colors.white,
                         ),
                       ),
                     ),
                   ],
                 ),
                 Text(
-                  _isTyping ? 'Thinking...' : 'Online • Ready to help',
+                  _isTyping ? 'Analyzing with AI…' : 'Online • Agricultural & Market Advisor',
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     color: _isTyping ? const Color(0xFFD97706) : const Color(0xFF059669),
@@ -453,11 +477,11 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
       actions: [
         IconButton(
           icon: const Icon(
-            Icons.delete_outline_rounded,
+            Icons.refresh_rounded,
             color: Color(0xFF64748B),
             size: 20,
           ),
-          tooltip: 'Clear Chat',
+          tooltip: 'Reset Chat',
           onPressed: () {
             setState(() {
               _messages.clear();
@@ -465,8 +489,13 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
               _messages.add({
                 'isUser': false,
                 'text':
-                    'Moo! Chat reset. How can I help you today? Pick a topic below or type your inquiry!',
+                    'Moo! 🌾 Chat reset. Paano kita matutulungan sa inyong sakahan o pamimili ngayon?',
                 'time': nowStr,
+                'followUps': <String>[
+                  '🌾 Crop care guide',
+                  '📷 I-diagnose ang pananim',
+                  '🛒 Paano mag-order?',
+                ],
               });
             });
           },
@@ -509,7 +538,7 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Kiko AI Carabao Assistant',
+                  'Kiko AI Carabao Advisor',
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
@@ -533,13 +562,78 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
   }
 
   // ===========================================================================
-  // 2. MESSAGE BUBBLE BUILDER
+  // 2. IMAGE PREVIEW BAR
+  // ===========================================================================
+  Widget _buildImagePreviewBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF059669).withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.memory(
+              _selectedImageBytes!,
+              width: 44,
+              height: 44,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Attached Crop Image',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                Text(
+                  _selectedImageName ?? 'Ready for AI diagnosis',
+                  style: GoogleFonts.inter(
+                    fontSize: 10.5,
+                    color: const Color(0xFF64748B),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
+            onPressed: _removeSelectedImage,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 3. MESSAGE BUBBLE BUILDER
   // ===========================================================================
   Widget _buildMessageBubble({
     required String text,
     required String time,
     required bool isUser,
     List<String>? followUps,
+    Uint8List? imageBytes,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -582,7 +676,7 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
               Flexible(
                 child: Container(
                   constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.78,
+                    maxWidth: MediaQuery.of(context).size.width * 0.82,
                   ),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -618,6 +712,21 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
                         ? CrossAxisAlignment.end
                         : CrossAxisAlignment.start,
                     children: [
+                      // Attached image display in bubble
+                      if (imageBytes != null) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.memory(
+                            imageBytes,
+                            width: double.infinity,
+                            height: 160,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+
+                      // Message Body
                       Text(
                         text,
                         style: GoogleFonts.inter(
@@ -627,16 +736,37 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
                           fontWeight: FontWeight.w400,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        time,
-                        style: GoogleFonts.inter(
-                          color: isUser
-                              ? Colors.white.withValues(alpha: 0.75)
-                              : const Color(0xFF94A3B8),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      const SizedBox(height: 8),
+
+                      // Time + Action Footer
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            time,
+                            style: GoogleFonts.inter(
+                              color: isUser
+                                  ? Colors.white.withValues(alpha: 0.75)
+                                  : const Color(0xFF94A3B8),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          if (!isUser) ...[
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: () => _copyToClipboard(text),
+                              child: const Padding(
+                                padding: EdgeInsets.all(2),
+                                child: Icon(
+                                  Icons.copy_rounded,
+                                  size: 13,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -700,7 +830,7 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
   }
 
   // ===========================================================================
-  // 3. BOUNCING DOTS TYPING INDICATOR
+  // 4. TYPING INDICATOR
   // ===========================================================================
   Widget _buildTypingIndicator() {
     return Padding(
@@ -758,7 +888,7 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  'Kiko is thinking…',
+                  'Kiko is analyzing with AI…',
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     color: const Color(0xFF64748B),
@@ -774,7 +904,7 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
   }
 
   // ===========================================================================
-  // 4. TOPIC DISCOVERY CAROUSEL
+  // 5. TOPIC DISCOVERY CAROUSEL
   // ===========================================================================
   Widget _buildTopicCarousel() {
     final categories = _discoveryCategories;
@@ -826,11 +956,11 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
   }
 
   // ===========================================================================
-  // 5. INPUT COMPOSER
+  // 6. INPUT COMPOSER
   // ===========================================================================
   Widget _buildInputComposer() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
+      padding: const EdgeInsets.fromLTRB(10, 8, 14, 12),
       decoration: BoxDecoration(
         color: Colors.white,
         border: const Border(top: BorderSide(color: Color(0xFFE2E8F0))),
@@ -844,6 +974,50 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
       ),
       child: Row(
         children: [
+          // Camera / Gallery Image Attachment Button
+          PopupMenuButton<ImageSource>(
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+              ),
+              child: const Icon(
+                Icons.camera_alt_rounded,
+                color: Color(0xFF059669),
+                size: 19,
+              ),
+            ),
+            tooltip: 'Diagnose Crop / Leaf Photo',
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            onSelected: _pickImage,
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: ImageSource.camera,
+                child: Row(
+                  children: [
+                    const Icon(Icons.photo_camera_rounded, color: Color(0xFF059669), size: 20),
+                    const SizedBox(width: 10),
+                    Text('Take Photo (Camera)', style: GoogleFonts.inter(fontSize: 13)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: ImageSource.gallery,
+                child: Row(
+                  children: [
+                    const Icon(Icons.photo_library_rounded, color: Color(0xFF2563EB), size: 20),
+                    const SizedBox(width: 10),
+                    Text('Choose from Gallery', style: GoogleFonts.inter(fontSize: 13)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 6),
+
+          // Text Field
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -861,7 +1035,9 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
                   color: const Color(0xFF0F172A),
                 ),
                 decoration: InputDecoration(
-                  hintText: 'Ask Kiko anything…',
+                  hintText: _selectedImageBytes != null
+                      ? 'Add question about this photo (optional)…'
+                      : 'Ask Kiko anything (Farming, Orders, Prices)…',
                   hintStyle: GoogleFonts.inter(
                     fontSize: 13,
                     color: const Color(0xFF94A3B8),
@@ -873,6 +1049,8 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
             ),
           ),
           const SizedBox(width: 8),
+
+          // Send Button
           Container(
             width: 44,
             height: 44,

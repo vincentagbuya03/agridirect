@@ -481,7 +481,7 @@ class ProductService {
     try {
       final response = await _supabase
           .from('product_reviews')
-          .select('*, customers(users(name, avatar_url))')
+          .select('*, customers(users(name, avatar_url)), review_images(image_url)')
           .eq('product_id', productId)
           .limit(limit)
           .order('created_at', ascending: false);
@@ -652,6 +652,11 @@ class ProductService {
   ProductReview _reviewFromDatabase(Map<String, dynamic> json) {
     final customer = json['customers'] as Map<String, dynamic>?;
     final user = customer?['users'] as Map<String, dynamic>?;
+    final reviewImages = (json['review_images'] as List?)
+            ?.map((img) => img['image_url']?.toString() ?? '')
+            .where((u) => u.isNotEmpty)
+            .toList() ??
+        <String>[];
 
     return ProductReview(
       reviewId: json['review_id']?.toString() ?? '',
@@ -668,6 +673,7 @@ class ProductService {
           DateTime.now(),
       userName: user?['name']?.toString(),
       userAvatar: user?['avatar_url']?.toString(),
+      images: reviewImages,
     );
   }
 

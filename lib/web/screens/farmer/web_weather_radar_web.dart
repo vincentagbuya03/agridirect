@@ -43,7 +43,7 @@ class _WebWeatherRadarScreenState extends State<WebWeatherRadarScreen> {
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
       final iframe = html.IFrameElement()
         ..src =
-            'https://embed.windy.com/embed2.html?lat=${lat.toStringAsFixed(4)}&lon=${lon.toStringAsFixed(4)}&detailLat=${lat.toStringAsFixed(4)}&detailLon=${lon.toStringAsFixed(4)}&zoom=10&level=surface&overlay=wind&product=ecmwf&menu=&message=&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1'
+            'https://embed.windy.com/embed2.html?lat=${lat.toStringAsFixed(4)}&lon=${lon.toStringAsFixed(4)}&detailLat=${lat.toStringAsFixed(4)}&detailLon=${lon.toStringAsFixed(4)}&zoom=10&level=surface&overlay=wind&product=ecmwf&menu=&message=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1'
         ..style.border = 'none'
         ..style.height = '100%'
         ..style.width = '100%'
@@ -258,44 +258,74 @@ class _WebWeatherRadarScreenState extends State<WebWeatherRadarScreen> {
 
                   // ── Cover: Windy.com logo — AgriDirect badge ─────────────────
                   Positioned(
-                    top: 10,
-                    left: 10,
-                    child: IgnorePointer(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(
-                            0xFF0F172A,
-                          ).withValues(alpha: 0.92),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.12),
+                    top: 6,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: IgnorePointer(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 7,
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 7,
-                              height: 7,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF22C55E),
-                                shape: BoxShape.circle,
-                              ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0B132B),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              width: 1.2,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'AgriDirect Radar',
-                              style: GoogleFonts.plusJakartaSans(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                blurRadius: 12,
+                                offset: const Offset(0, 3),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF22C55E),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'AgriDirect Radar',
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(width: 7),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 1.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF22C55E,
+                                  ).withValues(alpha: 0.25),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                                child: Text(
+                                  'LIVE',
+                                  style: GoogleFonts.inter(
+                                    color: const Color(0xFF4ADE80),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

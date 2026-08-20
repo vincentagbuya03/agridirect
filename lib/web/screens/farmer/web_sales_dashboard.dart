@@ -559,30 +559,66 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
 
   Widget _buildWelcomeHeader() {
     final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+    final isTablet = sw >= 650 && sw < 1100;
 
     final headerText = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Welcome back, $_farmerName!',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: sw < 650 ? 24 : (sw < 1100 ? 30 : 36),
-            fontWeight: FontWeight.w800,
-            color: _dark,
-            letterSpacing: -1,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: _primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: _primary.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: const BoxDecoration(
+                  color: _primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Storefront Active · ${_farmLocationName ?? 'Local Farm'}',
+                style: GoogleFonts.inter(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: _primary,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Text(
-          "Manage your farm's performance and orders from one place.",
+          'Welcome back, $_farmerName! 🌾',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: isMobile ? 24 : (isTablet ? 28 : 34),
+            fontWeight: FontWeight.w900,
+            color: _dark,
+            letterSpacing: -0.8,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          "Manage your farm's performance, products, and order fulfillments in real-time.",
           style: GoogleFonts.inter(
-            fontSize: sw < 650 ? 14 : 16,
+            fontSize: isMobile ? 13 : 15,
             color: _muted,
             fontWeight: FontWeight.w400,
+            height: 1.3,
           ),
         ),
       ],
-    );    Widget weatherWidget;
+    );
+
+    Widget weatherWidget;
     if (_isLoadingWeather || _weatherData == null) {
       weatherWidget = AppShimmerLoader.rectangle(width: 260, height: 80, borderRadius: 20);
     } else {
@@ -599,15 +635,15 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         child: GestureDetector(
           onTap: () => _showWeatherDetailsModal(data),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _border),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 10,
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 14,
                   offset: const Offset(0, 4),
                 ),
               ],
@@ -616,18 +652,18 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: (isSunny ? _accent : const Color(0xFF3B82F6)).withValues(alpha: 0.1),
+                    color: (isSunny ? _accent : const Color(0xFF3B82F6)).withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     isSunny ? Icons.wb_sunny_rounded : Icons.cloud_rounded,
                     color: isSunny ? _accent : const Color(0xFF3B82F6),
-                    size: 28,
+                    size: 24,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -636,37 +672,59 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                       children: [
                         Text(
                           '$desc · $temp°C',
-                          style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w800, color: _dark),
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: _dark,
+                          ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                           decoration: BoxDecoration(
                             color: _primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             'Feels $feelsLike°C',
-                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: _primary),
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: _primary,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.air_rounded, size: 14, color: _muted),
-                        const SizedBox(width: 4),
+                        const Icon(Icons.air_rounded, size: 12, color: _muted),
+                        const SizedBox(width: 3),
                         Text(
-                          'Wind: $wind m/s',
-                          style: GoogleFonts.inter(fontSize: 12, color: _muted, fontWeight: FontWeight.w500),
+                          '$wind m/s',
+                          style: GoogleFonts.inter(fontSize: 11, color: _muted, fontWeight: FontWeight.w500),
                         ),
-                        const SizedBox(width: 12),
-                        const Icon(Icons.water_drop_outlined, size: 14, color: _muted),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 10),
+                        const Icon(Icons.water_drop_outlined, size: 12, color: _muted),
+                        const SizedBox(width: 3),
                         Text(
-                          'Humidity: $humidity%',
-                          style: GoogleFonts.inter(fontSize: 12, color: _muted, fontWeight: FontWeight.w500),
+                          '$humidity%',
+                          style: GoogleFonts.inter(fontSize: 11, color: _muted, fontWeight: FontWeight.w500),
+                        ),
+                        const SizedBox(width: 8),
+                        Row(
+                          children: [
+                            Text(
+                              'Radar',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: const Color(0xFF3B82F6),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFF3B82F6)),
+                          ],
                         ),
                       ],
                     ),
@@ -679,59 +737,69 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
       );
     }
 
-    if (sw < 650) {
+    final actionButtons = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ElevatedButton.icon(
+          onPressed: () => widget.onNavigate(1),
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: const Text('Add Product'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _primary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            textStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+        ),
+        const SizedBox(width: 10),
+        OutlinedButton.icon(
+          onPressed: _openVoucherManager,
+          icon: const Icon(Icons.confirmation_number_outlined, size: 16),
+          label: const Text('Manage Vouchers'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _dark,
+            backgroundColor: Colors.white,
+            side: const BorderSide(color: Color(0xFFCBD5E1)),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            textStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+
+    if (isMobile) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           headerText,
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _openVoucherManager,
-                  icon: const Icon(Icons.confirmation_number_outlined),
-                  label: const Text('Manage Vouchers'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: actionButtons,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           weatherWidget,
         ],
       );
     }
 
-    if (sw < 1100) {
+    if (isTablet) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           headerText,
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              ElevatedButton.icon(
-                onPressed: _openVoucherManager,
-                icon: const Icon(Icons.confirmation_number_outlined),
-                label: const Text('Manage Vouchers'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
+              actionButtons,
               weatherWidget,
             ],
           ),
@@ -741,22 +809,11 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(child: headerText),
-        const SizedBox(width: 16),
-        ElevatedButton.icon(
-          onPressed: _openVoucherManager,
-          icon: const Icon(Icons.confirmation_number_outlined),
-          label: const Text('Manage Vouchers'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _primary,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
+        const SizedBox(width: 20),
+        actionButtons,
         const SizedBox(width: 16),
         weatherWidget,
       ],
@@ -1410,13 +1467,49 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   Widget _buildMetricsRow() {
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 650;
-    final isTablet = sw >= 650 && sw < 1000;
+    final isTablet = sw >= 650 && sw < 1100;
 
     final metrics = [
-      ('Pending Orders', '$_pendingOrders', 'Active tasks', Icons.shopping_bag_outlined, _secondary),
-      ('Active Listings', '$_activeListings', 'Storefront live', Icons.inventory_2_outlined, _primary),
-      ('Total Revenue', _currencyFormat.format(_weeklyRevenue), 'Lifetime sales', Icons.trending_up_rounded, _accent),
-      ('Farmer Rating', _farmerRating, _farmerReviews, Icons.star_rounded, Colors.amber),
+      (
+        'Pending Orders',
+        '$_pendingOrders',
+        _pendingOrders > 0 ? '$_pendingOrders require fulfillment' : 'All orders fulfilled',
+        Icons.shopping_bag_outlined,
+        const Color(0xFF3B82F6),
+        () => widget.onNavigate(2),
+        _pendingOrders > 0 ? 'Needs Action' : 'Clear',
+        _pendingOrders > 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+      ),
+      (
+        'Active Listings',
+        '$_activeListings',
+        'Storefront live products',
+        Icons.inventory_2_outlined,
+        _primary,
+        () => widget.onNavigate(1),
+        'Live',
+        _primary,
+      ),
+      (
+        'Total Revenue',
+        _currencyFormat.format(_weeklyRevenue),
+        '7-day sales: ${_currencyFormat.format(_salesData.fold(0.0, (a, b) => a + b))}',
+        Icons.trending_up_rounded,
+        const Color(0xFF8B5CF6),
+        null,
+        'Earnings',
+        const Color(0xFF8B5CF6),
+      ),
+      (
+        'Farmer Rating',
+        '$_farmerRating ★',
+        '$_farmerReviews · Verified Seller',
+        Icons.star_rounded,
+        const Color(0xFFF59E0B),
+        null,
+        'Top Rated',
+        const Color(0xFFF59E0B),
+      ),
     ];
 
     if (isMobile) {
@@ -1432,6 +1525,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                   metrics[0].$3,
                   metrics[0].$4,
                   metrics[0].$5,
+                  onTap: metrics[0].$6,
+                  badgeText: metrics[0].$7,
+                  badgeColor: metrics[0].$8,
                 ),
               ),
               const SizedBox(width: 12),
@@ -1443,6 +1539,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                   metrics[1].$3,
                   metrics[1].$4,
                   metrics[1].$5,
+                  onTap: metrics[1].$6,
+                  badgeText: metrics[1].$7,
+                  badgeColor: metrics[1].$8,
                 ),
               ),
             ],
@@ -1458,6 +1557,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                   metrics[2].$3,
                   metrics[2].$4,
                   metrics[2].$5,
+                  onTap: metrics[2].$6,
+                  badgeText: metrics[2].$7,
+                  badgeColor: metrics[2].$8,
                 ),
               ),
               const SizedBox(width: 12),
@@ -1469,6 +1571,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                   metrics[3].$3,
                   metrics[3].$4,
                   metrics[3].$5,
+                  onTap: metrics[3].$6,
+                  badgeText: metrics[3].$7,
+                  badgeColor: metrics[3].$8,
                 ),
               ),
             ],
@@ -1484,7 +1589,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             children: [
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(right: 12, bottom: 16),
+                  padding: const EdgeInsets.only(right: 10, bottom: 14),
                   child: _buildAnimatedMetricCard(
                     0,
                     metrics[0].$1,
@@ -1492,12 +1597,15 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                     metrics[0].$3,
                     metrics[0].$4,
                     metrics[0].$5,
+                    onTap: metrics[0].$6,
+                    badgeText: metrics[0].$7,
+                    badgeColor: metrics[0].$8,
                   ),
                 ),
               ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 12, bottom: 16),
+                  padding: const EdgeInsets.only(left: 10, bottom: 14),
                   child: _buildAnimatedMetricCard(
                     1,
                     metrics[1].$1,
@@ -1505,6 +1613,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                     metrics[1].$3,
                     metrics[1].$4,
                     metrics[1].$5,
+                    onTap: metrics[1].$6,
+                    badgeText: metrics[1].$7,
+                    badgeColor: metrics[1].$8,
                   ),
                 ),
               ),
@@ -1514,7 +1625,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             children: [
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(right: 12),
+                  padding: const EdgeInsets.only(right: 10),
                   child: _buildAnimatedMetricCard(
                     2,
                     metrics[2].$1,
@@ -1522,12 +1633,15 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                     metrics[2].$3,
                     metrics[2].$4,
                     metrics[2].$5,
+                    onTap: metrics[2].$6,
+                    badgeText: metrics[2].$7,
+                    badgeColor: metrics[2].$8,
                   ),
                 ),
               ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 12),
+                  padding: const EdgeInsets.only(left: 10),
                   child: _buildAnimatedMetricCard(
                     3,
                     metrics[3].$1,
@@ -1535,6 +1649,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                     metrics[3].$3,
                     metrics[3].$4,
                     metrics[3].$5,
+                    onTap: metrics[3].$6,
+                    badgeText: metrics[3].$7,
+                    badgeColor: metrics[3].$8,
                   ),
                 ),
               ),
@@ -1549,7 +1666,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
         metrics.length,
         (index) => Expanded(
           child: Padding(
-            padding: EdgeInsets.only(right: index == 3 ? 0 : 24),
+            padding: EdgeInsets.only(right: index == 3 ? 0 : 20),
             child: _buildAnimatedMetricCard(
               index,
               metrics[index].$1,
@@ -1557,6 +1674,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               metrics[index].$3,
               metrics[index].$4,
               metrics[index].$5,
+              onTap: metrics[index].$6,
+              badgeText: metrics[index].$7,
+              badgeColor: metrics[index].$8,
             ),
           ),
         ),
@@ -1564,77 +1684,132 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
     );
   }
 
-  Widget _buildAnimatedMetricCard(int i, String l, String v, String s, IconData ic, Color c) {
+  Widget _buildAnimatedMetricCard(
+    int i,
+    String label,
+    String value,
+    String subtitle,
+    IconData icon,
+    Color color, {
+    VoidCallback? onTap,
+    String? badgeText,
+    Color? badgeColor,
+  }) {
     final isMobile = MediaQuery.of(context).size.width < 650;
+    final isHovered = _hoveredMetrics.contains(i);
+
     return FadeTransition(
       opacity: _metricControllers[i],
       child: SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
+        position: Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero).animate(
           CurvedAnimation(parent: _metricControllers[i], curve: Curves.easeOutQuart),
         ),
         child: MouseRegion(
+          cursor: onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
           onEnter: (_) => setState(() => _hoveredMetrics.add(i)),
           onExit: (_) => setState(() => _hoveredMetrics.remove(i)),
-          child: HoverScaleCard(
-            child: Container(
-              padding: EdgeInsets.all(isMobile ? 16 : 28),
+          child: GestureDetector(
+            onTap: onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              transform: Matrix4.translationValues(0, isHovered ? -4 : 0, 0),
+              padding: EdgeInsets.all(isMobile ? 16 : 22),
               decoration: BoxDecoration(
                 color: _white,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: _hoveredMetrics.contains(i) ? c.withValues(alpha: 0.5) : _border,
-                  width: _hoveredMetrics.contains(i) ? 2 : 1,
+                  color: isHovered ? color.withValues(alpha: 0.5) : const Color(0xFFE2E8F0),
+                  width: isHovered ? 1.5 : 1,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: c.withValues(alpha: 0.05),
-                    blurRadius: 40,
-                    offset: const Offset(0, 10),
+                    color: isHovered ? color.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.03),
+                    blurRadius: isHovered ? 24 : 10,
+                    offset: Offset(0, isHovered ? 8 : 3),
                   ),
                 ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
-                        padding: EdgeInsets.all(isMobile ? 8 : 12),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: c.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(isMobile ? 10 : 14),
+                          color: color.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(ic, color: c, size: isMobile ? 20 : 24),
+                        child: Icon(icon, color: color, size: isMobile ? 18 : 22),
                       ),
-                      Icon(Icons.more_horiz_rounded, color: _muted.withValues(alpha: 0.5)),
+                      if (badgeText != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: (badgeColor ?? color).withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            badgeText,
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: badgeColor ?? color,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
-                  SizedBox(height: isMobile ? 12 : 32),
+                  SizedBox(height: isMobile ? 12 : 16),
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      v,
+                      value,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: isMobile ? 22 : 32,
-                        fontWeight: FontWeight.w800,
+                        fontSize: isMobile ? 22 : 28,
+                        fontWeight: FontWeight.w900,
                         color: _dark,
+                        letterSpacing: -0.5,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
-                    l.toUpperCase(),
+                    label.toUpperCase(),
                     style: GoogleFonts.inter(
-                      fontSize: isMobile ? 10 : 12,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w700,
                       color: _muted,
                       letterSpacing: 0.5,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.circle,
+                        size: 6,
+                        color: color,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          subtitle,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: _muted,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1682,17 +1857,17 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
     final total7Days = _salesData.fold<double>(0, (sum, item) => sum + item);
 
     return Container(
-      padding: EdgeInsets.all(isMobile ? 20 : 32),
+      padding: EdgeInsets.all(isMobile ? 20 : 28),
       height: 420,
       decoration: BoxDecoration(
         color: _white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: _border),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -1710,7 +1885,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                       'Sales Performance',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: isMobile ? 18 : 20,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w900,
                         color: _dark,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -1718,25 +1893,29 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                     const SizedBox(height: 4),
                     Text(
                       '7-Day Total: ${_currencyFormat.format(total7Days)}',
-                      style: GoogleFonts.inter(fontSize: 13, color: _muted, fontWeight: FontWeight.w500),
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: _primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: _primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _primary.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.show_chart_rounded, size: 18, color: _primary),
+                    const Icon(Icons.show_chart_rounded, size: 16, color: _primary),
                     const SizedBox(width: 6),
                     Text(
                       'Last 7 Days',
-                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: _primary),
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: _primary),
                     ),
                   ],
                 ),
@@ -1760,45 +1939,68 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   }
 
   Widget _buildInventoryDistribution() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 650;
+
     return Container(
-      padding: const EdgeInsets.all(32),
-      height: 400,
+      padding: EdgeInsets.all(isMobile ? 20 : 28),
+      height: 420,
       decoration: BoxDecoration(
         color: _white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: _border),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Inventory Split',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: _dark,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Inventory Split',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: isMobile ? 18 : 20,
+                  fontWeight: FontWeight.w900,
+                  color: _dark,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, size: 18, color: _muted),
+                tooltip: 'Refresh',
+                onPressed: _loadDashboardData,
+              ),
+            ],
           ),
           const Spacer(),
           Center(
             child: MiniDonutChart(
-              size: 200,
+              size: isMobile ? 170 : 190,
               values: _inventoryData,
               colors: const [_primary, _secondary, _accent],
               center: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('$_activeListings', style: GoogleFonts.plusJakartaSans(fontSize: 28, fontWeight: FontWeight.w800, color: _dark)),
-                  Text('Total', style: GoogleFonts.inter(fontSize: 12, color: _muted)),
+                  Text(
+                    '$_activeListings',
+                    style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.w900, color: _dark),
+                  ),
+                  Text('Total Items', style: GoogleFonts.inter(fontSize: 11, color: _muted, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
           ),
           const Spacer(),
           _buildLegendRow('In Stock', _primary, _inventoryLegend1),
-          const SizedBox(height: 12),
-          _buildLegendRow('Low Stock', _secondary, _inventoryLegend2),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+          _buildLegendRow('Low Stock (<5kg)', _secondary, _inventoryLegend2),
+          const SizedBox(height: 10),
           _buildLegendRow('Out of Stock', _accent, _inventoryLegend3),
         ],
       ),
@@ -1808,11 +2010,11 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   Widget _buildLegendRow(String label, Color color, String percent) {
     return Row(
       children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 12),
-        Text(label, style: GoogleFonts.inter(fontSize: 13, color: _dark, fontWeight: FontWeight.w500)),
+        Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 10),
+        Text(label, style: GoogleFonts.inter(fontSize: 12.5, color: _dark, fontWeight: FontWeight.w600)),
         const Spacer(),
-        Text(percent, style: GoogleFonts.inter(fontSize: 13, color: _muted, fontWeight: FontWeight.w600)),
+        Text(percent, style: GoogleFonts.inter(fontSize: 12.5, color: _muted, fontWeight: FontWeight.w700)),
       ],
     );
   }
@@ -1839,7 +2041,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           flex: 2,
           child: _buildRecentActivitySection(),
         ),
-        const SizedBox(width: 40),
+        const SizedBox(width: 32),
         Expanded(
           flex: 1,
           child: _buildLowStockAlertsCard(),
@@ -1851,11 +2053,18 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   Widget _buildLowStockAlertsCard() {
     final isMobile = MediaQuery.of(context).size.width < 650;
     return Container(
-      padding: EdgeInsets.all(isMobile ? 20 : 32),
+      padding: EdgeInsets.all(isMobile ? 20 : 28),
       decoration: BoxDecoration(
         color: _white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: _border),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1868,14 +2077,14 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.1),
+                      color: Colors.amber.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 20),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Text(
-                    'Low Stock Alerts',
+                    'Stock Alerts',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -1886,11 +2095,11 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               ),
               TextButton(
                 onPressed: () => widget.onNavigate(1),
-                child: Text('Manage Stock', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _primary)),
+                child: Text('Manage Stock', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _primary, fontSize: 13)),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
           if (_lowStockProducts.isEmpty)
             Center(
               child: Padding(
@@ -1900,7 +2109,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                     const Icon(Icons.check_circle_outline_rounded, color: _primary, size: 36),
                     const SizedBox(height: 8),
                     Text(
-                      'All items fully stocked!',
+                      'All products fully stocked!',
                       style: GoogleFonts.inter(color: _dark, fontWeight: FontWeight.w600, fontSize: 14),
                     ),
                   ],
@@ -1912,7 +2121,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _lowStockProducts.length > 4 ? 4 : _lowStockProducts.length,
-              separatorBuilder: (context, i) => Divider(color: _border.withValues(alpha: 0.5), height: 20),
+              separatorBuilder: (context, i) => Divider(color: const Color(0xFFF1F5F9), height: 18),
               itemBuilder: (context, i) {
                 final item = _lowStockProducts[i];
                 final name = item['name'] ?? 'Product';
@@ -1921,33 +2130,33 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                 return Row(
                   children: [
                     Container(
-                      width: 10,
-                      height: 10,
+                      width: 8,
+                      height: 8,
                       decoration: BoxDecoration(
                         color: isOutOfStock ? Colors.redAccent : Colors.amber,
                         shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         name,
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: _dark, fontSize: 14),
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: _dark, fontSize: 13.5),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
                       decoration: BoxDecoration(
-                        color: isOutOfStock ? Colors.red.withValues(alpha: 0.1) : Colors.amber.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
+                        color: isOutOfStock ? Colors.red.withValues(alpha: 0.1) : Colors.amber.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         isOutOfStock ? 'OUT OF STOCK' : '$qty left',
                         style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
                           color: isOutOfStock ? Colors.redAccent : Colors.amber.shade900,
                         ),
                       ),
@@ -1962,12 +2171,21 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   }
 
   Widget _buildRecentActivitySection() {
+    final isMobile = MediaQuery.of(context).size.width < 650;
+
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: EdgeInsets.all(isMobile ? 20 : 28),
       decoration: BoxDecoration(
         color: _white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: _border),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1976,28 +2194,39 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Recent Activity',
+                'Recent Orders',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
+                  fontSize: isMobile ? 18 : 20,
+                  fontWeight: FontWeight.w900,
                   color: _dark,
                 ),
               ),
               TextButton(
                 onPressed: () => widget.onNavigate(2),
-                child: Text('View Full History', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _primary)),
+                child: Text('View All Orders', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _primary, fontSize: 13)),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           if (_recentOrders.isEmpty)
-            Center(child: Padding(padding: const EdgeInsets.all(40), child: Text('No recent orders.', style: GoogleFonts.inter(color: _muted))))
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(
+                  children: [
+                    const Icon(Icons.inbox_outlined, size: 36, color: _muted),
+                    const SizedBox(height: 8),
+                    Text('No customer orders yet.', style: GoogleFonts.inter(color: _muted, fontSize: 14)),
+                  ],
+                ),
+              ),
+            )
           else
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _recentOrders.length,
-              separatorBuilder: (context, i) => Divider(color: _border.withValues(alpha: 0.5), height: 32),
+              separatorBuilder: (context, i) => Divider(color: const Color(0xFFF1F5F9), height: 24),
               itemBuilder: (context, i) => _buildActivityRow(_recentOrders[i]),
             ),
         ],
@@ -2007,54 +2236,56 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
 
   Widget _buildActivityRow(Map<String, dynamic> o) {
     final status = o['status']?.toString().toUpperCase() ?? 'PENDING';
-    Color statusColor = Colors.orange;
+    Color statusColor = const Color(0xFFF59E0B);
     if (status == 'DELIVERED') statusColor = _primary;
+    if (status == 'CANCELLED') statusColor = Colors.redAccent;
     
     return Row(
       children: [
         Container(
-          width: 48,
-          height: 48,
+          width: 42,
+          height: 42,
           decoration: BoxDecoration(
-            color: statusColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(14),
+            color: statusColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
-            status == 'DELIVERED' ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+            status == 'DELIVERED' ? Icons.check_circle_rounded : Icons.local_shipping_outlined,
             color: statusColor,
             size: 20,
           ),
         ),
-        const SizedBox(width: 20),
+        const SizedBox(width: 16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Order from ${o['customerName'] ?? 'Customer'}',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _dark, fontSize: 15),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: _dark, fontSize: 14),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
-                o['items'] ?? 'Processing...',
-                style: GoogleFonts.inter(color: _muted, fontSize: 13),
+                o['items'] ?? 'Processing order items...',
+                style: GoogleFonts.inter(color: _muted, fontSize: 12.5),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         ),
+        const SizedBox(width: 12),
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
               o['total'] ?? '₱0',
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, color: _dark, fontSize: 16),
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, color: _dark, fontSize: 15),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               o['timeAgo'] ?? 'Recently',
-              style: GoogleFonts.inter(color: _muted, fontSize: 12),
+              style: GoogleFonts.inter(color: _muted, fontSize: 11.5, fontWeight: FontWeight.w500),
             ),
           ],
         ),

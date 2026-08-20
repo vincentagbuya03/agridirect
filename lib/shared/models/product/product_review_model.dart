@@ -20,6 +20,7 @@ class ProductReview {
   // Related data for display
   final String? userName;
   final String? userAvatar;
+  final List<String> images;
 
   ProductReview({
     required this.reviewId,
@@ -31,6 +32,7 @@ class ProductReview {
     required this.updatedAt,
     this.userName,
     this.userAvatar,
+    this.images = const [],
   });
 
   factory ProductReview.fromJson(Map<String, dynamic> json) =>

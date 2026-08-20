@@ -539,6 +539,172 @@ class AdminService extends ChangeNotifier {
     }
   }
 
+  /// Get enhanced users list enriched with order counts and total spent
+  Future<List<Map<String, dynamic>>> getEnhancedCustomersList() async {
+    try {
+      final results = await Future.wait([
+        _client.from('v_users_with_roles').select('*').order('created_at', ascending: false),
+        _client.from('orders').select('customer_id, total_amount, created_at'),
+      ]);
+
+      final users = List<Map<String, dynamic>>.from(results[0] as List);
+      final orders = List<Map<String, dynamic>>.from(results[1] as List);
+
+      // Map orders and spend by customer_id
+      final Map<String, int> orderCounts = {};
+      final Map<String, double> totalSpends = {};
+      final Map<String, String> lastOrderDates = {};
+
+      for (var order in orders) {
+        final custId = (order['customer_id'] ?? '').toString();
+        if (custId.isNotEmpty) {
+          final amt = (order['total_amount'] as num?)?.toDouble() ?? 0.0;
+          orderCounts[custId] = (orderCounts[custId] ?? 0) + 1;
+          totalSpends[custId] = (totalSpends[custId] ?? 0.0) + amt;
+          final dateStr = (order['created_at'] ?? '').toString();
+          if (dateStr.isNotEmpty) {
+            final existing = lastOrderDates[custId] ?? '';
+            if (existing.isEmpty || dateStr.compareTo(existing) > 0) {
+              lastOrderDates[custId] = dateStr;
+            }
+          }
+        }
+      }
+
+      for (final user in users) {
+        final id = (user['user_id'] ?? '').toString();
+        final roleName = (user['role_name'] ?? '').toString().toLowerCase();
+        if (roleName == 'admin') {
+          user['role'] = 'admin';
+        } else if (roleName == 'farmer') {
+          user['role'] = 'farmer';
+        } else {
+          user['role'] = 'customer';
+        }
+
+        user['orders_count'] = orderCounts[id] ?? 0;
+        user['total_spent'] = totalSpends[id] ?? 0.0;
+        user['last_order_date'] = lastOrderDates[id] ?? '';
+      }
+
+      return users;
+    } catch (e) {
+      debugPrint('Error loading enhanced customers: $e');
+      return getAllUsers();
+    }
+  }
+
+  /// Get comprehensive customer summary metrics
+  Future<Map<String, dynamic>> getCustomerSummaryMetrics() async {
+    try {
+      final now = DateTime.now();
+      final last30Days = now.subtract(const Duration(days: 30));
+
+      final users = await _client.from('v_users_with_roles').select('user_id, role_name, created_at');
+      final userList = List<Map<String, dynamic>>.from(users);
+
+      int total = userList.length;
+      int buyers = 0;
+      int farmers = 0;
+      int admins = 0;
+      int new30d = 0;
+
+      for (var u in userList) {
+        final role = (u['role_name'] ?? '').toString().toLowerCase();
+        if (role == 'admin') {
+          admins++;
+        } else if (role == 'farmer') {
+          farmers++;
+        } else {
+          buyers++;
+        }
+
+        final createdStr = u['created_at']?.toString();
+        if (createdStr != null) {
+          final dt = DateTime.tryParse(createdStr);
+          if (dt != null && dt.isAfter(last30Days)) {
+            new30d++;
+          }
+        }
+      }
+
+      return {
+        'total_users': total,
+        'buyers': buyers,
+        'farmers': farmers,
+        'admins': admins,
+        'new_last_30d': new30d,
+        'active_accounts': total,
+      };
+    } catch (e) {
+      debugPrint('Error getting customer metrics: $e');
+      return {
+        'total_users': 0,
+        'buyers': 0,
+        'farmers': 0,
+        'admins': 0,
+        'new_last_30d': 0,
+        'active_accounts': 0,
+      };
+    }
+  }
+
+  /// Get specific customer details, addresses, and recent orders
+  Future<Map<String, dynamic>> getCustomerProfileDetails(String userId) async {
+    try {
+      final results = await Future.wait([
+        // 0: User profile
+        _client.from('v_users_with_roles').select('*').eq('user_id', userId).maybeSingle(),
+        // 1: Orders
+        _client.from('orders').select('order_id, total_amount, created_at').eq('customer_id', userId).order('created_at', ascending: false).limit(10),
+        // 2: Addresses
+        _client.from('addresses').select('*').eq('user_id', userId),
+      ]);
+
+      final profile = results[0] as Map<String, dynamic>? ?? {};
+      final orders = List<Map<String, dynamic>>.from(results[1] as List? ?? []);
+      final addresses = List<Map<String, dynamic>>.from(results[2] as List? ?? []);
+
+      double totalSpend = 0.0;
+      for (var o in orders) {
+        totalSpend += (o['total_amount'] as num?)?.toDouble() ?? 0.0;
+      }
+
+      return {
+        'profile': profile,
+        'orders': orders,
+        'addresses': addresses,
+        'orders_count': orders.length,
+        'total_spent': totalSpend,
+      };
+    } catch (e) {
+      debugPrint('Error getting customer profile details: $e');
+      return {};
+    }
+  }
+
+  /// Update user account active/suspended status
+  Future<bool> updateUserAccountStatus({required String userId, required bool isActive}) async {
+    try {
+      await _client.from('users').update({
+        'is_active': isActive,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('user_id', userId);
+
+      await _logAdminAction(
+        isActive ? 'reactivate_user' : 'suspend_user',
+        'User account status changed to ${isActive ? "active" : "suspended"}',
+        userId,
+      );
+
+      _notifyDataChanged();
+      return true;
+    } catch (e) {
+      debugPrint('Error updating account status: $e');
+      return false;
+    }
+  }
+
   /// Delete user by ID
   Future<bool> deleteUser(String userId) async {
     try {
@@ -656,7 +822,7 @@ class AdminService extends ChangeNotifier {
       final response = await _client
           .from('v_products')
           .select(
-            'product_id, name, farm_name, price, average_rating, review_count, is_preorder, farmer_id, created_at, is_active, is_featured, category_name, stock_quantity, image_url, unit_abbr, description',
+            'product_id, name, farm_name, price, average_rating, review_count, is_preorder, farmer_id, created_at, updated_at, is_active, is_featured, is_free_shipping, is_wholesale, is_flash_sale, discount_percent, harvest_days, category_name, unit_name, unit_abbr, stock_quantity, sold_count, total_sold, image_url, description',
           )
           .order('created_at', ascending: false)
           .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -1899,6 +2065,146 @@ class AdminService extends ChangeNotifier {
     }
   }
 
+  /// Sends a targeted test push notification to a specific user (or current admin)
+  Future<Map<String, dynamic>> sendTestPushNotification({
+    required String targetUserId,
+    required String title,
+    required String body,
+    String notificationCode = 'test_alert',
+    String? linkType,
+    String? linkId,
+  }) async {
+    _errorMessage = null;
+    try {
+      final response = await _client.functions.invoke(
+        'send-push-notification',
+        body: {
+          'targetUserId': targetUserId,
+          'title': title.trim(),
+          'body': body.trim(),
+          'notificationCode': notificationCode,
+          'linkType': linkType,
+          'linkId': linkId,
+          'data': {
+            'is_test': 'true',
+            'sent_at': DateTime.now().toIso8601String(),
+          },
+        },
+      );
+
+      unawaited(
+        _logAdminAction(
+          'test_push_notification',
+          'Sent test push to $targetUserId: ${title.trim()}',
+          null,
+        ),
+      );
+
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        if (data['error'] != null) {
+          throw Exception(data['error'].toString());
+        }
+        return data;
+      }
+      return {'success': true};
+    } catch (e) {
+      _errorMessage = 'Failed to send test push: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Sends a targeted/broadcast campaign push notification with custom metadata
+  Future<Map<String, dynamic>> sendCustomPushNotification({
+    required String audience,
+    required String title,
+    required String body,
+    String notificationCode = 'campaign',
+    String? linkType,
+    String? linkId,
+    Map<String, String>? extraData,
+  }) async {
+    _errorMessage = null;
+
+    final normalizedAudience = audience.trim();
+    if (normalizedAudience.isEmpty) {
+      throw Exception('Audience is required.');
+    }
+    if (title.trim().isEmpty || body.trim().isEmpty) {
+      throw Exception('Title and message are required.');
+    }
+
+    try {
+      final response = await _client.functions.invoke(
+        'send-push-notification',
+        body: {
+          'audience': normalizedAudience,
+          'title': title.trim(),
+          'body': body.trim(),
+          'notificationCode': notificationCode,
+          'linkType': linkType,
+          'linkId': linkId,
+          'data': extraData ?? {},
+        },
+      );
+
+      unawaited(
+        _logAdminAction(
+          'send_push_campaign',
+          'Broadcast [$notificationCode] to $normalizedAudience: ${title.trim()}',
+          null,
+        ),
+      );
+
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        if (data['error'] != null) {
+          throw Exception(data['error'].toString());
+        }
+        return data;
+      }
+
+      return {'success': true};
+    } catch (e) {
+      _errorMessage = 'Failed to send campaign: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Triggers an immediate execution of the daily weather check across all farms
+  Future<Map<String, dynamic>> triggerDailyWeatherCheck() async {
+    _errorMessage = null;
+    try {
+      final response = await _client.functions.invoke(
+        'daily-weather-check',
+        body: {'source': 'admin_manual_trigger'},
+      );
+
+      unawaited(
+        _logAdminAction(
+          'trigger_weather_check',
+          'Admin manually initiated live weather scan across active farms',
+          null,
+        ),
+      );
+
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        if (data['error'] != null) {
+          throw Exception(data['error'].toString());
+        }
+        return data;
+      }
+      return {'success': true};
+    } catch (e) {
+      _errorMessage = 'Failed to trigger weather scan: $e';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   /// Verify farmer (for already approved farmers in farmers table)
   Future<bool> verifyFarmer({
     required String farmerId,
@@ -2809,6 +3115,402 @@ class AdminService extends ChangeNotifier {
     }
   }
 
+  /// Get comprehensive executive metrics with growth trends and operational health
+  Future<Map<String, dynamic>> getExecutiveDashboardMetrics() async {
+    try {
+      final now = DateTime.now();
+      final last30Days = now.subtract(const Duration(days: 30));
+      final prior30Days = now.subtract(const Duration(days: 60));
+
+      final results = await Future.wait([
+        // 0: All users
+        _client.from('v_users_with_roles').select('user_id, created_at'),
+        // 1: All farmers
+        _client.from('farmers').select('farmer_id, is_verified, is_active, specialty'),
+        // 2: All products
+        _client.from('v_products').select('product_id, is_active, stock_quantity, category_name, price'),
+        // 3: Orders with dates & amounts
+        _client.from('orders').select('order_id, total_amount, created_at').order('created_at', ascending: false),
+        // 4: Pending farmer registrations
+        _client.from('farmer_registrations').select('registration_id, status').eq('status', 'pending'),
+        // 5: Pending reported content
+        _client.from('reported_content').select('report_id, status').eq('status', 'pending'),
+        // 6: Active FCM device tokens
+        _client.from('user_device_tokens').select('token_id, is_active').eq('is_active', true),
+      ]);
+
+      final allUsers = (results[0] as List);
+      final allFarmers = (results[1] as List);
+      final allProducts = (results[2] as List);
+      final allOrders = (results[3] as List);
+      final pendingRegistrations = (results[4] as List);
+      final pendingReports = (results[5] as List);
+      final activeTokens = (results[6] as List);
+
+      // Revenue computations
+      double totalLifetimeRevenue = 0.0;
+      double revenueLast30Days = 0.0;
+      double revenuePrior30Days = 0.0;
+      int completedOrdersCount = allOrders.length;
+
+      for (var row in allOrders) {
+        final amount = (row['total_amount'] as num?)?.toDouble() ?? 0.0;
+        totalLifetimeRevenue += amount;
+
+        final createdAtStr = row['created_at']?.toString();
+        if (createdAtStr != null) {
+          final dt = DateTime.tryParse(createdAtStr);
+          if (dt != null) {
+            if (dt.isAfter(last30Days)) {
+              revenueLast30Days += amount;
+            } else if (dt.isAfter(prior30Days)) {
+              revenuePrior30Days += amount;
+            }
+          }
+        }
+      }
+
+      // Compute Revenue Trend % vs prior 30 days
+      double revenueGrowthPercent = 0.0;
+      if (revenuePrior30Days > 0) {
+        revenueGrowthPercent = ((revenueLast30Days - revenuePrior30Days) / revenuePrior30Days) * 100;
+      } else if (revenueLast30Days > 0) {
+        revenueGrowthPercent = 100.0;
+      }
+
+      final double avgOrderValue = completedOrdersCount > 0
+          ? totalLifetimeRevenue / completedOrdersCount
+          : 0.0;
+
+      // Farmer breakdown
+      final totalFarmers = allFarmers.length;
+      final verifiedFarmers = allFarmers.where((f) => f['is_verified'] == true).length;
+      final pendingFarmers = pendingRegistrations.length;
+
+      // Product breakdown
+      final totalProducts = allProducts.length;
+      final activeProducts = allProducts.where((p) => p['is_active'] == true).length;
+      final outOfStockProducts = allProducts.where((p) => (p['stock_quantity'] as num? ?? 0) <= 0).length;
+
+      // Category breakdown
+      final Map<String, int> categoryCount = {};
+      for (var p in allProducts) {
+        final cat = (p['category_name'] ?? 'General Produce').toString();
+        categoryCount[cat] = (categoryCount[cat] ?? 0) + 1;
+      }
+
+      final List<Map<String, dynamic>> categoryShare = categoryCount.entries.map((e) {
+        final pct = totalProducts > 0 ? (e.value / totalProducts * 100).round() : 0;
+        return {
+          'category': e.key,
+          'count': e.value,
+          'percentage': pct,
+        };
+      }).toList();
+
+      return {
+        'total_revenue': totalLifetimeRevenue,
+        'revenue_last_30d': revenueLast30Days,
+        'revenue_growth_pct': revenueGrowthPercent,
+        'completed_orders': completedOrdersCount,
+        'avg_order_value': avgOrderValue,
+        'total_users': allUsers.length,
+        'total_farmers': totalFarmers,
+        'verified_farmers': verifiedFarmers,
+        'pending_farmers': pendingFarmers,
+        'total_products': totalProducts,
+        'active_products': activeProducts,
+        'out_of_stock_products': outOfStockProducts,
+        'pending_verifications': pendingFarmers,
+        'pending_reports': pendingReports.length,
+        'active_devices_count': activeTokens.length,
+        'category_share': categoryShare,
+      };
+    } catch (e) {
+      debugPrint('Error loading executive dashboard metrics: $e');
+      return {};
+    }
+  }
+
+  /// Get advanced multi-range sales trends with daily spots, period totals, and peak day
+  Future<Map<String, dynamic>> getEnhancedSalesAnalytics(String range) async {
+    try {
+      int days = 30;
+      if (range == '7D') {
+        days = 7;
+      } else if (range == '30D') {
+        days = 30;
+      } else if (range == '90D') {
+        days = 90;
+      } else if (range == '1Y') {
+        days = 365;
+      }
+
+      final now = DateTime.now();
+      final cutoffDate = now.subtract(Duration(days: days));
+
+      final response = await _client
+          .from('orders')
+          .select('order_id, total_amount, created_at')
+          .gte('created_at', cutoffDate.toIso8601String())
+          .order('created_at', ascending: true);
+
+      final orders = List<Map<String, dynamic>>.from(response);
+
+      final Map<String, double> dailyRevenue = {};
+      final Map<String, int> dailyOrders = {};
+
+      for (int i = days; i >= 0; i--) {
+        final d = now.subtract(Duration(days: i));
+        final key = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+        dailyRevenue[key] = 0.0;
+        dailyOrders[key] = 0;
+      }
+
+      double periodTotalRevenue = 0.0;
+      double peakAmount = 0.0;
+      String peakDate = '';
+
+      for (var order in orders) {
+        final createdStr = (order['created_at'] ?? '').toString();
+        if (createdStr.length >= 10) {
+          final dateKey = createdStr.substring(0, 10);
+          final amount = (order['total_amount'] as num?)?.toDouble() ?? 0.0;
+          periodTotalRevenue += amount;
+
+          dailyRevenue[dateKey] = (dailyRevenue[dateKey] ?? 0.0) + amount;
+          dailyOrders[dateKey] = (dailyOrders[dateKey] ?? 0) + 1;
+
+          if (dailyRevenue[dateKey]! > peakAmount) {
+            peakAmount = dailyRevenue[dateKey]!;
+            peakDate = dateKey;
+          }
+        }
+      }
+
+      final sortedKeys = dailyRevenue.keys.toList()..sort();
+      final List<Map<String, dynamic>> timeline = [];
+      for (int i = 0; i < sortedKeys.length; i++) {
+        timeline.add({
+          'index': i.toDouble(),
+          'date': sortedKeys[i],
+          'revenue': dailyRevenue[sortedKeys[i]] ?? 0.0,
+          'orders': dailyOrders[sortedKeys[i]] ?? 0,
+        });
+      }
+
+      return {
+        'timeline': timeline,
+        'period_revenue': periodTotalRevenue,
+        'period_orders': orders.length,
+        'peak_date': peakDate,
+        'peak_amount': peakAmount,
+        'average_daily': sortedKeys.isNotEmpty ? periodTotalRevenue / sortedKeys.length : 0.0,
+      };
+    } catch (e) {
+      debugPrint('Error loading enhanced sales analytics: $e');
+      return {
+        'timeline': <Map<String, dynamic>>[],
+        'period_revenue': 0.0,
+        'period_orders': 0,
+        'peak_date': '',
+        'peak_amount': 0.0,
+        'average_daily': 0.0,
+      };
+    }
+  }
+
+  /// Universal platform search across farmers, customers, products, and orders
+  Future<Map<String, List<Map<String, dynamic>>>> searchPlatformUniversal(String query) async {
+    final clean = query.trim();
+    if (clean.isEmpty) {
+      return {'farmers': [], 'users': [], 'products': [], 'orders': []};
+    }
+
+    try {
+      final results = await Future.wait([
+        // Farmers
+        _client
+            .from('farmers')
+            .select('farmer_id, farm_name, specialty, is_verified')
+            .or('farm_name.ilike.%$clean%,specialty.ilike.%$clean%')
+            .limit(5),
+        // Users
+        _client
+            .from('users')
+            .select('user_id, name, email, phone')
+            .or('name.ilike.%$clean%,email.ilike.%$clean%,phone.ilike.%$clean%')
+            .limit(5),
+        // Products
+        _client
+            .from('v_products')
+            .select('product_id, title, price, category_name, stock_quantity')
+            .or('title.ilike.%$clean%,category_name.ilike.%$clean%')
+            .limit(5),
+        // Orders
+        _client
+            .from('orders')
+            .select('order_id, total_amount, created_at')
+            .ilike('order_id', '%$clean%')
+            .limit(5),
+      ]);
+
+      return {
+        'farmers': List<Map<String, dynamic>>.from(results[0] as List),
+        'users': List<Map<String, dynamic>>.from(results[1] as List),
+        'products': List<Map<String, dynamic>>.from(results[2] as List),
+        'orders': List<Map<String, dynamic>>.from(results[3] as List),
+      };
+    } catch (e) {
+      debugPrint('Error searching platform: $e');
+      return {'farmers': [], 'users': [], 'products': [], 'orders': []};
+    }
+  }
+
+  String _formatCsvDate(dynamic rawDate) {
+    if (rawDate == null) return '';
+    final str = rawDate.toString();
+    try {
+      final dt = DateTime.parse(str).toLocal();
+      final y = dt.year;
+      final m = dt.month.toString().padLeft(2, '0');
+      final d = dt.day.toString().padLeft(2, '0');
+      final h = dt.hour.toString().padLeft(2, '0');
+      final min = dt.minute.toString().padLeft(2, '0');
+      return '$y-$m-$d $h:$min';
+    } catch (_) {
+      return str.length > 16 ? str.substring(0, 16).replaceAll('T', ' ') : str;
+    }
+  }
+
+  String _csvCell(dynamic value) {
+    if (value == null) return '""';
+    final s = value.toString().replaceAll('"', '""');
+    return '"$s"';
+  }
+
+  /// Generates a professional, beautifully aligned CSV formatted report
+  Future<String> generatePlatformCsvReport() async {
+    final counts = await getExecutiveDashboardMetrics();
+    final orders = await _client
+        .from('orders')
+        .select('order_id, total_amount, created_at')
+        .order('created_at', ascending: false)
+        .limit(100);
+
+    final farmers = await _client
+        .from('farmers')
+        .select('farmer_id, farm_name, specialty, is_verified, is_active')
+        .limit(100);
+
+    final products = await _client
+        .from('v_products')
+        .select('product_id, title, price, category_name, stock_quantity, is_active')
+        .limit(100);
+
+    final nowStr = _formatCsvDate(DateTime.now());
+    final buffer = StringBuffer();
+
+    // 1. Title Block
+    buffer.writeln('${_csvCell("AGRIDIRECT ENTERPRISE PLATFORM EXECUTIVE REPORT")},,,,');
+    buffer.writeln('${_csvCell("Generated: $nowStr")},${_csvCell("Environment: Production")},${_csvCell("Status: Fully Operational")},,');
+    buffer.writeln(',,,,');
+
+    // 2. Executive KPI Table (5 Columns)
+    buffer.writeln('${_csvCell("SECTION 1: EXECUTIVE KEY PERFORMANCE INDICATORS")},,,,');
+    buffer.writeln('${_csvCell("METRIC CATEGORY")},${_csvCell("KEY INDICATOR")},${_csvCell("VALUE")},${_csvCell("UNIT")},${_csvCell("BENCHMARK / NOTES")}');
+    
+    final lifetimeRev = ((counts['total_revenue'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(2);
+    final monthRev = ((counts['revenue_last_30d'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(2);
+    final growthPct = ((counts['revenue_growth_pct'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(1);
+    final totalOrders = counts['completed_orders'] ?? 0;
+    final aov = ((counts['avg_order_value'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(2);
+    final verifiedFarmers = counts['verified_farmers'] ?? 0;
+    final totalFarmers = counts['total_farmers'] ?? 0;
+    final activeProducts = counts['active_products'] ?? 0;
+    final outOfStock = counts['out_of_stock_products'] ?? 0;
+    final activeDevices = counts['active_devices_count'] ?? 0;
+
+    buffer.writeln('${_csvCell("Financials")},${_csvCell("Total Lifetime Gross Revenue")},${_csvCell(lifetimeRev)},${_csvCell("PHP")},${_csvCell("All completed transactions")}');
+    buffer.writeln('${_csvCell("Financials")},${_csvCell("30-Day Gross Revenue")},${_csvCell(monthRev)},${_csvCell("PHP")},${_csvCell("$growthPct% vs prior 30 days")}');
+    buffer.writeln('${_csvCell("Financials")},${_csvCell("Average Order Value (AOV)")},${_csvCell(aov)},${_csvCell("PHP")},${_csvCell("Across all categories")}');
+    buffer.writeln('${_csvCell("Operations")},${_csvCell("Total Completed Orders")},${_csvCell(totalOrders)},${_csvCell("Orders")},${_csvCell("Lifetime fulfilled")}');
+    buffer.writeln('${_csvCell("Supply Chain")},${_csvCell("Verified Farmers")},${_csvCell(verifiedFarmers)},${_csvCell("Farmers")},${_csvCell("$totalFarmers total registered")}');
+    buffer.writeln('${_csvCell("Catalog")},${_csvCell("Active Products Listed")},${_csvCell(activeProducts)},${_csvCell("Items")},${_csvCell("$outOfStock out of stock")}');
+    buffer.writeln('${_csvCell("Technology")},${_csvCell("Active Push Devices (FCM)")},${_csvCell(activeDevices)},${_csvCell("Devices")},${_csvCell("Push notifications ready")}');
+    buffer.writeln(',,,,');
+
+    // 3. Recent Orders Table (5 Columns)
+    buffer.writeln('${_csvCell("SECTION 2: RECENT ORDERS LOG (LATEST 100)")},,,,');
+    buffer.writeln('${_csvCell("ORDER REF")},${_csvCell("AMOUNT (PHP)")},${_csvCell("TRANSACTION DATE")},${_csvCell("TIME")},${_csvCell("ORDER UUID")}');
+    for (var o in (orders as List)) {
+      final rawId = (o['order_id'] ?? '').toString();
+      final shortRef = rawId.length >= 8 ? 'ORD-${rawId.substring(0, 8).toUpperCase()}' : 'ORD-$rawId';
+      final amount = ((o['total_amount'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(2);
+      final rawDate = o['created_at']?.toString() ?? '';
+      final formattedDate = _formatCsvDate(rawDate);
+      final dateParts = formattedDate.split(' ');
+      final dStr = dateParts.isNotEmpty ? dateParts[0] : '';
+      final tStr = dateParts.length > 1 ? dateParts[1] : '';
+
+      buffer.writeln('${_csvCell(shortRef)},${_csvCell(amount)},${_csvCell(dStr)},${_csvCell(tStr)},${_csvCell(rawId)}');
+    }
+    buffer.writeln(',,,,');
+
+    // 4. Farmers Directory Table (5 Columns)
+    buffer.writeln('${_csvCell("SECTION 3: FARMER DIRECTORY & SUPPLY PARTNERS")},,,,');
+    buffer.writeln('${_csvCell("FARM NAME")},${_csvCell("CROP SPECIALTY")},${_csvCell("VERIFIED STATUS")},${_csvCell("ACCOUNT STATE")},${_csvCell("FARMER UUID")}');
+    for (var f in (farmers as List)) {
+      final farmName = (f['farm_name'] ?? 'Local Farm').toString().trim();
+      final specialty = (f['specialty'] ?? 'Organic Produce').toString().trim();
+      final isVerified = f['is_verified'] == true ? 'VERIFIED' : 'PENDING';
+      final isActive = f['is_active'] == true ? 'ACTIVE' : 'INACTIVE';
+      final farmerId = (f['farmer_id'] ?? '').toString();
+
+      buffer.writeln('${_csvCell(farmName)},${_csvCell(specialty)},${_csvCell(isVerified)},${_csvCell(isActive)},${_csvCell(farmerId)}');
+    }
+    buffer.writeln(',,,,');
+
+    // 5. Product Catalog Summary (5 Columns)
+    buffer.writeln('${_csvCell("SECTION 4: MARKETPLACE PRODUCE CATALOG")},,,,');
+    buffer.writeln('${_csvCell("PRODUCT TITLE")},${_csvCell("CATEGORY")},${_csvCell("PRICE (PHP)")},${_csvCell("STOCK LEVEL")},${_csvCell("AVAILABILITY")}');
+    for (var p in (products as List)) {
+      final title = (p['title'] ?? 'Produce').toString().trim();
+      final cat = (p['category_name'] ?? 'Vegetables').toString().trim();
+      final price = ((p['price'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(2);
+      final stock = (p['stock_quantity'] as num? ?? 0).toInt();
+      final avail = (p['is_active'] == true && stock > 0) ? 'IN STOCK' : (stock <= 0 ? 'OUT OF STOCK' : 'INACTIVE');
+
+      buffer.writeln('${_csvCell(title)},${_csvCell(cat)},${_csvCell(price)},${_csvCell(stock.toString())},${_csvCell(avail)}');
+    }
+
+    return buffer.toString();
+  }
+
+  /// Exports pure tabular Orders CSV
+  Future<String> generateOrdersOnlyCsv() async {
+    final orders = await _client
+        .from('orders')
+        .select('order_id, total_amount, created_at')
+        .order('created_at', ascending: false)
+        .limit(500);
+
+    final buffer = StringBuffer();
+    buffer.writeln('${_csvCell("ORDER REF")},${_csvCell("AMOUNT (PHP)")},${_csvCell("DATE")},${_csvCell("TIME")},${_csvCell("RAW ORDER ID")}');
+    for (var o in (orders as List)) {
+      final rawId = (o['order_id'] ?? '').toString();
+      final shortRef = rawId.length >= 8 ? 'ORD-${rawId.substring(0, 8).toUpperCase()}' : 'ORD-$rawId';
+      final amount = ((o['total_amount'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(2);
+      final formattedDate = _formatCsvDate(o['created_at']);
+      final parts = formattedDate.split(' ');
+      final dStr = parts.isNotEmpty ? parts[0] : '';
+      final tStr = parts.length > 1 ? parts[1] : '';
+
+      buffer.writeln('${_csvCell(shortRef)},${_csvCell(amount)},${_csvCell(dStr)},${_csvCell(tStr)},${_csvCell(rawId)}');
+    }
+    return buffer.toString();
+  }
+
   /// Get sales trends data from the database
   Future<List<Map<String, dynamic>>> getSalesTrends(String range) async {
     try {
@@ -2859,16 +3561,66 @@ class AdminService extends ChangeNotifier {
         _client.from('v_products').select('product_id'),
         _client.from('v_products').select('product_id').eq('is_active', true),
         _client.from('v_products').select('product_id').eq('stock_quantity', 0),
+        _client.from('v_products').select('product_id').eq('is_preorder', true),
+        _client.from('v_products').select('product_id').eq('is_featured', true),
       ]);
 
       return {
         'total': (results[0] as List).length,
         'active': (results[1] as List).length,
         'out_of_stock': (results[2] as List).length,
+        'preorder': (results[3] as List).length,
+        'featured': (results[4] as List).length,
       };
     } catch (e) {
       debugPrint('Error getting product metrics: $e');
-      return {'total': 0, 'active': 0, 'out_of_stock': 0};
+      return {'total': 0, 'active': 0, 'out_of_stock': 0, 'preorder': 0, 'featured': 0};
+    }
+  }
+
+  /// Toggle product active visibility status
+  Future<bool> toggleProductActiveStatus(String productId, bool isActive) async {
+    try {
+      await _client
+          .from('products')
+          .update({
+            'is_active': isActive,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('product_id', productId);
+      await _logAdminAction(
+        isActive ? 'activate_product' : 'deactivate_product',
+        isActive ? 'Activated product visibility' : 'Deactivated product visibility',
+        'Product ID: $productId',
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to toggle product status: $e';
+      return false;
+    }
+  }
+
+  /// Update product inventory / stock
+  Future<bool> updateProductStock(String productId, int newStock) async {
+    try {
+      await _client
+          .from('products')
+          .update({
+            'stock_quantity': newStock,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('product_id', productId);
+      await _logAdminAction(
+        'update_product_stock',
+        'Updated stock to $newStock',
+        'Product ID: $productId, Stock: $newStock',
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to update product stock: $e';
+      return false;
     }
   }
 

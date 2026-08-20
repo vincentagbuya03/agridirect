@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/supabase_config.dart';
 
 /// OTP (One-Time Password) Service - Professional 3NF Logic
@@ -175,6 +176,82 @@ class OTPService {
     } catch (e) {
       debugPrint('❌ Error getting OTP time remaining: $e');
       return null;
+    }
+  }
+
+  /// Format phone number to international E.164 format (+63...)
+  static String formatPhoneNumber(String phone) {
+    var cleaned = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    if (cleaned.startsWith('09') && cleaned.length == 11) {
+      cleaned = '+63${cleaned.substring(1)}';
+    } else if (cleaned.startsWith('9') && cleaned.length == 10) {
+      cleaned = '+63$cleaned';
+    } else if (cleaned.startsWith('63') && !cleaned.startsWith('+')) {
+      cleaned = '+$cleaned';
+    } else if (!cleaned.startsWith('+') && cleaned.isNotEmpty) {
+      cleaned = '+$cleaned';
+    }
+    return cleaned;
+  }
+
+  /// Send Phone OTP via Supabase Auth (Free with Test Numbers or SMS provider)
+  Future<Map<String, dynamic>> sendPhoneOTP(String phoneNumber) async {
+    try {
+      final formattedPhone = formatPhoneNumber(phoneNumber);
+      debugPrint('📱 Sending Supabase Phone OTP to: $formattedPhone');
+
+      await _client.auth.signInWithOtp(
+        phone: formattedPhone,
+      );
+
+      return {
+        'success': true,
+        'message': 'OTP sent successfully to $formattedPhone',
+        'phone': formattedPhone,
+      };
+    } catch (e) {
+      debugPrint('❌ Error sending Phone OTP: $e');
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Verify 6-digit Phone OTP via Supabase Auth
+  Future<Map<String, dynamic>> verifyPhoneOTP({
+    required String phoneNumber,
+    required String otpCode,
+  }) async {
+    try {
+      final formattedPhone = formatPhoneNumber(phoneNumber);
+      debugPrint('🔑 Verifying Phone OTP for: $formattedPhone with code: $otpCode');
+
+      final AuthResponse response = await _client.auth.verifyOTP(
+        phone: formattedPhone,
+        token: otpCode.trim(),
+        type: OtpType.sms,
+      );
+
+      if (response.user != null) {
+        return {
+          'success': true,
+          'message': 'Phone verified successfully',
+          'user': response.user,
+          'session': response.session,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': 'Verification failed: User not found',
+      };
+    } catch (e) {
+      debugPrint('❌ Error verifying Phone OTP: $e');
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
     }
   }
 }

@@ -18,6 +18,10 @@ class AppRoutes {
   static const String call = '/call';
   static const String loading = '/loading';
   static const String productDetails = '/product-details';
+  static const String productBase = '/product';
+  static String product(String id) => '$productBase/$id';
+  static const String preorderBase = '/preorder';
+  static String preorder(String id) => '$preorderBase/$id';
   static const String articleDetails = '/article-details';
   static const String mfaChallenge = '/mfa-challenge';
 
@@ -45,6 +49,9 @@ class AppRoutes {
   static const String accountActivity = '/account-activity';
   static const String manageDevice = '/manage-device';
   static const String kikoAiChat = '/kiko-ai-chat';
+  static const String termsOfService = '/terms-of-service';
+  static const String privacyPolicy = '/privacy-policy';
+  static const String communityRules = '/community-rules';
   // Web-specific
   static const String webWelcome = '/web-welcome';
   static const String articles = '/articles';

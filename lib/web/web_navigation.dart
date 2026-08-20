@@ -12,7 +12,6 @@ import 'screens/farmer/web_community_hub.dart';
 import 'screens/farmer/web_farmer_preorders_tab.dart';
 import 'screens/consumer/web_profile_screen.dart';
 import 'screens/auth/web_login_screen.dart';
-import 'screens/admin/admin_dashboard_redesigned.dart';
 
 class WebNavigation extends StatefulWidget {
   final VoidCallback onLogout;
@@ -144,13 +143,7 @@ class _WebNavigationState extends State<WebNavigation> {
       return Scaffold(body: AppOpenBanner(child: screens[_currentIndex]));
     }
 
-    // If user is admin, show admin dashboard
-    if (_auth.isAdmin) {
-      debugPrint('   → Showing admin dashboard');
-      return AdminDashboardRedesigned(onLogout: widget.onLogout);
-    }
-
-    debugPrint('   → Showing customer dashboard (current tab: $_currentIndex)');
+    debugPrint('   → Showing consumer dashboard (current tab: $_currentIndex, isAdmin: ${_auth.isAdmin})');
     final screens = _screens;
 
     if (_currentIndex >= screens.length) {

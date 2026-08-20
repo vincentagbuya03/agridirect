@@ -1841,11 +1841,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                         crossAxisCount: crossAxisCount,
                         mainAxisSpacing: 14,
                         crossAxisSpacing: 14,
-                        childAspectRatio: width < 550
-                            ? 0.70
-                            : (width < 800
-                                  ? 0.74
-                                  : (width < 1100 ? 0.78 : 0.82)),
+                        mainAxisExtent: 280,
                       ),
                       itemCount: displayProducts.length,
                       itemBuilder: (context, i) {
@@ -1907,7 +1903,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
               Stack(
                 children: [
                   Container(
-                    height: 110,
+                    height: 152,
                     width: double.infinity,
                     decoration: const BoxDecoration(
                       borderRadius: BorderRadius.vertical(
@@ -2316,7 +2312,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                         crossAxisCount: crossAxisCount,
                         mainAxisSpacing: 16,
                         crossAxisSpacing: 16,
-                        childAspectRatio: 1.30,
+                        mainAxisExtent: 258,
                       ),
                       itemCount: farmers.take(6).length,
                       itemBuilder: (context, i) {
@@ -2425,7 +2421,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
               children: [
                 // Cover Banner + Farmer Avatar overlay
                 SizedBox(
-                  height: 90,
+                  height: 115,
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [

@@ -411,9 +411,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           ),
           const SizedBox(height: 12),
           _buildListAction(Icons.help_outline_rounded, 'Help Center', () => context.push(AppRoutes.helpCenter)),
-          _buildListAction(Icons.description_outlined, 'Terms of Service', () {}),
-          _buildListAction(Icons.privacy_tip_outlined, 'Privacy Policy', () {}),
-          _buildListAction(Icons.policy_outlined, 'Community Rules', () {}),
+          _buildListAction(Icons.description_outlined, 'Terms of Service', () => context.push(AppRoutes.termsOfService)),
+          _buildListAction(Icons.privacy_tip_outlined, 'Privacy Policy', () => context.push(AppRoutes.privacyPolicy)),
+          _buildListAction(Icons.policy_outlined, 'Community Rules', () => context.push(AppRoutes.communityRules)),
           _buildListAction(
             Icons.logout_rounded, 
             'Log Out', 

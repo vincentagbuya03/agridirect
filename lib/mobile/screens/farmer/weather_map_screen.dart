@@ -32,7 +32,7 @@ class _WeatherMapScreenState extends State<WeatherMapScreen> {
 
     final lat = widget.latitude.toStringAsFixed(4);
     final lon = widget.longitude.toStringAsFixed(4);
-    final mapUrl = 'https://embed.windy.com/embed2.html?lat=$lat&lon=$lon&detailLat=$lat&detailLon=$lon&zoom=8&level=surface&overlay=wind&product=ecmwf&menu=&message=&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1';
+    final mapUrl = 'https://embed.windy.com/embed2.html?lat=$lat&lon=$lon&detailLat=$lat&detailLon=$lon&zoom=8&level=surface&overlay=wind&product=ecmwf&menu=&message=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1';
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
