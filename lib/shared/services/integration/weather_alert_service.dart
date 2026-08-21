@@ -5,6 +5,7 @@ import '../auth/auth_service.dart';
 import '../core/supabase_config.dart';
 import '../community/notification_service.dart';
 import '../integration/weather_service.dart';
+import '../ai/ai_service.dart';
 import '../../models/weather_model.dart';
 
 /// Service to monitor weather conditions and notify users of bad weather
@@ -16,6 +17,7 @@ class WeatherAlertService {
   final _auth = AuthService();
   final _weather = WeatherService();
   final _notifications = NotificationService();
+  final _ai = AiService();
   bool _isChecking = false;
 
   /// Trigger a weather check and notify the user if conditions are bad
@@ -29,6 +31,7 @@ class WeatherAlertService {
       double? lat;
       double? lon;
       String locationName = 'your area';
+      String? specialty;
 
       if (_auth.isViewingAsFarmer || _auth.isSeller) {
         // For farmers, use their registered farm location
@@ -37,6 +40,7 @@ class WeatherAlertService {
           lat = (farmerProfile['farm_latitude'] as num?)?.toDouble();
           lon = (farmerProfile['farm_longitude'] as num?)?.toDouble();
           locationName = farmerProfile['farm_name'] ?? 'your farm';
+          specialty = farmerProfile['specialty']?.toString();
         }
       }
 
@@ -73,7 +77,12 @@ class WeatherAlertService {
       if (combinedAlerts.isNotEmpty) {
         for (final alert in combinedAlerts) {
           if (alert.severity >= 0.65) {
-            await _showWeatherNotification(alert, locationName);
+            await _showWeatherNotification(
+              alert,
+              locationName,
+              specialty: specialty,
+              weatherData: weatherData,
+            );
           }
         }
       }
@@ -147,28 +156,58 @@ class WeatherAlertService {
   /// Show a local notification for a weather alert and save to database
   Future<void> _showWeatherNotification(
     WeatherAlert alert,
-    String locationName,
-  ) async {
-    final title = '${alert.alertIcon} ${alert.title}';
+    String locationName, {
+    String? specialty,
+    WeatherData? weatherData,
+  }) async {
+    String finalTitle = '${alert.alertIcon} ${alert.title}';
+    String finalBody = alert.description;
+
+    // Enhance with OpenRouter AI description if weather data is available
+    if (weatherData != null) {
+      try {
+        final aiResult = await _ai
+            .generateWeatherPushDescription(
+              farmName: locationName,
+              specialty: specialty,
+              condition: weatherData.description,
+              temperature: weatherData.temperature,
+              rainProbability: alert.type == 'rain' || alert.type == 'storm' ? 0.75 : 0.2,
+              windSpeed: weatherData.windSpeed,
+              alertType: alert.type,
+            )
+            .timeout(const Duration(seconds: 4));
+
+        if (aiResult['title'] != null && aiResult['body'] != null) {
+          finalTitle = aiResult['title']!;
+          finalBody = aiResult['body']!;
+        }
+      } catch (e) {
+        debugPrint('AI Weather description fallback: $e');
+      }
+    }
+
     final now = DateTime.now();
-    final timeStr = '${now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour)}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
-    final body = '${alert.description}\nChecked at $timeStr for $locationName.';
+    final timeStr =
+        '${now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour)}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
+    final fullBodyText = '$finalBody\nChecked at $timeStr for $locationName.';
 
     // 1. Save to database for history
     if (_auth.userId.isNotEmpty) {
       await _notifications.insertNotification(
         userId: _auth.userId,
-        title: title,
-        content: body,
+        title: finalTitle,
+        content: fullBodyText,
         type: 'weather',
+        linkType: 'weather',
       );
     }
 
     // 2. Show local notification
     await _notifications.flutterLocalNotificationsPlugin.show(
       alert.hashCode,
-      title,
-      body,
+      finalTitle,
+      fullBodyText,
       NotificationDetails(
         android: AndroidNotificationDetails(
           NotificationService.channelId,
@@ -185,6 +224,7 @@ class WeatherAlertService {
           presentSound: true,
         ),
       ),
+      payload: 'weather:radar',
     );
   }
 }

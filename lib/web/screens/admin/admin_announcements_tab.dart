@@ -1,8 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
 import '../../../shared/services/admin/admin_service.dart';
-import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/services/ai/ai_service.dart';
 import 'admin_ui.dart';
 
 class AdminAnnouncementsTab extends StatefulWidget {
@@ -16,422 +17,585 @@ class AdminAnnouncementsTab extends StatefulWidget {
 class _AdminAnnouncementsTabState extends State<AdminAnnouncementsTab> {
   final _titleController = TextEditingController();
   final _messageController = TextEditingController();
+  final _imageUrlController = TextEditingController();
   final _targetUserIdController = TextEditingController();
   final _linkIdController = TextEditingController();
+  final _ai = AiService();
 
   String _audience = 'test_me'; // 'test_me', 'test_user', 'farmers', 'customers', 'farmers_customers'
-  String _linkType = 'flash_sale';
-  String _notificationCode = 'promo_weather_rain';
+  String _linkType = 'weather';
+  String _notificationCode = 'weather_dynamic';
   bool _sending = false;
   bool _scanningWeather = false;
-  Map<String, dynamic>? _lastResult;
-  Map<String, dynamic>? _lastWeatherScanResult;
-  String _selectedPresetId = 'rain_promo';
+  bool _generatingAi = false;
+  String _activeCampaignType = 'weather';
   bool _isIosPreview = false;
 
-  final List<Map<String, dynamic>> _presets = [
+  static const Color _primary = Color(0xFF059669);
+  static const Color _primaryDark = Color(0xFF047857);
+  static const Color _dark = Color(0xFF0F172A);
+  static const Color _muted = Color(0xFF64748B);
+  static const Color _border = Color(0xFFE2E8F0);
+  static const Color _surface = Color(0xFFF8FAFC);
+
+  final List<Map<String, String>> _dynamicAiCampaigns = [
+    {
+      'id': 'weather',
+      'label': '🌾 Live Weather & Typhoon AI',
+      'audience': 'farmers',
+      'linkType': 'weather',
+      'code': 'weather_dynamic',
+    },
     {
       'id': 'rain_promo',
-      'title': 'Stay cozy with fresh farm soup veggies! 🍲🌧️',
-      'body': '10% OFF hearty stew & root vegetable baskets today! 💚 Direct from local farms. Tap to check fresh harvest! 📲',
-      'code': 'promo_weather_rain',
+      'label': '🍲 Rainy Comfort Promo AI',
+      'audience': 'customers',
       'linkType': 'flash_sale',
-      'label': '🍲 Rainy Day Promo',
-      'category': 'Consumer Marketing',
-    },
-    {
-      'id': 'farmer_storm',
-      'title': '⚠️ Severe Storm Advisory for your farm',
-      'body': 'Storm conditions detected in your area. Secure loose farm structures, verify drainage, and protect mature crops. 🚜',
-      'code': 'weather_storm',
-      'linkType': 'weather',
-      'label': '⚠️ Storm Advisory',
-      'category': 'Farmer Weather Alert',
-    },
-    {
-      'id': 'farmer_rain',
-      'title': '🌧️ Farm Rain & Drainage Advisory',
-      'body': 'High chance of heavy rainfall in the next 12 hours. Ensure field drainage is clear and harvest ripe produce early.',
-      'code': 'weather_rain',
-      'linkType': 'weather',
-      'label': '🌧️ Rain Advisory',
-      'category': 'Farmer Weather Alert',
+      'code': 'promo_weather_rain',
     },
     {
       'id': 'flash_harvest',
-      'title': 'Fresh harvest alert! Sweet corn just arrived 🌽🚜',
-      'body': 'Nueva Ecija sweet corn is freshly harvested! 15% off for early bird pre-orders today. Tap to reserve a basket!',
-      'code': 'flash_sale',
+      'label': '🌽 Flash Harvest Drop AI',
+      'audience': 'customers',
       'linkType': 'flash_sale',
-      'label': '🌽 Flash Harvest Drop',
-      'category': 'Consumer Marketing',
+      'code': 'flash_sale',
     },
     {
       'id': 'market_demand',
-      'title': 'High buyer demand for Tomatoes! 🍅📈',
-      'body': 'Buyer inquiries in your province have surged. Tap to update your inventory and post available harvest crates.',
-      'code': 'market_demand',
+      'label': '🍅 Market Demand Surge AI',
+      'audience': 'farmers',
       'linkType': 'farmer_dashboard',
-      'label': '🍅 Market Demand Surge',
-      'category': 'Farmer Market Alert',
+      'code': 'market_demand',
     },
     {
       'id': 'da_advisory',
-      'title': '🌾 Department of Agriculture Advisory',
-      'body': 'New climate-resilient seed distribution schedule is now active. Check the community hub for participating centers.',
-      'code': 'advisory',
+      'label': '📢 DA Platform Notice AI',
+      'audience': 'farmers',
       'linkType': 'announcement',
-      'label': '📢 DA Platform Notice',
-      'category': 'Official Advisory',
+      'code': 'advisory',
     },
   ];
 
   final List<String> _quickEmojis = [
-    '🍲', '🌧️', '☔', '🌽', '🍅', '🥕', '⚠️', '⚡', '🚜', '🧺', '💚', '📲', '🌾', '☀️', '📦', '🔥',
+    '🍲',
+    '🌧️',
+    '☔',
+    '🌽',
+    '🍅',
+    '🥕',
+    '⚠️',
+    '⚡',
+    '🚜',
+    '🧺',
+    '💚',
+    '📲',
+    '🌾',
+    '☀️',
+    '📦',
+    '🔥',
   ];
 
   @override
   void initState() {
     super.initState();
-    _applyPreset(_presets.first);
+    // Default initial template without firing automatic API calls on tab open
+    _titleController.text = '🌾 Live Weather & Harvest Advisory';
+    _messageController.text =
+        'Fair weather conditions across San Carlos City farms today. Ideal for early morning harvest and crop transport.';
+    _imageUrlController.text =
+        'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&auto=format&fit=crop&q=80';
+    _titleController.addListener(() => setState(() {}));
+    _messageController.addListener(() => setState(() {}));
+    _imageUrlController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _titleController.dispose();
     _messageController.dispose();
+    _imageUrlController.dispose();
     _targetUserIdController.dispose();
     _linkIdController.dispose();
     super.dispose();
   }
 
-  void _applyPreset(Map<String, dynamic> preset) {
-    setState(() {
-      _selectedPresetId = preset['id'];
-      _titleController.text = preset['title'];
-      _messageController.text = preset['body'];
-      _notificationCode = preset['code'];
-      _linkType = preset['linkType'];
-      _linkIdController.clear();
-    });
-  }
+  Future<void> _triggerDynamicAiCampaign(Map<String, String> campaign) async {
+    final id = campaign['id']!;
+    setState(() => _activeCampaignType = id);
 
-  void _insertEmoji(String emoji) {
-    final text = _messageController.text;
-    final selection = _messageController.selection;
-    if (selection.start >= 0 && selection.end >= 0) {
-      final newText = text.replaceRange(selection.start, selection.end, emoji);
-      _messageController.value = TextEditingValue(
-        text: newText,
-        selection: TextSelection.collapsed(offset: selection.start + emoji.length),
-      );
-    } else {
-      _messageController.text += emoji;
+    if (id == 'weather') {
+      await _generateWithOpenRouter();
+      return;
     }
-    setState(() {});
-  }
 
-  Future<void> _triggerWeatherScan() async {
-    setState(() {
-      _scanningWeather = true;
-      _lastWeatherScanResult = null;
-    });
-
+    setState(() => _generatingAi = true);
     try {
-      final result = await widget.adminService.triggerDailyWeatherCheck();
-      if (!mounted) return;
-      setState(() => _lastWeatherScanResult = result);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AdminUi.brand,
-          content: Text(
-            '✅ Weather scan completed: ${result['checked'] ?? 0} farms evaluated, ${result['sent'] ?? 0} alerts dispatched.',
+      final res = await _ai.generateCampaignPush(
+        campaignType: id,
+        location: 'San Carlos City, Pangasinan',
+      );
+
+      String campaignImg =
+          'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&auto=format&fit=crop&q=80';
+      if (id == 'flash_harvest') {
+        campaignImg =
+            'https://images.unsplash.com/photo-1551754655-cd27e38d2076?w=600&auto=format&fit=crop&q=80';
+      } else if (id == 'market_demand') {
+        campaignImg =
+            'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&auto=format&fit=crop&q=80';
+      } else if (id == 'da_advisory') {
+        campaignImg =
+            'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&auto=format&fit=crop&q=80';
+      }
+
+      setState(() {
+        _titleController.text = res['title'] ?? '';
+        _messageController.text = res['body'] ?? '';
+        _imageUrlController.text = campaignImg;
+        _notificationCode = campaign['code'] ?? 'announcement';
+        _linkType = campaign['linkType'] ?? 'flash_sale';
+        _linkIdController.clear();
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: _primary,
+            behavior: SnackBarBehavior.floating,
+            content: Text('✨ Dynamically generated ${campaign['label']} with AI!'),
           ),
-        ),
-      );
+        );
+      }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AdminUi.danger,
-          content: Text('Weather scan failed: $e'),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            content: Text('AI Generation failed: $e'),
+          ),
+        );
+      }
     } finally {
-      if (mounted) setState(() => _scanningWeather = false);
+      if (mounted) setState(() => _generatingAi = false);
     }
   }
 
-  Future<void> _sendNotification() async {
+  Future<void> _showApiKeyDialog() async {
+    final keyCtrl = TextEditingController(
+      text: AiService.effectiveOpenRouterKey,
+    );
+    final newKey = await showDialog<String>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.key_rounded, color: _primary),
+            const SizedBox(width: 8),
+            Text('OpenRouter API Key', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enter your OpenRouter API key (sk-or-v1-...) to generate custom, live weather push notifications with free AI models directly in this browser session:',
+              style: GoogleFonts.inter(fontSize: 13, color: _muted),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: keyCtrl,
+              decoration: InputDecoration(
+                hintText: 'sk-or-v1-...',
+                hintStyle: GoogleFonts.inter(fontSize: 13, color: _muted),
+                prefixIcon: const Icon(Icons.lock_outline_rounded, size: 18, color: _muted),
+                filled: true,
+                fillColor: _surface,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _primary, width: 1.5)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(dialogCtx, keyCtrl.text.trim()),
+            child: const Text('Save Key'),
+          ),
+        ],
+      ),
+    );
+
+    if (newKey != null && newKey.isNotEmpty && mounted) {
+      AiService.runtimeOpenRouterKey = newKey;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: _primary,
+          behavior: SnackBarBehavior.floating,
+          content: Text('✅ OpenRouter API key saved for this session!'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _generateWithOpenRouter() async {
+    setState(() => _generatingAi = true);
+    try {
+      String condition = 'Partly Cloudy';
+      double temp = 30.0;
+      double rainProb = 0.2;
+      double windSpeed = 12.0;
+      String alertType = 'daily_summary';
+      String linkType = 'weather';
+      String code = 'weather_daily_summary';
+      const farmName = 'San Carlos City farms';
+
+      const apiKey = 'd519e73b738173d3d9a7bd5737ea3992';
+      try {
+        final url = Uri.parse(
+          'https://api.openweathermap.org/data/2.5/forecast?lat=15.9224&lon=120.3489&units=metric&appid=$apiKey',
+        );
+        final res = await http.get(url);
+        if (res.statusCode == 200) {
+          final data = jsonDecode(utf8.decode(res.bodyBytes));
+          final list = (data['list'] as List?) ?? [];
+          final first = list.isNotEmpty ? list[0] : null;
+
+          if (first != null) {
+            final main = first['main'] ?? {};
+            final weather = (first['weather'] as List?)?.first ?? {};
+            final wind = first['wind'] ?? {};
+
+            temp = (main['temp'] as num?)?.toDouble() ?? 29.0;
+            condition = weather['description']?.toString() ?? 'Partly Cloudy';
+            final weatherId = (weather['id'] as num?)?.toInt() ?? 800;
+            rainProb = (first['pop'] as num?)?.toDouble() ?? 0.0;
+            windSpeed = ((wind['speed'] as num?)?.toDouble() ?? 3.0) * 3.6;
+
+            double maxWind = windSpeed;
+            double maxRainProb = rainProb;
+            bool hasSevereStorm = (weatherId >= 200 && weatherId <= 232);
+            bool isTyphoon = condition.toLowerCase().contains('typhoon') ||
+                condition.toLowerCase().contains('tropical storm') ||
+                condition.toLowerCase().contains('cyclone') ||
+                condition.toLowerCase().contains('squall') ||
+                condition.toLowerCase().contains('gale');
+
+            for (int i = 0; i < (list.length < 12 ? list.length : 12); i++) {
+              final item = list[i];
+              final itemWind = ((item['wind']?['speed'] as num?)?.toDouble() ?? 0.0) * 3.6;
+              final itemPop = (item['pop'] as num?)?.toDouble() ?? 0.0;
+              final itemWId = (item['weather']?[0]?['id'] as num?)?.toInt() ?? 800;
+              final itemDesc = (item['weather']?[0]?['description']?.toString() ?? '').toLowerCase();
+
+              if (itemWind > maxWind) maxWind = itemWind;
+              if (itemPop > maxRainProb) maxRainProb = itemPop;
+              if (itemWId >= 200 && itemWId <= 232) hasSevereStorm = true;
+              if (itemDesc.contains('typhoon') ||
+                  itemDesc.contains('cyclone') ||
+                  itemDesc.contains('tropical storm')) {
+                isTyphoon = true;
+              }
+            }
+
+            if (isTyphoon || maxWind >= 45.0 || hasSevereStorm) {
+              alertType = 'storm';
+              code = 'weather_storm_warning';
+              linkType = 'weather';
+            } else if (maxRainProb >= 0.6) {
+              alertType = 'rain';
+              code = 'weather_heavy_rain';
+              linkType = 'weather';
+            } else if (temp >= 36.0) {
+              alertType = 'heat';
+              code = 'weather_extreme_heat';
+              linkType = 'weather';
+            }
+          }
+        }
+      } catch (_) {}
+
+      final aiRes = await _ai.generateWeatherPush(
+        farmName: farmName,
+        condition: condition,
+        temperature: temp,
+        rainProbability: rainProb,
+        windSpeed: windSpeed,
+        alertType: alertType,
+        targetAudience: 'farmers',
+      );
+
+      String aiImg =
+          'https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=600&auto=format&fit=crop&q=80';
+      if (alertType == 'storm') {
+        aiImg =
+            'https://images.unsplash.com/photo-1514632595-4944383f2737?w=600&auto=format&fit=crop&q=80';
+      } else if (alertType == 'rain') {
+        aiImg =
+            'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=600&auto=format&fit=crop&q=80';
+      }
+
+      setState(() {
+        _titleController.text = aiRes['title'] ?? '';
+        _messageController.text = aiRes['body'] ?? '';
+        _imageUrlController.text = aiImg;
+        _notificationCode = code;
+        _linkType = linkType;
+        _linkIdController.clear();
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: _primary,
+            behavior: SnackBarBehavior.floating,
+            content: Text('✨ Live OpenWeather + AI Push copy updated!'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            content: Text('OpenRouter AI generation failed: $e'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _generatingAi = false);
+    }
+  }
+
+  Future<void> _sendPushNotification() async {
     final title = _titleController.text.trim();
     final message = _messageController.text.trim();
     if (title.isEmpty || message.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Title and message are required.')),
+        const SnackBar(
+          content: Text('Please enter both title and message.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
 
-    // Confirmation if broadcasting to all or farmers
-    if (_audience == 'farmers' || _audience == 'customers' || _audience == 'farmers_customers') {
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: AdminUi.radiusMd),
-          title: Row(
-            children: [
-              const Icon(Icons.campaign_rounded, color: AdminUi.brand),
-              const SizedBox(width: 10),
-              Text('Confirm Broadcast Push', style: AdminUi.title(size: 18)),
-            ],
-          ),
-          content: Text(
-            'Are you sure you want to broadcast this push notification to ${_audience.replaceAll('_', ' ').toUpperCase()}?\n\nThis will be delivered to active devices immediately.',
-            style: AdminUi.body(size: 14),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text('Cancel', style: AdminUi.body(color: AdminUi.textMuted)),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              style: AdminUi.primaryButton,
-              child: const Text('Confirm & Send'),
-            ),
-          ],
-        ),
-      );
-      if (confirm != true) return;
-    }
-
     setState(() {
       _sending = true;
-      _lastResult = null;
     });
 
     try {
-      Map<String, dynamic> result;
-      if (_audience == 'test_me') {
-        final currentAdminId = AuthService().userId.isNotEmpty
-            ? AuthService().userId
-            : Supabase.instance.client.auth.currentUser?.id;
+      final res = await widget.adminService.sendPushNotification(
+        title: title,
+        message: message,
+        audience: _audience,
+        targetUserId: _targetUserIdController.text.trim().isEmpty
+            ? null
+            : _targetUserIdController.text.trim(),
+        imageUrl: _imageUrlController.text.trim().isEmpty
+            ? null
+            : _imageUrlController.text.trim(),
+        linkType: _linkType,
+        linkId: _linkIdController.text.trim().isEmpty
+            ? null
+            : _linkIdController.text.trim(),
+        notificationCode: _notificationCode,
+      );
 
-        if (currentAdminId == null || currentAdminId.isEmpty) {
-          throw Exception('Could not determine current admin user ID.');
-        }
-
-        result = await widget.adminService.sendTestPushNotification(
-          targetUserId: currentAdminId,
-          title: title,
-          body: message,
-          notificationCode: _notificationCode,
-          linkType: _linkType,
-          linkId: _linkIdController.text.trim().isNotEmpty ? _linkIdController.text.trim() : null,
-        );
-      } else if (_audience == 'test_user') {
-        final targetId = _targetUserIdController.text.trim();
-        if (targetId.isEmpty) {
-          throw Exception('Please enter a Target User ID.');
-        }
-        result = await widget.adminService.sendTestPushNotification(
-          targetUserId: targetId,
-          title: title,
-          body: message,
-          notificationCode: _notificationCode,
-          linkType: _linkType,
-          linkId: _linkIdController.text.trim().isNotEmpty ? _linkIdController.text.trim() : null,
-        );
-      } else {
-        result = await widget.adminService.sendCustomPushNotification(
-          audience: _audience,
-          title: title,
-          body: message,
-          notificationCode: _notificationCode,
-          linkType: _linkType,
-          linkId: _linkIdController.text.trim().isNotEmpty ? _linkIdController.text.trim() : null,
+      if (mounted) {
+        final success = res['success'] == true;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? '🚀 Notification sent! ${res['fcm_sent_count'] ?? 0} devices notified.'
+                  : '⚠️ Failed: ${res['error'] ?? 'Unknown error'}',
+            ),
+            backgroundColor: success ? _primary : Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
-
-      if (!mounted) return;
-      setState(() => _lastResult = result);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AdminUi.brand,
-          content: Text(
-            _audience.startsWith('test')
-                ? '✅ Test push sent successfully!'
-                : '✅ Campaign push dispatched to audience.',
-          ),
-        ),
-      );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AdminUi.danger,
-          content: Text(widget.adminService.errorMessage ?? 'Failed to send: $e'),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating),
+        );
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }
   }
 
+  Future<void> _runWeatherScanNow() async {
+    setState(() => _scanningWeather = true);
+    try {
+      final res = await widget.adminService.runWeatherForecastScan();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              res['success'] == true
+                  ? '⚡ Weather Scan Complete! ${res['alerts_dispatched'] ?? 0} farm alerts dispatched.'
+                  : '⚠️ Scan error: ${res['error']}',
+            ),
+            backgroundColor: res['success'] == true ? _primary : Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Weather Scan failed: $e'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _scanningWeather = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AdminDashboardHeader(
-          title: 'Push Studio & Weather Hub',
-          subtitle: 'Automated weather notifications, contextual marketing campaigns, and real-time push testing.',
-          actions: [
-            OutlinedButton.icon(
-              onPressed: _scanningWeather ? null : _triggerWeatherScan,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AdminUi.brand,
-                side: const BorderSide(color: AdminUi.brand),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: AdminUi.radiusSm),
-              ),
-              icon: _scanningWeather
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AdminUi.brand),
-                    )
-                  : const Icon(Icons.cloud_sync_rounded, size: 18),
-              label: Text(_scanningWeather ? 'Scanning...' : 'Trigger Weather Scan'),
-            ),
-            const SizedBox(width: 12),
-            ElevatedButton.icon(
-              onPressed: _sending ? null : _sendNotification,
-              style: AdminUi.primaryButton,
-              icon: _sending
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : Icon(
-                      _audience.startsWith('test') ? Icons.send_to_mobile_rounded : Icons.campaign_rounded,
-                      size: 18,
-                    ),
-              label: Text(
-                _sending
-                    ? 'Processing...'
-                    : _audience.startsWith('test')
-                        ? 'Send Test Push'
-                        : 'Broadcast Push',
-              ),
-            ),
-          ],
-        ),
+    final sw = MediaQuery.of(context).size.width;
+    final isDesktop = sw >= 1080;
 
-        // 1. Weather Automation Cloud Engine Status Banner
-        _buildWeatherAutomationBanner(),
-        const SizedBox(height: 24),
-
-        // 2. Weather Scan Result Summary (if triggered)
-        if (_lastWeatherScanResult != null) ...[
-          _buildWeatherScanResultCard(),
+    return AdminPageFrame(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildExecutiveHeader(sw < 768),
+          const SizedBox(height: 20),
+          _buildOperationalKpiStrip(context),
           const SizedBox(height: 24),
-        ],
-
-        // 3. Main Composition Grid & Live Phone Mockup
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 1080;
-            if (isWide) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 3, child: _buildStudioForm()),
-                  const SizedBox(width: 24),
-                  Expanded(flex: 2, child: _buildPreviewColumn()),
-                ],
-              );
-            }
-            return Column(
+          if (isDesktop)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildStudioForm(),
-                const SizedBox(height: 24),
-                _buildPreviewColumn(),
+                Expanded(flex: 58, child: _buildComposerCard()),
+                const SizedBox(width: 24),
+                Expanded(flex: 42, child: _buildPreviewAndWeatherColumn()),
               ],
-            );
-          },
-        ),
-      ],
+            )
+          else
+            Column(
+              children: [
+                _buildComposerCard(),
+                const SizedBox(height: 20),
+                _buildPreviewAndWeatherColumn(),
+              ],
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _buildWeatherAutomationBanner() {
+  // ─── Executive Header ──────────────────────────────────────────────────────
+  Widget _buildExecutiveHeader(bool isMobile) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: AdminUi.radiusMd,
-        border: Border.all(color: AdminUi.border),
-        boxShadow: AdminUi.shadowSm,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x04000000),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AdminUi.brandSoft,
-              borderRadius: AdminUi.radiusSm,
-            ),
-            child: const Icon(Icons.bolt_rounded, color: AdminUi.brand, size: 28),
-          ),
-          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      'Automated Cloud Weather Service',
-                      style: AdminUi.title(size: 16),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AdminUi.accentSoft,
-                        borderRadius: AdminUi.radiusFull,
-                      ),
-                      child: Text(
-                        '100% AUTOMATIC • 24/7',
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.cell_tower_rounded, size: 13, color: _primary),
+                      const SizedBox(width: 5),
+                      Text(
+                        'BROADCAST STUDIO & WEATHER AUTOMATION',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.w800,
-                          color: AdminUi.brand,
+                          color: _primaryDark,
+                          letterSpacing: 0.5,
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Push Broadcast Studio & Weather Hub',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: isMobile ? 20 : 26,
+                    fontWeight: FontWeight.w900,
+                    color: _dark,
+                    letterSpacing: -0.5,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'The Supabase cloud cron scheduler automatically monitors live OpenWeather forecasts across all registered farm coordinates every 6 hours and dispatches real-time storm warnings, rain advisories, and crop safeguard alerts directly to farmers\' mobile phones.',
-                  style: AdminUi.body(size: 13, color: AdminUi.textSecondary),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 8,
-                  children: [
-                    _buildFeaturePill(Icons.schedule_rounded, 'Schedule: Every 6h (pg_cron)'),
-                    _buildFeaturePill(Icons.gps_fixed_rounded, 'Hyper-local Farm GPS'),
-                    _buildFeaturePill(Icons.psychology_rounded, 'Crop-Specific Logic'),
-                    _buildFeaturePill(Icons.shield_outlined, 'Duplicate Cooldown Protection'),
-                  ],
+                  'Compose targeted push notifications, run AI-assisted campaigns, and monitor automated cloud weather forecasts.',
+                  style: GoogleFonts.inter(
+                    fontSize: isMobile ? 12 : 13.5,
+                    color: _muted,
+                  ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          ElevatedButton.icon(
+            onPressed: _sending ? null : _sendPushNotification,
+            icon: _sending
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.send_rounded, size: 16),
+            label: Text(
+              _sending ? 'Dispatching...' : 'Dispatch Broadcast',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 14 : 20,
+                vertical: 13,
+              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),
         ],
@@ -439,353 +603,479 @@ class _AdminAnnouncementsTabState extends State<AdminAnnouncementsTab> {
     );
   }
 
-  Widget _buildFeaturePill(IconData icon, String text) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: AdminUi.brandSecondary),
-        const SizedBox(width: 6),
-        Text(
-          text,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AdminUi.textPrimary,
-          ),
+  // ─── 4-Column Operational KPI Metrics Strip ────────────────────────────────
+  Widget _buildOperationalKpiStrip(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 768;
+    final isTablet = width >= 768 && width < 1100;
+
+    final metrics = [
+      _kpiMetricCard(
+        title: 'CLOUD WEATHER CRON',
+        value: 'Every 6 hrs',
+        subtitle: '8AM, 2PM, 8PM, 2AM pg_cron',
+        icon: Icons.thunderstorm_rounded,
+        color: const Color(0xFF0284C7),
+        bgColor: const Color(0xFFF0F9FF),
+        borderColor: const Color(0xFFBAE6FD),
+        badgeText: '24/7 ACTIVE',
+      ),
+      _kpiMetricCard(
+        title: 'TARGET AUDIENCE',
+        value: _audienceLabel(_audience),
+        subtitle: 'Broadcast recipient scope',
+        icon: Icons.groups_rounded,
+        color: const Color(0xFF059669),
+        bgColor: const Color(0xFFECFDF5),
+        borderColor: const Color(0xFFA7F3D0),
+      ),
+      _kpiMetricCard(
+        title: 'DEEP-LINK ACTION',
+        value: _linkType.toUpperCase(),
+        subtitle: 'In-app navigation destination',
+        icon: Icons.open_in_browser_rounded,
+        color: const Color(0xFFD97706),
+        bgColor: const Color(0xFFFFFBEB),
+        borderColor: const Color(0xFFFDE68A),
+      ),
+      _kpiMetricCard(
+        title: 'FCM DELIVERY SLA',
+        value: '100% Live',
+        subtitle: 'Real-time push gateway',
+        icon: Icons.bolt_rounded,
+        color: const Color(0xFF7C3AED),
+        bgColor: const Color(0xFFF5F3FF),
+        borderColor: const Color(0xFFDDD6FE),
+        badgeText: 'ONLINE',
+      ),
+    ];
+
+    if (isMobile) {
+      return SizedBox(
+        height: 110,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          itemCount: metrics.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 12),
+          itemBuilder: (ctx, i) => SizedBox(width: 220, child: metrics[i]),
         ),
+      );
+    }
+
+    if (isTablet) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: metrics[0]),
+              const SizedBox(width: 14),
+              Expanded(child: metrics[1]),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: metrics[2]),
+              const SizedBox(width: 14),
+              Expanded(child: metrics[3]),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: metrics[0]),
+        const SizedBox(width: 16),
+        Expanded(child: metrics[1]),
+        const SizedBox(width: 16),
+        Expanded(child: metrics[2]),
+        const SizedBox(width: 16),
+        Expanded(child: metrics[3]),
       ],
     );
   }
 
-  Widget _buildWeatherScanResultCard() {
-    final checked = _lastWeatherScanResult?['checked'] ?? 0;
-    final sent = _lastWeatherScanResult?['sent'] ?? 0;
-    final errors = _lastWeatherScanResult?['errors'] ?? 0;
-
+  Widget _kpiMetricCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required Color bgColor,
+    required Color borderColor,
+    String? badgeText,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0FDF4),
-        borderRadius: AdminUi.radiusMd,
-        border: Border.all(color: const Color(0xFFBBF7D0)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor.withValues(alpha: 0.8)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x03000000),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Icon(Icons.check_circle_rounded, color: AdminUi.brandSecondary, size: 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Latest Live Weather Scan Diagnostics',
-                  style: AdminUi.title(size: 14, color: AdminUi.brand),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Farms Scanned: $checked active farms • Alerts Triggered & Sent: $sent • Errors: $errors',
-                  style: AdminUi.body(size: 13, color: AdminUi.brandDark),
+                child: Icon(icon, size: 18, color: color),
+              ),
+              if (badgeText != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    badgeText,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                    ),
+                  ),
                 ),
-              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: _muted,
+              letterSpacing: 0.5,
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.close_rounded, size: 18, color: AdminUi.brand),
-            onPressed: () => setState(() => _lastWeatherScanResult = null),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: _dark,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: GoogleFonts.inter(fontSize: 11, color: _muted),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStudioForm() {
+  // ─── Left Column: AI Assistant & Push Composer ─────────────────────────────
+  Widget _buildComposerCard() {
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: AdminUi.cardDecoration(),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x04000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Preset Chips Section
+          // Dynamic AI Campaign Generators Header
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.auto_awesome_rounded, color: AdminUi.brand, size: 18),
-              const SizedBox(width: 8),
-              Text('Preset Campaign Templates', style: AdminUi.label(size: 13)),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.auto_awesome_rounded, color: _primary, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'On-Demand AI Campaign Generators',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                    ),
+                  ),
+                ],
+              ),
+              IconButton(
+                onPressed: _showApiKeyDialog,
+                icon: const Icon(Icons.key_rounded, size: 18, color: _muted),
+                tooltip: 'Configure OpenRouter API Key',
+                splashRadius: 18,
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
+          Text(
+            'Click any AI generator below to compose fresh notification copy on demand:',
+            style: GoogleFonts.inter(fontSize: 12.5, color: _muted),
+          ),
+          const SizedBox(height: 14),
+
+          // AI Campaign Chips
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _presets.map((preset) {
-              final isSelected = _selectedPresetId == preset['id'];
-              return ChoiceChip(
-                label: Text(preset['label']),
-                selected: isSelected,
-                onSelected: (selected) {
-                  if (selected) _applyPreset(preset);
-                },
-                selectedColor: AdminUi.brandSoft,
-                backgroundColor: AdminUi.background,
-                labelStyle: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? AdminUi.brand : AdminUi.textPrimary,
+            children: _dynamicAiCampaigns.map((camp) {
+              final isCurrent = _activeCampaignType == camp['id'] && _generatingAi;
+              return MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: _generatingAi ? null : () => _triggerDynamicAiCampaign(camp),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _surface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isCurrent) ...[
+                          const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: _primary),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          isCurrent ? 'Generating AI...' : camp['label']!,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isCurrent ? _primaryDark : const Color(0xFF334155),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                side: BorderSide(
-                  color: isSelected ? AdminUi.brand : AdminUi.border,
-                ),
-                shape: RoundedRectangleBorder(borderRadius: AdminUi.radiusSm),
               );
             }).toList(),
           ),
-          const SizedBox(height: 24),
-          const Divider(height: 1, color: AdminUi.border),
-          const SizedBox(height: 24),
-
-          // Target Audience
-          Text('Dispatch Mode & Audience', style: AdminUi.label(size: 12)),
-          const SizedBox(height: 8),
-          InputDecorator(
-            decoration: AdminUi.inputDecoration(),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _audience,
-                isExpanded: true,
-                isDense: true,
-                items: const [
-                  DropdownMenuItem(
-                    value: 'test_me',
-                    child: Row(
-                      children: [
-                        Icon(Icons.phone_android_rounded, size: 18, color: AdminUi.brandSecondary),
-                        SizedBox(width: 8),
-                        Text('🧪 Test Push → Send directly to my Admin device'),
-                      ],
-                    ),
-                  ),
-                  DropdownMenuItem(
-                    value: 'test_user',
-                    child: Row(
-                      children: [
-                        Icon(Icons.person_search_rounded, size: 18, color: AdminUi.info),
-                        SizedBox(width: 8),
-                        Text('🎯 Targeted Test → Send to specific User ID'),
-                      ],
-                    ),
-                  ),
-                  DropdownMenuItem(
-                    value: 'farmers',
-                    child: Row(
-                      children: [
-                        Icon(Icons.agriculture_rounded, size: 18, color: AdminUi.brand),
-                        SizedBox(width: 8),
-                        Text('🚜 Broadcast → All Registered Farmers'),
-                      ],
-                    ),
-                  ),
-                  DropdownMenuItem(
-                    value: 'customers',
-                    child: Row(
-                      children: [
-                        Icon(Icons.shopping_basket_rounded, size: 18, color: AdminUi.warning),
-                        SizedBox(width: 8),
-                        Text('🧺 Broadcast → All Consumers & Buyers'),
-                      ],
-                    ),
-                  ),
-                  DropdownMenuItem(
-                    value: 'farmers_customers',
-                    child: Row(
-                      children: [
-                        Icon(Icons.public_rounded, size: 18, color: AdminUi.brandDark),
-                        SizedBox(width: 8),
-                        Text('📢 Global Broadcast → Farmers + Consumers'),
-                      ],
-                    ),
-                  ),
-                ],
-                onChanged: _sending ? null : (v) => setState(() => _audience = v ?? _audience),
-              ),
-            ),
-          ),
-
-          if (_audience == 'test_user') ...[
-            const SizedBox(height: 16),
-            Text('Target User ID', style: AdminUi.label(size: 12)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _targetUserIdController,
-              enabled: !_sending,
-              decoration: AdminUi.inputDecoration(
-                hintText: 'Enter UUID of target user or farmer',
-                prefixIcon: const Icon(Icons.person_outline_rounded, size: 18),
-              ),
-            ),
-          ],
-
+          const SizedBox(height: 22),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
           const SizedBox(height: 20),
 
-          // Title
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Notification Title', style: AdminUi.label(size: 12)),
-              Text(
-                '${_titleController.text.length} chars',
-                style: AdminUi.body(size: 11, color: AdminUi.textMuted),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _titleController,
-            enabled: !_sending,
-            onChanged: (_) => setState(() {}),
-            decoration: AdminUi.inputDecoration(
-              hintText: 'e.g. Stay cozy with fresh farm soup veggies! 🍲',
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Quick Emoji Bar
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Notification Message Body', style: AdminUi.label(size: 12)),
-              Text(
-                '${_messageController.text.length} chars',
-                style: AdminUi.body(size: 11, color: AdminUi.textMuted),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: AdminUi.background,
-              borderRadius: BorderRadius.vertical(top: AdminUi.radiusSm.topLeft),
-              border: Border.all(color: AdminUi.border),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  Text('Quick Emojis: ', style: AdminUi.label(size: 11, color: AdminUi.textMuted)),
-                  ..._quickEmojis.map(
-                    (emoji) => InkWell(
-                      onTap: () => _insertEmoji(emoji),
-                      borderRadius: BorderRadius.circular(4),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                        child: Text(emoji, style: const TextStyle(fontSize: 16)),
+          // Target Audience Selector
+          _buildFieldLabel('Target Audience Segment'),
+          const SizedBox(height: 6),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                {'id': 'test_me', 'label': '📱 Test Me (Admin)'},
+                {'id': 'farmers', 'label': '🚜 All Farmers'},
+                {'id': 'customers', 'label': '🛒 All Customers'},
+                {'id': 'farmers_customers', 'label': '🌐 Platform-Wide'},
+              ].map((aud) {
+                final isSelected = _audience == aud['id'];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () => setState(() => _audience = aud['id']!),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected ? _primary : _surface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: isSelected ? _primary : _border),
+                        ),
+                        child: Text(
+                          aud['label']!,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                            color: isSelected ? Colors.white : const Color(0xFF475569),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ],
-              ),
+                );
+              }).toList(),
             ),
           ),
+          const SizedBox(height: 18),
+
+          // Notification Title
+          _buildFieldLabel('Notification Title'),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _titleController,
+            style: GoogleFonts.inter(fontSize: 13.5, color: _dark),
+            decoration: _inputDecoration(
+              hintText: 'e.g. 🌧️ Heavy Rain Warning: San Carlos City',
+              prefixIcon: Icons.title_rounded,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Notification Message
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildFieldLabel('Notification Message Body'),
+              Text(
+                '${_messageController.text.length} chars',
+                style: GoogleFonts.inter(fontSize: 11, color: _muted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
           TextField(
             controller: _messageController,
-            enabled: !_sending,
-            maxLines: 4,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              hintText: 'Write the notification copy with emojis and promotional offer...',
-              hintStyle: AdminUi.body(color: AdminUi.textMuted),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.vertical(bottom: AdminUi.radiusSm.bottomLeft),
-                borderSide: const BorderSide(color: AdminUi.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.vertical(bottom: AdminUi.radiusSm.bottomLeft),
-                borderSide: const BorderSide(color: AdminUi.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.vertical(bottom: AdminUi.radiusSm.bottomLeft),
-                borderSide: const BorderSide(color: AdminUi.brand, width: 1.5),
-              ),
-              contentPadding: const EdgeInsets.all(16),
+            maxLines: 3,
+            style: GoogleFonts.inter(fontSize: 13.5, color: _dark),
+            decoration: _inputDecoration(
+              hintText: 'Compose your push notification broadcast text...',
+              prefixIcon: Icons.chat_bubble_outline_rounded,
             ),
           ),
+          const SizedBox(height: 10),
 
-          const SizedBox(height: 20),
+          // Quick Emoji Bar
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _quickEmojis.map((emoji) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: InkWell(
+                    onTap: () {
+                      _messageController.text += emoji;
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _surface,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: _border),
+                      ),
+                      child: Text(emoji, style: const TextStyle(fontSize: 14)),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 18),
 
-          // Deep Link Routing Destination
+          // Media Image URL
+          _buildFieldLabel('Produce / Banner Image URL (Optional)'),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _imageUrlController,
+            style: GoogleFonts.inter(fontSize: 13, color: _dark),
+            decoration: _inputDecoration(
+              hintText: 'https://images.unsplash.com/...',
+              prefixIcon: Icons.image_outlined,
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // Deep Link Type
           Row(
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('On-Tap Deep Link Action', style: AdminUi.label(size: 12)),
-                    const SizedBox(height: 8),
-                    InputDecorator(
-                      decoration: AdminUi.inputDecoration(),
+                    _buildFieldLabel('In-App Navigation Target'),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: _surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _border),
+                      ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           value: _linkType,
                           isExpanded: true,
-                          isDense: true,
+                          style: GoogleFonts.inter(fontSize: 13, color: _dark, fontWeight: FontWeight.w600),
                           items: const [
                             DropdownMenuItem(value: 'weather', child: Text('🌦️ Weather Radar & Forecast')),
-                            DropdownMenuItem(value: 'flash_sale', child: Text('⚡ Flash Harvest & Promos')),
-                            DropdownMenuItem(value: 'marketplace', child: Text('🛒 Produce Marketplace')),
+                            DropdownMenuItem(value: 'flash_sale', child: Text('🌽 Flash Harvest Sale')),
                             DropdownMenuItem(value: 'farmer_dashboard', child: Text('🚜 Farmer Sales Dashboard')),
-                            DropdownMenuItem(value: 'announcement', child: Text('📢 Community Forum & Bulletin')),
-                            DropdownMenuItem(value: 'preorder', child: Text('📦 Pre-Order Reservation')),
-                            DropdownMenuItem(value: 'product', child: Text('🏷️ Specific Product Details')),
+                            DropdownMenuItem(value: 'announcement', child: Text('📢 Platform Announcement')),
                           ],
-                          onChanged: _sending ? null : (v) => setState(() => _linkType = v ?? _linkType),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _linkType = val);
+                          },
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              if (_linkType == 'preorder' || _linkType == 'product') ...[
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Target Reference ID', style: AdminUi.label(size: 12)),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _linkIdController,
-                        enabled: !_sending,
-                        decoration: AdminUi.inputDecoration(
-                          hintText: 'Enter ${_linkType == "product" ? "Product" : "Preorder"} ID',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ],
           ),
-
-          if (_lastResult != null) ...[
-            const SizedBox(height: 24),
-            const Divider(height: 1, color: AdminUi.border),
-            const SizedBox(height: 16),
-            _ResultSummary(result: _lastResult!),
-          ],
         ],
       ),
     );
   }
 
-  Widget _buildPreviewColumn() {
+  // ─── Right Column: Interactive Phone Simulator & Weather Engine ───────────
+  Widget _buildPreviewAndWeatherColumn() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Live Smartphone Simulator Card
         Container(
-          padding: const EdgeInsets.all(24),
-          decoration: AdminUi.cardDecoration(),
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: _border),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x04000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -794,30 +1084,266 @@ class _AdminAnnouncementsTabState extends State<AdminAnnouncementsTab> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.remove_red_eye_rounded, color: AdminUi.brand, size: 18),
+                      const Icon(Icons.remove_red_eye_outlined, size: 18, color: _primary),
                       const SizedBox(width: 8),
-                      Text('Live Mobile Preview', style: AdminUi.title(size: 16)),
+                      Text(
+                        'Live Mobile Device Preview',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: _dark,
+                        ),
+                      ),
                     ],
                   ),
+                  // Android / iOS Switcher
                   Container(
                     decoration: BoxDecoration(
-                      color: AdminUi.background,
-                      borderRadius: AdminUi.radiusSm,
+                      color: _surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: _border),
                     ),
-                    padding: const EdgeInsets.all(3),
                     child: Row(
                       children: [
-                        _buildPlatformToggle(false, 'Android'),
-                        _buildPlatformToggle(true, 'iOS'),
+                        _deviceToggle('Android', !_isIosPreview, () => setState(() => _isIosPreview = false)),
+                        _deviceToggle('iOS', _isIosPreview, () => setState(() => _isIosPreview = true)),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
-              // Mockup Phone Frame
-              _buildPhoneMockup(),
+              // Device Screen Mockup
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    // Status bar
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '12:00 PM',
+                          style: GoogleFonts.inter(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                        const Row(
+                          children: [
+                            Icon(Icons.wifi_rounded, size: 14, color: Colors.white70),
+                            SizedBox(width: 4),
+                            Icon(Icons.battery_full_rounded, size: 14, color: Colors.white70),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Notification Banner
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: _primary,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.spa_rounded, color: Colors.white, size: 12),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'AGRIDIRECT',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white70,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '• Just now',
+                                style: GoogleFonts.inter(fontSize: 10.5, color: Colors.white38),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _titleController.text.isNotEmpty ? _titleController.text : 'AgriDirect Alert',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _messageController.text.isNotEmpty
+                                ? _messageController.text
+                                : 'Your fresh harvest and weather update will appear here in real-time.',
+                            style: GoogleFonts.inter(fontSize: 12, color: Colors.white70, height: 1.4),
+                          ),
+                          if (_imageUrlController.text.trim().isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                _imageUrlController.text.trim(),
+                                height: 110,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _primary.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: _primary.withValues(alpha: 0.5)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.touch_app_rounded, size: 12, color: Color(0xFF6EE7B7)),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Tap to open $_linkType',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF6EE7B7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Automated Cloud Weather Monitor Card
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: _border),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x04000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.cloud_sync_rounded, color: Color(0xFF0284C7), size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Cloud Weather Cron Engine',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: _dark,
+                        ),
+                      ),
+                    ],
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _scanningWeather ? null : _runWeatherScanNow,
+                    icon: _scanningWeather
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.bolt_rounded, size: 16),
+                    label: Text(
+                      _scanningWeather ? 'Scanning...' : 'Scan Now',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0284C7),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Supabase cloud pg_cron monitors live OpenWeather forecasts across registered Pangasinan farms every 6 hours and broadcasts typhoon & rain alerts automatically.',
+                style: GoogleFonts.inter(fontSize: 12.5, color: _muted, height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _surface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _border),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 16, color: _primary),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Target Grid: San Carlos City (15.9224°N, 120.3489°E)',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: _dark),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -825,233 +1351,75 @@ class _AdminAnnouncementsTabState extends State<AdminAnnouncementsTab> {
     );
   }
 
-  Widget _buildPlatformToggle(bool isIos, String label) {
-    final isSelected = _isIosPreview == isIos;
-    return InkWell(
-      onTap: () => setState(() => _isIosPreview = isIos),
-      borderRadius: BorderRadius.circular(6),
+  Widget _deviceToggle(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
+          color: isSelected ? _primary : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
-          boxShadow: isSelected ? AdminUi.shadowSm : null,
         ),
         child: Text(
           label,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 11,
+          style: GoogleFonts.inter(
+            fontSize: 11.5,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            color: isSelected ? AdminUi.brand : AdminUi.textMuted,
+            color: isSelected ? Colors.white : _muted,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildPhoneMockup() {
-    final title = _titleController.text.trim().isEmpty ? 'AgriDirect Alert' : _titleController.text.trim();
-    final body = _messageController.text.trim().isEmpty
-        ? 'Your fresh harvest and weather update will appear here in real-time.'
-        : _messageController.text.trim();
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF1E293B),
-            Color(0xFF0F172A),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: AdminUi.shadowMd,
-        border: Border.all(color: const Color(0xFF334155), width: 3),
-      ),
-      child: Column(
-        children: [
-          // Phone Status Bar
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '12:00 PM',
-                  style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Row(
-                  children: const [
-                    Icon(Icons.wifi_rounded, size: 14, color: Colors.white),
-                    SizedBox(width: 6),
-                    Icon(Icons.signal_cellular_4_bar_rounded, size: 14, color: Colors.white),
-                    SizedBox(width: 6),
-                    Icon(Icons.battery_full_rounded, size: 14, color: Colors.white),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Notification Banner Card
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: _isIosPreview
-                    ? const Color(0xFF262626).withValues(alpha: 0.92)
-                    : const Color(0xFF1F2937),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.1),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // App Header
-                  Row(
-                    children: [
-                      Container(
-                        width: 22,
-                        height: 22,
-                        decoration: BoxDecoration(
-                          color: AdminUi.brand,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Icon(Icons.eco_rounded, color: Colors.white, size: 14),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'AGRIDIRECT',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFFE2E8F0),
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '•  Just now',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: const Color(0xFF94A3B8),
-                        ),
-                      ),
-                      const Spacer(),
-                      const Icon(Icons.expand_more_rounded, size: 16, color: Color(0xFF94A3B8)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Notification Title
-                  Text(
-                    title,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Notification Body
-                  Text(
-                    body,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      height: 1.4,
-                      color: const Color(0xFFCBD5E1),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Action Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AdminUi.brandSoft.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AdminUi.brandSecondary.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.touch_app_rounded, size: 13, color: AdminUi.brandSecondary),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Tap to open ${_linkType.replaceAll("_", " ")}',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AdminUi.brandSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+  Widget _buildFieldLabel(String text) {
+    return Text(
+      text.toUpperCase(),
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 10,
+        color: _muted,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.5,
       ),
     );
   }
-}
 
-class _ResultSummary extends StatelessWidget {
-  final Map<String, dynamic> result;
-  const _ResultSummary({required this.result});
-
-  @override
-  Widget build(BuildContext context) {
-    final users = (result['users'] as num?)?.toInt();
-    final sent = (result['sent'] as num?)?.toInt();
-    final total = (result['total'] as num?)?.toInt();
-    final reason = result['reason']?.toString();
-
-    final summary = [
-      if (users != null) 'Users: $users',
-      if (sent != null && total != null) 'Delivered: $sent/$total',
-      if (reason != null && reason.isNotEmpty) reason,
-    ].join(' • ');
-
-    return Row(
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: (sent != null && total != null && total > 0 && sent == 0)
-                ? AdminUi.warning
-                : AdminUi.success,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            summary.isEmpty ? 'Dispatched successfully.' : summary,
-            style: AdminUi.body(size: 13, color: AdminUi.textSecondary),
-          ),
-        ),
-      ],
+  InputDecoration _inputDecoration({
+    required String hintText,
+    required IconData prefixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: GoogleFonts.inter(fontSize: 13, color: _muted),
+      prefixIcon: Icon(prefixIcon, color: _muted, size: 18),
+      filled: true,
+      fillColor: _surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: _border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: _border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: _primary, width: 1.5),
+      ),
     );
+  }
+
+  String _audienceLabel(String aud) {
+    switch (aud) {
+      case 'farmers':
+        return 'All Farmers';
+      case 'customers':
+        return 'All Customers';
+      case 'farmers_customers':
+        return 'Platform-Wide';
+      default:
+        return 'Admin Device';
+    }
   }
 }

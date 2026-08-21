@@ -124,18 +124,22 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   }
 
   Future<void> _confirmLogout() async {
-    final shouldLogout = await showDialog<bool>(
+    await showDialog<bool>(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => const PremiumConfirmDialog(
+      builder: (ctx) => PremiumConfirmDialog(
         title: 'Confirm Logout',
         content: 'Are you sure you want to log out of AgriDirect?',
+        confirmText: 'Log Out',
+        loadingText: 'Logging out...',
+        onConfirm: () async {
+          await AuthService().logout();
+          if (mounted) {
+            context.go(AppRoutes.login);
+          }
+        },
       ),
     );
-
-    if (shouldLogout == true) {
-      widget.onLogout();
-    }
   }
 
   void _handleSwitchToFarmer() {

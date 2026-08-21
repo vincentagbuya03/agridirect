@@ -51,7 +51,7 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
 
         final isFarmerMode = AuthService().isViewingAsFarmer;
         final navItems = isFarmerMode
-            ? const ['Dashboard', 'Products', 'Orders', 'Community']
+            ? const ['Dashboard', 'Products', 'Orders', 'Community', 'Pre-Orders']
             : const ['Home', 'Shop', 'Community', 'DA Articles', 'About Us', 'Find Farmer', 'Weather'];
 
         return Column(
@@ -116,8 +116,8 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                               isActive = currentPath.startsWith(consumerRoutes[i]);
                             }
                           } else {
-                            // Farmer mode: fall back to currentIndex
-                            isActive = i == widget.currentIndex;
+                            // Farmer mode: fall back to currentIndex (Profile is index 5)
+                            isActive = i == widget.currentIndex && widget.currentIndex != 5;
                           }
                           final isHovered = _hoveredNav == i;
 
@@ -271,32 +271,51 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                   ],
 
                   if (!isMobile) ...[
-                    MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        onTap: () {
-                          if (isFarmerMode) {
-                            widget.onNavigate(5);
-                          } else {
-                            widget.onNavigate(3);
-                          }
-                        },
-                        child: Container(
-                          width: compact ? 36 : 44,
-                          height: compact ? 36 : 44,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFDCFCE7),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: _primary, width: 1.5),
-                          ),
-                          child: Icon(
-                            Icons.person_rounded,
-                            color: _primary,
-                            size: compact ? 18 : 22,
+                    Builder(builder: (context) {
+                      final currentPath = GoRouterState.of(context).uri.path;
+                      final isProfileActive = (isFarmerMode && widget.currentIndex == 5) ||
+                          (!isFarmerMode && (widget.currentIndex == 3 || currentPath.startsWith(AppRoutes.profile)));
+
+                      return MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          onTap: () {
+                            if (isFarmerMode) {
+                              widget.onNavigate(5);
+                            } else {
+                              widget.onNavigate(3);
+                            }
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            width: compact ? 36 : 44,
+                            height: compact ? 36 : 44,
+                            decoration: BoxDecoration(
+                              color: isProfileActive ? _primary : const Color(0xFFDCFCE7),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: _primary,
+                                width: isProfileActive ? 2.5 : 1.5,
+                              ),
+                              boxShadow: isProfileActive
+                                  ? [
+                                      BoxShadow(
+                                        color: _primary.withValues(alpha: 0.35),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Icon(
+                              Icons.person_rounded,
+                              color: isProfileActive ? Colors.white : _primary,
+                              size: compact ? 18 : 22,
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    }),
                   ],
                   if (isMobile) ...[
                     const SizedBox(width: 8),

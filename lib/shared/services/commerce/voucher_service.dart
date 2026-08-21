@@ -314,4 +314,28 @@ class VoucherService {
       debugPrint('Error marking voucher as used: $e');
     }
   }
+
+  /// Get claimed vouchers for a user for a specific farmer
+  Future<List<Map<String, dynamic>>> getUserClaimedVouchersForFarmer(
+    String userId,
+    String farmerId,
+  ) async {
+    try {
+      final allClaimed = await getUserClaimedVouchers(userId);
+      return allClaimed.where((item) {
+        final voucher = item['vouchers'] as Map<String, dynamic>? ?? {};
+        final vFarmerId = voucher['farmer_id']?.toString() ?? '';
+        return vFarmerId.isEmpty || vFarmerId == farmerId;
+      }).map((item) {
+        final voucher = item['vouchers'] as Map<String, dynamic>? ?? {};
+        return {
+          ...voucher,
+          'claim_id': item['claim_id'],
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('Error getting vouchers for farmer: $e');
+      return [];
+    }
+  }
 }

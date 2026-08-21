@@ -642,14 +642,14 @@ class _WebFreshProduceScreenState extends State<WebFreshProduceScreen>
     final sw = MediaQuery.of(context).size.width;
     int crossAxisCount = sw < 480 ? 2 : (sw < 768 ? 2 : (sw < 1100 ? 3 : 4));
     double childAspectRatio = sw < 480
-        ? 0.66
+        ? 0.62
         : (sw < 640
-            ? 0.70
+            ? 0.64
             : (sw < 960
-                ? 0.76
+                ? 0.68
                 : (sw < 1280
-                    ? 0.82
-                    : 0.85)));
+                    ? 0.70
+                    : 0.72)));
 
     return FutureBuilder<List<ProductItem>>(
       future: _productsFuture,

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -296,23 +296,32 @@ class _WebProfileScreenState extends State<WebProfileScreen>
 
 
   Future<void> _confirmLogout() async {
-    final shouldLogout = await showDialog<bool>(
+    await showDialog<bool>(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => const PremiumConfirmDialog(
+      builder: (ctx) => PremiumConfirmDialog(
         title: 'Confirm Logout',
         content: 'Are you sure you want to log out of AgriDirect?',
+        confirmText: 'Log Out',
+        loadingText: 'Logging out...',
+        onConfirm: () async {
+          await AuthService().logout();
+          if (mounted) {
+            context.go(AppRoutes.login);
+          }
+        },
       ),
     );
-
-    if (shouldLogout == true) {
-      widget.onLogout();
-    }
   }
 
   void _handleSwitchToFarmer() {
-    AuthService().switchToFarmerMode();
-    widget.onModeChanged();
+    final auth = AuthService();
+    if (auth.isSeller) {
+      auth.switchToFarmerMode();
+      widget.onModeChanged();
+    } else {
+      context.push(AppRoutes.webFarmerRegister);
+    }
   }
 
   void _handleSwitchToCustomer() {
@@ -345,7 +354,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     );
   }
 
-  // â”€â”€â”€ Mobile Layout: compact header + tab strip + content â”€â”€â”€
+  // ─── Mobile Layout: compact header + tab strip + content ───
   Widget _buildMobileLayout(AuthService auth) {
     final isFarmer = auth.isViewingAsFarmer;
     final displayName = isFarmer && _farmerProfile != null
@@ -361,7 +370,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
 
     return Column(
       children: [
-        // â”€â”€ Compact user header â”€â”€
+        // ─── Compact user header ───
         Container(
           color: Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -420,20 +429,39 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                           color: isFarmer ? Colors.amber.shade300 : primary.withValues(alpha: 0.4),
                         ),
                       ),
-                      child: Text(
-                        isFarmer ? 'Farmer' : 'Consumer',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: isFarmer ? Colors.amber.shade900 : primary,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isFarmer
+                                ? Icons.swap_horiz_rounded
+                                : (auth.isSeller
+                                    ? Icons.storefront_rounded
+                                    : Icons.agriculture_rounded),
+                            size: 13,
+                            color: isFarmer ? Colors.amber.shade900 : primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isFarmer
+                                ? 'Farmer Mode'
+                                : (auth.isSeller
+                                    ? 'Switch to Farm'
+                                    : 'Become a Farmer'),
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: isFarmer ? Colors.amber.shade900 : primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              // â”€â”€ Horizontal tab strip â”€â”€
+              // ─── Horizontal tab strip ───
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -1550,6 +1578,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   }
 
   Widget _buildAddressesContent() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 768;
+
     return FutureBuilder<List<UserAddress>>(
       future: UserService().getAllUserAddresses(),
       builder: (context, snapshot) {
@@ -1557,7 +1588,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         final isLoading = snapshot.connectionState == ConnectionState.waiting;
 
         return Container(
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.all(isMobile ? 16 : 32),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -1573,8 +1604,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 16,
+                runSpacing: 12,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1582,15 +1616,15 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       Text(
                         'My Delivery Addresses',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 20,
+                          fontSize: isMobile ? 18 : 20,
                           fontWeight: FontWeight.w800,
                           color: _dark,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Manage your shipping addresses for fast fresh farm produce orders',
-                        style: GoogleFonts.inter(fontSize: 13, color: _muted),
+                        'Manage your shipping addresses for fast farm produce orders',
+                        style: GoogleFonts.inter(fontSize: isMobile ? 12 : 13, color: _muted),
                       ),
                     ],
                   ),
@@ -1616,8 +1650,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       backgroundColor: primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
+                        horizontal: 16,
+                        vertical: 10,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -1694,37 +1728,38 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                 : const Color(0xFF64748B),
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
                                   Text(
                                     addr.recipientName,
                                     style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 15,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w700,
                                       color: _dark,
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
                                   Text(
                                     addr.recipientPhone.isNotEmpty
                                         ? addr.recipientPhone
                                         : 'No Phone',
                                     style: GoogleFonts.inter(
-                                      fontSize: 13,
+                                      fontSize: 12,
                                       color: _muted,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                  if (addr.isDefault) ...[
-                                    const SizedBox(width: 12),
+                                  if (addr.isDefault)
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
+                                        horizontal: 6,
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
@@ -1737,20 +1772,19 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                       child: Text(
                                         'Default',
                                         style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 11,
+                                          fontSize: 10,
                                           fontWeight: FontWeight.w700,
                                           color: primary,
                                         ),
                                       ),
                                     ),
-                                  ],
                                 ],
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 4),
                               Text(
                                 '${addr.street}, ${addr.barangay}, ${addr.city}, ${addr.province} ${addr.zipCode}',
                                 style: GoogleFonts.inter(
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   color: const Color(0xFF334155),
                                   height: 1.4,
                                 ),
@@ -1758,7 +1792,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                             ],
                           ),
                         ),
-                        Row(
+                        const SizedBox(width: 6),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             TextButton(
                               onPressed: () async {
@@ -1781,33 +1818,45 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                 if (!context.mounted) return;
                                 setState(() {});
                               },
-                                child: Text(
-                                  'Edit',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: primary,
-                                  ),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                'Edit',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: primary,
                                 ),
                               ),
-                              if (!addr.isDefault)
-                                TextButton(
-                                  onPressed: () async {
-                                    await UserService().deleteAddressById(
-                                      addr.addressId,
-                                    );
-                                    if (!context.mounted) return;
-                                    setState(() {});
-                                  },
-                                  child: Text(
+                            ),
+                            if (!addr.isDefault) ...[
+                              const SizedBox(height: 4),
+                              TextButton(
+                                onPressed: () async {
+                                  await UserService().deleteAddressById(
+                                    addr.addressId,
+                                  );
+                                  if (!context.mounted) return;
+                                  setState(() {});
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
                                   'Delete',
                                   style: GoogleFonts.inter(
-                                    fontSize: 13,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.red.shade600,
                                   ),
                                 ),
                               ),
+                            ],
                           ],
                         ),
                       ],

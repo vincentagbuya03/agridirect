@@ -12,6 +12,7 @@ import '../../../web/widgets/web_consumer_nav_bar.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../widgets/auth/mobile_two_factor_sheet.dart';
 import '../../../shared/widgets/phone_verification_dialog.dart';
+import '../../../shared/widgets/premium_confirm_dialog.dart';
 
 class AppSettingsScreen extends StatefulWidget {
   const AppSettingsScreen({super.key});
@@ -965,10 +966,22 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             margin: const EdgeInsets.symmetric(horizontal: 16),
             child: ElevatedButton(
               onPressed: () async {
-                await AuthService().logout();
-                if (context.mounted) {
-                  context.go(AppRoutes.login);
-                }
+                await showDialog<bool>(
+                  context: context,
+                  barrierDismissible: true,
+                  builder: (ctx) => PremiumConfirmDialog(
+                    title: 'Confirm Logout',
+                    content: 'Are you sure you want to log out of AgriDirect?',
+                    confirmText: 'Log Out',
+                    loadingText: 'Logging out...',
+                    onConfirm: () async {
+                      await AuthService().logout();
+                      if (context.mounted) {
+                        context.go(AppRoutes.login);
+                      }
+                    },
+                  ),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,

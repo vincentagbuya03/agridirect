@@ -639,7 +639,7 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
             crossAxisCount: crossAxisCount,
             mainAxisSpacing: 16,
             crossAxisSpacing: 16,
-            childAspectRatio: 1.25,
+            childAspectRatio: childAspectRatio,
           ),
           itemCount: shops.length,
           itemBuilder: (context, index) {

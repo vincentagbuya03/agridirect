@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/services/admin/admin_service.dart';
-import '../../../shared/router/app_router.dart';
-import '../../../shared/data/app_data.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'admin_ui.dart';
@@ -1266,27 +1263,6 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
       estHarvestDate = baseDate.add(Duration(days: harvestDays));
     }
 
-    void navigateToStorefront() {
-      Navigator.of(context).pop();
-      final routePath = isPreorder ? AppRoutes.preorderDetails : AppRoutes.productDetails;
-      final productItem = ProductItem(
-        productId: productId,
-        farmerId: product['farmer_id']?.toString(),
-        farmerName: farmName,
-        name: name,
-        farm: farmName,
-        price: price.toString(),
-        unit: unit,
-        imageUrl: imageUrl ?? '',
-        categoryName: category,
-        rating: rating,
-        reviews: reviews,
-        isFeatured: isFeatured,
-        description: description,
-      );
-      context.push('$routePath?id=$productId', extra: productItem);
-    }
-
     showDialog(
       context: context,
       builder: (context) {
@@ -1479,22 +1455,6 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                                     _buildProductVisualCard(imageUrl, isPreorder, category),
                                     const SizedBox(height: 14),
                                     _buildPricingAndInventoryCard(price, unit, unitName, stock, isPreorder),
-                                    const SizedBox(height: 14),
-                                    ElevatedButton.icon(
-                                      onPressed: navigateToStorefront,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AdminUi.brand,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
-                                        elevation: 0,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      ),
-                                      icon: const Icon(Icons.storefront_rounded, size: 18),
-                                      label: Text(
-                                        'View on Live Storefront',
-                                        style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w800),
-                                      ),
-                                    ),
                                   ],
                                 ),
                               ),
@@ -1565,17 +1525,6 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                         spacing: 8,
                         runSpacing: 6,
                         children: [
-                          if (isMobile)
-                            OutlinedButton.icon(
-                              onPressed: navigateToStorefront,
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                side: const BorderSide(color: Color(0xFFD3DFD7)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                              icon: const Icon(Icons.storefront_rounded, size: 15),
-                              label: Text('View in Store', style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w700)),
-                            ),
                           OutlinedButton(
                             onPressed: () => Navigator.of(context).pop(),
                             style: OutlinedButton.styleFrom(

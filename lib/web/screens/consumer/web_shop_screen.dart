@@ -1931,12 +1931,12 @@ FadeTransition(
             : 2;
 
         final double childAspectRatio = constraints.maxWidth < 480
-            ? (_showPreOrders ? 0.62 : 0.70)
+            ? (_showPreOrders ? 0.70 : 0.78)
             : (constraints.maxWidth < 700
-                ? (_showPreOrders ? 0.68 : 0.75)
+                ? (_showPreOrders ? 0.74 : 0.82)
                 : (constraints.maxWidth < 1100
-                    ? (_showPreOrders ? 0.74 : 0.81)
-                    : (_showPreOrders ? 0.76 : 0.83)));
+                    ? (_showPreOrders ? 0.78 : 0.86)
+                    : (_showPreOrders ? 0.80 : 0.88)));
 
         return GridView.builder(
           shrinkWrap: true,
@@ -2230,9 +2230,9 @@ FadeTransition(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Top Image - Enlarged & Prominent
+              // 1. Top Image
               AspectRatio(
-                aspectRatio: 1.25,
+                aspectRatio: 1.35,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -2306,158 +2306,148 @@ FadeTransition(
                 ),
               ),
 
-              // 2. Bottom Details - Tightly Budgeted Spacing
+              // 2. Bottom Details - Balanced Compact Spacing
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Text(
+                        product.name,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: _dark,
+                          height: 1.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Container(
+                            width: 16,
+                            height: 16,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFFE2E8F0),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.storefront_rounded,
+                                size: 9.5,
+                                color: _primary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => _openFarmerProfile(product.farmerId),
+                              child: Text(
+                                farmDisplayName,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: _muted,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          if (product.rating != null) ...[
+                            const Icon(Icons.star_rounded, size: 12, color: Color(0xFFF59E0B)),
+                            Text(
+                              ' ${product.rating!}',
+                              style: GoogleFonts.inter(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: _dark,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const Spacer(),
+                      if (_showPreOrders) ...[
+                        Builder(
+                          builder: (context) {
+                            final totalDays = int.tryParse(product.harvestDays ?? '') ?? 0;
+                            final remainingDays = product.createdAt == null
+                                ? totalDays
+                                : product.createdAt!.add(Duration(days: totalDays)).difference(DateTime.now()).inDays + 1;
+                            final harvestLabel = remainingDays > 0
+                                ? 'Harvest in $remainingDays d'
+                                : (remainingDays == 0 ? 'Harvesting today' : 'Harvested');
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 3),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.schedule_rounded, size: 11, color: Color(0xFFEA580C)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    harvestLabel,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFFEA580C),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
                         children: [
                           Text(
-                            product.name,
+                            formattedPrice,
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: _dark,
-                              height: 1.2,
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w900,
+                              color: _primary,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Container(
-                                width: 17,
-                                height: 17,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Color(0xFFE2E8F0),
-                                ),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.storefront_rounded,
-                                    size: 10,
-                                    color: _primary,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 5),
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => _openFarmerProfile(product.farmerId),
-                                  child: Text(
-                                    farmDisplayName,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: _muted,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                              if (product.rating != null) ...[
-                                const Icon(Icons.star_rounded, size: 12, color: Color(0xFFF59E0B)),
-                                Text(
-                                  ' ${product.rating!}',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: _dark,
-                                  ),
-                                ),
-                              ],
-                            ],
+                          Text(
+                            unitLabel,
+                            style: GoogleFonts.inter(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: _mutedLight,
+                            ),
                           ),
                         ],
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (_showPreOrders) ...[
-                            Builder(
-                              builder: (context) {
-                                final totalDays = int.tryParse(product.harvestDays ?? '') ?? 0;
-                                final remainingDays = product.createdAt == null
-                                    ? totalDays
-                                    : product.createdAt!.add(Duration(days: totalDays)).difference(DateTime.now()).inDays + 1;
-                                final harvestLabel = remainingDays > 0
-                                    ? 'Harvest in $remainingDays d'
-                                    : (remainingDays == 0 ? 'Harvesting today' : 'Harvested');
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.schedule_rounded, size: 11, color: Color(0xFFEA580C)),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        harvestLabel,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: const Color(0xFFEA580C),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Text(
-                                formattedPrice,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: _primary,
-                                ),
-                              ),
-                              Text(
-                                unitLabel,
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: _mutedLight,
-                                ),
-                              ),
-                            ],
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _addToCart(product),
+                          icon: Icon(
+                            _showPreOrders ? Icons.calendar_today_rounded : Icons.add_shopping_cart_rounded,
+                            size: 13,
                           ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () => _addToCart(product),
-                              icon: Icon(
-                                _showPreOrders ? Icons.calendar_today_rounded : Icons.add_shopping_cart_rounded,
-                                size: 13.5,
-                              ),
-                              label: Text(_showPreOrders ? 'Reserve' : 'Add to Cart'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _primary,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                textStyle: GoogleFonts.inter(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 11.5,
-                                ),
-                              ),
+                          label: Text(_showPreOrders ? 'Reserve' : 'Add to Cart'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 7),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            textStyle: GoogleFonts.inter(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
@@ -2594,7 +2584,7 @@ FadeTransition(
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: 20,
             mainAxisSpacing: 20,
-            mainAxisExtent: _showPreOrders ? 460 : 425,
+            mainAxisExtent: _showPreOrders ? 360 : 330,
           ),
           itemCount: 8,
           itemBuilder: (context, index) => const AppShimmerCard(),

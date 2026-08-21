@@ -710,55 +710,76 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          Center(
-            child: Container(
-              height: 90,
-              width: 90,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: CachedNetworkImage(
-                  imageUrl:
-                      'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://agridirect.ph',
-                  fit: BoxFit.cover,
-                  placeholder: (ctx, url) => const Icon(
-                    Icons.qr_code_2_rounded,
-                    size: 50,
-                    color: Color(0xFF059669),
-                  ),
-                  errorWidget: (ctx, url, err) => const Icon(
-                    Icons.qr_code_2_rounded,
-                    size: 50,
-                    color: Color(0xFF059669),
+          if (!isFullWidth) ...[
+            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                height: 90,
+                width: 90,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    imageUrl:
+                        'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://github.com/vincentagbuya03/agridirect/releases/latest/download/AgriDirect-Installer.apk',
+                    fit: BoxFit.cover,
+                    placeholder: (ctx, url) => const Icon(
+                      Icons.qr_code_2_rounded,
+                      size: 50,
+                      color: Color(0xFF059669),
+                    ),
+                    errorWidget: (ctx, url, err) => const Icon(
+                      Icons.qr_code_2_rounded,
+                      size: 50,
+                      color: Color(0xFF059669),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
+          ],
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () => ApkDownloader.download(),
+              onPressed: () async {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Row(
+                      children: [
+                        Icon(Icons.download_rounded,
+                            color: Colors.white, size: 18),
+                        SizedBox(width: 8),
+                        Text('Downloading AgriDirect APK installer...'),
+                      ],
+                    ),
+                    backgroundColor: const Color(0xFF059669),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+                await ApkDownloader.download();
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF059669),
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              icon: const Icon(Icons.android_rounded, size: 16),
+              icon: const Icon(Icons.android_rounded, size: 18),
               label: Text(
                 'GET ANDROID APP',
                 style: GoogleFonts.inter(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w800,
                 ),
               ),

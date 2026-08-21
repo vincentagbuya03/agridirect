@@ -12,6 +12,7 @@ type SendPushPayload = {
   audience?: "farmers" | "customers" | "farmers_customers" | "all";
   title?: string;
   body?: string;
+  imageUrl?: string;
   notificationCode?: string;
   linkType?: string;
   linkId?: string | null;
@@ -373,6 +374,10 @@ Deno.serve(async (request: Request) => {
     const audience = payload.audience;
     const title = payload.title?.trim();
     const body = payload.body?.trim();
+    const imageUrl = payload.imageUrl?.trim() ||
+      payload.data?.image_url?.trim() ||
+      payload.data?.imageUrl?.trim() ||
+      null;
     const notificationCode = payload.notificationCode?.trim() || "general";
 
     // Enforce authorization: Non-admins cannot broadcast notifications
@@ -469,7 +474,12 @@ Deno.serve(async (request: Request) => {
       payload.linkType === "weather" ||
       payload.data?.category === "weather";
 
-    if (isWeatherNotification && resolvedUserIds.length === 1) {
+    const bypassCooldown =
+      payload.data?.skipCooldown === true ||
+      payload.data?.isTest === true ||
+      payload.data?.source === "admin_test";
+
+    if (isWeatherNotification && resolvedUserIds.length === 1 && !bypassCooldown) {
       const cutoff = new Date(
         Date.now() - WEATHER_NOTIFICATION_COOLDOWN_HOURS * 60 * 60 * 1000,
       ).toISOString();
@@ -567,10 +577,12 @@ Deno.serve(async (request: Request) => {
                   notification: {
                     title,
                     body,
+                    ...(imageUrl ? { image: imageUrl } : {}),
                   },
                 }),
                 data: {
                   ...messageData,
+                  ...(imageUrl ? { image_url: imageUrl } : {}),
                   // For calls, also include these top-level data fields so the
                   // background handler can read them from RemoteMessage.data
                   ...(payload.linkType === "call" && {
@@ -589,6 +601,8 @@ Deno.serve(async (request: Request) => {
                     notification: {
                       channel_id: "agridirect_channel",
                       sound: "default",
+                      tag: (payload.linkType === "weather" || notificationCode.startsWith("weather_")) ? "agridirect_weather" : undefined,
+                      ...(imageUrl ? { image: imageUrl } : {}),
                     },
                   }),
                 },
@@ -600,8 +614,14 @@ Deno.serve(async (request: Request) => {
                     aps: {
                       sound: "default",
                       "content-available": 1,
+                      "mutable-content": 1,
                     },
                   },
+                  ...(imageUrl ? {
+                    fcm_options: {
+                      image: imageUrl,
+                    },
+                  } : {}),
                 },
               },
             }),

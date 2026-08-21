@@ -131,26 +131,28 @@ class _WebNotificationsContentState extends State<WebNotificationsContent> {
                 ),
               ),
               const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Notification Settings',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: _dark,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Notification Settings',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: _dark,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Customize how and when you want to receive alerts from AgriDirect',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: _muted,
+                    const SizedBox(height: 4),
+                    Text(
+                      'Customize how and when you want to receive alerts from AgriDirect',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: _muted,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),

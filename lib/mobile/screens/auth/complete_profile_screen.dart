@@ -12,8 +12,7 @@ class CompleteProfileScreen extends StatefulWidget {
   const CompleteProfileScreen({super.key, required this.onComplete});
 
   @override
-  State<CompleteProfileScreen> createState() =>
-      _CompleteProfileScreenState();
+  State<CompleteProfileScreen> createState() => _CompleteProfileScreenState();
 }
 
 class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
@@ -66,7 +65,10 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     final confirmPassword = _confirmPasswordController.text.trim();
 
     if (password.isEmpty) {
-      _showErrorModal('Missing Password', 'Please create a secure password for your account');
+      _showErrorModal(
+        'Missing Password',
+        'Please create a secure password for your account',
+      );
       return;
     }
 
@@ -116,7 +118,10 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         ),
         content: Text(
           message,
-          style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF475569)),
+          style: GoogleFonts.inter(
+            fontSize: 13.5,
+            color: const Color(0xFF475569),
+          ),
         ),
         actions: [
           TextButton(
@@ -147,24 +152,37 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               children: [
                 // Top App Bar & Step Indicator
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       if (_currentStep == 1)
                         IconButton(
                           onPressed: _goToPhoneStep,
-                          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+                          icon: const Icon(
+                            Icons.arrow_back_rounded,
+                            color: Color(0xFF0F172A),
+                          ),
                         )
                       else
                         const SizedBox(width: 48),
                       // Step Pill Indicator
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFECFDF5),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                          border: Border.all(
+                            color: const Color(
+                              0xFF10B981,
+                            ).withValues(alpha: 0.3),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -190,10 +208,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   child: PageView(
                     controller: _pageController,
                     physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      _buildStep1Phone(auth),
-                      _buildStep2Password(),
-                    ],
+                    children: [_buildStep1Phone(auth), _buildStep2Password()],
                   ),
                 ),
               ],
@@ -419,11 +434,17 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFFECFDF5),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+              border: Border.all(
+                color: const Color(0xFF10B981).withValues(alpha: 0.3),
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 20),
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF059669),
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -504,9 +525,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       color: const Color(0xFF94A3B8),
                       size: 19,
                     ),
-                    onPressed: () => setState(
-                      () => _obscurePassword = !_obscurePassword,
-                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -597,7 +617,10 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       ),
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
+        hintStyle: GoogleFonts.inter(
+          fontSize: 13,
+          color: const Color(0xFF94A3B8),
+        ),
         prefixIcon: Icon(prefixIcon, size: 19, color: const Color(0xFF64748B)),
         suffixIcon: suffixIcon,
         filled: true,

@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:go_router/go_router.dart';
+import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/admin/admin_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/utils/js_helper.dart';
@@ -279,18 +281,22 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
   }
 
   Future<void> _confirmLogout() async {
-    final shouldLogout = await showDialog<bool>(
+    await showDialog<bool>(
       context: context,
       barrierDismissible: true,
-      builder: (dialogContext) => const PremiumConfirmDialog(
+      builder: (dialogContext) => PremiumConfirmDialog(
         title: 'Confirm Logout',
         content: 'Are you sure you want to log out of the admin panel?',
+        confirmText: 'Log Out',
+        loadingText: 'Logging out...',
+        onConfirm: () async {
+          await AuthService().logout();
+          if (mounted) {
+            context.go(AppRoutes.login);
+          }
+        },
       ),
     );
-
-    if (shouldLogout == true) {
-      widget.onLogout();
-    }
   }
 
   Future<void> _loadDashboardData() async {

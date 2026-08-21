@@ -35,6 +35,7 @@ class WebSalesDashboard extends StatefulWidget {
 class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProviderStateMixin {
   // Premium Design Tokens
   static const Color _primary = Color(0xFF10B981); // Emerald
+  static const Color _primaryDark = Color(0xFF047857);
   static const Color _secondary = Color(0xFF3B82F6); // Blue
   static const Color _accent = Color(0xFFF59E0B); // Amber
   
@@ -918,40 +919,40 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               backgroundColor: Colors.white,
               surfaceTintColor: Colors.transparent,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(24),
               ),
-              titlePadding: const EdgeInsets.fromLTRB(32, 32, 32, 0),
-              contentPadding: const EdgeInsets.fromLTRB(32, 24, 32, 0),
-              actionsPadding: const EdgeInsets.fromLTRB(32, 24, 32, 32),
+              titlePadding: const EdgeInsets.fromLTRB(28, 28, 28, 0),
+              contentPadding: const EdgeInsets.fromLTRB(28, 20, 28, 0),
+              actionsPadding: const EdgeInsets.fromLTRB(28, 20, 28, 28),
               title: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: _primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     child: const Icon(
                       Icons.confirmation_number_rounded,
                       color: _primary,
-                      size: 26,
+                      size: 24,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Voucher Manager',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
                           color: _dark,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Manage store vouchers & discount codes',
+                        'Manage store vouchers & customer discount codes',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           color: _muted,
@@ -964,19 +965,19 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                   Container(
                     decoration: BoxDecoration(
                       color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    padding: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.all(3),
                     child: Row(
                       children: [
                         GestureDetector(
                           onTap: () => setModalState(() => activeTab = 0),
                           child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
                             decoration: BoxDecoration(
                               color: activeTab == 0 ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(9),
                               boxShadow: activeTab == 0
                                   ? [
                                       BoxShadow(
@@ -987,24 +988,30 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                     ]
                                   : [],
                             ),
-                            child: Text(
-                              'Vouchers List',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: activeTab == 0 ? FontWeight.w700 : FontWeight.w600,
-                                color: activeTab == 0 ? _dark : _muted,
-                              ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.style_outlined, size: 14, color: activeTab == 0 ? _primary : _muted),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Vouchers List (${vouchers.length})',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.5,
+                                    fontWeight: activeTab == 0 ? FontWeight.w800 : FontWeight.w600,
+                                    color: activeTab == 0 ? _dark : _muted,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                         GestureDetector(
                           onTap: () => setModalState(() => activeTab = 1),
                           child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
                             decoration: BoxDecoration(
                               color: activeTab == 1 ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(9),
                               boxShadow: activeTab == 1
                                   ? [
                                       BoxShadow(
@@ -1015,13 +1022,19 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                     ]
                                   : [],
                             ),
-                            child: Text(
-                              'Create New',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: activeTab == 1 ? FontWeight.w700 : FontWeight.w600,
-                                color: activeTab == 1 ? _dark : _muted,
-                              ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.add_circle_outline_rounded, size: 14, color: activeTab == 1 ? _primary : _muted),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Create New',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.5,
+                                    fontWeight: activeTab == 1 ? FontWeight.w800 : FontWeight.w600,
+                                    color: activeTab == 1 ? _dark : _muted,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -1031,8 +1044,8 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                 ],
               ),
               content: SizedBox(
-                width: 600,
-                height: 440,
+                width: 640,
+                height: 460,
                 child: activeTab == 0
                     ? (isLoadingList
                         ? const Center(child: CircularProgressIndicator(color: _primary))
@@ -1042,30 +1055,30 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.all(24),
+                                      padding: const EdgeInsets.all(22),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFF8FAFC),
                                         shape: BoxShape.circle,
-                                        border: Border.all(color: const Color(0xFFF1F5F9)),
+                                        border: Border.all(color: const Color(0xFFE2E8F0)),
                                       ),
                                       child: const Icon(
                                         Icons.confirmation_number_outlined,
-                                        size: 48,
+                                        size: 42,
                                         color: Colors.grey,
                                       ),
                                     ),
-                                    const SizedBox(height: 18),
+                                    const SizedBox(height: 16),
                                     Text(
-                                      'No vouchers created yet',
+                                      'No store vouchers created yet',
                                       style: GoogleFonts.plusJakartaSans(
-                                        fontWeight: FontWeight.w700,
+                                        fontWeight: FontWeight.w800,
                                         fontSize: 16,
                                         color: _dark,
                                       ),
                                     ),
-                                    const SizedBox(height: 6),
+                                    const SizedBox(height: 4),
                                     Text(
-                                      'Click "Create New" to add discount vouchers for your shop.',
+                                      'Click "Create New" to add promotional codes for your shop.',
                                       style: GoogleFonts.inter(
                                         color: _muted,
                                         fontSize: 13,
@@ -1079,16 +1092,23 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                 itemCount: vouchers.length,
                                 itemBuilder: (context, index) {
                                   final voucher = vouchers[index];
-                                  final code = voucher['code'] ?? '';
-                                  final discVal = (voucher['discount_value'] as num).toDouble();
-                                  final type = voucher['discount_type'] ?? '';
-                                  final minSpend = (voucher['min_spend'] as num).toDouble();
-                                  final limit = voucher['usage_limit'] ?? 0;
-                                  final used = voucher['used_count'] ?? 0;
-                                  final endStr = DateFormat('yMMMd').format(DateTime.parse(voucher['end_date']));
+                                  final code = voucher['code']?.toString() ?? 'VOUCHER';
+                                  final dynamic rawVal = voucher['discount_percentage'] ??
+                                      voucher['discount_value'] ??
+                                      voucher['discount_amount'];
+                                  final double discVal = rawVal != null ? (rawVal as num).toDouble() : 0.0;
+                                  final String type = voucher['discount_type']?.toString() ?? 'flat';
+                                  final dynamic rawMin = voucher['min_spend'];
+                                  final double minSpend = rawMin != null ? (rawMin as num).toDouble() : 0.0;
+                                  final int limit = (voucher['usage_limit'] as num?)?.toInt() ?? 100;
+                                  final int used = (voucher['used_count'] as num?)?.toInt() ?? 0;
+                                  final String? dateStr = voucher['valid_until']?.toString() ?? voucher['end_date']?.toString();
+                                  final String endStr = dateStr != null
+                                      ? DateFormat('yMMMd').format(DateTime.tryParse(dateStr) ?? DateTime.now().add(const Duration(days: 30)))
+                                      : 'No Expiry';
 
                                   return Container(
-                                    margin: const EdgeInsets.only(bottom: 16),
+                                    margin: const EdgeInsets.only(bottom: 14),
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(16),
@@ -1096,19 +1116,19 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                       boxShadow: [
                                         BoxShadow(
                                           color: Colors.black.withValues(alpha: 0.02),
-                                          blurRadius: 6,
-                                          offset: const Offset(0, 3),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
                                         ),
                                       ],
                                     ),
                                     child: Row(
                                       children: [
-                                        // Left discount ticket block
+                                        // Left discount ticket block with ticket style
                                         Container(
                                           width: 120,
-                                          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+                                          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
                                           decoration: BoxDecoration(
-                                            color: _primary.withValues(alpha: 0.06),
+                                            color: _primary.withValues(alpha: 0.07),
                                             borderRadius: const BorderRadius.horizontal(left: Radius.circular(15)),
                                             border: const Border(
                                               right: BorderSide(color: Color(0xFFE2E8F0), style: BorderStyle.solid),
@@ -1119,10 +1139,12 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                             mainAxisAlignment: MainAxisAlignment.center,
                                             children: [
                                               Text(
-                                                type == 'flat' ? '₱${discVal.toStringAsFixed(0)}' : '${discVal.toStringAsFixed(0)}%',
+                                                type == 'flat'
+                                                    ? '₱${discVal.toStringAsFixed(0)}'
+                                                    : '${discVal.toStringAsFixed(0)}%',
                                                 style: GoogleFonts.plusJakartaSans(
                                                   fontWeight: FontWeight.w900,
-                                                  fontSize: 22,
+                                                  fontSize: 20,
                                                   color: _primary,
                                                 ),
                                                 textAlign: TextAlign.center,
@@ -1132,7 +1154,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                                 'OFF',
                                                 style: GoogleFonts.plusJakartaSans(
                                                   fontWeight: FontWeight.w800,
-                                                  fontSize: 10,
+                                                  fontSize: 9.5,
                                                   color: _primary,
                                                   letterSpacing: 1.5,
                                                 ),
@@ -1143,31 +1165,40 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                         // Right details block
                                         Expanded(
                                           child: Padding(
-                                            padding: const EdgeInsets.all(16),
+                                            padding: const EdgeInsets.all(14),
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 Row(
                                                   children: [
-                                                    Text(
-                                                      code,
-                                                      style: GoogleFonts.plusJakartaSans(
-                                                        fontWeight: FontWeight.w800,
-                                                        fontSize: 15,
-                                                        color: _dark,
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFFDCFCE7),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                      ),
+                                                      child: Text(
+                                                        code,
+                                                        style: GoogleFonts.plusJakartaSans(
+                                                          fontWeight: FontWeight.w800,
+                                                          fontSize: 13,
+                                                          color: _primaryDark,
+                                                        ),
                                                       ),
                                                     ),
                                                     const SizedBox(width: 8),
                                                     Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                                       decoration: BoxDecoration(
                                                         color: const Color(0xFFF1F5F9),
-                                                        borderRadius: BorderRadius.circular(20),
+                                                        borderRadius: BorderRadius.circular(6),
                                                       ),
                                                       child: Text(
-                                                        'Min. Spend ₱${minSpend.toStringAsFixed(0)}',
+                                                        minSpend > 0
+                                                            ? 'Min. Spend ₱${minSpend.toStringAsFixed(0)}'
+                                                            : 'No Min. Spend',
                                                         style: GoogleFonts.inter(
-                                                          fontSize: 10,
+                                                          fontSize: 11,
                                                           fontWeight: FontWeight.w700,
                                                           color: _muted,
                                                         ),
@@ -1178,11 +1209,11 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                                 const SizedBox(height: 8),
                                                 Row(
                                                   children: [
-                                                    const Icon(Icons.history_toggle_off_rounded, size: 13, color: Colors.grey),
+                                                    const Icon(Icons.event_available_rounded, size: 13, color: Colors.grey),
                                                     const SizedBox(width: 6),
                                                     Text(
-                                                      'Expires $endStr',
-                                                      style: GoogleFonts.inter(fontSize: 11, color: _muted),
+                                                      'Valid until $endStr',
+                                                      style: GoogleFonts.inter(fontSize: 11.5, color: _muted),
                                                     ),
                                                   ],
                                                 ),
@@ -1193,7 +1224,7 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                                     const SizedBox(width: 6),
                                                     Text(
                                                       'Claimed $used / $limit times',
-                                                      style: GoogleFonts.inter(fontSize: 11, color: _muted),
+                                                      style: GoogleFonts.inter(fontSize: 11.5, color: _muted),
                                                     ),
                                                   ],
                                                 ),
@@ -1202,18 +1233,21 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                           ),
                                         ),
                                         Padding(
-                                          padding: const EdgeInsets.only(right: 12),
+                                          padding: const EdgeInsets.only(right: 14),
                                           child: IconButton(
-                                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
                                             tooltip: 'Delete Voucher',
                                             style: IconButton.styleFrom(
-                                              backgroundColor: Colors.red.withValues(alpha: 0.05),
-                                              padding: const EdgeInsets.all(10),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                              backgroundColor: Colors.red.withValues(alpha: 0.06),
+                                              padding: const EdgeInsets.all(8),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                             ),
                                             onPressed: () async {
-                                              await voucherService.deleteVoucher(voucher['voucher_id']);
-                                              loadList();
+                                              final voucherId = voucher['voucher_id']?.toString() ?? voucher['id']?.toString();
+                                              if (voucherId != null) {
+                                                await voucherService.deleteVoucher(voucherId);
+                                                loadList();
+                                              }
                                             },
                                           ),
                                         ),
@@ -1230,56 +1264,57 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(16),
+                                padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: const Color(0xFFF1F5F9)),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.lightbulb_outline_rounded, color: _primary, size: 20),
+                                    const Icon(Icons.lightbulb_outline_rounded, color: _primary, size: 18),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
-                                        'Configure discount value and rules. Vouchers are displayed on your store profile page and product details pages.',
+                                        'Configure discount value and rules. Vouchers are automatically displayed on your store profile page and product details pages.',
                                         style: GoogleFonts.inter(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w500,
                                           color: _muted,
-                                          height: 1.5,
+                                          height: 1.4,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 20),
                               Row(
                                 children: [
                                   Expanded(
                                     child: TextFormField(
                                       controller: codeController,
                                       textCapitalization: TextCapitalization.characters,
+                                      style: GoogleFonts.inter(fontSize: 13.5, color: _dark),
                                       decoration: InputDecoration(
-                                        labelText: 'Voucher Code',
-                                        hintText: 'e.g. FARM50',
-                                        prefixIcon: const Icon(Icons.label_outline_rounded, size: 20),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                        labelText: 'Voucher Promo Code',
+                                        hintText: 'e.g. HARVEST50',
+                                        prefixIcon: const Icon(Icons.label_outline_rounded, size: 18),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                                       ),
                                       validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                                     ),
                                   ),
-                                  const SizedBox(width: 16),
+                                  const SizedBox(width: 14),
                                   Expanded(
                                     child: DropdownButtonFormField<String>(
                                       initialValue: discountType,
                                       decoration: InputDecoration(
                                         labelText: 'Discount Type',
-                                        prefixIcon: const Icon(Icons.style_outlined, size: 20),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                        prefixIcon: const Icon(Icons.style_outlined, size: 18),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                                       ),
                                       items: const [
                                         DropdownMenuItem(value: 'flat', child: Text('Flat Discount (₱)')),
@@ -1294,146 +1329,144 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 16),
                               Row(
                                 children: [
                                   Expanded(
                                     child: TextFormField(
                                       controller: valueController,
                                       keyboardType: TextInputType.number,
+                                      style: GoogleFonts.inter(fontSize: 13.5, color: _dark),
                                       decoration: InputDecoration(
                                         labelText: discountType == 'flat' ? 'Discount Value (₱)' : 'Discount Value (%)',
                                         hintText: discountType == 'flat' ? '50' : '10',
                                         prefixIcon: Icon(
                                           discountType == 'flat' ? Icons.payments_outlined : Icons.percent_rounded,
-                                          size: 20,
+                                          size: 18,
                                         ),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                                       ),
                                       validator: (v) => (v == null || double.tryParse(v) == null) ? 'Required number' : null,
                                     ),
                                   ),
-                                  const SizedBox(width: 16),
+                                  const SizedBox(width: 14),
                                   Expanded(
                                     child: TextFormField(
                                       controller: minSpendController,
                                       keyboardType: TextInputType.number,
+                                      style: GoogleFonts.inter(fontSize: 13.5, color: _dark),
                                       decoration: InputDecoration(
                                         labelText: 'Min. Spend (₱)',
                                         hintText: '100',
-                                        prefixIcon: const Icon(Icons.shopping_bag_outlined, size: 20),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                        prefixIcon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                                       ),
                                       validator: (v) => (v == null || double.tryParse(v) == null) ? 'Required number' : null,
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 16),
                               Row(
                                 children: [
                                   Expanded(
                                     child: TextFormField(
                                       controller: maxDiscountController,
                                       keyboardType: TextInputType.number,
+                                      style: GoogleFonts.inter(fontSize: 13.5, color: _dark),
                                       decoration: InputDecoration(
                                         labelText: 'Max Discount Limit (₱)',
-                                        hintText: 'Leave empty for no limit',
-                                        prefixIcon: const Icon(Icons.money_off_rounded, size: 20),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                        hintText: 'Optional',
+                                        prefixIcon: const Icon(Icons.money_off_rounded, size: 18),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 16),
+                                  const SizedBox(width: 14),
                                   Expanded(
                                     child: TextFormField(
                                       controller: limitController,
                                       keyboardType: TextInputType.number,
+                                      style: GoogleFonts.inter(fontSize: 13.5, color: _dark),
                                       decoration: InputDecoration(
                                         labelText: 'Total Quantity Limit',
                                         hintText: '100',
-                                        prefixIcon: const Icon(Icons.onetwothree_rounded, size: 20),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                        prefixIcon: const Icon(Icons.onetwothree_rounded, size: 18),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                                       ),
                                       validator: (v) => (v == null || int.tryParse(v) == null) ? 'Required integer' : null,
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 20),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () async {
-                                        final picked = await showDatePicker(
-                                          context: context,
-                                          initialDate: endDate,
-                                          firstDate: DateTime.now(),
-                                          lastDate: DateTime.now().add(const Duration(days: 365)),
-                                          builder: (context, child) {
-                                            return Theme(
-                                              data: Theme.of(context).copyWith(
-                                                colorScheme: const ColorScheme.light(
-                                                  primary: _primary,
-                                                  onPrimary: Colors.white,
-                                                  onSurface: _dark,
-                                                ),
-                                              ),
-                                              child: child!,
-                                            );
-                                          },
-                                        );
-                                        if (picked != null) {
-                                          setModalState(() => endDate = picked);
-                                        }
-                                      },
-                                      borderRadius: BorderRadius.circular(16),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                                        decoration: BoxDecoration(
-                                          border: Border.all(color: Colors.grey.shade400),
-                                          borderRadius: BorderRadius.circular(16),
+                              const SizedBox(height: 16),
+                              InkWell(
+                                onTap: () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: endDate,
+                                    firstDate: DateTime.now(),
+                                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                                    builder: (context, child) {
+                                      return Theme(
+                                        data: Theme.of(context).copyWith(
+                                          colorScheme: const ColorScheme.light(
+                                            primary: _primary,
+                                            onPrimary: Colors.white,
+                                            onSurface: _dark,
+                                          ),
                                         ),
-                                        child: Row(
+                                        child: child!,
+                                      );
+                                    },
+                                  );
+                                  if (picked != null) {
+                                    setModalState(() => endDate = picked);
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade400),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.date_range_rounded, color: _primary, size: 18),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            const Icon(Icons.date_range_rounded, color: _primary, size: 20),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    'Expiration Date',
-                                                    style: GoogleFonts.inter(
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.w500,
-                                                      color: _muted,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    DateFormat('yMMMd').format(endDate),
-                                                    style: GoogleFonts.inter(
-                                                      fontSize: 14,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: _dark,
-                                                    ),
-                                                  ),
-                                                ],
+                                            Text(
+                                              'Expiration Date',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                                color: _muted,
                                               ),
                                             ),
-                                            const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              DateFormat('yMMMd').format(endDate),
+                                              style: GoogleFonts.inter(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w700,
+                                                color: _dark,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       ),
-                                    ),
+                                      const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ],
                           ),
@@ -1443,12 +1476,22 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               actions: [
                 TextButton(
                   onPressed: isSaving ? null : () => Navigator.of(dialogCtx).pop(),
-                  child: const Text('Close'),
+                  child: Text('Close', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: _muted)),
                 ),
                 if (activeTab == 1)
-                  FilledButton(
+                  ElevatedButton(
                     onPressed: isSaving ? null : submit,
-                    child: Text(isSaving ? 'Saving...' : 'Create Voucher'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(
+                      isSaving ? 'Creating...' : 'Create Voucher',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
                   ),
               ],
             );

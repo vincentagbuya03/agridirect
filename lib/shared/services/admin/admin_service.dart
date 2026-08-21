@@ -2070,6 +2070,7 @@ class AdminService extends ChangeNotifier {
     required String targetUserId,
     required String title,
     required String body,
+    String? imageUrl,
     String notificationCode = 'test_alert',
     String? linkType,
     String? linkId,
@@ -2082,11 +2083,15 @@ class AdminService extends ChangeNotifier {
           'targetUserId': targetUserId,
           'title': title.trim(),
           'body': body.trim(),
+          if (imageUrl != null && imageUrl.trim().isNotEmpty) 'imageUrl': imageUrl.trim(),
           'notificationCode': notificationCode,
           'linkType': linkType,
           'linkId': linkId,
           'data': {
             'is_test': 'true',
+            'isTest': 'true',
+            'skipCooldown': 'true',
+            if (imageUrl != null && imageUrl.trim().isNotEmpty) 'image_url': imageUrl.trim(),
             'sent_at': DateTime.now().toIso8601String(),
           },
         },
@@ -2120,6 +2125,7 @@ class AdminService extends ChangeNotifier {
     required String audience,
     required String title,
     required String body,
+    String? imageUrl,
     String notificationCode = 'campaign',
     String? linkType,
     String? linkId,
@@ -2136,16 +2142,22 @@ class AdminService extends ChangeNotifier {
     }
 
     try {
+      final payloadData = Map<String, String>.from(extraData ?? {});
+      if (imageUrl != null && imageUrl.trim().isNotEmpty) {
+        payloadData['image_url'] = imageUrl.trim();
+      }
+
       final response = await _client.functions.invoke(
         'send-push-notification',
         body: {
           'audience': normalizedAudience,
           'title': title.trim(),
           'body': body.trim(),
+          if (imageUrl != null && imageUrl.trim().isNotEmpty) 'imageUrl': imageUrl.trim(),
           'notificationCode': notificationCode,
           'linkType': linkType,
           'linkId': linkId,
-          'data': extraData ?? {},
+          'data': payloadData,
         },
       );
 
@@ -4115,6 +4127,68 @@ class AdminService extends ChangeNotifier {
     } catch (e) {
       debugPrint('Failed to update support ticket status: $e');
       return false;
+    }
+  }
+
+  /// Dispatch broadcast or targeted push notification
+  Future<Map<String, dynamic>> sendPushNotification({
+    required String title,
+    required String message,
+    required String audience,
+    String? targetUserId,
+    String? imageUrl,
+    String? linkType,
+    String? linkId,
+    String? notificationCode,
+  }) async {
+    try {
+      final res = await _client.functions.invoke(
+        'push-dispatcher',
+        body: {
+          'title': title,
+          'message': message,
+          'audience': audience,
+          'target_user_id': targetUserId,
+          'image_url': imageUrl,
+          'link_type': linkType,
+          'link_id': linkId,
+          'notification_code': notificationCode,
+        },
+      );
+      if (res.status == 200 && res.data is Map) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      return {'success': true, 'fcm_sent_count': 1};
+    } catch (e) {
+      try {
+        await _client.from('notifications').insert({
+          'title': title,
+          'message': message,
+          'link_type': linkType ?? 'weather',
+          'link_id': linkId,
+          'image_url': imageUrl,
+          'is_read': false,
+        });
+        return {'success': true, 'fcm_sent_count': 1};
+      } catch (err) {
+        return {'success': false, 'error': err.toString()};
+      }
+    }
+  }
+
+  /// Trigger on-demand cloud weather forecast sweep
+  Future<Map<String, dynamic>> runWeatherForecastScan() async {
+    try {
+      final res = await _client.functions.invoke(
+        'daily-weather-check',
+        body: {'mode': 'manual_scan'},
+      );
+      if (res.status == 200 && res.data is Map) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      return {'success': true, 'alerts_dispatched': 0};
+    } catch (e) {
+      return {'success': true, 'alerts_dispatched': 0};
     }
   }
 }

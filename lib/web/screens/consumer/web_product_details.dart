@@ -520,11 +520,19 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                       ),
                     ),
                     _qtyButton(Icons.add_rounded, () {
-                      final isPreorder = _product!.targetQuantity != null;
-                      final maxQty = isPreorder ? 999 : (_product!.stockQuantity?.toInt() ?? 0);
-                      if (isPreorder || _quantity < maxQty) {
-                        setState(() => _quantity++);
+                      final isPreorder = _product?.targetQuantity != null || (_product?.isPreorder ?? false);
+                      final maxQty = isPreorder ? 999 : (_product?.stockQuantity?.toInt() ?? 0);
+                      if (!isPreorder && _quantity >= maxQty) {
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Only $maxQty item(s) available in stock.'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                        return;
                       }
+                      setState(() => _quantity++);
                     }),
                   ],
                 ),

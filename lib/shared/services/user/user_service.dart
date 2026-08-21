@@ -58,20 +58,49 @@ class UserService {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
 
-      final response = await _supabase
+      final updateData = <String, dynamic>{};
+      if (name != null) updateData['name'] = name;
+      if (phone != null) updateData['phone'] = phone;
+      if (avatarUrl != null) updateData['avatar_url'] = avatarUrl;
+      if (bio != null) updateData['bio'] = bio;
+
+      if (updateData.isEmpty) return await getCurrentUser();
+
+      final existing = await _supabase
           .from('users')
-          .update({
-            'name': ?name,
-            'phone': ?phone,
-            'avatar_url': ?avatarUrl,
-            'bio': ?bio,
-          })
+          .select('user_id')
           .eq('user_id', userId)
-          .select()
-          .single();
+          .maybeSingle();
+
+      Map<String, dynamic> response;
+      if (existing == null) {
+        updateData['user_id'] = userId;
+        updateData['email'] = _supabase.auth.currentUser?.email ?? '';
+        response = await _supabase
+            .from('users')
+            .upsert(updateData)
+            .select()
+            .single();
+      } else {
+        response = await _supabase
+            .from('users')
+            .update(updateData)
+            .eq('user_id', userId)
+            .select()
+            .single();
+      }
+
+      try {
+        if (name != null) {
+          await _supabase.auth.updateUser(
+            UserAttributes(data: {'name': name}),
+          );
+        }
+      } catch (_) {}
 
       return user_model.User.fromJson(response);
     } catch (e) {
+      // Return null on failure but rethrow if needed
       return null;
     }
   }

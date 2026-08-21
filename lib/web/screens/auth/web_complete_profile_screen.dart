@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/widgets/phone_verification_input_widget.dart';
+
+import '../../../shared/widgets/premium_confirm_dialog.dart';
 
 /// Web profile completion screen with professional phone verification and password setup.
 class WebCompleteProfileScreen extends StatefulWidget {
@@ -40,6 +44,26 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleLogout() async {
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => PremiumConfirmDialog(
+        title: 'Log Out',
+        content:
+            'Are you sure you want to log out? You can sign in again later to complete your profile.',
+        confirmText: 'Log Out',
+        loadingText: 'Logging out...',
+        onConfirm: () async {
+          await AuthService().logout();
+          if (mounted) {
+            context.go(AppRoutes.login);
+          }
+        },
+      ),
+    );
   }
 
   Future<void> _handleComplete() async {
@@ -346,6 +370,25 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: _isLoading ? null : _handleLogout,
+                          icon: const Icon(
+                            Icons.logout_rounded,
+                            size: 16,
+                            color: Color(0xFFDC2626),
+                          ),
+                          label: Text(
+                            'Log Out & Sign In Later',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFFDC2626),
+                            ),
+                          ),
                         ),
                       ),
                     ],

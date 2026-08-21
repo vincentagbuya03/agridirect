@@ -329,14 +329,30 @@ class AdminHeroCard extends StatelessWidget {
                 ),
               ],
               if (metrics.isNotEmpty) ...[
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 const Divider(height: 1, color: Color(0xFFE6EDE8)),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: isMobile ? 16 : 24,
-                  runSpacing: 16,
-                  children: metrics.where((m) => m is! SizedBox).toList(),
-                ),
+                const SizedBox(height: 14),
+                if (isMobile)
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 14,
+                    children: metrics
+                        .where((m) => m is! SizedBox)
+                        .map((m) {
+                          final itemWidth = (constraints.maxWidth - 36 - 12) / 2;
+                          return SizedBox(
+                            width: itemWidth > 120 ? itemWidth : null,
+                            child: m,
+                          );
+                        })
+                        .toList(),
+                  )
+                else
+                  Wrap(
+                    spacing: 24,
+                    runSpacing: 16,
+                    children: metrics.where((m) => m is! SizedBox).toList(),
+                  ),
               ],
             ],
           ),

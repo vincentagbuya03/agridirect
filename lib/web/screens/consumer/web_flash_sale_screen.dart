@@ -606,14 +606,14 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
     final sw = MediaQuery.of(context).size.width;
     int crossAxisCount = sw < 600 ? 2 : (sw < 960 ? 3 : (sw < 1200 ? 4 : 5));
     double childAspectRatio = sw < 480
-        ? 0.62
+        ? 0.58
         : (sw < 640
-            ? 0.66
+            ? 0.60
             : (sw < 960
-                ? 0.72
+                ? 0.62
                 : (sw < 1280
-                    ? 0.78
-                    : 0.82)));
+                    ? 0.64
+                    : 0.66)));
 
     return FutureBuilder<List<ProductItem>>(
       future: _productsFuture,

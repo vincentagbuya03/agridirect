@@ -14,7 +14,7 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/services/commerce/voucher_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
-
+import '../../widgets/web_consumer_nav_bar.dart';
 
 /// Dedicated full-page checkout for cart items (web).
 class WebCartCheckoutScreen extends StatefulWidget {
@@ -25,7 +25,8 @@ class WebCartCheckoutScreen extends StatefulWidget {
 }
 
 class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
-  static const Color _primary = Color(0xFF16A34A);
+  static const Color _primary = Color(0xFF059669);
+  static const Color _primaryDark = Color(0xFF047857);
   static const Color _dark = Color(0xFF0F172A);
   static const Color _muted = Color(0xFF64748B);
   static const Color _border = Color(0xFFE2E8F0);
@@ -40,6 +41,7 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
   bool _isLoadingAddresses = true;
   bool _isSubmittingOrder = false;
   String _paymentMethod = 'COD';
+  String _selectedDeliverySlot = 'morning'; // 'morning' | 'afternoon'
 
   List<FarmerProfile> _farmerProfiles = [];
   late List<CartItem> _cartItems;
@@ -170,15 +172,18 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
 
     if (_paymentMethod == 'COD' && _selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a delivery address.')),
+        const SnackBar(
+          content: Text('Please select or add a delivery address.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
 
     setState(() => _isSubmittingOrder = true);
     try {
-      // Simulate/allow loading state transition
-      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
       final orderService = OrderService();
       final Map<String, List<OrderItemInput>> itemsByFarmer = {};
       for (final item in _cartItems) {
@@ -192,8 +197,14 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
         );
       }
 
+      final deliverySlotNote = _selectedDeliverySlot == 'morning'
+          ? 'Preferred: Morning Dispatch (8AM - 12PM)'
+          : 'Preferred: Afternoon Dispatch (1PM - 5PM)';
+      final combinedNotes = _instructionsController.text.trim().isEmpty
+          ? deliverySlotNote
+          : '$deliverySlotNote | Notes: ${_instructionsController.text.trim()}';
+
       for (final entry in itemsByFarmer.entries) {
-        // Calculate per-farmer delivery fee
         final farmerSubtotal = _cartItems
             .where((i) => i.farmerId == entry.key)
             .fold<double>(0.0, (sum, i) => sum + i.total);
@@ -215,9 +226,8 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
           farmerId: entry.key,
           items: entry.value,
           paymentMethod: _paymentMethod,
-          deliveryAddressId:
-              _paymentMethod == 'COP' ? null : _selectedAddress?.addressId,
-          notes: _instructionsController.text.trim(),
+          deliveryAddressId: _paymentMethod == 'COP' ? null : _selectedAddress?.addressId,
+          notes: combinedNotes,
           deliveryFee: farmerDeliveryFee,
           discount: farmerDiscount,
         );
@@ -244,8 +254,9 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Order(s) placed successfully!'),
+          content: Text('🎉 Order placed successfully! Direct from Pangasinan farms.'),
           backgroundColor: _primary,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       context.go(AppRoutes.orderSuccess, extra: firstCategory);
@@ -253,12 +264,13 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
       if (!mounted) return;
       final rawMessage = e.toString().replaceFirst('Exception: ', '');
       final message = rawMessage.contains('Customer profile not found')
-          ? 'Customer profile not found. Please complete your consumer profile first.'
+          ? 'Customer profile not found. Please complete your profile first.'
           : rawMessage;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to place order: $message'),
           backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } finally {
@@ -279,7 +291,8 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
       );
     }
 
-    final isCompact = MediaQuery.of(context).size.width < 980;
+    final sw = MediaQuery.of(context).size.width;
+    final isCompact = sw < 980;
 
     return Scaffold(
       backgroundColor: _surface,
@@ -287,46 +300,59 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
         children: [
           Column(
             children: [
-              _buildTopBar(),
+              WebConsumerNavBar(
+                currentIndex: -1,
+                onNavigate: (i) => context.go(AppRoutes.webTabRoute(i)),
+                onCartTap: () => context.go(AppRoutes.cart),
+                isCartActive: true,
+                margin: EdgeInsets.fromLTRB(
+                  isCompact ? 16 : 32,
+                  20,
+                  isCompact ? 16 : 32,
+                  12,
+                ),
+              ),
               Expanded(
                 child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(
-                    isCompact ? 16 : 32,
-                    24,
-                    isCompact ? 16 : 32,
+                    isCompact ? 16 : 36,
+                    12,
+                    isCompact ? 16 : 36,
                     48,
                   ),
                   child: Center(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1200),
+                      constraints: const BoxConstraints(maxWidth: 1360),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildBreadcrumbs(),
+                          _buildStepperHeader(isCompact),
                           const SizedBox(height: 24),
-                          isCompact
-                              ? Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildCheckoutDetailsCard(),
-                                    const SizedBox(height: 24),
-                                    _buildOrderSummaryCard(),
-                                  ],
-                                )
-                              : Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      flex: 7,
-                                      child: _buildCheckoutDetailsCard(),
-                                    ),
-                                    const SizedBox(width: 28),
-                                    Expanded(
-                                      flex: 5,
-                                      child: _buildOrderSummaryCard(),
-                                    ),
-                                  ],
+                          if (isCompact)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildFulfillmentDetailsCard(),
+                                const SizedBox(height: 24),
+                                _buildOrderSummaryCard(),
+                              ],
+                            )
+                          else
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 62,
+                                  child: _buildFulfillmentDetailsCard(),
                                 ),
+                                const SizedBox(width: 28),
+                                Expanded(
+                                  flex: 38,
+                                  child: _buildOrderSummaryCard(),
+                                ),
+                              ],
+                            ),
                         ],
                       ),
                     ),
@@ -344,11 +370,11 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
                   decoration: BoxDecoration(
                     color: _white,
                     borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
+                        color: Color(0x22000000),
                         blurRadius: 20,
-                        offset: const Offset(0, 10),
+                        offset: Offset(0, 10),
                       ),
                     ],
                   ),
@@ -361,7 +387,7 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        'Processing transaction...',
+                        'Confirming Farm Direct Order...',
                         style: GoogleFonts.plusJakartaSans(
                           fontWeight: FontWeight.w800,
                           fontSize: 16,
@@ -370,7 +396,7 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Please do not refresh or navigate away',
+                        'Dispatching details to local growers',
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           color: _muted,
@@ -386,236 +412,320 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
     );
   }
 
-  // ─── Top Bar ───
-
-  Widget _buildTopBar() {
-    return SafeArea(
-      bottom: false,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        decoration: BoxDecoration(
-          color: _white,
-          border: Border(bottom: BorderSide(color: _border)),
-        ),
-        child: Row(
-          children: [
-            IconButton(
-              onPressed: () => context.go(AppRoutes.cart),
-              icon: const Icon(Icons.arrow_back_rounded, color: _dark),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Checkout',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: _dark,
-              ),
-            ),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: _primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+  // ─── 3-Step Visual Checkout Stepper ───────────────────────────────────────
+  Widget _buildStepperHeader(bool isCompact) {
+    return Container(
+      padding: EdgeInsets.all(isCompact ? 16 : 20),
+      decoration: BoxDecoration(
+        color: _white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x03000000),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
                 children: [
-                  const Icon(Icons.shopping_cart_rounded, size: 16, color: _primary),
+                  IconButton(
+                    onPressed: () => context.go(AppRoutes.cart),
+                    icon: const Icon(Icons.arrow_back_rounded, size: 20, color: _dark),
+                    splashRadius: 20,
+                  ),
                   const SizedBox(width: 6),
                   Text(
-                    '${_cartItems.length} item${_cartItems.length == 1 ? '' : 's'}',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: _primary,
+                    'Order Checkout',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: isCompact ? 18 : 22,
+                      fontWeight: FontWeight.w900,
+                      color: _dark,
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.shopping_bag_rounded, size: 14, color: _primaryDark),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${_cartItems.length} item${_cartItems.length == 1 ? '' : 's'}',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: _primaryDark,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 14),
+          // 3-Step Progress Bar
+          Row(
+            children: [
+              _stepIndicator('1', 'Cart Review', true, false),
+              _stepConnector(true),
+              _stepIndicator('2', 'Shipping & Payment', true, true),
+              _stepConnector(false),
+              _stepIndicator('3', 'Confirmation', false, false),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildBreadcrumbs() {
+  Widget _stepIndicator(String stepNum, String title, bool isComplete, bool isActive) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        _breadcrumb('Shop', () => context.go(AppRoutes.shop)),
-        _crumbArrow(),
-        _breadcrumb('Cart', () => context.go(AppRoutes.cart)),
-        _crumbArrow(),
+        Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            color: isActive ? _primary : (isComplete ? const Color(0xFFDCFCE7) : _surface),
+            shape: BoxShape.circle,
+            border: Border.all(color: isActive || isComplete ? _primary : _border),
+          ),
+          child: Center(
+            child: isComplete && !isActive
+                ? const Icon(Icons.check_rounded, size: 14, color: _primaryDark)
+                : Text(
+                    stepNum,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: isActive ? Colors.white : _muted,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(width: 8),
         Text(
-          'Checkout',
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: _dark,
+          title,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12.5,
+            fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+            color: isActive ? _dark : _muted,
           ),
         ),
       ],
     );
   }
 
-  Widget _breadcrumb(String label, VoidCallback onTap) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Text(
-          label,
-          style: GoogleFonts.inter(fontSize: 13, color: _primary),
-        ),
+  Widget _stepConnector(bool isComplete) {
+    return Expanded(
+      child: Container(
+        height: 2,
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        color: isComplete ? _primary : const Color(0xFFE2E8F0),
       ),
     );
   }
 
-  Widget _crumbArrow() =>
-      const Icon(Icons.chevron_right_rounded, size: 18, color: _muted);
-
-  // ─── Left Column: Checkout Details ───
-
-  Widget _buildCheckoutDetailsCard() {
+  // ─── Left Column: Fulfillment Details ──────────────────────────────────────
+  Widget _buildFulfillmentDetailsCard() {
     final requiresAddress = _paymentMethod == 'COD';
 
     return Container(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
         color: _white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: _border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x04000000),
+            blurRadius: 14,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Fulfillment Options',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: _dark,
-            ),
-          ),
-          const SizedBox(height: 18),
-          // Payment method selection
+          // Section Title
+          _buildSectionHeader(Icons.local_shipping_rounded, 'Fulfillment & Delivery Method'),
+          const SizedBox(height: 16),
+
+          // Payment Option Cards
           Row(
             children: [
-              Expanded(child: _buildPaymentOption('COD', 'Cash on Delivery')),
-              const SizedBox(width: 12),
-              Expanded(child: _buildPaymentOption('COP', 'Cash on Pickup')),
+              Expanded(
+                child: _buildFulfillmentOption(
+                  code: 'COD',
+                  title: 'Cash on Delivery (COD)',
+                  subtitle: 'Pay cash when produce arrives at your doorstep',
+                  icon: Icons.delivery_dining_rounded,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _buildFulfillmentOption(
+                  code: 'COP',
+                  title: 'Cash on Pickup (COP)',
+                  subtitle: 'Collect directly at the grower’s farm location',
+                  icon: Icons.storefront_rounded,
+                ),
+              ),
             ],
           ),
+          const SizedBox(height: 26),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
           const SizedBox(height: 24),
+
+          // Shipping Address / Farm Pickup Section
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                requiresAddress ? 'Shipping Address' : 'Pickup Location (at Farm)',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: _dark,
-                ),
+              _buildSectionHeader(
+                requiresAddress ? Icons.location_on_rounded : Icons.agriculture_rounded,
+                requiresAddress ? 'Delivery Destination' : 'Farm Pickup Location',
               ),
               if (requiresAddress)
-                MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: GestureDetector(
-                    onTap: _openAddressBook,
-                    child: Text(
-                      'Manage Addresses',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: _primary,
-                      ),
+                TextButton.icon(
+                  onPressed: _openAddressBook,
+                  icon: const Icon(Icons.add_location_alt_outlined, size: 16, color: _primary),
+                  label: Text(
+                    'Manage Addresses',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _primary,
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
+
           if (_isLoadingAddresses)
             const Center(
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
+                padding: EdgeInsets.symmetric(vertical: 24),
                 child: CircularProgressIndicator(color: _primary),
               ),
             )
           else if (requiresAddress)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildAddressPanel(),
-                const SizedBox(height: 24),
-              ],
-            )
+            _buildAddressPanel()
           else
-            Column(
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: _surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _border),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: _surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.pin_drop_rounded, color: _primaryDark, size: 22),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Pickup will be arranged directly with the farmer.',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: _dark,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Direct Farm Collection',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: _dark,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Visit each farm to collect your order(s).',
-                        style: GoogleFonts.inter(fontSize: 13, color: _muted),
-                      ),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          'Pickup instructions & farm gate coordinates will be provided upon order confirmation.',
+                          style: GoogleFonts.inter(fontSize: 12.5, color: _muted),
+                        ),
+                      ],
+                    ),
                   ),
+                ],
+              ),
+            ),
+
+          const SizedBox(height: 26),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 24),
+
+          // Preferred Delivery Time Slot
+          _buildSectionHeader(Icons.schedule_rounded, 'Preferred Dispatch Time Slot'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTimeSlotOption(
+                  id: 'morning',
+                  title: '🌅 Morning Dispatch',
+                  timeRange: '8:00 AM – 12:00 PM (Early Harvest)',
                 ),
-                const SizedBox(height: 24),
-              ],
-            ),
-          Text(
-            'Special Instructions',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: _dark,
-            ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _buildTimeSlotOption(
+                  id: 'afternoon',
+                  title: '🌇 Afternoon Dispatch',
+                  timeRange: '1:00 PM – 5:00 PM (Evening Batch)',
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
+
+          const SizedBox(height: 26),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 24),
+
+          // Special Instructions for Farmer
+          _buildSectionHeader(Icons.speaker_notes_outlined, 'Special Instructions for Local Farmer'),
+          const SizedBox(height: 12),
           TextField(
             controller: _instructionsController,
             maxLines: 3,
-            style: GoogleFonts.inter(fontSize: 14, color: _dark),
+            style: GoogleFonts.inter(fontSize: 13.5, color: _dark),
             decoration: InputDecoration(
-              hintText:
-                  'Notes for the farmer, e.g. preferred delivery time, landmarks...',
+              hintText: 'e.g. Leave with security guard, preferred ripeness level, landmark near green gate...',
               hintStyle: GoogleFonts.inter(fontSize: 13, color: _muted),
               filled: true,
               fillColor: _surface,
+              contentPadding: const EdgeInsets.all(14),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: _border),
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: _border),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: _border),
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: _border),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: _primary, width: 2),
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: _primary, width: 1.5),
               ),
             ),
           ),
@@ -624,37 +734,118 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
     );
   }
 
-  Widget _buildPaymentOption(String code, String label) {
+  Widget _buildSectionHeader(IconData icon, String title) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: _primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: _dark,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFulfillmentOption({
+    required String code,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+  }) {
     final isSelected = _paymentMethod == code;
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: () => setState(() => _paymentMethod = code),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.all(14),
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? _primary.withValues(alpha: 0.08) : _white,
+          color: isSelected ? const Color(0xFFECFDF5) : _surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? _primary : _border,
-            width: isSelected ? 1.5 : 1,
+            width: isSelected ? 2 : 1,
           ),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
+                Icon(icon, size: 20, color: isSelected ? _primaryDark : _muted),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: isSelected ? _primaryDark : _dark,
+                    ),
+                  ),
+                ),
+                if (isSelected)
+                  const Icon(Icons.check_circle_rounded, size: 18, color: _primary),
+              ],
+            ),
+            const SizedBox(height: 6),
             Text(
-              code,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: isSelected ? _primary : _dark,
-              ),
+              subtitle,
+              style: GoogleFonts.inter(fontSize: 11.5, color: _muted, height: 1.3),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimeSlotOption({
+    required String id,
+    required String title,
+    required String timeRange,
+  }) {
+    final isSelected = _selectedDeliverySlot == id;
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => setState(() => _selectedDeliverySlot = id),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFECFDF5) : _surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? _primary : _border,
+            width: isSelected ? 1.8 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: isSelected ? _primaryDark : _dark,
+                  ),
+                ),
+                if (isSelected)
+                  const Icon(Icons.check_circle_rounded, size: 16, color: _primary),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
-              label,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 12, color: _muted),
+              timeRange,
+              style: GoogleFonts.inter(fontSize: 11, color: _muted),
             ),
           ],
         ),
@@ -676,127 +867,84 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
           children: [
             Expanded(
               child: Text(
-                'No saved address found. Add one first to use Cash on Delivery.',
+                'No saved address found. Add one to use Cash on Delivery.',
                 style: GoogleFonts.inter(fontSize: 13, color: _muted),
               ),
             ),
             const SizedBox(width: 8),
-            TextButton(
+            ElevatedButton(
               onPressed: _openAddressBook,
-              child: Text(
-                'Manage',
-                style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w700, color: _primary),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
+              child: const Text('Add Address'),
             ),
           ],
         ),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DropdownButtonFormField<String>(
-          initialValue: _selectedAddress?.addressId,
-          items: _addresses
-              .map(
-                (address) => DropdownMenuItem<String>(
-                  value: address.addressId,
-                  child: Text(
-                    '${address.label} • ${address.city}',
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(fontSize: 14, color: _dark),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.person_rounded, size: 18, color: _primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    _selectedAddress?.recipientName ?? 'Recipient',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                    ),
                   ),
-                ),
-              )
-              .toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedAddress = _addresses.cast<UserAddress?>().firstWhere(
-                (address) => address?.addressId == value,
-                orElse: () => null,
-              );
-            });
-          },
-          decoration: InputDecoration(
-            labelText: 'Delivery address',
-            labelStyle: GoogleFonts.inter(color: _muted),
-            filled: true,
-            fillColor: _surface,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: _border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: _border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: _primary, width: 2),
-            ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      _selectedAddress?.label.toUpperCase() ?? 'HOME',
+                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: _primaryDark),
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                _selectedAddress?.recipientPhone ?? '',
+                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: _dark),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 12),
-        if (_selectedAddress != null)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.person_outline_rounded,
-                        size: 16, color: _muted),
-                    const SizedBox(width: 8),
-                    Text(
-                      _selectedAddress!.recipientName,
-                      style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _dark),
-                    ),
-                    const Spacer(),
-                    const Icon(Icons.phone_outlined, size: 16, color: _muted),
-                    const SizedBox(width: 8),
-                    Text(
-                      _selectedAddress!.recipientPhone,
-                      style: GoogleFonts.inter(fontSize: 13, color: _dark),
-                    ),
-                  ],
-                ),
-                const Divider(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.location_on_outlined,
-                        size: 16, color: _muted),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${_selectedAddress!.street}, ${_selectedAddress!.barangay}, ${_selectedAddress!.city}, ${_selectedAddress!.province}',
-                        style: GoogleFonts.inter(
-                            fontSize: 13, color: _dark, height: 1.4),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+          const SizedBox(height: 8),
+          Text(
+            _selectedAddress != null
+                ? '${_selectedAddress!.street}, ${_selectedAddress!.barangay}, ${_selectedAddress!.city}, ${_selectedAddress!.province}'
+                : 'Please select an address',
+            style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569), height: 1.4),
           ),
-      ],
+        ],
+      ),
     );
   }
 
-  // ─── Right Column: Order Summary ───
-
+  // ─── Right Column: Order Summary & Vouchers ────────────────────────────────
   Widget _buildOrderSummaryCard() {
     final subtotal = _subtotal();
     final deliveryFee = _totalDeliveryFee();
@@ -809,11 +957,18 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
         color: _white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: _border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x04000000),
+            blurRadius: 14,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -822,12 +977,15 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
             'Order Summary',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 18,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w900,
               color: _dark,
             ),
           ),
-          const SizedBox(height: 12),
-          // Item list grouped by farmer
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 14),
+
+          // Item list grouped by farm
           ...itemsByFarmer.entries.map((entry) {
             final farmerId = entry.key;
             final farmerItems = entry.value;
@@ -835,116 +993,141 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
               (p) => p?.profileId == farmerId,
               orElse: () => null,
             );
-            final farmName = profile?.farmName ?? 'Farmer Store';
+            final farmName = profile?.farmName ?? farmerItems.first.farm;
             final farmerSubtotal = farmerItems.fold<double>(0.0, (sum, i) => sum + i.total);
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 14, bottom: 8),
-                  child: Row(
+            return Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
                       const Icon(Icons.storefront_rounded, size: 16, color: _primary),
-                      const SizedBox(width: 8),
-                      Text(
-                        farmName,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                          color: _dark,
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          farmName,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13.5,
+                            color: _dark,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                ),
-                ...farmerItems.map((item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildItemRow(item),
-                    )),
-                _buildFarmerVoucherRow(farmerId, farmName, farmerSubtotal),
-                const Divider(height: 24),
-              ],
+                  const SizedBox(height: 10),
+                  ...farmerItems.map((item) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _buildItemRow(item),
+                      )),
+                  const Divider(height: 12, color: Color(0xFFE2E8F0)),
+                  _buildFarmerVoucherRow(farmerId, farmName, farmerSubtotal),
+                ],
+              ),
             );
           }),
-          // Cost breakdown
+
+          const SizedBox(height: 8),
           _costRow('Subtotal', _currency(subtotal)),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           _costRow(
             'Delivery Fee',
-            deliveryFee > 0 ? _currency(deliveryFee) : 'Free',
+            deliveryFee > 0 ? _currency(deliveryFee) : 'Free Delivery',
+            isHighlight: deliveryFee == 0,
           ),
           if (_totalVoucherDiscount() > 0) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             _costRow(
               'Voucher Discount',
               '-${_currency(_totalVoucherDiscount())}',
+              isDiscount: true,
             ),
           ],
-          const Divider(height: 36),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 16),
+
+          // Total Amount
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                'Total Amount',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: _dark,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Total Amount',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: _dark,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text('Direct farmgate pricing', style: GoogleFonts.inter(fontSize: 11, color: _muted)),
+                ],
               ),
-              const Spacer(),
               Text(
                 _currency(total),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: _primary,
+                  fontWeight: FontWeight.w900,
+                  color: _primaryDark,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
+
+          // Place Order Button
           SizedBox(
             width: double.infinity,
-            child: FilledButton(
+            child: ElevatedButton.icon(
               onPressed: _isSubmittingOrder ? null : _submitOrder,
-              style: FilledButton.styleFrom(
-                backgroundColor: _primary,
-                foregroundColor: _white,
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: _isSubmittingOrder
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Placing Order...',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
+              icon: _isSubmittingOrder
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                     )
-                  : Text(
-                      'Place Order',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                  : const Icon(Icons.check_circle_outline_rounded, size: 18),
+              label: Text(
+                _isSubmittingOrder ? 'Placing Order...' : 'Place Order Now',
+                style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w800),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Safety Seal
+          Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.shield_outlined, size: 14, color: _primaryDark),
+                const SizedBox(width: 5),
+                Text(
+                  '100% Cash on Delivery Protected • No Prepayment',
+                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: _muted),
+                ),
+              ],
             ),
           ),
         ],
@@ -956,27 +1139,20 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
     return Row(
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           child: SizedBox(
-            width: 56,
-            height: 56,
+            width: 44,
+            height: 44,
             child: item.imageUrl.isNotEmpty
                 ? SafeNetworkImage(
                     imageUrl: item.imageUrl,
                     fit: BoxFit.cover,
-                    placeholder: Container(color: Colors.grey[100]),
-                    errorWidget: Container(
-                      color: Colors.grey[100],
-                      child: const Icon(Icons.image_outlined, color: _muted),
-                    ),
+                    errorWidget: Container(color: Colors.grey[100], child: const Icon(Icons.eco_rounded, size: 18, color: _primary)),
                   )
-                : Container(
-                    color: Colors.grey[100],
-                    child: const Icon(Icons.image_outlined, color: _muted),
-                  ),
+                : Container(color: Colors.grey[100], child: const Icon(Icons.eco_rounded, size: 18, color: _primary)),
           ),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -984,17 +1160,16 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
               Text(
                 item.name,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
                   color: _dark,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 2),
               Text(
                 '${item.quantity} ${item.unit} × ₱${item.priceValue.toStringAsFixed(0)}',
-                style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                style: GoogleFonts.inter(fontSize: 11.5, color: _muted),
               ),
             ],
           ),
@@ -1002,8 +1177,8 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
         Text(
           _currency(item.total),
           style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
             color: _dark,
           ),
         ),
@@ -1013,70 +1188,31 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
 
   Widget _buildFarmerVoucherRow(String farmerId, String farmName, double farmerSubtotal) {
     final selectedVoucher = _selectedVouchersByFarmer[farmerId];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
           children: [
-            const Icon(Icons.confirmation_number_outlined, color: _primary, size: 16),
-            const SizedBox(width: 6),
+            const Icon(Icons.confirmation_number_outlined, color: _primaryDark, size: 15),
+            const SizedBox(width: 5),
             Text(
-              'Shop Voucher',
-              style: GoogleFonts.plusJakartaSans(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                color: _dark,
-              ),
-            ),
-            const Spacer(),
-            TextButton(
-              onPressed: () => _openVoucherSelectionDialogForFarmer(farmerId, farmName, farmerSubtotal),
-              style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(40, 20)),
-              child: Text(
-                selectedVoucher == null ? 'Select Voucher' : 'Change',
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                  color: _primary,
-                ),
-              ),
+              selectedVoucher != null ? 'Voucher Applied' : 'Shop Voucher',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12, color: _dark),
             ),
           ],
         ),
-        if (selectedVoucher != null) ...[
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: _primary.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: _primary.withValues(alpha: 0.2)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.check_circle_outline_rounded, color: _primary, size: 14),
-                const SizedBox(width: 6),
-                Text(
-                  'Applied: ${selectedVoucher['code']}',
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 11,
-                    color: _primary,
-                  ),
-                ),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedVouchersByFarmer.remove(farmerId);
-                    });
-                  },
-                  child: const Icon(Icons.clear_rounded, size: 14, color: Colors.grey),
-                ),
-              ],
+        TextButton(
+          onPressed: () => _openVoucherSelectionDialogForFarmer(farmerId, farmName, farmerSubtotal),
+          style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(40, 20)),
+          child: Text(
+            selectedVoucher == null ? 'Select Voucher' : 'Change (${selectedVoucher['code']})',
+            style: GoogleFonts.inter(
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              color: _primary,
             ),
           ),
-        ],
+        ),
       ],
     );
   }
@@ -1098,107 +1234,63 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
       builder: (dialogCtx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            Future<void> load() async {
-              try {
-                final list = await voucherService.getValidCheckoutVouchers(
-                  userId: currentUserId,
-                  farmerId: farmerId,
-                  cartAmount: farmerSubtotal,
-                );
+            if (isLoading) {
+              voucherService.getUserClaimedVouchersForFarmer(currentUserId, farmerId).then((vouchers) {
                 setModalState(() {
-                  validVouchers = list;
+                  validVouchers = vouchers.where((v) {
+                    final minSpend = (v['min_spend'] as num?)?.toDouble() ?? 0.0;
+                    return farmerSubtotal >= minSpend;
+                  }).toList();
                   isLoading = false;
                 });
-              } catch (_) {
-                setModalState(() => isLoading = false);
-              }
-            }
-
-            if (isLoading) {
-              WidgetsBinding.instance.addPostFrameCallback((_) => load());
+              });
             }
 
             return AlertDialog(
-              backgroundColor: Colors.white,
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              title: Text(
-                'Vouchers for $farmName',
-                style: GoogleFonts.plusJakartaSans(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                  color: _dark,
-                ),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text('Vouchers for $farmName', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16)),
               content: SizedBox(
                 width: 400,
-                height: 300,
                 child: isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : (validVouchers.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.confirmation_number_outlined, size: 40, color: Colors.grey),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'No valid vouchers found for this shop.',
-                                  style: GoogleFonts.inter(color: Colors.grey, fontSize: 13),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
+                    ? const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Center(child: CircularProgressIndicator(color: _primary)),
+                      )
+                    : validVouchers.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              'No eligible vouchers available for this order amount.',
+                              style: GoogleFonts.inter(fontSize: 13, color: _muted),
                             ),
                           )
-                        : ListView.builder(
+                        : ListView.separated(
+                            shrinkWrap: true,
                             itemCount: validVouchers.length,
-                            itemBuilder: (context, index) {
-                              final v = validVouchers[index];
-                              final code = v['code'] ?? '';
-                              final val = (v['discount_value'] as num).toDouble();
-                              final type = v['discount_type'] ?? '';
-                              final minSpend = (v['min_spend'] as num).toDouble();
-
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                                ),
-                                child: ListTile(
-                                  title: Text(
-                                    code,
-                                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
-                                  ),
-                                  subtitle: Text(
-                                    type == 'flat'
-                                        ? '₱${val.toStringAsFixed(0)} OFF (Min. spend ₱${minSpend.toStringAsFixed(0)})'
-                                        : '${val.toStringAsFixed(0)}% OFF (Min. spend ₱${minSpend.toStringAsFixed(0)})',
-                                    style: GoogleFonts.inter(fontSize: 12, color: _muted),
-                                  ),
-                                  trailing: const Icon(
-                                    Icons.arrow_forward_ios_rounded,
-                                    size: 14,
-                                    color: _muted,
-                                  ),
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedVouchersByFarmer[farmerId] = v;
-                                    });
-                                    Navigator.of(dialogCtx).pop();
+                            separatorBuilder: (_, _) => const SizedBox(height: 8),
+                            itemBuilder: (ctx, i) {
+                              final v = validVouchers[i];
+                              return ListTile(
+                                tileColor: _surface,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                title: Text(v['code'] ?? 'VOUCHER', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 13)),
+                                subtitle: Text(v['description'] ?? '', style: GoogleFonts.inter(fontSize: 11)),
+                                trailing: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: Colors.white),
+                                  onPressed: () {
+                                    setState(() => _selectedVouchersByFarmer[farmerId] = v);
+                                    Navigator.pop(dialogCtx);
                                   },
+                                  child: const Text('Apply'),
                                 ),
                               );
                             },
-                          )),
+                          ),
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: const Text('Cancel'),
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Close'),
                 ),
               ],
             );
@@ -1208,20 +1300,19 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
     );
   }
 
-  Widget _costRow(String label, String value) {
+  Widget _costRow(String label, String value, {bool isHighlight = false, bool isDiscount = false}) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(fontSize: 14, color: _muted),
-        ),
-        const Spacer(),
+        Text(label, style: GoogleFonts.inter(fontSize: 13, color: _muted)),
         Text(
           value,
           style: GoogleFonts.inter(
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: _dark,
+            color: isDiscount
+                ? const Color(0xFFDC2626)
+                : (isHighlight ? _primaryDark : _dark),
           ),
         ),
       ],

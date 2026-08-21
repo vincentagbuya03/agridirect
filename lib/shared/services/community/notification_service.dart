@@ -863,7 +863,7 @@ class NotificationService {
         return;
       }
 
-      if (linkType == 'radar' || linkType == 'weather_radar') {
+      if (linkType == 'radar' || linkType == 'weather_radar' || linkType == 'weather') {
         GoRouter.of(ctx).go(AppRoutes.weatherRadar);
         return;
       }

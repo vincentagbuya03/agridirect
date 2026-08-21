@@ -20,9 +20,15 @@ class CartService extends ChangeNotifier {
 
   List<CartItem> get selectedItems => _items.where((item) => item.isSelected).toList();
 
-  int get itemCount => _items.fold(0, (sum, item) => sum + item.quantity);
+  /// Total number of unique products in the cart (displayed on cart badges)
+  int get itemCount => _items.length;
+
+  /// Total units/pieces across all items in the cart
+  int get totalQuantity => _items.fold(0, (sum, item) => sum + item.quantity);
 
   double get totalAmount => _items.fold(0, (sum, item) => sum + (item.isSelected ? item.total : 0));
+
+  double get selectedTotal => totalAmount;
 
   bool get isAllSelected => _items.isNotEmpty && _items.every((item) => item.isSelected);
 
@@ -320,6 +326,7 @@ class CartService extends ChangeNotifier {
     if (index != -1) {
       if (quantity <= 0) {
         _items.removeAt(index);
+        notifyListeners(); // Instant UI update
         if (currentUserId != null) {
           final customerId = await _getCustomerId();
           if (customerId != null) {
@@ -331,36 +338,44 @@ class CartService extends ChangeNotifier {
         } else {
           await _saveGuestCart();
         }
-        notifyListeners();
         return null;
       } else {
-        // Fetch product to verify stock
-        final product = await SupabaseDataService().getProductById(productId);
-        int finalQuantity = quantity;
-        String? warning;
+        // Optimistically update quantity in memory immediately
+        _items[index].quantity = quantity;
+        notifyListeners(); // Instant UI update!
 
-        if (product != null && !product.isPreorder && product.stockQuantity != null) {
-          final maxStock = product.stockQuantity!.toInt();
-          if (quantity > maxStock) {
-            finalQuantity = maxStock;
-            warning = 'Only $maxStock available in stock';
-          }
-        }
+        try {
+          // Asynchronously verify stock and sync with database
+          final product = await SupabaseDataService().getProductById(productId);
+          int finalQuantity = quantity;
+          String? warning;
 
-        _items[index].quantity = finalQuantity;
-        if (currentUserId != null) {
-          final customerId = await _getCustomerId();
-          if (customerId != null) {
-            await _supabase.from('cart_items').update({
-              'quantity': finalQuantity,
-              'updated_at': DateTime.now().toIso8601String(),
-            }).eq('customer_id', customerId).eq('product_id', productId);
+          if (product != null && !product.isPreorder && product.stockQuantity != null) {
+            final maxStock = product.stockQuantity!.toInt();
+            if (quantity > maxStock) {
+              finalQuantity = maxStock;
+              warning = 'Only $maxStock available in stock';
+              _items[index].quantity = finalQuantity;
+              notifyListeners();
+            }
           }
-        } else {
-          await _saveGuestCart();
+
+          if (currentUserId != null) {
+            final customerId = await _getCustomerId();
+            if (customerId != null) {
+              await _supabase.from('cart_items').update({
+                'quantity': finalQuantity,
+                'updated_at': DateTime.now().toIso8601String(),
+              }).eq('customer_id', customerId).eq('product_id', productId);
+            }
+          } else {
+            await _saveGuestCart();
+          }
+          return warning;
+        } catch (e) {
+          debugPrint('Error syncing cart quantity: $e');
+          return null;
         }
-        notifyListeners();
-        return warning;
       }
     }
     return 'Item not found in cart';

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/services/articles/articles_service.dart';
+import '../../../shared/services/auth/auth_service.dart';
 import '../../widgets/animated_components.dart';
 import '../../widgets/web_footer.dart';
 
@@ -122,6 +123,8 @@ class _WebArticlesScreenState extends State<WebArticlesScreen> {
   }
 
   Widget _buildTopNav(bool isMobile) {
+    final isFarmerMode = AuthService().isViewingAsFarmer;
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: isMobile ? 16 : 48,
@@ -146,63 +149,112 @@ class _WebArticlesScreenState extends State<WebArticlesScreen> {
               MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: GestureDetector(
-                  onTap: () => context.go('/'),
+                  onTap: () => context.go(isFarmerMode ? AppRoutes.farmerDashboard : '/'),
                   child: BrandLogo(size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium),
                 ),
               ),
               const Spacer(),
               if (!isMobile) ...[
-                TextButton(
-                  onPressed: () => context.go('/'),
-                  child: Text('Home', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
-                ),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () => context.go(AppRoutes.shop),
-                  child: Text('Shop', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
-                ),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () => context.go(AppRoutes.community),
-                  child: Text('Community', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
-                ),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _activeArticle = null;
-                      _selectedCategory = 'All Articles';
-                    });
-                  },
-                  child: Text('DA Articles', style: GoogleFonts.inter(color: AgriColors.emerald700, fontWeight: FontWeight.w700)),
-                ),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () => context.go(AppRoutes.aboutUs),
-                  child: Text('About Us', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
-                ),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () => context.go(AppRoutes.farmersMap),
-                  child: Text('Find Farmer', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
-                ),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () => context.go(AppRoutes.weatherRadar),
-                  child: Text('Weather', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
-                ),
-                const SizedBox(width: 14),
+                if (isFarmerMode) ...[
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.farmerDashboard),
+                    child: Text('Dashboard', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 6),
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.community),
+                    child: Text('Community', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 6),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _activeArticle = null;
+                        _selectedCategory = 'All Articles';
+                      });
+                    },
+                    child: Text('DA Articles', style: GoogleFonts.inter(color: AgriColors.emerald700, fontWeight: FontWeight.w700)),
+                  ),
+                  const SizedBox(width: 6),
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.farmersMap),
+                    child: Text('Find Farmer', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 6),
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.weatherRadar),
+                    child: Text('Weather', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 14),
+                ] else ...[
+                  TextButton(
+                    onPressed: () => context.go('/'),
+                    child: Text('Home', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 6),
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.shop),
+                    child: Text('Shop', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 6),
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.community),
+                    child: Text('Community', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 6),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _activeArticle = null;
+                        _selectedCategory = 'All Articles';
+                      });
+                    },
+                    child: Text('DA Articles', style: GoogleFonts.inter(color: AgriColors.emerald700, fontWeight: FontWeight.w700)),
+                  ),
+                  const SizedBox(width: 6),
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.aboutUs),
+                    child: Text('About Us', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 6),
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.farmersMap),
+                    child: Text('Find Farmer', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 6),
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.weatherRadar),
+                    child: Text('Weather', style: GoogleFonts.inter(color: AgriColors.dark, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 14),
+                ],
               ],
               ElevatedButton.icon(
-                onPressed: () => context.go(AppRoutes.marketplace),
+                onPressed: () {
+                  if (isFarmerMode) {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go(AppRoutes.farmerDashboard);
+                    }
+                  } else {
+                    context.go(AppRoutes.marketplace);
+                  }
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF005A36),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 ),
-                icon: const Icon(Icons.storefront_rounded, size: 16),
-                label: Text('Marketplace', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 13)),
+                icon: Icon(
+                  isFarmerMode ? Icons.dashboard_rounded : Icons.storefront_rounded,
+                  size: 16,
+                ),
+                label: Text(
+                  isFarmerMode ? 'Dashboard' : 'Marketplace',
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 13),
+                ),
               ),
             ],
           ),
@@ -212,6 +264,8 @@ class _WebArticlesScreenState extends State<WebArticlesScreen> {
   }
 
   Widget _buildArticlesListView(List<DAArticleData> articles, bool isMobile) {
+    final isFarmerMode = AuthService().isViewingAsFarmer;
+
     return Container(
       color: const Color(0xFFFBFDFB),
       padding: EdgeInsets.symmetric(
@@ -228,8 +282,11 @@ class _WebArticlesScreenState extends State<WebArticlesScreen> {
               Row(
                 children: [
                   GestureDetector(
-                    onTap: () => context.go('/'),
-                    child: Text('Home', style: GoogleFonts.inter(fontSize: 13, color: AgriColors.muted, fontWeight: FontWeight.w500)),
+                    onTap: () => context.go(isFarmerMode ? AppRoutes.farmerDashboard : '/'),
+                    child: Text(
+                      isFarmerMode ? 'Farmer Dashboard' : 'Home',
+                      style: GoogleFonts.inter(fontSize: 13, color: AgriColors.muted, fontWeight: FontWeight.w500),
+                    ),
                   ),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
