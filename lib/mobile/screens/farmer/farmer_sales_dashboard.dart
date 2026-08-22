@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -52,7 +53,8 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     'listingsTrend': '0%',
   };
   bool _isSpeedDialOpen = false;
-  int _selectedAnalyticsPeriod = 0; // 0: Week, 1: Month, 2: Year
+  int _selectedAnalyticsPeriod = 0; // 0: 7D, 1: 30D, 2: 1Y
+  int? _touchedChartIndex;
 
   late Stream<int> _unreadMessagesStream;
   late Stream<int> _unreadNotificationsStream;
@@ -1298,10 +1300,52 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   }
 
   // ===========================================================================
-  // 5. SALES ANALYTICS CARD
+  // 5. SALES ANALYTICS CARD (DYNAMIC & INTERACTIVE)
   // ===========================================================================
   Widget _buildSalesAnalyticsCard() {
-    final revenue = (_stats['totalRevenue'] as num?)?.toDouble() ?? 0.0;
+    final analyticsMap = (_stats['analytics'] as Map<String, dynamic>?) ?? {};
+    final activeKey = _selectedAnalyticsPeriod == 0
+        ? '7D'
+        : (_selectedAnalyticsPeriod == 1 ? '30D' : '1Y');
+
+    final defaultLabels = _selectedAnalyticsPeriod == 0
+        ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        : (_selectedAnalyticsPeriod == 1
+            ? ['W1', 'W2', 'W3', 'W4', 'W5']
+            : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
+
+    final activeAnalytics = (analyticsMap[activeKey] as Map<String, dynamic>?) ?? {
+      'revenue': (_stats['totalRevenue'] as num?)?.toDouble() ?? 0.0,
+      'trend': _stats['revenueTrend']?.toString() ?? '+0%',
+      'data': List<double>.filled(defaultLabels.length, 0.0),
+      'labels': defaultLabels,
+      'dates': List<String>.filled(defaultLabels.length, ''),
+      'orderCounts': List<int>.filled(defaultLabels.length, 0),
+    };
+
+    final periodRevenue = (activeAnalytics['revenue'] as num?)?.toDouble() ?? 0.0;
+    final periodTrend = activeAnalytics['trend']?.toString() ?? '+0%';
+    final chartData = (activeAnalytics['data'] as List<dynamic>?)
+            ?.map((e) => (e as num).toDouble())
+            .toList() ??
+        List<double>.filled(defaultLabels.length, 0.0);
+    final chartLabels = (activeAnalytics['labels'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        defaultLabels;
+    final chartDates = (activeAnalytics['dates'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+    final chartOrders = (activeAnalytics['orderCounts'] as List<dynamic>?)
+            ?.map((e) => (e as num).toInt())
+            .toList() ??
+        [];
+
+    final isPositiveTrend = !periodTrend.startsWith('-');
+    final periodSubtitle = _selectedAnalyticsPeriod == 0
+        ? 'Past 7 Days'
+        : (_selectedAnalyticsPeriod == 1 ? 'Past 30 Days' : 'This Year');
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -1320,30 +1364,84 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Period Selector Chips
+          // Period Selector Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'REVENUE TRAJECTORY',
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF94A3B8),
-                      letterSpacing: 0.6,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        'REVENUE TRAJECTORY',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF94A3B8),
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '• $periodSubtitle',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF059669),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '₱${revenue.toStringAsFixed(2)}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF0F172A),
-                    ),
+                  const SizedBox(height: 3),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        '₱${periodRevenue.toStringAsFixed(2)}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: (isPositiveTrend ? const Color(0xFF10B981) : const Color(0xFFF59E0B))
+                              .withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isPositiveTrend
+                                  ? Icons.trending_up_rounded
+                                  : Icons.trending_flat_rounded,
+                              size: 13,
+                              color: isPositiveTrend
+                                  ? const Color(0xFF059669)
+                                  : const Color(0xFFD97706),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              periodTrend,
+                              style: GoogleFonts.inter(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: isPositiveTrend
+                                  ? const Color(0xFF059669)
+                                  : const Color(0xFFD97706),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1358,41 +1456,80 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
 
-          // Chart Canvas
-          SizedBox(
-            height: 120,
-            width: double.infinity,
-            child: CustomPaint(
-              painter: _AnalyticsChartPainter(
-                AppColors.primary,
-                [
-                  revenue * 0.2,
-                  revenue * 0.4,
-                  revenue * 0.35,
-                  revenue * 0.6,
-                  revenue * 0.75,
-                  revenue * 0.8,
-                  revenue,
+          // Interactive Tooltip Badge (if touched)
+          if (_touchedChartIndex != null &&
+              _touchedChartIndex! >= 0 &&
+              _touchedChartIndex! < chartData.length) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF064E3B),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.touch_app_rounded, size: 13, color: Color(0xFF34D399)),
+                  const SizedBox(width: 5),
+                  Text(
+                    '${chartDates.isNotEmpty && _touchedChartIndex! < chartDates.length && chartDates[_touchedChartIndex!].isNotEmpty ? chartDates[_touchedChartIndex!] : chartLabels[_touchedChartIndex!]}: ₱${chartData[_touchedChartIndex!].toStringAsFixed(2)}${chartOrders.isNotEmpty && _touchedChartIndex! < chartOrders.length ? " (${chartOrders[_touchedChartIndex!]} orders)" : ""}',
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
             ),
+            const SizedBox(height: 8),
+          ],
+
+          // Interactive Chart Canvas
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return GestureDetector(
+                onTapDown: (details) {
+                  final width = constraints.maxWidth;
+                  final step = width / (chartData.length - 1);
+                  final idx = ((details.localPosition.dx) / step).round().clamp(0, chartData.length - 1);
+                  HapticFeedback.selectionClick();
+                  setState(() => _touchedChartIndex = idx);
+                },
+                onPanUpdate: (details) {
+                  final width = constraints.maxWidth;
+                  final step = width / (chartData.length - 1);
+                  final idx = ((details.localPosition.dx) / step).round().clamp(0, chartData.length - 1);
+                  if (idx != _touchedChartIndex) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _touchedChartIndex = idx);
+                  }
+                },
+                onPanEnd: (_) => Future.delayed(const Duration(seconds: 3), () {
+                  if (mounted) setState(() => _touchedChartIndex = null);
+                }),
+                child: SizedBox(
+                  height: 125,
+                  width: double.infinity,
+                  child: CustomPaint(
+                    painter: _AnalyticsChartPainter(
+                      color: const Color(0xFF059669),
+                      data: chartData,
+                      selectedIndex: _touchedChartIndex,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 12),
 
-          // Chart Days Axis
+          // Dynamic Chart X-Axis Labels
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildAxisLabel('Mon'),
-              _buildAxisLabel('Tue'),
-              _buildAxisLabel('Wed'),
-              _buildAxisLabel('Thu'),
-              _buildAxisLabel('Fri'),
-              _buildAxisLabel('Sat'),
-              _buildAxisLabel('Sun'),
-            ],
+            children: chartLabels.map((lbl) => _buildAxisLabel(lbl)).toList(),
           ),
         ],
       ),
@@ -1402,12 +1539,28 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   Widget _buildPeriodChip(int index, String label) {
     final isSelected = _selectedAnalyticsPeriod == index;
     return GestureDetector(
-      onTap: () => setState(() => _selectedAnalyticsPeriod = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() {
+          _selectedAnalyticsPeriod = index;
+          _touchedChartIndex = null;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : const Color(0xFFF1F5F9),
+          color: isSelected ? const Color(0xFF059669) : const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(8),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF059669).withValues(alpha: 0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
@@ -1586,16 +1739,25 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   }
 }
 
+
 // =============================================================================
-// CHART PAINTER
+// CHART PAINTER (DYNAMIC & INTERACTIVE)
 // =============================================================================
 class _AnalyticsChartPainter extends CustomPainter {
   final Color color;
   final List<double> data;
-  _AnalyticsChartPainter(this.color, this.data);
+  final int? selectedIndex;
+
+  _AnalyticsChartPainter({
+    required this.color,
+    required this.data,
+    this.selectedIndex,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (data.isEmpty) return;
+
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
@@ -1606,26 +1768,46 @@ class _AnalyticsChartPainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [color.withValues(alpha: 0.25), color.withValues(alpha: 0.0)],
+        colors: [color.withValues(alpha: 0.28), color.withValues(alpha: 0.0)],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-
-    final path = Path();
-    final fillPath = Path();
 
     final maxVal = data.fold<double>(
       0,
       (prev, element) => element > prev ? element : prev,
     );
-    final displayMax = maxVal == 0 ? 1.0 : maxVal;
+    final displayMax = maxVal == 0 ? 100.0 : maxVal;
+
+    // Draw subtle horizontal grid baselines
+    final gridPaint = Paint()
+      ..color = const Color(0xFFE2E8F0).withValues(alpha: 0.8)
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(
+      Offset(0, size.height * 0.25),
+      Offset(size.width, size.height * 0.25),
+      gridPaint,
+    );
+    canvas.drawLine(
+      Offset(0, size.height * 0.75),
+      Offset(size.width, size.height * 0.75),
+      gridPaint,
+    );
 
     final points = List.generate(data.length, (i) {
-      final x = (size.width / (data.length - 1)) * i;
-      final y =
-          size.height -
-          (size.height * (data[i] / displayMax) * 0.75) -
-          (size.height * 0.1);
+      final x = data.length == 1 ? size.width / 2 : (size.width / (data.length - 1)) * i;
+      final ratio = maxVal == 0 ? 0.0 : (data[i] / displayMax);
+      final y = size.height - (size.height * ratio * 0.75) - (size.height * 0.12);
       return Offset(x, y);
     });
+
+    if (points.length == 1) {
+      canvas.drawCircle(points.first, 5, Paint()..color = color);
+      return;
+    }
+
+    final path = Path();
+    final fillPath = Path();
 
     path.moveTo(points[0].dx, points[0].dy);
     fillPath.moveTo(points[0].dx, points[0].dy);
@@ -1661,11 +1843,46 @@ class _AnalyticsChartPainter extends CustomPainter {
     canvas.drawPath(fillPath, fillPaint);
     canvas.drawPath(path, paint);
 
-    final lastPoint = points.last;
-    canvas.drawCircle(lastPoint, 6, Paint()..color = Colors.white);
-    canvas.drawCircle(lastPoint, 4, Paint()..color = color);
+    // Draw Selected Point Highlight & Guideline
+    if (selectedIndex != null && selectedIndex! >= 0 && selectedIndex! < points.length) {
+      final selPoint = points[selectedIndex!];
+
+      // Vertical dashed line
+      final guidelinePaint = Paint()
+        ..color = color.withValues(alpha: 0.4)
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke;
+
+      double startY = 0;
+      while (startY < size.height) {
+        canvas.drawLine(
+          Offset(selPoint.dx, startY),
+          Offset(selPoint.dx, (startY + 4).clamp(0, size.height)),
+          guidelinePaint,
+        );
+        startY += 8;
+      }
+
+      // Outer glowing ring
+      canvas.drawCircle(
+        selPoint,
+        9,
+        Paint()..color = color.withValues(alpha: 0.25),
+      );
+      canvas.drawCircle(selPoint, 6, Paint()..color = Colors.white);
+      canvas.drawCircle(selPoint, 4, Paint()..color = color);
+    } else {
+      // Default: highlight last point
+      final lastPoint = points.last;
+      canvas.drawCircle(lastPoint, 6, Paint()..color = Colors.white);
+      canvas.drawCircle(lastPoint, 4, Paint()..color = color);
+    }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _AnalyticsChartPainter oldDelegate) {
+    return oldDelegate.selectedIndex != selectedIndex ||
+        oldDelegate.data != data ||
+        oldDelegate.color != color;
+  }
 }

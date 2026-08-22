@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'search_screen.dart';
+import '../auth/qr_scanner_screen.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
@@ -145,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildPremiumHeader(context),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.only(top: 20, bottom: 40),
+                padding: const EdgeInsets.only(top: 14, bottom: 40),
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -892,91 +893,187 @@ class _HomeScreenState extends State<HomeScreen> {
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF047857), Color(0xFF10B981)],
+          colors: [Color(0xFF047857), Color(0xFF059669), Color(0xFF10B981)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF064E3B).withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // 1. Compact Location Pill
-              GestureDetector(
-                onTap: () => _showAddressPicker(context),
-                child: Container(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.location_on_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 4),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 85),
-                        child: Text(
-                          _displayCity,
-                          style: GoogleFonts.inter(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
+              // Row 1: Location selector pill + Quick Actions (Messages, Alerts, Cart)
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _showAddressPicker(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.25),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.location_on_rounded,
+                              color: Color(0xFFFDE047),
+                              size: 16,
+                            ),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: RichText(
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                text: TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: 'Deliver to: ',
+                                      style: GoogleFonts.inter(
+                                        color: Colors.white.withValues(alpha: 0.85),
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: _displayCity,
+                                      style: GoogleFonts.inter(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ],
                         ),
                       ),
-                      const Icon(
-                        Icons.arrow_drop_down_rounded,
-                        color: Colors.white70,
-                        size: 20,
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  StreamBuilder<int>(
+                    stream: _unreadCountStream,
+                    builder: (context, snapshot) {
+                      return _buildCompactHeaderAction(
+                        Icons.chat_bubble_outline_rounded,
+                        (snapshot.data ?? 0) > 0,
+                        () => context.push(AppRoutes.customerMessages),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  _buildCompactHeaderNotification(context),
+                  const SizedBox(width: 12),
+                  _buildCompactHeaderCart(context),
+                ],
               ),
-              // 2. Search Bar Middle
-              Expanded(
-                child: GestureDetector(
+              const SizedBox(height: 10),
+              // Row 2: Full-width Hero Search Button
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const SearchScreen()),
                     );
                   },
+                  borderRadius: BorderRadius.circular(14),
                   child: Container(
-                    height: 38,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.95),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(
-                          Icons.search_rounded,
-                          color: Color(0xFF6B7280),
-                          size: 18,
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: const Icon(
+                            Icons.search_rounded,
+                            color: Color(0xFF059669),
+                            size: 18,
+                          ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Search fresh produce...',
+                            'Search fresh vegetables, fruits, crops...',
                             style: GoogleFonts.inter(
-                              color: const Color(0xFF6B7280),
+                              color: const Color(0xFF94A3B8),
                               fontSize: 13,
+                              fontWeight: FontWeight.w500,
                             ),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          height: 20,
+                          width: 1,
+                          color: const Color(0xFFE2E8F0),
+                          margin: const EdgeInsets.symmetric(horizontal: 6),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const QRScannerScreen(
+                                  title: 'Scan QR / Product',
+                                  instruction: 'Scan QR code to locate produce',
+                                ),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.qr_code_scanner_rounded,
+                              color: Color(0xFF059669),
+                              size: 18,
+                            ),
                           ),
                         ),
                       ],
@@ -984,22 +1081,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
-              // 3. Icons (Chat, Notification, Cart)
-              StreamBuilder<int>(
-                stream: _unreadCountStream,
-                builder: (context, snapshot) {
-                  return _buildCompactHeaderAction(
-                    Icons.chat_bubble_outline_rounded,
-                    (snapshot.data ?? 0) > 0,
-                    () => context.push(AppRoutes.customerMessages),
-                  );
-                },
-              ),
-              const SizedBox(width: 14),
-              _buildCompactHeaderNotification(context),
-              const SizedBox(width: 14),
-              _buildCompactHeaderCart(context),
             ],
           ),
         ),

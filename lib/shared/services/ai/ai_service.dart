@@ -112,7 +112,7 @@ Your responsibilities:
             'temperature': temperature,
             'max_tokens': 1024,
           }),
-        );
+        ).timeout(const Duration(seconds: 4));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -145,7 +145,7 @@ Your responsibilities:
             'temperature': temperature,
             'max_tokens': 1024,
           }),
-        );
+        ).timeout(const Duration(seconds: 4));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(utf8.decode(response.bodyBytes));

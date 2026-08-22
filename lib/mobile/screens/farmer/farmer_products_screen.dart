@@ -1346,14 +1346,17 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                 const SizedBox(height: 8),
 
                 // Bottom Action Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     if (isPreorder)
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
-                          vertical: 3,
+                          vertical: 3.5,
                         ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF0F9FF),
@@ -1387,15 +1390,15 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                         if (isPreorder && productId.isNotEmpty) ...[
                           InkWell(
                             onTap: () => _showPostUpdateBottomSheet(productId, name),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(8),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
+                                horizontal: 10,
+                                vertical: 5,
                               ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFECFDF5),
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                   color: const Color(0xFF10B981)
                                       .withValues(alpha: 0.3),
@@ -1406,14 +1409,14 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                                 children: [
                                   const Icon(
                                     Icons.camera_alt_outlined,
-                                    size: 13,
+                                    size: 12,
                                     color: Color(0xFF059669),
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Post Update',
                                     style: GoogleFonts.inter(
-                                      fontSize: 12,
+                                      fontSize: 11.5,
                                       fontWeight: FontWeight.w700,
                                       color: const Color(0xFF059669),
                                     ),
@@ -1422,7 +1425,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                         ],
                         InkWell(
                           onTap: () async {
@@ -1432,15 +1435,15 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                             );
                             _initializeStreams();
                           },
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(8),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
+                              horizontal: 10,
+                              vertical: 5,
                             ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: const Color(0xFFE2E8F0),
                               ),
@@ -1450,14 +1453,14 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                               children: [
                                 const Icon(
                                   Icons.edit_outlined,
-                                  size: 13,
+                                  size: 12,
                                   color: Color(0xFF475569),
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Manage',
                                   style: GoogleFonts.inter(
-                                    fontSize: 12,
+                                    fontSize: 11.5,
                                     fontWeight: FontWeight.w700,
                                     color: const Color(0xFF475569),
                                   ),
@@ -1490,12 +1493,16 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
         children: [
           Icon(icon, size: 11, color: const Color(0xFF64748B)),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: const Color(0xFF475569),
+          Flexible(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF475569),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

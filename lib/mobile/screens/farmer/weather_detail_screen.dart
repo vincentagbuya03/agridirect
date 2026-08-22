@@ -66,14 +66,13 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     );
   }
 
-  String _getKikoMascotAsset(String description, double temp) {
+  String _getKikoMascotAsset(String description, double temp, double precipRate) {
     final desc = description.toLowerCase();
     if (desc.contains('storm') || desc.contains('thunder')) {
       return 'assets/images/kiko_stormy.png';
     }
-    if (desc.contains('rain') ||
-        desc.contains('drizzle') ||
-        desc.contains('shower')) {
+    // Only show rainy mascot if actively precipitating
+    if ((desc.contains('rain') || desc.contains('drizzle') || desc.contains('shower')) && precipRate > 0.1) {
       return 'assets/images/kiko_rainy.jpg';
     }
     if (temp <= 18 ||
@@ -85,7 +84,9 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     if (desc.contains('cloud') ||
         desc.contains('overcast') ||
         desc.contains('fog') ||
-        desc.contains('mist')) {
+        desc.contains('mist') ||
+        desc.contains('rain') ||
+        desc.contains('shower')) {
       return 'assets/images/kiko_cloudy.png';
     }
     return 'assets/images/kiko_happy.png';
@@ -137,41 +138,60 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
   }
 
   String _getSprayingStatus(double windSpeed, double humidity, String desc) {
-    final isRainy = desc.toLowerCase().contains('rain') ||
-        desc.toLowerCase().contains('storm');
-    if (isRainy || windSpeed > 15) return 'UNSAFE';
+    final lower = desc.toLowerCase();
+    final isStormOrRain = lower.contains('rain') ||
+        lower.contains('storm') ||
+        lower.contains('thunder') ||
+        lower.contains('drizzle') ||
+        lower.contains('shower');
+    if (isStormOrRain || windSpeed > 15) return 'UNSAFE';
     if (windSpeed > 10 || humidity > 85) return 'CAUTION';
     return 'SAFE';
   }
 
   String _getIrrigationStatus(double humidity, double temperature, String desc) {
-    final isRainy = desc.toLowerCase().contains('rain') ||
-        desc.toLowerCase().contains('storm');
-    if (isRainy || humidity > 85) return 'NO NEED';
-    if (temperature > 30 && humidity < 60) return 'HIGH NEED';
-    if (temperature > 26 && humidity < 70) return 'MODERATE';
-    return 'NO NEED';
+    final lower = desc.toLowerCase();
+    final isStormOrRain = lower.contains('rain') ||
+        lower.contains('storm') ||
+        lower.contains('thunder') ||
+        lower.contains('drizzle') ||
+        lower.contains('shower');
+    if (isStormOrRain || humidity > 80) return 'NO NEED';
+    if (temperature >= 35 && humidity < 50) return 'HIGH NEED';
+    if (temperature >= 30 && humidity < 65) return 'MODERATE';
+    return 'LOW';
   }
 
   String _getDiseaseRiskStatus(double humidity, double temperature) {
-    if (humidity > 80 && temperature > 22) return 'HIGH';
-    if (humidity > 68 && temperature > 18) return 'MEDIUM';
+    if (humidity >= 80 && temperature >= 24) return 'HIGH';
+    if (humidity >= 65 && temperature >= 20) return 'MEDIUM';
     return 'LOW';
+  }
+
+  String _getHarvestingStatus(String desc, double humidity) {
+    final lower = desc.toLowerCase();
+    if (lower.contains('storm') || lower.contains('thunder')) return 'UNSAFE';
+    if (lower.contains('rain') || lower.contains('drizzle') || lower.contains('shower')) return 'DELAY';
+    if (humidity > 85) return 'CAUTION';
+    return 'OPTIMAL';
   }
 
   Color _getStatusColor(String status) {
     switch (status) {
       case 'SAFE':
+      case 'OPTIMAL':
       case 'NO NEED':
       case 'LOW':
         return const Color(0xFF10B981);
       case 'CAUTION':
       case 'MODERATE':
       case 'MEDIUM':
+      case 'DELAY':
         return const Color(0xFFF59E0B);
       case 'UNSAFE':
       case 'HIGH NEED':
       case 'HIGH':
+      case 'RESTRICTED':
       default:
         return const Color(0xFFEF4444);
     }
@@ -188,7 +208,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     final wind = weather.windSpeed.toStringAsFixed(1);
     final location = weather.location;
     final atmosphereGradient = _getAtmosphereGradient(desc);
-    final kikoAsset = _getKikoMascotAsset(desc, temp);
+    final kikoAsset = _getKikoMascotAsset(desc, temp, weather.precipitationRate);
 
     // Hourly forecast list for temperature curve (max 7 items)
     final hourlyItems = (forecast?.forecasts ?? [])
@@ -333,34 +353,46 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
           ),
         ),
 
-        // Location Title Tag
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.location_on_rounded,
-                color: Color(0xFF34D399),
-                size: 15,
+        const SizedBox(width: 8),
+
+        // Location Title Tag (Overflow-Proof)
+        Expanded(
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
               ),
-              const SizedBox(width: 6),
-              Text(
-                location,
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.location_on_rounded,
+                    color: Color(0xFF34D399),
+                    size: 15,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      location,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
+
+        const SizedBox(width: 8),
 
         // Refresh / Radar Action
         ClipRRect(
@@ -532,6 +564,59 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
               ],
             ),
           ),
+
+          // Hyper-Local Nowcast Advance Warning Strip
+          if (widget.weatherData.nowcastSummary != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0284C7).withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF38BDF8).withValues(alpha: 0.4),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.radar_rounded,
+                    size: 16,
+                    color: Color(0xFF38BDF8),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.weatherData.nowcastSummary!,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _launchWeatherMap,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF38BDF8).withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Radar',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -862,15 +947,25 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     required String kikoAsset,
   }) {
     String kikoSpeech;
-    if (desc.toLowerCase().contains('rain') || wind > 14) {
+    final lower = desc.toLowerCase();
+    if (lower.contains('storm') || lower.contains('thunder')) {
       kikoSpeech =
-          'Moo! High wind or rain detected. Delay foliar fertilizer and pesticide spraying today to avoid wash-off and chemical waste. Keep water channels clear!';
-    } else if (temp >= 31) {
+          'Moo! ⚡ Thunderstorm & lightning alert! Suspend open field labor immediately, secure loose tools and farm shelters, and ensure drainage canals are clear to prevent waterlogging.';
+    } else if (lower.contains('rain') || lower.contains('drizzle') || lower.contains('shower')) {
       kikoSpeech =
-          'Moo! Heat stress alert today ($temp°C). Water crops deeply in the early morning before sunrise and check mulching to preserve ground moisture!';
+          'Moo! 🌧️ Wet field conditions detected. Delay foliar fertilizer and pesticide spraying today to avoid wash-off. Move harvested produce to dry storage!';
+    } else if (wind > 14) {
+      kikoSpeech =
+          'Moo! 💨 Strong wind gusts detected (${wind.toStringAsFixed(1)} km/h). Stake tall crop trellises and avoid chemical spraying due to severe drift risk.';
+    } else if (temp >= 36) {
+      kikoSpeech =
+          'Moo! ☀️ Intense heat wave alert (${temp.toStringAsFixed(0)}°C). Irrigate early before sunrise, check mulching, and protect field workers from midday heat!';
+    } else if (humidity >= 80) {
+      kikoSpeech =
+          'Moo! ☁️ High humidity (${humidity.toStringAsFixed(0)}%) elevates fungal blight risk. Inspect lower leaves for spots and ensure good field aeration.';
     } else {
       kikoSpeech =
-          'Moo! Great farming weather today! Ideal conditions for weeding, seedling transplanting, and applying organic bio-stimulants in the fields.';
+          'Moo! 🌿 Great farming weather today! Ideal conditions for weeding, seedling transplanting, and routine field operations in San Carlos.';
     }
 
     return Container(
@@ -965,6 +1060,7 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
     final sprayingStatus = _getSprayingStatus(windSpeed, humidity, desc);
     final irrigationStatus = _getIrrigationStatus(humidity, temperature, desc);
     final diseaseRisk = _getDiseaseRiskStatus(humidity, temperature);
+    final harvestingStatus = _getHarvestingStatus(desc, humidity);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1021,10 +1117,10 @@ class _WeatherDetailScreenState extends State<WeatherDetailScreen> {
               child: _buildAgroBentoCard(
                 icon: Icons.agriculture_rounded,
                 title: 'Field Harvesting',
-                status: desc.toLowerCase().contains('rain') ? 'RESTRICTED' : 'OPTIMAL',
-                subtitle: desc.toLowerCase().contains('rain')
-                    ? 'Muddy soil risk'
-                    : 'Dry produce condition',
+                status: harvestingStatus,
+                subtitle: harvestingStatus == 'OPTIMAL'
+                    ? 'Dry produce condition'
+                    : 'Wet / lightning risk',
               ),
             ),
           ],

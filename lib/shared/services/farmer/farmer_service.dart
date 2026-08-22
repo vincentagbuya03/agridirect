@@ -4,6 +4,7 @@
 // ============================================================================
 
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/farmer/farmer_profile_model.dart';
 import '../../models/farmer/farmer_registration_model.dart';
@@ -377,57 +378,115 @@ class FarmerService {
           .eq('user_id', userId);
       final communityPosts = (postsResponse as List).length;
 
-      // 2. Get Sales Data for the last 14 days (to calculate trends)
+      // 2. Fetch Orders for the last 365 days (and previous period for trend)
       final now = DateTime.now();
-      final fourteenDaysAgo = now
-          .subtract(const Duration(days: 14))
-          .toIso8601String();
+      final oneYearAgo = DateTime(now.year - 1, now.month, now.day).toIso8601String();
 
       final ordersResponse = await _supabase
           .from('orders')
           .select('total_amount, created_at')
           .eq('farmer_id', farmerId)
-          .gte('created_at', fourteenDaysAgo)
-          .not(
-            'order_status_id',
-            'in',
-            '(5, 6)',
-          ); // Exclude cancelled/failed orders
+          .gte('created_at', oneYearAgo)
+          .not('order_status_id', 'in', '(5, 6)'); // Exclude cancelled/failed
 
-      final orders = ordersResponse as List<dynamic>;
+      final orders = (ordersResponse as List<dynamic>?) ?? [];
 
-      // Calculate weekly data for chart (last 7 days)
-      List<double> weeklyData = List.filled(7, 0.0);
-      double currentWeekRevenue = 0;
-      double previousWeekRevenue = 0;
+      // =======================================================================
+      // A. 7-DAY ANALYTICS
+      // =======================================================================
+      final sevenDaysAgo = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
+      final fourteenDaysAgo = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 13));
 
-      final sevenDaysAgo = DateTime(
-        now.year,
-        now.month,
-        now.day,
-      ).subtract(const Duration(days: 6));
+      List<double> data7D = List.filled(7, 0.0);
+      List<int> orders7D = List.filled(7, 0);
+      List<String> labels7D = [];
+      List<String> dates7D = [];
+      double rev7D = 0;
+      double prevRev7D = 0;
 
-      for (var order in orders) {
-        final createdAt = DateTime.tryParse(order['created_at'] ?? '');
+      for (int i = 0; i < 7; i++) {
+        final d = sevenDaysAgo.add(Duration(days: i));
+        labels7D.add(DateFormat('E').format(d)); // 'Mon', 'Tue', etc.
+        dates7D.add(DateFormat('MMM d').format(d)); // 'Aug 21'
+      }
+
+      // =======================================================================
+      // B. 30-DAY ANALYTICS (5 x 6-day intervals)
+      // =======================================================================
+      final thirtyDaysAgo = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 29));
+      final sixtyDaysAgo = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 59));
+
+      List<double> data30D = List.filled(5, 0.0);
+      List<int> orders30D = List.filled(5, 0);
+      List<String> labels30D = ['W1', 'W2', 'W3', 'W4', 'W5'];
+      List<String> dates30D = [];
+      double rev30D = 0;
+      double prevRev30D = 0;
+
+      for (int i = 0; i < 5; i++) {
+        final startD = thirtyDaysAgo.add(Duration(days: i * 6));
+        final endD = startD.add(const Duration(days: 5));
+        dates30D.add('${DateFormat('MMM d').format(startD)} - ${DateFormat('d').format(endD)}');
+      }
+
+      // =======================================================================
+      // C. 1-YEAR ANALYTICS (12 Months)
+      // =======================================================================
+      List<double> data1Y = List.filled(12, 0.0);
+      List<int> orders1Y = List.filled(12, 0);
+      List<String> labels1Y = [];
+      List<String> dates1Y = [];
+      double rev1Y = 0;
+
+      for (int i = 11; i >= 0; i--) {
+        final mDate = DateTime(now.year, now.month - i, 1);
+        labels1Y.add(DateFormat('MMM').format(mDate)); // 'Jan', 'Feb', etc.
+        dates1Y.add(DateFormat('MMMM yyyy').format(mDate));
+      }
+
+      // Populate buckets from orders
+      for (final order in orders) {
+        final createdAt = DateTime.tryParse(order['created_at']?.toString() ?? '');
         if (createdAt == null) continue;
 
         final amount = (order['total_amount'] as num?)?.toDouble() ?? 0.0;
 
-        // Check if it belongs to current week (last 7 days)
-        if (createdAt.isAfter(sevenDaysAgo)) {
-          currentWeekRevenue += amount;
-          // Calculate index (0 is 6 days ago, 6 is today)
-          final dayIndex = createdAt.difference(sevenDaysAgo).inDays;
-          if (dayIndex >= 0 && dayIndex < 7) {
-            weeklyData[dayIndex] += amount;
+        // 7D logic
+        if (!createdAt.isBefore(sevenDaysAgo)) {
+          final dayIdx = createdAt.difference(sevenDaysAgo).inDays;
+          if (dayIdx >= 0 && dayIdx < 7) {
+            data7D[dayIdx] += amount;
+            orders7D[dayIdx] += 1;
+            rev7D += amount;
           }
-        } else {
-          // Belongs to previous week (8-14 days ago)
-          previousWeekRevenue += amount;
+        } else if (!createdAt.isBefore(fourteenDaysAgo)) {
+          prevRev7D += amount;
+        }
+
+        // 30D logic
+        if (!createdAt.isBefore(thirtyDaysAgo)) {
+          final dayIdx = createdAt.difference(thirtyDaysAgo).inDays;
+          final bucketIdx = (dayIdx / 6).floor().clamp(0, 4);
+          data30D[bucketIdx] += amount;
+          orders30D[bucketIdx] += 1;
+          rev30D += amount;
+        } else if (!createdAt.isBefore(sixtyDaysAgo)) {
+          prevRev30D += amount;
+        }
+
+        // 1Y logic
+        final monthsDiff = (now.year - createdAt.year) * 12 + (now.month - createdAt.month);
+        if (monthsDiff >= 0 && monthsDiff < 12) {
+          final bucketIdx = 11 - monthsDiff;
+          if (bucketIdx >= 0 && bucketIdx < 12) {
+            data1Y[bucketIdx] += amount;
+            orders1Y[bucketIdx] += 1;
+            rev1Y += amount;
+          }
         }
       }
 
-      // 3. Get Total Revenue (Lifetime)
+      // 3. Get Total Lifetime Revenue
       final lifetimeResponse = await _supabase
           .from('orders')
           .select('total_amount')
@@ -435,35 +494,25 @@ class FarmerService {
           .not('order_status_id', 'in', '(5, 6)');
 
       double totalRevenue = 0;
-      for (var order in lifetimeResponse as List) {
+      for (var order in (lifetimeResponse as List? ?? [])) {
         totalRevenue += (order['total_amount'] as num?)?.toDouble() ?? 0;
       }
 
-      // 4. Get Yearly Sales
-      final startOfYear = DateTime(now.year, 1, 1).toIso8601String();
-      final yearlyResponse = await _supabase
-          .from('orders')
-          .select('total_amount')
-          .eq('farmer_id', farmerId)
-          .gte('created_at', startOfYear)
-          .not('order_status_id', 'in', '(5, 6)');
-
-      double yearlySales = 0;
-      for (var order in yearlyResponse as List) {
-        yearlySales += (order['total_amount'] as num?)?.toDouble() ?? 0;
+      // Trend calculations
+      String trend7D = '+0%';
+      if (prevRev7D > 0) {
+        final p = ((rev7D - prevRev7D) / prevRev7D * 100);
+        trend7D = '${p >= 0 ? '+' : ''}${p.toStringAsFixed(1)}%';
+      } else if (rev7D > 0) {
+        trend7D = '+100%';
       }
 
-      // Calculate trends
-      String revenueTrend = '+0%';
-      if (previousWeekRevenue > 0) {
-        final percent =
-            ((currentWeekRevenue - previousWeekRevenue) /
-            previousWeekRevenue *
-            100);
-        revenueTrend =
-            '${percent >= 0 ? '+' : ''}${percent.toStringAsFixed(1)}%';
-      } else if (currentWeekRevenue > 0) {
-        revenueTrend = '+100%';
+      String trend30D = '+0%';
+      if (prevRev30D > 0) {
+        final p = ((rev30D - prevRev30D) / prevRev30D * 100);
+        trend30D = '${p >= 0 ? '+' : ''}${p.toStringAsFixed(1)}%';
+      } else if (rev30D > 0) {
+        trend30D = '+100%';
       }
 
       return {
@@ -471,10 +520,36 @@ class FarmerService {
         'activeListings': activeListings,
         'followers': followers,
         'communityPosts': communityPosts,
-        'yearlySales': yearlySales,
-        'revenueTrend': revenueTrend,
-        'listingsTrend': '0%', // Trends for listings would need product history
-        'weeklyData': weeklyData,
+        'yearlySales': rev1Y,
+        'revenueTrend': trend7D,
+        'listingsTrend': '0%',
+        'weeklyData': data7D,
+        'analytics': {
+          '7D': {
+            'revenue': rev7D,
+            'trend': trend7D,
+            'data': data7D,
+            'labels': labels7D,
+            'dates': dates7D,
+            'orderCounts': orders7D,
+          },
+          '30D': {
+            'revenue': rev30D,
+            'trend': trend30D,
+            'data': data30D,
+            'labels': labels30D,
+            'dates': dates30D,
+            'orderCounts': orders30D,
+          },
+          '1Y': {
+            'revenue': rev1Y,
+            'trend': '+0%',
+            'data': data1Y,
+            'labels': labels1Y,
+            'dates': dates1Y,
+            'orderCounts': orders1Y,
+          },
+        },
       };
     } catch (e) {
       debugPrint('Error fetching farmer stats: $e');
@@ -487,6 +562,32 @@ class FarmerService {
         'revenueTrend': '0%',
         'listingsTrend': '0%',
         'weeklyData': List.filled(7, 0.0),
+        'analytics': {
+          '7D': {
+            'revenue': 0.0,
+            'trend': '0%',
+            'data': List.filled(7, 0.0),
+            'labels': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            'dates': List.filled(7, ''),
+            'orderCounts': List.filled(7, 0),
+          },
+          '30D': {
+            'revenue': 0.0,
+            'trend': '0%',
+            'data': List.filled(5, 0.0),
+            'labels': ['W1', 'W2', 'W3', 'W4', 'W5'],
+            'dates': List.filled(5, ''),
+            'orderCounts': List.filled(5, 0),
+          },
+          '1Y': {
+            'revenue': 0.0,
+            'trend': '0%',
+            'data': List.filled(12, 0.0),
+            'labels': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            'dates': List.filled(12, ''),
+            'orderCounts': List.filled(12, 0),
+          },
+        },
       };
     }
   }

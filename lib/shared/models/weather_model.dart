@@ -165,8 +165,6 @@ class WeatherForecast {
 
       // Parse main alerts
       if (emergency['is_emergency'] == true) {
-        // Only surface forecast alerts when the near-term forecast shows a
-        // meaningful weather risk, not just generic cloud cover.
         final now = DateTime.now();
         final hasSevereWeather = forecasts.any((f) {
           final hoursUntilForecast = f.dateTime.difference(now).inHours;
@@ -221,6 +219,62 @@ class WeatherForecast {
       forecasts: forecasts,
       alerts: alerts,
       dailyAdvisories: dailyAdvisories,
+    );
+  }
+
+  /// Factory constructor for Open-Meteo High-Resolution Model
+  factory WeatherForecast.fromOpenMeteo({
+    required Map<String, dynamic> json,
+    required String locationName,
+  }) {
+    final forecasts = <ForecastData>[];
+    final hourly = json['hourly'] as Map<String, dynamic>? ?? {};
+    final times = hourly['time'] as List<dynamic>? ?? [];
+    final temps = hourly['temperature_2m'] as List<dynamic>? ?? [];
+    final humidities = hourly['relative_humidity_2m'] as List<dynamic>? ?? [];
+    final pops = hourly['precipitation_probability'] as List<dynamic>? ?? [];
+    final precips = hourly['precipitation'] as List<dynamic>? ?? [];
+    final wmoCodes = hourly['weather_code'] as List<dynamic>? ?? [];
+    final clouds = hourly['cloud_cover'] as List<dynamic>? ?? [];
+    final winds = hourly['wind_speed_10m'] as List<dynamic>? ?? [];
+
+    for (int i = 0; i < times.length && i < 48; i++) {
+      final timeStr = times[i].toString();
+      final dt = DateTime.tryParse(timeStr) ?? DateTime.now().add(Duration(hours: i));
+      final temp = (i < temps.length ? temps[i] as num? : 28.0)?.toDouble() ?? 28.0;
+      final hum = (i < humidities.length ? humidities[i] as num? : 70.0)?.toDouble() ?? 70.0;
+      final pop = (i < pops.length ? pops[i] as num? : 0.0)?.toDouble() ?? 0.0;
+      final precip = (i < precips.length ? precips[i] as num? : 0.0)?.toDouble() ?? 0.0;
+      final wmo = (i < wmoCodes.length ? wmoCodes[i] as int? : 0) ?? 0;
+      final cloud = (i < clouds.length ? clouds[i] as int? : 0) ?? 0;
+      final wind = (i < winds.length ? winds[i] as num? : 5.0)?.toDouble() ?? 5.0;
+
+      final parsed = WeatherData.parseWmoCode(wmo, precipitation: precip, cloudCover: cloud);
+
+      forecasts.add(
+        ForecastData(
+          dateTime: dt,
+          temperature: temp,
+          feelsLike: temp + (hum > 75 ? 2.5 : 1.0),
+          humidity: hum,
+          windSpeed: wind,
+          cloudiness: cloud,
+          pressure: 1010.0,
+          description: parsed['description']!,
+          icon: parsed['icon']!,
+          rainProbability: pop / 100.0,
+          rainVolume: precip > 0 ? precip : null,
+        ),
+      );
+    }
+
+    final alerts = _generateForecastAlerts(forecasts);
+
+    return WeatherForecast(
+      location: locationName,
+      forecasts: forecasts,
+      alerts: alerts,
+      dailyAdvisories: const [],
     );
   }
 
@@ -337,7 +391,6 @@ class WeatherForecast {
       );
     }
 
-    // Only add dedicated wind alert if not already covered by storm
     if (stormCandidate == null) {
       final windCandidate = _firstMatching(upcoming, (f) => f.windSpeed >= 28);
       if (windCandidate != null) {
@@ -436,6 +489,9 @@ class WeatherData {
   final double pressure;
   final String description;
   final String icon;
+  final double precipitationRate; // mm/h
+  final String? nowcastSummary;
+  final int? rainProbability;
   final List<WeatherAlert> alerts;
 
   WeatherData({
@@ -448,8 +504,47 @@ class WeatherData {
     required this.pressure,
     required this.description,
     required this.icon,
+    this.precipitationRate = 0.0,
+    this.nowcastSummary,
+    this.rainProbability,
     required this.alerts,
   });
+
+  /// Parse WMO weather codes into accurate human-readable description & icon
+  static Map<String, String> parseWmoCode(
+    int code, {
+    double precipitation = 0.0,
+    int cloudCover = 0,
+  }) {
+    if (code == 0) {
+      return {'description': 'Sunny', 'icon': '01d'};
+    } else if (code == 1) {
+      return {'description': 'Mainly Clear', 'icon': '02d'};
+    } else if (code == 2) {
+      return {'description': 'Partly Cloudy', 'icon': '03d'};
+    } else if (code == 3) {
+      return {'description': 'Cloudy', 'icon': '04d'};
+    } else if (code == 45 || code == 48) {
+      return {'description': 'Foggy', 'icon': '50d'};
+    } else if (code >= 51 && code <= 55) {
+      return {'description': 'Light Drizzle', 'icon': '09d'};
+    } else if (code == 61) {
+      return {'description': 'Light Rain', 'icon': '10d'};
+    } else if (code == 63) {
+      return {'description': 'Moderate Rain', 'icon': '10d'};
+    } else if (code == 65) {
+      return {'description': 'Heavy Rain', 'icon': '10d'};
+    } else if (code >= 80 && code <= 82) {
+      return {'description': 'Rain Showers', 'icon': '09d'};
+    } else if (code >= 95 && code <= 99) {
+      return {'description': 'Thunderstorm', 'icon': '11d'};
+    } else {
+      if (precipitation > 0.5) return {'description': 'Rain', 'icon': '10d'};
+      if (cloudCover > 60) return {'description': 'Cloudy', 'icon': '04d'};
+      if (cloudCover > 20) return {'description': 'Partly Cloudy', 'icon': '02d'};
+      return {'description': 'Sunny', 'icon': '01d'};
+    }
+  }
 
   factory WeatherData.fromJson(Map<String, dynamic> json) {
     final alerts = <WeatherAlert>[];
@@ -473,6 +568,10 @@ class WeatherData {
       }
     }
 
+    final weatherMain = json['weather']?[0]?['main'] ?? 'Clear';
+    final rainObj = json['rain'] as Map<String, dynamic>?;
+    final rainRate = (rainObj?['1h'] as num?)?.toDouble() ?? 0.0;
+
     return WeatherData(
       location: json['name'] ?? 'Unknown',
       temperature: (json['main']['temp'] as num).toDouble(),
@@ -481,8 +580,44 @@ class WeatherData {
       windSpeed: (json['wind']['speed'] as num).toDouble(),
       cloudiness: json['clouds']['all'] as int,
       pressure: (json['main']['pressure'] as num).toDouble(),
-      description: json['weather'][0]['main'] ?? 'Clear',
-      icon: json['weather'][0]['icon'] ?? '01d',
+      description: weatherMain,
+      icon: json['weather']?[0]?['icon'] ?? '01d',
+      precipitationRate: rainRate,
+      alerts: alerts,
+    );
+  }
+
+  /// Factory constructor for Open-Meteo High-Resolution Tropical API
+  factory WeatherData.fromOpenMeteo({
+    required Map<String, dynamic> json,
+    required String locationName,
+    String? nowcastAlert,
+    int? nextHourRainChance,
+  }) {
+    final current = json['current'] as Map<String, dynamic>? ?? {};
+    final wmo = current['weather_code'] as int? ?? 0;
+    final precip = (current['precipitation'] as num?)?.toDouble() ??
+        (current['rain'] as num?)?.toDouble() ??
+        0.0;
+    final cloud = (current['cloud_cover'] as num?)?.toInt() ?? 0;
+    final parsed = parseWmoCode(wmo, precipitation: precip, cloudCover: cloud);
+
+    final alerts = <WeatherAlert>[];
+
+    return WeatherData(
+      location: locationName,
+      temperature: (current['temperature_2m'] as num?)?.toDouble() ?? 28.0,
+      feelsLike: (current['apparent_temperature'] as num?)?.toDouble() ??
+          ((current['temperature_2m'] as num?)?.toDouble() ?? 28.0) + 2.0,
+      humidity: (current['relative_humidity_2m'] as num?)?.toDouble() ?? 70.0,
+      windSpeed: (current['wind_speed_10m'] as num?)?.toDouble() ?? 5.0,
+      cloudiness: cloud,
+      pressure: (current['pressure_msl'] as num?)?.toDouble() ?? 1010.0,
+      description: parsed['description']!,
+      icon: parsed['icon']!,
+      precipitationRate: precip,
+      nowcastSummary: nowcastAlert,
+      rainProbability: nextHourRainChance,
       alerts: alerts,
     );
   }
@@ -509,20 +644,20 @@ class WeatherData {
       );
     }
 
-    // Current rain warning
-    if (normalizedDescription.contains('rain') ||
-        normalizedDescription.contains('drizzle') ||
-        normalizedDescription.contains('thunderstorm')) {
+    // Current rain warning - only if actively precipitating or thunderstorm
+    if (precipitationRate > 0.5 ||
+        normalizedDescription.contains('thunderstorm') ||
+        (normalizedDescription.contains('rain') && precipitationRate > 0.1)) {
       alerts.add(
         WeatherAlert(
-          title: 'Rain Detected',
+          title: 'Active Rainfall',
           description:
-              'Current conditions show $description. Wet field conditions may affect farm work.',
+              'Current conditions show $description (${precipitationRate.toStringAsFixed(1)} mm/h). Wet field conditions may affect farm work.',
           type: 'rain',
           severity: normalizedDescription.contains('thunderstorm') ? 0.85 : 0.7,
           timestamp: now,
           recommendation:
-              'Check drainage and adjust harvesting or spraying plans before working the field.',
+              'Check field drainage and adjust harvesting or spraying plans before working the field.',
         ),
       );
     }
