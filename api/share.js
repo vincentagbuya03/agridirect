@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   // reads the Flutter app's generic meta tags, and overwrites our rich product tags.
   function buildShareUrl(productId) {
     return productId
-      ? `${APP_URL}/api/share?id=${productId}`
+      ? `${APP_URL}/product/${productId}`
       : `${APP_URL}/marketplace`;
   }
 
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     <!-- Real users get JS redirect; crawlers/bots ignore JS -->
     <script>
       var ua = navigator.userAgent || '';
-      var isCrawler = /facebookexternalhit|Twitterbot|LinkedInBot|WhatsApp|Slackbot/i.test(ua);
+      var isCrawler = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|TelegramBot|Discordbot|Applebot|Googlebot|bingbot|SkypeUriPreview/i.test(ua);
       if (!isCrawler) {
         window.location.replace("${redirectUrl}");
       }

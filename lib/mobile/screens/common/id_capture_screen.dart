@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
@@ -8,30 +9,38 @@ import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
+import 'package:image/image.dart' as img;
 
-/// Full-screen camera view for capturing the front of an ID card.
+/// Full-screen camera view for capturing the front or back of an ID card.
 ///
-/// Detection logic (simplified & robust):
-///   1. Text recognition — looks for Philippine National ID keywords OR
+/// Detection logic:
+///   1. Text recognition — looks for Philippine National ID keywords AND
 ///      a minimum number of text blocks (dense text = ID-like document).
-///   2. Face detection — a face must be visible on the ID card.
+///   2. Tilt check — average rotation angle of detected text blocks must be
+///      within [_maxTiltDegrees] of horizontal.
+///   3. Face detection (front only) — a face must be visible inside the
+///      guide box. Skipped for back captures.
+///   4. QR / barcode detection (back only, when [requireQr] is true) — a
+///      QR/PDF417 code must be visible inside the guide box.
 ///
-/// The detected face and text must also fit inside the visible guide box.
-///
-/// When BOTH conditions are met for [_requiredStableFrames] stable frames,
-/// the screen auto-captures a photo and returns the file path.
+/// When all required conditions are met for [_countdownSeconds] stable
+/// frames, the screen auto-captures a photo, applies a perspective
+/// crop/de-skew to the guide-box region, and returns the file path.
 class IdCaptureScreen extends StatefulWidget {
   final String label;
   final bool requireQr;
+  final bool isBack;
 
   const IdCaptureScreen({super.key, this.label = 'ID Front', bool? requireQr})
-    : requireQr = requireQr ?? false;
+    : requireQr = requireQr ?? false,
+      isBack = false;
 
   const IdCaptureScreen.back({
     super.key,
     this.label = 'ID Back',
     this.requireQr = true,
-  });
+  }) : isBack = true;
 
   @override
   State<IdCaptureScreen> createState() => _IdCaptureScreenState();
@@ -58,9 +67,16 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
       minFaceSize: 0.02,
     ),
   );
+  final BarcodeScanner _barcodeScanner = BarcodeScanner(
+    formats: [BarcodeFormat.qrCode, BarcodeFormat.pdf417],
+  );
 
   bool _isProcessing = false;
   bool _isCapturing = false;
+
+  // Frame throttling — avoid running ML Kit back-to-back with zero gap.
+  DateTime _lastFrameTime = DateTime.fromMillisecondsSinceEpoch(0);
+  static const Duration _frameInterval = Duration(milliseconds: 150);
 
   // ─── Detection state ───
   bool _isIdDetected = false;
@@ -75,10 +91,21 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
   String _statusText = 'Initializing camera...';
   String _guidanceText = '';
 
-  // ─── Guide overlay and detection constants ───
+  // ─── Guide overlay and detection constants (single source of truth) ───
   static const double _cardCenterYFraction = 0.42;
   static const double _cardWidthFraction = 0.88;
   static const double _cardAspectRatio = 1.586;
+  static const double _cardHeightFraction =
+      _cardWidthFraction / _cardAspectRatio;
+  static const double _guideLeft = 0.5 - _cardWidthFraction / 2;
+  static const double _guideRight = 0.5 + _cardWidthFraction / 2;
+  static const double _guideTop =
+      _cardCenterYFraction - _cardHeightFraction / 2;
+  static const double _guideBottom =
+      _cardCenterYFraction + _cardHeightFraction / 2;
+
+  // Max allowed average text-block tilt, in degrees, before we flag "straighten".
+  static const double _maxTiltDegrees = 8.0;
 
   // ─── Keywords for Philippine National ID ───
   final List<String> _validKeywords = [
@@ -198,6 +225,11 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
 
   void _onCameraFrame(CameraImage image) {
     if (_isProcessing || _isCapturing) return;
+
+    final now = DateTime.now();
+    if (now.difference(_lastFrameTime) < _frameInterval) return;
+    _lastFrameTime = now;
+
     _isProcessing = true;
     _processFrame(image).whenComplete(() => _isProcessing = false);
   }
@@ -207,19 +239,33 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
     if (inputImage == null) return;
 
     try {
-      final results = await Future.wait([
+      final futures = <Future<Object>>[
         _textRecognizer.processImage(inputImage),
-        _faceDetector.processImage(inputImage),
-      ]);
+        if (!widget.isBack) _faceDetector.processImage(inputImage),
+        if (widget.isBack && widget.requireQr)
+          _barcodeScanner.processImage(inputImage),
+      ];
 
+      final results = await Future.wait(futures);
       if (!mounted || _isCapturing) return;
 
       final recognizedText = results[0] as RecognizedText;
-      final faces = results[1] as List<Face>;
+
+      List<Face> faces = const [];
+      List<Barcode> barcodes = const [];
+      int nextIndex = 1;
+      if (!widget.isBack) {
+        faces = results[nextIndex] as List<Face>;
+        nextIndex++;
+      }
+      if (widget.isBack && widget.requireQr) {
+        barcodes = results[nextIndex] as List<Barcode>;
+      }
 
       _analyzeFrame(
         recognizedText,
         faces,
+        barcodes,
         image.width.toDouble(),
         image.height.toDouble(),
         _rearCamera!.sensorOrientation,
@@ -277,17 +323,133 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
     return false;
   }
 
+  /// Returns true if the point (fractional coords) falls inside the guide box.
+  bool _isInsideGuideBox(double xFrac, double yFrac) {
+    return xFrac >= _guideLeft &&
+        xFrac <= _guideRight &&
+        yFrac >= _guideTop &&
+        yFrac <= _guideBottom;
+  }
+
   void _analyzeFrame(
     RecognizedText recognizedText,
     List<Face> faces,
+    List<Barcode> barcodes,
     double frameW,
     double frameH,
     int sensorOrientation,
   ) {
-    final String fullText = recognizedText.text.toUpperCase();
-    final int blockCount = recognizedText.blocks.length;
-    final int keywordHits = _countKeywordMatches(fullText);
-    final bool isForbidden = _hasForbiddenKeyword(fullText);
+    final double portraitW =
+        (sensorOrientation == 90 || sensorOrientation == 270) ? frameH : frameW;
+    final double portraitH =
+        (sensorOrientation == 90 || sensorOrientation == 270) ? frameW : frameH;
+
+    // ── Only process text inside the guide box, and track bounding envelope & tilt ──
+    int blockCount = 0;
+    int keywordHits = 0;
+    bool isForbidden = false;
+    double totalAngle = 0.0;
+    int angleCount = 0;
+
+    double minX = 1.0;
+    double maxX = 0.0;
+    double minY = 1.0;
+    double maxY = 0.0;
+
+    int upperBlockCount = 0;
+    int lowerBlockCount = 0;
+
+    for (final block in recognizedText.blocks) {
+      final rect = block.boundingBox;
+      final bLeft = (rect.left / portraitW).clamp(0.0, 1.0);
+      final bRight = (rect.right / portraitW).clamp(0.0, 1.0);
+      final bTop = (rect.top / portraitH).clamp(0.0, 1.0);
+      final bBottom = (rect.bottom / portraitH).clamp(0.0, 1.0);
+
+      final cx = (bLeft + bRight) / 2;
+      final cy = (bTop + bBottom) / 2;
+
+      if (!_isInsideGuideBox(cx, cy)) continue;
+
+      blockCount++;
+      minX = math.min(minX, bLeft);
+      maxX = math.max(maxX, bRight);
+      minY = math.min(minY, bTop);
+      maxY = math.max(maxY, bBottom);
+
+      if (cy < _cardCenterYFraction) {
+        upperBlockCount++;
+      } else {
+        lowerBlockCount++;
+      }
+
+      final text = block.text.toUpperCase();
+      keywordHits += _countKeywordMatches(text);
+      if (_hasForbiddenKeyword(text)) {
+        isForbidden = true;
+      }
+
+      // Estimate tilt from the block's corner points (top edge slope).
+      final corners = block.cornerPoints;
+      if (corners.length >= 4) {
+        final sorted = List.of(corners)..sort((a, b) => a.y.compareTo(b.y));
+        final dx = (sorted[1].x - sorted[0].x).toDouble();
+        final dy = (sorted[1].y - sorted[0].y).toDouble();
+        if (dx != 0 || dy != 0) {
+          double angle = math.atan2(dy, dx) * (180.0 / math.pi);
+          if (angle > 90) angle -= 180;
+          if (angle < -90) angle += 180;
+          totalAngle += angle;
+          angleCount++;
+        }
+      }
+    }
+
+    // ── Face gate (front only) ──
+    bool hasFaceInBox = true;
+    if (!widget.isBack) {
+      hasFaceInBox = false;
+      for (final face in faces) {
+        final rect = face.boundingBox;
+        final fLeft = (rect.left / portraitW).clamp(0.0, 1.0);
+        final fRight = (rect.right / portraitW).clamp(0.0, 1.0);
+        final fTop = (rect.top / portraitH).clamp(0.0, 1.0);
+        final fBottom = (rect.bottom / portraitH).clamp(0.0, 1.0);
+
+        final cx = (fLeft + fRight) / 2;
+        final cy = (fTop + fBottom) / 2;
+        if (_isInsideGuideBox(cx, cy)) {
+          hasFaceInBox = true;
+          minX = math.min(minX, fLeft);
+          maxX = math.max(maxX, fRight);
+          minY = math.min(minY, fTop);
+          maxY = math.max(maxY, fBottom);
+        }
+      }
+    }
+
+    // ── QR/barcode gate (back only) ──
+    bool hasQrInBox = true;
+    if (widget.isBack && widget.requireQr) {
+      hasQrInBox = false;
+      for (final barcode in barcodes) {
+        final rect = barcode.boundingBox;
+        final bLeft = (rect.left / portraitW).clamp(0.0, 1.0);
+        final bRight = (rect.right / portraitW).clamp(0.0, 1.0);
+        final bTop = (rect.top / portraitH).clamp(0.0, 1.0);
+        final bBottom = (rect.bottom / portraitH).clamp(0.0, 1.0);
+
+        final cx = (bLeft + bRight) / 2;
+        final cy = (bTop + bBottom) / 2;
+        if (_isInsideGuideBox(cx, cy)) {
+          hasQrInBox = true;
+          minX = math.min(minX, bLeft);
+          maxX = math.max(maxX, bRight);
+          minY = math.min(minY, bTop);
+          maxY = math.max(maxY, bBottom);
+        }
+      }
+    }
 
     // ── Forbidden card ──
     if (isForbidden) {
@@ -304,12 +466,41 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
       return;
     }
 
-    // ── Text-density gate:
-    // Require 3+ Philippine ID keywords AND 5+ text blocks.
-    // A tilted or partially-visible card cannot produce this many readable fields.
-    final bool isRichEnough = keywordHits >= 3 && blockCount >= 5;
+    // ── 1. Text Density & Coverage Gates ──
+    final bool isRichEnough = widget.isBack
+        ? (blockCount >= 2 || hasQrInBox)
+        : (keywordHits >= 2 && blockCount >= 4);
 
-    if (isRichEnough) {
+    final double cardHeightSpan = (maxY > minY) ? (maxY - minY) : 0.0;
+    final double cardWidthSpan = (maxX > minX) ? (maxX - minX) : 0.0;
+    final double cardCenterY = (minY + maxY) / 2;
+
+    // The card must span at least 38% of the guide box vertically and 50% horizontally
+    final bool hasFullCardCoverage = cardHeightSpan >= (_cardHeightFraction * 0.38) &&
+        cardWidthSpan >= (_cardWidthFraction * 0.50);
+
+    // Front card must have text in both top and bottom halves (not half cut off)
+    final bool hasTopAndBottomContent = widget.isBack ||
+        (upperBlockCount >= 1 && lowerBlockCount >= 2);
+
+    // Card must be vertically centered in the box (not stuck at the bottom or top edge)
+    final bool isWellCentered = (cardCenterY - _cardCenterYFraction).abs() <= 0.09;
+
+    // ── 2. Tilt Gate ──
+    const int minAngleSamples = 3;
+    final double avgAngle =
+        angleCount > 0 ? (totalAngle / angleCount).abs() : 0.0;
+    final bool isStraight =
+        angleCount < minAngleSamples || avgAngle <= _maxTiltDegrees;
+
+    // ── 3. PERFECT ALIGNMENT: Full Card Inside Box ──
+    if (isRichEnough &&
+        hasFullCardCoverage &&
+        hasTopAndBottomContent &&
+        isWellCentered &&
+        isStraight &&
+        hasFaceInBox &&
+        hasQrInBox) {
       if (mounted) {
         setState(() {
           _isForbiddenCard = false;
@@ -317,8 +508,8 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
           _progress = 1.0;
           _statusText = _countdownActive
               ? 'Capturing in $_countdownSeconds...'
-              : 'ID Detected! Hold steady...';
-          _guidanceText = 'Hold still — all fields visible';
+              : 'ID Aligned! Hold steady...';
+          _guidanceText = 'Hold still for photo';
         });
       }
 
@@ -328,24 +519,48 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
       return;
     }
 
-    // ── Partial card detected (some keywords but not enough) ──
+    // ── 4. Not Aligned: Provide helpful dynamic feedback ──
     if (_countdownActive) _resetCountdown();
 
-    if (keywordHits >= 1) {
+    if (keywordHits >= 1 || blockCount >= 2) {
+      String statusMsg = 'Fit ID inside the box';
+      String guideMsg = 'Center the full card inside the green lines';
+
+      if (!isStraight) {
+        statusMsg = 'Straighten the card';
+        guideMsg = 'Hold the ID level with the frame';
+      } else if (!hasFaceInBox && !widget.isBack) {
+        statusMsg = 'Photo not visible';
+        guideMsg = 'Make sure the ID photo is inside the frame';
+      } else if (!hasQrInBox && widget.isBack && widget.requireQr) {
+        statusMsg = 'QR code not visible';
+        guideMsg = 'Make sure the QR code is inside the frame';
+      } else if (!isWellCentered) {
+        if (cardCenterY > _cardCenterYFraction + 0.06) {
+          statusMsg = 'Move ID up';
+          guideMsg = 'Center the ID inside the green frame';
+        } else if (cardCenterY < _cardCenterYFraction - 0.06) {
+          statusMsg = 'Move ID down';
+          guideMsg = 'Center the ID inside the green frame';
+        }
+      } else if (!hasFullCardCoverage || !hasTopAndBottomContent) {
+        statusMsg = 'Fit entire card in box';
+        guideMsg = 'Show all top and bottom text inside the frame';
+      }
+
       if (mounted) {
         setState(() {
           _isForbiddenCard = false;
           _isIdDetected = false;
           _progress = 0.0;
-          _statusText = 'Move ID closer & fit inside box';
-          _guidanceText =
-              'Make sure all card text is visible inside the green frame';
+          _statusText = statusMsg;
+          _guidanceText = guideMsg;
         });
       }
       return;
     }
 
-    // ── No ID detected ──
+    // ── 5. No ID detected ──
     _resetDetection();
   }
 
@@ -363,13 +578,13 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
   }
 
   // ─────────────────────────────────────────────────
-  // Countdown & Auto-capture
+  // Countdown & Auto-capture (Snappy 1-Second Countdown)
   // ─────────────────────────────────────────────────
 
   void _startCountdown() {
     if (_countdownActive) return;
     _countdownActive = true;
-    _countdownSeconds = 2;
+    _countdownSeconds = 1;
 
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
@@ -395,7 +610,7 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
     _countdownTimer?.cancel();
     _countdownTimer = null;
     _countdownActive = false;
-    _countdownSeconds = 2;
+    _countdownSeconds = 1;
   }
 
   Future<void> _autoCapture() async {
@@ -411,8 +626,10 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
         await _controller!.stopImageStream();
       }
       final xFile = await _controller!.takePicture();
+      final croppedPath = await _applyGuideBoxCrop(xFile.path);
+
       if (mounted) {
-        Navigator.of(context).pop(xFile.path);
+        Navigator.of(context).pop(croppedPath);
       }
     } catch (e) {
       debugPrint('[IdCapture] Capture error: $e');
@@ -433,6 +650,47 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
     }
   }
 
+  /// Crops the captured photo down to the guide-box region and corrects
+  /// for EXIF orientation. Uses a straight crop (not homography) because
+  /// the detection gate already enforces the card sits flat and centered
+  /// inside the guide box before capture is allowed — this avoids the
+  /// warping artifacts a `copyRectify` homography can introduce when
+  /// estimated corners are imprecise.
+  Future<String> _applyGuideBoxCrop(String filePath) async {
+    try {
+      final bytes = await File(filePath).readAsBytes();
+      final original = img.decodeImage(bytes);
+      if (original == null) return filePath;
+
+      final upright = img.bakeOrientation(original);
+      final int iw = upright.width;
+      final int ih = upright.height;
+
+      final left = (_guideLeft * iw).round().clamp(0, iw);
+      final right = (_guideRight * iw).round().clamp(0, iw);
+      final top = (_guideTop * ih).round().clamp(0, ih);
+      final bottom = (_guideBottom * ih).round().clamp(0, ih);
+
+      final cropW = (right - left).clamp(1, iw);
+      final cropH = (bottom - top).clamp(1, ih);
+
+      final cropped = img.copyCrop(
+        upright,
+        x: left,
+        y: top,
+        width: cropW,
+        height: cropH,
+      );
+
+      final outJpg = img.encodeJpg(cropped, quality: 94);
+      await File(filePath).writeAsBytes(outJpg);
+      return filePath;
+    } catch (e) {
+      debugPrint('[IdCapture] Crop error: $e');
+      return filePath;
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -443,6 +701,7 @@ class _IdCaptureScreenState extends State<IdCaptureScreen>
     cameraController?.dispose();
     _textRecognizer.close();
     _faceDetector.close();
+    _barcodeScanner.close();
     super.dispose();
   }
 
@@ -639,7 +898,7 @@ class _CardOverlayPainter extends CustomPainter {
     canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = Colors.black.withValues(alpha: 0.6),
+      Paint()..color = Colors.black.withValues(alpha: 0.95),
     );
     canvas.drawRRect(cardRect, Paint()..blendMode = BlendMode.clear);
     canvas.restore();

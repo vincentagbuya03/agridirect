@@ -167,13 +167,32 @@ void _analyzeFrame({
   required double frameH,
   required int sensorOrientation,
 }) {
+  final double portraitW = (sensorOrientation == 90 || sensorOrientation == 270) ? frameH : frameW;
+  final double portraitH = (sensorOrientation == 90 || sensorOrientation == 270) ? frameW : frameH;
+
+  const cardWidthFraction = _cardWidthFraction;
+  const cardAspectRatio = _cardAspectRatio;
+  const cardCenterYFraction = _cardCenterYFraction;
+  const cardHeightFraction = cardWidthFraction / cardAspectRatio;
+
+  final guideLeft = 0.5 - cardWidthFraction / 2;
+  final guideRight = 0.5 + cardWidthFraction / 2;
+  final guideTop = cardCenterYFraction - cardHeightFraction / 2;
+  final guideBottom = cardCenterYFraction + cardHeightFraction / 2;
+
   Barcode? validBarcode;
 
   for (final barcode in barcodes) {
     final rawValue = barcode.rawValue ?? barcode.displayValue ?? '';
     if (rawValue.length >= 8) {
-      validBarcode = barcode;
-      break;
+      final cx = (barcode.boundingBox.left + barcode.boundingBox.width / 2) / portraitW;
+      final cy = (barcode.boundingBox.top + barcode.boundingBox.height / 2) / portraitH;
+      
+      // QR center must be inside the guide window
+      if (cx >= guideLeft && cx <= guideRight && cy >= guideTop && cy <= guideBottom) {
+        validBarcode = barcode;
+        break;
+      }
     }
   }
 
@@ -185,37 +204,6 @@ void _analyzeFrame({
       _detectedQrData = null;
       _statusText = 'Position ID Back in frame';
       _guidanceText = 'Fit the entire card inside the box';
-    });
-    return;
-  }
-
-  final guideRect = _portraitGuideRect();
-  final qrRect = _normalizeRectToPortraitFraction(
-    validBarcode.boundingBox,
-    frameW,
-    frameH,
-    sensorOrientation,
-  );
-  final cx = qrRect.center.dx;
-  final cy = qrRect.center.dy;
-  final bool isInsideBox = cx >= (guideRect.left - 0.02) &&
-                cx <= (guideRect.right + 0.02) &&
-                cy >= (guideRect.top - 0.02) &&
-                cy <= (guideRect.bottom + 0.02);
-  final bool isLargeEnough = qrRect.width >= 0.20 && qrRect.height >= 0.18;
-
-  if (!isInsideBox || !isLargeEnough) {
-    if (_countdownActive) _resetCountdown();
-    setState(() {
-      _qrDetected = false;
-      _detectedQrData = null;
-      if (!isInsideBox) {
-        _statusText = 'Fit ID inside the box';
-        _guidanceText = 'Align the ID card inside the guide frame';
-      } else {
-        _statusText = 'Move closer';
-        _guidanceText = 'Position the ID closer to fill the box';
-      }
     });
     return;
   }
@@ -233,81 +221,7 @@ void _analyzeFrame({
   }
 }
 
-Rect _portraitGuideRect() {
-  final cardHeight = _cardWidthFraction / _cardAspectRatio;
-  return Rect.fromCenter(
-    center: const Offset(0.5, _cardCenterYFraction),
-    width: _cardWidthFraction,
-    height: cardHeight,
-  ).inflate(0.06);
-}
 
-Rect _normalizeRectToPortraitFraction(
-  Rect rect,
-  double frameW,
-  double frameH,
-  int sensorOrientation,
-) {
-  final points = [
-    _normalizePointToPortraitFraction(
-      rect.left,
-      rect.top,
-      frameW,
-      frameH,
-      sensorOrientation,
-    ),
-    _normalizePointToPortraitFraction(
-      rect.right,
-      rect.top,
-      frameW,
-      frameH,
-      sensorOrientation,
-    ),
-    _normalizePointToPortraitFraction(
-      rect.right,
-      rect.bottom,
-      frameW,
-      frameH,
-      sensorOrientation,
-    ),
-    _normalizePointToPortraitFraction(
-      rect.left,
-      rect.bottom,
-      frameW,
-      frameH,
-      sensorOrientation,
-    ),
-  ];
-
-  final xs = points.map((point) => point.dx);
-  final ys = points.map((point) => point.dy);
-
-  return Rect.fromLTRB(
-    xs.reduce((a, b) => a < b ? a : b).clamp(0.0, 1.0),
-    ys.reduce((a, b) => a < b ? a : b).clamp(0.0, 1.0),
-    xs.reduce((a, b) => a > b ? a : b).clamp(0.0, 1.0),
-    ys.reduce((a, b) => a > b ? a : b).clamp(0.0, 1.0),
-  );
-}
-
-Offset _normalizePointToPortraitFraction(
-  double x,
-  double y,
-  double frameW,
-  double frameH,
-  int sensorOrientation,
-) {
-  switch (sensorOrientation) {
-    case 90:
-      return Offset(1.0 - (y / frameH), x / frameW);
-    case 180:
-      return Offset(1.0 - (x / frameW), 1.0 - (y / frameH));
-    case 270:
-      return Offset(y / frameH, 1.0 - (x / frameW));
-    default:
-      return Offset(x / frameW, y / frameH);
-  }
-}
 
   void _startCaptureCountdown() {
     if (_countdownActive) return;
@@ -567,7 +481,7 @@ class _CardOverlayPainter extends CustomPainter {
     canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = Colors.black.withValues(alpha: 0.6),
+      Paint()..color = Colors.black.withValues(alpha: 0.95),
     );
     canvas.drawRRect(cardRect, Paint()..blendMode = BlendMode.clear);
     canvas.restore();

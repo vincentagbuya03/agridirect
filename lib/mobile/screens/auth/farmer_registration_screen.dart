@@ -1456,6 +1456,68 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
             'Capture both front and back sides clearly without glare.',
             style: GoogleFonts.inter(fontSize: 12, color: _muted),
           ),
+          const SizedBox(height: 12),
+
+          // ─── AgriDirect AI Verification Card ───
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF86EFAC)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'AgriDirect AI Verification',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF065F46),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Powered by On-Device Computer Vision & Machine Learning. AgriDirect automatically detects ID boundaries, eliminates shadows, and securely extracts your legal credentials to speed up farmer approval.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    height: 1.45,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF047857),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 14),
 
           // ID FRONT CARD
@@ -2208,25 +2270,30 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
 
       if (source == 'camera') {
         if (!isFront && _idType == 'national_id') {
-          // Automatic stream scanner for PhilSys National ID Back
+          // Automatic in-app stream scanner for PhilSys National ID Back
           final result = await Navigator.of(context).push<IdBackCaptureResult>(
             MaterialPageRoute(
               builder: (context) =>
-                  const IdBackCaptureScreen(label: 'PhilSys QR Auto-Scan'),
+                  const IdBackCaptureScreen(label: 'PhilSys ID Back'),
             ),
           );
           if (result != null) {
             imagePath = result.imagePath;
             qrPayload = result.qrData;
+          } else {
+            return; // Cancelled
           }
         } else {
-          // Front or other ID photo capture
+          // Front ID direct in-app camera capture
           imagePath = await Navigator.of(context).push<String>(
             MaterialPageRoute(
               builder: (context) =>
                   IdCaptureScreen(label: isFront ? 'ID Front' : 'ID Back'),
             ),
           );
+          if (imagePath == null) {
+            return; // Cancelled
+          }
         }
       } else {
         final image = await _imagePicker.pickImage(
@@ -2253,6 +2320,67 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
       }
 
       if (imagePath != null && mounted) {
+        // ── Validation: If National ID Front, require genuine Philippine National ID keywords ──
+        if (isFront && _idType == 'national_id') {
+          final inputImage = InputImage.fromFilePath(imagePath);
+          final textRecognizer = TextRecognizer();
+          final recognizedText = await textRecognizer.processImage(inputImage);
+          await textRecognizer.close();
+
+          if (!_isStrictPhilippineNationalId(recognizedText.text)) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.credit_card_off_rounded, color: Colors.white, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Only Philippine National ID (PhilSys) is accepted. Other cards or IDs are not permitted.',
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: const Color(0xFFEF4444),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            );
+            return; // Reject and do not save
+          }
+        }
+
+        // ── Validation: If National ID Back, require valid back document verification ──
+        if (!isFront && _idType == 'national_id' && (qrPayload == null || qrPayload.isEmpty)) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.flip_to_back_rounded, color: Colors.white, size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Invalid ID Back. Please make sure you are scanning the back side of your ID clearly.',
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFFEF4444),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+          return; // Reject image and do not save
+        }
+
         final file = File(imagePath);
         final bytes = await file.readAsBytes();
         setState(() {
@@ -2295,6 +2423,91 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         _showError('Failed to capture ID: $e');
       }
     }
+  }
+
+  bool _isStrictPhilippineNationalId(String text) {
+    final upper = text.toUpperCase();
+
+    // 1. Check for Forbidden Non-National ID words (School IDs, University IDs, ATM, Bank, Driver's License, SSS, etc.)
+    final forbidden = [
+      'SCHOOL',
+      'UNIVERSITY',
+      'COLLEGE',
+      'CAMPUS',
+      'STUDENT',
+      'STUDENT NO',
+      'LRN',
+      'GRADE',
+      'SECTION',
+      'ENROLLED',
+      'FACULTY',
+      'ACADEMY',
+      'INSTITUTE',
+      'DEPED',
+      'CHED',
+      'EMPLOYEE',
+      'COMPANY',
+      'CORP',
+      'CORPORATION',
+      'VISA',
+      'MASTERCARD',
+      'DEBIT',
+      'CREDIT',
+      'BANK',
+      'BDO',
+      'BPI',
+      'METROBANK',
+      'UNIONBANK',
+      'LANDBANK',
+      'EXPRESSPAY',
+      'PAYMAYA',
+      'GCASH',
+      'DRIVER',
+      'LICENSE',
+      'LTO',
+      'MEMBERSHIP',
+      'REWARD',
+      'LOYALTY',
+      'SSS',
+      'GSIS',
+      'UMID',
+      'POSTAL',
+      'PHILHEALTH',
+      'TIN',
+    ];
+
+    for (final word in forbidden) {
+      if (upper.contains(word)) return false;
+    }
+
+    // 2. Check for Mandatory PhilSys National ID Keywords
+    final nationalIdKeywords = [
+      'REPUBLIKA',
+      'PILIPINAS',
+      'PAMBANSANG',
+      'PAGKAKAKILANLAN',
+      'PHILIPPINE IDENTIFICATION',
+      'PHILID',
+      'APELYIDO',
+      'PANGALAN',
+      'KAPANGANAKAN',
+      'TIRAHAN',
+      'REPUBLIC OF THE PHILIPPINES',
+    ];
+
+    int matchCount = 0;
+    for (final keyword in nationalIdKeywords) {
+      if (upper.contains(keyword)) {
+        matchCount++;
+      }
+    }
+
+    // Also check for 16-digit PCN format (e.g. 5978-8912-6371-5068)
+    final hasPcn =
+        RegExp(r'\b\d{4}[-\s]\d{4}[-\s]\d{4}[-\s]\d{4}\b').hasMatch(upper);
+
+    // Require at least 2 National ID keywords OR (1 keyword + valid PCN)
+    return matchCount >= 2 || (matchCount >= 1 && hasPcn);
   }
 
   Future<void> _processIdFrontOcr(String imagePath) async {
