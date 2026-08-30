@@ -378,16 +378,35 @@ class _KikoAiChatScreenState extends State<KikoAiChatScreen>
       }
     }
 
-    if (lower.contains('crop') || lower.contains('sell') || lower.contains('benta') || lower.contains('presyo')) {
+    if (lower.contains('presyo') || lower.contains('price') || lower.contains('magkano') || lower.contains('cost')) {
+      return {
+        'text':
+            '### 🌾 **Gabay sa Pagpepresyo ng Ani (Farmer Pricing Guide)** 🐮\n\n'
+            'Moo! Narito ang simpleng formula para sa patas at kumikitang presyo:\n\n'
+            '1. **Kwentahin ang Production Cost (Puhunan)**:\n'
+            '   • Binhi/Punla + Pataba/Pesticides + Labor/Paggawa + Tubig/Kuryente.\n'
+            '2. **Magdagdag ng Makatwirang Profit Margin**:\n'
+            '   • Karaniwang **25% hanggang 40%** na tubo para sa sariwang gulay at prutas.\n'
+            '3. **Suriin ang Prevailing Market Price**:\n'
+            '   • Tingnan ang kasalukuyang presyo sa DA Bantay Presyo at local San Carlos City markets.\n'
+            '4. **Direct-to-Consumer Advantage**:\n'
+            '   • Dahil walang middleman sa AgriDirect, maaari kang magpresyo nang mas abot-kaya sa mga mamimili habang mas mataas ang iyong kita!\n\n'
+            '💡 *Tip: Para sa bulk orders o pre-orders bago ang harvest, magbigay ng 5-10% discount gamit ang Shop Vouchers.*',
+        'followUps': ['📊 View my sales', '🎟️ Create shop vouchers', '📦 How pre-orders work'],
+      };
+    }
+
+    if (lower.contains('crop') || lower.contains('sell') || lower.contains('benta') || lower.contains('list') || lower.contains('ani')) {
       return {
         'text':
             '### 🌾 **AgriDirect Harvest Listing Guide**\n\n'
-            'Para mag-list ng sariwang ani:\n\n'
-            '• I-switch ang app sa **Farmer Mode**.\n'
-            '• I-tap ang **"+ Add Product"** sa inyong Farmer Dashboard.\n'
-            '• Mag-upload ng malinaw na litrato, ilagay ang per-kilo price, at minimum order.\n'
-            '• Piliin kung Available Now o Pre-Order para sa paparating na ani.',
-        'followUps': ['📊 View my sales', '🎟️ Create shop vouchers'],
+            'Para mag-post ng sariwang ani sa marketplace:\n\n'
+            '1. I-switch ang inyong app sa **Farmer Mode**.\n'
+            '2. Pumunta sa **Products Tab** at i-tap ang **"+ LIST PRODUCT"**.\n'
+            '3. Mag-upload ng malinaw na litrato ng inyong ani.\n'
+            '4. Ilagay ang pangalan ng gulay/pananim, presyo kada kilo, at available quantity (kg).\n'
+            '5. Piliin kung **Standard Stock (Available Now)** o **Pre-order (Paparating na Harvest)**.',
+        'followUps': ['📊 View my sales', '🎟️ Create shop vouchers', '📷 I-diagnose ang pananim ko'],
       };
     }
 

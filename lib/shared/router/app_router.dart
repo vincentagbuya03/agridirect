@@ -26,12 +26,20 @@ import '../../mobile/screens/profile/address_book_screen.dart';
 import '../../mobile/screens/profile/favorites_screen.dart';
 import '../../mobile/screens/profile/help_center_screen.dart';
 import '../../mobile/screens/profile/app_settings_screen.dart';
+import '../../mobile/screens/profile/update_phone_screen.dart';
+import '../../mobile/screens/profile/update_email_screen.dart';
 import '../../mobile/screens/profile/change_password_screen.dart';
 import '../../mobile/screens/profile/account_activity_screen.dart';
 import '../../mobile/screens/profile/manage_device_screen.dart';
+import '../../web/screens/profile/web_app_settings_screen.dart';
+import '../../web/screens/profile/web_update_phone_screen.dart';
+import '../../web/screens/profile/web_update_email_screen.dart';
+import '../../web/screens/profile/web_change_password_screen.dart';
 import '../../mobile/screens/legal/terms_of_service_screen.dart';
 import '../../mobile/screens/legal/privacy_policy_screen.dart';
 import '../../mobile/screens/legal/community_rules_screen.dart';
+import '../../mobile/screens/consumer/community_stories_screen.dart';
+import '../../mobile/screens/farmer/farmer_community_hub.dart';
 import '../../web/web_navigation.dart';
 import '../../web/screens/auth/web_login_screen.dart';
 import '../../web/screens/auth/web_registration_screen.dart';
@@ -315,6 +323,11 @@ GoRouter createAppRouter({String? initialRoute}) {
         AppRoutes.farmerFollowers,
         AppRoutes.helpCenter,
         AppRoutes.appSettings,
+        AppRoutes.updatePhone,
+        AppRoutes.updateEmail,
+        AppRoutes.changePassword,
+        AppRoutes.accountActivity,
+        AppRoutes.manageDevice,
         AppRoutes.admin,
         AppRoutes.completeProfile,
         AppRoutes.checkout,
@@ -545,14 +558,10 @@ GoRouter createAppRouter({String? initialRoute}) {
                   },
                 );
               }
-              return MobileNavigation(
-                initialIndex: 0,
-                initialPostId: postId,
-                onLogout: () async {
-                  await AuthService().logout();
-                  if (context.mounted) context.go(AppRoutes.login);
-                },
-              );
+              if (AuthService().isViewingAsFarmer) {
+                return FarmerCommunityHub(initialPostId: postId);
+              }
+              return const CommunityStoriesScreen();
             },
           );
         },
@@ -1137,7 +1146,27 @@ GoRouter createAppRouter({String? initialRoute}) {
       ),
       GoRoute(
         path: AppRoutes.appSettings,
-        builder: (context, state) => const AppSettingsScreen(),
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+              ? const WebAppSettingsScreen()
+              : const AppSettingsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.updatePhone,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+              ? const WebUpdatePhoneScreen()
+              : const UpdatePhoneScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.updateEmail,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+              ? const WebUpdateEmailScreen()
+              : const UpdateEmailScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.accountActivity,
@@ -1149,7 +1178,11 @@ GoRouter createAppRouter({String? initialRoute}) {
       ),
       GoRoute(
         path: AppRoutes.changePassword,
-        builder: (context, state) => const ChangePasswordScreen(),
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+              ? const WebChangePasswordScreen()
+              : const ChangePasswordScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.appTour,

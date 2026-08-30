@@ -12,8 +12,8 @@ class VerificationGuideWidget extends StatelessWidget {
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(30),
-          topRight: Radius.circular(30),
+          topLeft: Radius.circular(32),
+          topRight: Radius.circular(32),
         ),
       ),
       child: Column(
@@ -21,12 +21,12 @@ class VerificationGuideWidget extends StatelessWidget {
           // Handle bar
           Center(
             child: Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 40,
-              height: 4,
+              margin: const EdgeInsets.only(top: 14),
+              width: 44,
+              height: 5,
               decoration: BoxDecoration(
                 color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
           ),
@@ -37,21 +37,46 @@ class VerificationGuideWidget extends StatelessWidget {
               child: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                    padding: const EdgeInsets.fromLTRB(24, 20, 20, 16),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Verification Guide',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF1E293B),
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Verification Guide',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF0F172A),
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Tips for quick and successful approval',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close_rounded),
+                          icon: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 18,
+                              color: Color(0xFF475569),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -61,17 +86,23 @@ class VerificationGuideWidget extends StatelessWidget {
                     isScrollable: true,
                     tabAlignment: TabAlignment.start,
                     labelColor: const Color(0xFF10B981),
-                    unselectedLabelColor: Colors.grey[400],
+                    unselectedLabelColor: const Color(0xFF94A3B8),
                     indicatorColor: const Color(0xFF10B981),
                     indicatorWeight: 3,
+                    indicatorSize: TabBarIndicatorSize.label,
+                    dividerColor: const Color(0xFFF1F5F9),
                     labelStyle: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                    unselectedLabelStyle: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
                     tabs: const [
                       Tab(text: 'Face Scan'),
                       Tab(text: 'ID Front'),
-                      Tab(text: 'ID Back / QR'),
+                      Tab(text: 'ID Back'),
                     ],
                   ),
 
@@ -81,7 +112,7 @@ class VerificationGuideWidget extends StatelessWidget {
                         _GuidePage(
                           title: 'Face Biometric Scan',
                           description:
-                              'We need to verify that you are the real owner of the ID.',
+                              'We verify that you match your valid government ID.',
                           lottiePath: 'assets/lottie/Face Scan.json',
                           steps: [
                             _GuideStep(
@@ -93,13 +124,13 @@ class VerificationGuideWidget extends StatelessWidget {
                             _GuideStep(
                               title: 'Center your Face',
                               description:
-                                  'Align your face within the circular frame provided.',
+                                  'Align your face within the circle frame provided.',
                               isCorrect: true,
                             ),
                             _GuideStep(
                               title: 'Remove Accessories',
                               description:
-                                  'Remove sunglasses, masks, or hats that cover your face.',
+                                  'Remove sunglasses, face masks, or hats covering your face.',
                               isCorrect: false,
                               wrongLabel: 'Don\'t cover your face',
                             ),
@@ -108,54 +139,54 @@ class VerificationGuideWidget extends StatelessWidget {
                         _GuidePage(
                           title: 'ID Front Capture',
                           description:
-                              'Capture a clear photo of the front side of your ID.',
+                              'Capture a clear, sharp photo of the front of your ID card.',
                           lottiePath: 'assets/lottie/Scan User ID.json',
                           steps: [
                             _GuideStep(
-                              title: 'Flat Surface',
+                              title: 'Flat & Contrasting Surface',
                               description:
-                                  'Place your ID on a flat, dark surface for contrast.',
+                                  'Place your ID on a plain, dark background for high contrast.',
                               isCorrect: true,
                             ),
                             _GuideStep(
-                              title: 'Avoid Glare',
+                              title: 'Avoid Direct Glare',
                               description:
-                                  'Ensure there are no bright reflections on the ID card.',
+                                  'Ensure no bright light reflections obscure your photo or name.',
                               isCorrect: true,
                             ),
                             _GuideStep(
                               title: 'Blurry Photo',
                               description:
-                                  'Text must be readable. Don\'t move while capturing.',
+                                  'All text and ID numbers must be sharp and legible.',
                               isCorrect: false,
                               wrongLabel: 'Don\'t submit blurry images',
                             ),
                           ],
                         ),
                         _GuidePage(
-                          title: 'QR Code / ID Back',
+                          title: 'ID Back Capture',
                           description:
-                              'Scan the QR code on the back of your National ID.',
+                              'Capture a clear, sharp photo of the back side of your ID.',
                           lottiePath: 'assets/lottie/Scan User ID.json',
                           steps: [
                             _GuideStep(
-                              title: 'Steady Focus',
+                              title: 'All 4 Corners Visible',
                               description:
-                                  'Hold your phone steady until the QR is recognized.',
+                                  'Keep the full ID card inside the capture camera frame.',
                               isCorrect: true,
                             ),
                             _GuideStep(
-                              title: 'Distance',
+                              title: 'Hold Steady',
                               description:
-                                  'Keep the QR code about 10-15cm away from the camera.',
+                                  'Rest your hands to ensure maximum camera focus.',
                               isCorrect: true,
                             ),
                             _GuideStep(
-                              title: 'Moving Camera',
+                              title: 'Obscured Details',
                               description:
-                                  'Movement will cause the scanner to fail extraction.',
+                                  'Ensure fingers or shadows do not block barcodes or signatures.',
                               isCorrect: false,
-                              wrongLabel: 'Avoid shaky hands',
+                              wrongLabel: 'Avoid covering card edges',
                             ),
                           ],
                         ),
@@ -167,7 +198,7 @@ class VerificationGuideWidget extends StatelessWidget {
                     padding: const EdgeInsets.all(24),
                     child: SizedBox(
                       width: double.infinity,
-                      height: 56,
+                      height: 54,
                       child: ElevatedButton(
                         onPressed: () => Navigator.pop(context),
                         style: ElevatedButton.styleFrom(
@@ -181,7 +212,7 @@ class VerificationGuideWidget extends StatelessWidget {
                         child: Text(
                           'Got it, let\'s start!',
                           style: GoogleFonts.plusJakartaSans(
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w800,
                             fontSize: 16,
                           ),
                         ),
@@ -214,6 +245,7 @@ class _GuidePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,30 +254,32 @@ class _GuidePage extends StatelessWidget {
           Center(
             child: Container(
               height: 180,
+              width: double.infinity,
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFF1F5F9)),
               ),
               child: Lottie.asset(
                 lottiePath,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
-                  debugPrint('Lottie error ($lottiePath): $error');
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.error_outline_rounded,
-                          size: 40,
-                          color: const Color(0xFFEF4444),
+                        const Icon(
+                          Icons.badge_rounded,
+                          size: 48,
+                          color: Color(0xFF10B981),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Animation error',
+                          'Card Verification Guide',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 10,
-                            color: Colors.grey[400],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF64748B),
                           ),
                         ),
                       ],
@@ -255,24 +289,26 @@ class _GuidePage extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           Text(
             title,
             style: GoogleFonts.plusJakartaSans(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF1E293B),
+              color: const Color(0xFF0F172A),
+              letterSpacing: -0.3,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             description,
-            style: GoogleFonts.plusJakartaSans(
+            style: GoogleFonts.inter(
               fontSize: 14,
-              color: Colors.grey[600],
+              color: const Color(0xFF64748B),
+              height: 1.4,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           ...steps,
         ],
       ),
@@ -296,11 +332,11 @@ class _GuideStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isCorrect ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: isCorrect ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
         ),
@@ -309,10 +345,10 @@ class _GuideStep extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: isCorrect
-                  ? const Color(0xFF22C55E)
+                  ? const Color(0xFF10B981)
                   : const Color(0xFFEF4444),
               shape: BoxShape.circle,
             ),
@@ -322,7 +358,7 @@ class _GuideStep extends StatelessWidget {
               size: 16,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,20 +367,21 @@ class _GuideStep extends StatelessWidget {
                   isCorrect ? title : (wrongLabel ?? title),
                   style: GoogleFonts.plusJakartaSans(
                     fontWeight: FontWeight.w700,
-                    fontSize: 15,
+                    fontSize: 14,
                     color: isCorrect
                         ? const Color(0xFF166534)
                         : const Color(0xFF991B1B),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   description,
-                    style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
                     color: isCorrect
-                        ? const Color(0xFF166534).withValues(alpha: 0.7)
-                        : const Color(0xFF991B1B).withValues(alpha: 0.7),
+                        ? const Color(0xFF166534).withValues(alpha: 0.8)
+                        : const Color(0xFF991B1B).withValues(alpha: 0.8),
+                    height: 1.35,
                   ),
                 ),
               ],

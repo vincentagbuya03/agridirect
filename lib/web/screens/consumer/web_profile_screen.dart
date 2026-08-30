@@ -23,6 +23,7 @@ import '../../../mobile/screens/profile/account_activity_screen.dart';
 import '../../../mobile/screens/consumer/orders_screen.dart';
 import '../../widgets/web_vouchers_content.dart';
 import '../../widgets/web_notifications_content.dart';
+import '../../widgets/web_mobile_farmer_dialog.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -154,6 +155,18 @@ class _WebProfileScreenState extends State<WebProfileScreen>
 
     _loadFarmerProfile();
     _loadUserProfileDetails();
+  }
+
+  Future<void> _refreshProfile() async {
+    final auth = AuthService();
+    final user = SupabaseConfig.client.auth.currentUser;
+    if (user != null && mounted) {
+      setState(() {
+        _emailController.text = user.email ?? auth.userEmail;
+      });
+    }
+    await _loadFarmerProfile();
+    await _loadUserProfileDetails();
   }
 
   Future<void> _loadUserProfileDetails() async {
@@ -320,7 +333,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       auth.switchToFarmerMode();
       widget.onModeChanged();
     } else {
-      context.push(AppRoutes.webFarmerRegister);
+      WebMobileFarmerDialog.show(context);
     }
   }
 
@@ -1331,14 +1344,39 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         _buildInlineEditRow(label: 'Registered Email', controller: _emailController, icon: Icons.mail_outline, readOnly: true, badge: 'Farmer Verified'),
       ] else ...[
         _buildInlineEditRow(label: 'Full Name', controller: _nameController, icon: Icons.person_outline),
-        _buildInlineEditRow(label: 'Email Address', controller: _emailController, icon: Icons.mail_outline, readOnly: true, badge: 'Verified'),
-        _buildInlineEditRow(label: 'Contact Number', controller: _phoneController, icon: Icons.phone_outlined),
+        _buildInlineEditRow(
+          label: 'Email Address',
+          controller: _emailController,
+          icon: Icons.mail_outline,
+          readOnly: true,
+          badge: 'Verified',
+          suffixWidget: TextButton(
+            onPressed: () async {
+              final res = await context.push(AppRoutes.updateEmail);
+              if (res == true && mounted) _refreshProfile();
+            },
+            child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primary)),
+          ),
+        ),
+        _buildInlineEditRow(
+          label: 'Contact Number',
+          controller: _phoneController,
+          icon: Icons.phone_outlined,
+          readOnly: true,
+          suffixWidget: TextButton(
+            onPressed: () async {
+              final res = await context.push(AppRoutes.updatePhone);
+              if (res == true && mounted) _refreshProfile();
+            },
+            child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primary)),
+          ),
+        ),
         _buildInlineEditRow(label: 'Account Type', controller: TextEditingController(text: 'Consumer / Buyer Account'), icon: Icons.badge_outlined, readOnly: true),
       ],
     ];
   }
 
-  // â”€â”€ Desktop form: fields on left, avatar on right â”€â”€
+  // ─── Desktop form: fields on left, avatar on right ───
   List<Widget> _buildDesktopFormLayout(bool isFarmer) {
     return [
       Row(
@@ -1352,12 +1390,62 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   _buildInlineEditRow(label: 'Farm Store Name', controller: _nameController, icon: Icons.storefront_outlined),
                   _buildInlineEditRow(label: 'Farm Specialty', controller: _specialtyController, icon: Icons.grass_outlined),
                   _buildInlineEditRow(label: 'Farm Location', controller: _locationController, icon: Icons.location_on_outlined, suffixWidget: IconButton(onPressed: _openFarmPinPicker, icon: const Icon(Icons.map_outlined, color: primary))),
-                  _buildInlineEditRow(label: 'Business Phone', controller: _phoneController, icon: Icons.phone_outlined),
-                  _buildInlineEditRow(label: 'Registered Email', controller: _emailController, icon: Icons.mail_outline, readOnly: true, badge: 'Farmer Verified'),
+                  _buildInlineEditRow(
+                    label: 'Business Phone',
+                    controller: _phoneController,
+                    icon: Icons.phone_outlined,
+                    readOnly: true,
+                    suffixWidget: TextButton(
+                      onPressed: () async {
+                        final res = await context.push(AppRoutes.updatePhone);
+                        if (res == true && mounted) _refreshProfile();
+                      },
+                      child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primary)),
+                    ),
+                  ),
+                  _buildInlineEditRow(
+                    label: 'Registered Email',
+                    controller: _emailController,
+                    icon: Icons.mail_outline,
+                    readOnly: true,
+                    badge: 'Farmer Verified',
+                    suffixWidget: TextButton(
+                      onPressed: () async {
+                        final res = await context.push(AppRoutes.updateEmail);
+                        if (res == true && mounted) _refreshProfile();
+                      },
+                      child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primary)),
+                    ),
+                  ),
                 ] else ...[
                   _buildInlineEditRow(label: 'Full Name', controller: _nameController, icon: Icons.person_outline),
-                  _buildInlineEditRow(label: 'Email Address', controller: _emailController, icon: Icons.mail_outline, readOnly: true, badge: 'Verified'),
-                  _buildInlineEditRow(label: 'Contact Number', controller: _phoneController, icon: Icons.phone_outlined),
+                  _buildInlineEditRow(
+                    label: 'Email Address',
+                    controller: _emailController,
+                    icon: Icons.mail_outline,
+                    readOnly: true,
+                    badge: 'Verified',
+                    suffixWidget: TextButton(
+                      onPressed: () async {
+                        final res = await context.push(AppRoutes.updateEmail);
+                        if (res == true && mounted) _refreshProfile();
+                      },
+                      child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primary)),
+                    ),
+                  ),
+                  _buildInlineEditRow(
+                    label: 'Contact Number',
+                    controller: _phoneController,
+                    icon: Icons.phone_outlined,
+                    readOnly: true,
+                    suffixWidget: TextButton(
+                      onPressed: () async {
+                        final res = await context.push(AppRoutes.updatePhone);
+                        if (res == true && mounted) _refreshProfile();
+                      },
+                      child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primary)),
+                    ),
+                  ),
                   _buildInlineEditRow(label: 'Account Type', controller: TextEditingController(text: 'Consumer / Buyer Account'), icon: Icons.badge_outlined, readOnly: true),
                 ],
               ],
@@ -1645,7 +1733,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       setState(() {}); // Refresh list
                     },
                     icon: const Icon(Icons.add, size: 16),
-                    label: const Text('+ Add New Address'),
+                    label: const Text('Add New Address'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primary,
                       foregroundColor: Colors.white,

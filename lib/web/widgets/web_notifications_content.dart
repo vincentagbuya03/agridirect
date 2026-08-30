@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../shared/services/core/supabase_config.dart';
-import '../../shared/services/auth/auth_service.dart';class WebNotificationsContent extends StatefulWidget {
+import '../../shared/services/auth/auth_service.dart';
+
+class WebNotificationsContent extends StatefulWidget {
   const WebNotificationsContent({super.key});
 
   @override

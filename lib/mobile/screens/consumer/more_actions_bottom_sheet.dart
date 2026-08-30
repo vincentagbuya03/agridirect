@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_router.dart';
-import 'promo_action_screen.dart';
 
 void showMoreActionsBottomSheet(BuildContext context) {
   showModalBottomSheet(
@@ -59,46 +58,8 @@ class _MoreActionsBottomSheet extends StatelessWidget {
           const SizedBox(height: 8),
           _buildActionRow(
             context,
-            title: 'Equipment Rental',
-            subtitle: 'Rent tractors, plows, and more',
-            icon: Icons.handyman_rounded,
-            color: const Color(0xFF3B82F6),
-            onTap: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const PromoActionScreen(
-                    title: 'Equipment Rental',
-                    icon: Icons.handyman_rounded,
-                    color: Color(0xFF3B82F6),
-                  ),
-                ),
-              );
-            },
-          ),
-          _buildActionRow(
-            context,
-            title: 'Farm Services',
-            subtitle: 'Hire experts and laborers',
-            icon: Icons.engineering_rounded,
-            color: const Color(0xFF8B5CF6),
-            onTap: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const PromoActionScreen(
-                    title: 'Farm Services',
-                    icon: Icons.engineering_rounded,
-                    color: Color(0xFF8B5CF6),
-                  ),
-                ),
-              );
-            },
-          ),
-          _buildActionRow(
-            context,
             title: 'Community Forum',
-            subtitle: 'Connect with other farmers',
+            subtitle: 'Connect with other farmers & buyers',
             icon: Icons.forum_rounded,
             color: const Color(0xFF10B981),
             onTap: () {

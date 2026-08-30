@@ -6,6 +6,7 @@ import '../../shared/services/auth/auth_service.dart';
 import '../../shared/router/app_routes.dart';
 import '../../shared/utils/apk_downloader.dart';
 import '../../shared/widgets/premium_confirm_dialog.dart';
+import 'web_mobile_farmer_dialog.dart';
 
 class WebHamburgerMenuButton extends StatefulWidget {
   final int currentIndex;
@@ -116,7 +117,7 @@ class _WebHamburgerMenuButtonState extends State<WebHamburgerMenuButton> {
               widget.onNavigate(0);
             }
           } else if (index == 107) {
-            context.go(AppRoutes.webFarmerRegister);
+            WebMobileFarmerDialog.show(context);
           } else if (index == 108) {
             context.go(AppRoutes.notifications);
           } else if ((isFarmerMode && index == 6) || (!isFarmerMode && index == 5)) {

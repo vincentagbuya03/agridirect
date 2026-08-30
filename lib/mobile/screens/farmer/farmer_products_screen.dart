@@ -550,6 +550,19 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                     });
                   },
                 ),
+                const SizedBox(width: 6),
+                _buildQuickFilterChip(
+                  label: '⚠️ Low Stock',
+                  isSelected: _selectedStockFilter == 'Low Stock',
+                  onTap: () {
+                    setState(() {
+                      _selectedStockFilter =
+                          _selectedStockFilter == 'Low Stock'
+                              ? 'All'
+                              : 'Low Stock';
+                    });
+                  },
+                ),
               ],
             ),
           ),
@@ -696,7 +709,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                   ),
                   const SizedBox(height: 8),
                   Row(
-                    children: ['All', 'In Stock', 'Out of Stock'].map((stock) {
+                    children: ['All', 'In Stock', 'Low Stock', 'Out of Stock'].map((stock) {
                       final isSelected = _selectedStockFilter == stock;
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
@@ -848,6 +861,10 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
         offlineProducts = offlineProducts
             .where((p) => (p.availableQuantity ?? 0) > 0)
             .toList();
+      } else if (_selectedStockFilter == 'Low Stock') {
+        offlineProducts = offlineProducts
+            .where((p) => (p.availableQuantity ?? 0) > 0 && (p.availableQuantity ?? 0) <= 10 && !p.isPreorder)
+            .toList();
       } else if (_selectedStockFilter == 'Out of Stock') {
         offlineProducts = offlineProducts
             .where((p) => (p.availableQuantity ?? 0) <= 0)
@@ -922,6 +939,15 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
       filteredOnline =
           filteredOnline
               .where((p) => (p['available'] as num? ?? 0) > 0)
+              .toList();
+    } else if (_selectedStockFilter == 'Low Stock') {
+      filteredOnline =
+          filteredOnline
+              .where((p) {
+                final qty = (p['available'] as num? ?? 0).toDouble();
+                final isPre = p['is_preorder'] == true;
+                return qty > 0 && qty <= 10 && !isPre;
+              })
               .toList();
     } else if (_selectedStockFilter == 'Out of Stock') {
       filteredOnline =
@@ -1051,8 +1077,27 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
   // ─── Compact & Modern Product Card ───
   Widget _buildProductCard(Map<String, dynamic> product) {
     final isPreorder = product['is_preorder'] == true;
-    final status = product['status']?.toString().toUpperCase() ??
-        (isPreorder ? 'PRE-ORDER' : 'IN STOCK');
+    final available = product['available'] ?? 0;
+    final availableNum = (available is num)
+        ? available.toDouble()
+        : (double.tryParse(available.toString()) ?? 0.0);
+    final rawStatus = product['status']?.toString().toUpperCase();
+
+    final String status;
+    if (rawStatus != null &&
+        rawStatus != 'IN STOCK' &&
+        rawStatus != 'LIVE (OFFLINE)' &&
+        rawStatus.isNotEmpty) {
+      status = rawStatus;
+    } else if (availableNum <= 0) {
+      status = 'SOLD OUT';
+    } else if (availableNum <= 10 && !isPreorder) {
+      status = 'LOW STOCK';
+    } else if (isPreorder) {
+      status = 'PRE-ORDER';
+    } else {
+      status = 'IN STOCK';
+    }
 
     Color statusColor;
     Color statusBg;
@@ -1062,7 +1107,7 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
         statusBg = const Color(0xFFFEF2F2);
         break;
       case 'LOW STOCK':
-        statusColor = const Color(0xFFF59E0B);
+        statusColor = const Color(0xFFD97706);
         statusBg = const Color(0xFFFFFBEB);
         break;
       case 'PENDING SYNC':
@@ -1089,7 +1134,6 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
     final price = product['price']?.toString() ?? '0';
     final unit = product['unit']?.toString() ?? 'kg';
     final desc = product['description']?.toString() ?? '';
-    final available = product['available'] ?? 0;
     final harvest = product['harvest']?.toString() ??
         (isPreorder ? 'Pre-order' : 'Ready Now');
 
@@ -1283,6 +1327,36 @@ class _FarmerProductsScreenState extends State<FarmerProductsScreen> {
                     ),
                   ],
                 ),
+
+                // Low Stock Warning Banner
+                if (status == 'LOW STOCK') ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.5)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFD97706)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '⚠️ Low Stock: Only $available $unit left. Tap to restock.',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFB45309),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 // Pre-order Milestone Badges & Under-reserved Warning
                 if (isPreorder && productId.isNotEmpty) ...[

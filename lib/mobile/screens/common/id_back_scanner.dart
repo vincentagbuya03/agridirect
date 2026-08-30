@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:image/image.dart' as img;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 /// Result returned from the IdBackCaptureScreen.
 /// Contains the QR raw string data and the path to the captured photo.
@@ -16,12 +16,11 @@ class IdBackCaptureResult {
   IdBackCaptureResult({required this.qrData, required this.imagePath});
 }
 
-/// Full-screen camera view for scanning the BACK of a National ID.
-/// It validates the PhilSys QR code and only captures once the full card
-/// appears to be inside the visible guide for a few stable frames.
+/// Full-screen camera view for automatically scanning the BACK of a National ID.
+/// It validates the PhilSys QR code and automatically captures as soon as the QR is recognized.
 class IdBackCaptureScreen extends StatefulWidget {
   final String label;
-  const IdBackCaptureScreen({super.key, this.label = 'ID Back'});
+  const IdBackCaptureScreen({super.key, this.label = 'PhilSys QR Auto-Scan'});
 
   @override
   State<IdBackCaptureScreen> createState() => _IdBackCaptureScreenState();
@@ -35,14 +34,6 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
   static const double _cardCenterYFraction = 0.42;
   static const double _cardWidthFraction = 0.88;
   static const double _cardAspectRatio = 1.586;
-  static const double _guideInset = 10.0;
-  static const double _guideTolerance = 40.0;
-  static const double _guideFilterMargin = 80.0;
-  static const double _minGuideIntersectionRatio = 0.45;
-  static const double _minDetectedWidthCoverage = 0.30;
-  static const double _minDetectedHeightCoverage = 0.25; // Relaxed from 0.50
-  static const double _minQrWidthCoverage = 0.08; // Relaxed from 0.18
-  static const int _requiredStableFrames = 3; // Reduced from 4
 
   CameraController? _controller;
   CameraDescription? _rearCamera;
@@ -51,18 +42,16 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
   final BarcodeScanner _barcodeScanner = BarcodeScanner(
     formats: [BarcodeFormat.qrCode],
   );
-  final TextRecognizer _textRecognizer = TextRecognizer();
 
   bool _isProcessing = false;
   bool _qrDetected = false;
-  bool _isInvalidQr = false;
+  final bool _isInvalidQr = false;
   bool _isCapturing = false;
   bool _countdownActive = false;
-  int _stableFrames = 0;
-  int _countdown = 3;
+  int _countdown = 1;
   String? _detectedQrData;
-  String _statusText = 'Fit the full ID back inside the box';
-  String _guidanceText = 'Center the entire card until it is captured';
+  String _statusText = 'Point camera at PhilSys QR Code';
+  String _guidanceText = 'Hold steady, camera will auto-capture';
 
   Timer? _countdownTimer;
 
@@ -79,7 +68,6 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
     _countdownTimer?.cancel();
     _controller?.dispose();
     _barcodeScanner.close();
-    _textRecognizer.close();
     super.dispose();
   }
 
@@ -119,8 +107,8 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
 
       setState(() {
         _isCameraReady = true;
-        _statusText = 'Fit the full ID back inside the box';
-        _guidanceText = 'Center the entire card until it is captured';
+        _statusText = 'Point camera at PhilSys QR Code';
+        _guidanceText = 'Hold steady, camera will auto-capture';
       });
 
       await _controller!.startImageStream(_processCameraImage);
@@ -156,292 +144,179 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
         ),
       );
 
-      final results = await Future.wait([
-        _barcodeScanner.processImage(inputImage),
-        _textRecognizer.processImage(inputImage),
-      ]);
+    final barcodes = await _barcodeScanner.processImage(inputImage);
 
-      if (!mounted || _isCapturing) return;
+    if (!mounted || _isCapturing) return;
 
-      _analyzeFrame(
-        barcodes: results[0] as List<Barcode>,
-        recognizedText: results[1] as RecognizedText,
-        frameWidth: image.width.toDouble(),
-        frameHeight: image.height.toDouble(),
-      );
-    } catch (e) {
-      debugPrint('Error processing image: $e');
-    } finally {
-      _isProcessing = false;
+    _analyzeFrame(
+      barcodes: barcodes,
+      frameW: image.width.toDouble(),
+      frameH: image.height.toDouble(),
+      sensorOrientation: _rearCamera!.sensorOrientation,
+    );
+  } catch (e) {
+    debugPrint('Error processing image: $e');
+  } finally {
+    _isProcessing = false;
+  }
+}
+
+void _analyzeFrame({
+  required List<Barcode> barcodes,
+  required double frameW,
+  required double frameH,
+  required int sensorOrientation,
+}) {
+  Barcode? validBarcode;
+
+  for (final barcode in barcodes) {
+    final rawValue = barcode.rawValue ?? barcode.displayValue ?? '';
+    if (rawValue.length >= 8) {
+      validBarcode = barcode;
+      break;
     }
   }
 
-  void _analyzeFrame({
-    required List<Barcode> barcodes,
-    required RecognizedText recognizedText,
-    required double frameWidth,
-    required double frameHeight,
-  }) {
-    final guideRect = _buildGuideRect(
-      frameWidth,
-      frameHeight,
-      inset: _guideInset,
-    );
-    final guideFilterRect = guideRect.inflate(_guideFilterMargin);
-
-    final normalizedTextRects = recognizedText.blocks
-        .map(
-          (block) => _normalizeRectToPortrait(
-            block.boundingBox,
-            frameWidth,
-            frameHeight,
-          ),
-        )
-        .where(
-          (rect) =>
-              _intersectionRatio(rect, guideFilterRect) >=
-              _minGuideIntersectionRatio,
-        )
-        .toList();
-
-    Barcode? validBarcode;
-    Rect? qrRect;
-    bool sawInvalidPayload = false;
-
-    for (final barcode in barcodes) {
-      final rawValue = barcode.rawValue ?? barcode.displayValue ?? '';
-      final rect = barcode.boundingBox;
-
-      final normalizedRect = _normalizeRectToPortrait(
-        rect,
-        frameWidth,
-        frameHeight,
-      );
-      final qrWidthCoverage = (normalizedRect.width / guideRect.width).clamp(
-        0.0,
-        1.0,
-      );
-      // Accept any QR with meaningful content (PhilSys QR may vary in format)
-      final isValidPayload = rawValue.length >= 10;
-
-      if (!isValidPayload) {
-        sawInvalidPayload = true;
-        continue;
-      }
-
-      if (_intersectionRatio(normalizedRect, guideFilterRect) >=
-              _minGuideIntersectionRatio &&
-          _isRectInsideGuide(normalizedRect, guideRect) &&
-          qrWidthCoverage >= _minQrWidthCoverage) {
-        validBarcode = barcode;
-        qrRect = normalizedRect;
-        break;
-      }
-    }
-
-    if (validBarcode == null || qrRect == null) {
-      _stableFrames = 0;
-      if (_countdownActive) _resetCountdown();
-
-      if (sawInvalidPayload) {
-        _markInvalidQr();
-      }
-
-      setState(() {
-        _qrDetected = false;
-        _detectedQrData = null;
-        _statusText = 'Align the ID back inside the guide';
-        _guidanceText = barcodes.isEmpty
-            ? 'Center the full card back and keep it steady'
-            : 'Move the full ID inside the box before capture';
-      });
-      return;
-    }
-
-    final detectedBounds = _combineRects([qrRect, ...normalizedTextRects]);
-
-    final coverage = detectedBounds == null
-        ? (width: 0.0, height: 0.0)
-        : _computeRectCoverage([detectedBounds], guideRect);
-    final hasGoodGuideFit =
-        detectedBounds != null && _isRectInsideGuide(detectedBounds, guideRect);
-    final hasEnoughCoverage =
-        coverage.width >= _minDetectedWidthCoverage &&
-        coverage.height >= _minDetectedHeightCoverage;
-
-    if (!hasGoodGuideFit || !hasEnoughCoverage) {
-      _stableFrames = 0;
-      if (_countdownActive) _resetCountdown();
-
-      setState(() {
-        _qrDetected = false;
-        _detectedQrData = null;
-        _statusText = 'Fit the full ID back inside the box';
-        _guidanceText = detectedBounds == null
-            ? 'Move the card fully into the guide'
-            : _buildGuideOverflowHint(detectedBounds, guideRect);
-      });
-      return;
-    }
-
-    _stableFrames++;
-    _detectedQrData = validBarcode.rawValue ?? validBarcode.displayValue;
+  if (validBarcode == null) {
+    if (_countdownActive) _resetCountdown();
 
     setState(() {
-      _qrDetected = true;
-      _isInvalidQr = false;
-      _statusText = _countdownActive
-          ? 'Capturing in $_countdown...'
-          : 'ID Back detected. Hold steady';
-      _guidanceText = 'Keep the full ID back inside the guide';
+      _qrDetected = false;
+      _detectedQrData = null;
+      _statusText = 'Position ID Back in frame';
+      _guidanceText = 'Fit the entire card inside the box';
     });
-
-    if (_stableFrames >= _requiredStableFrames && !_countdownActive) {
-      _startCaptureCountdown();
-    }
+    return;
   }
 
-  Size _normalizedFrameSize(double frameWidth, double frameHeight) {
-    return Size(
-      frameWidth < frameHeight ? frameWidth : frameHeight,
-      frameWidth > frameHeight ? frameWidth : frameHeight,
-    );
-  }
+  final guideRect = _portraitGuideRect();
+  final qrRect = _normalizeRectToPortraitFraction(
+    validBarcode.boundingBox,
+    frameW,
+    frameH,
+    sensorOrientation,
+  );
+  final cx = qrRect.center.dx;
+  final cy = qrRect.center.dy;
+  final bool isInsideBox = cx >= (guideRect.left - 0.02) &&
+                cx <= (guideRect.right + 0.02) &&
+                cy >= (guideRect.top - 0.02) &&
+                cy <= (guideRect.bottom + 0.02);
+  final bool isLargeEnough = qrRect.width >= 0.20 && qrRect.height >= 0.18;
 
-  Rect _normalizeRectToPortrait(
-    Rect rect,
-    double frameWidth,
-    double frameHeight,
-  ) {
-    if (frameHeight >= frameWidth) return rect;
-
-    return Rect.fromLTRB(rect.top, rect.left, rect.bottom, rect.right);
-  }
-
-  Rect _buildGuideRect(
-    double frameWidth,
-    double frameHeight, {
-    double inset = 0,
-  }) {
-    final frameSize = _normalizedFrameSize(frameWidth, frameHeight);
-    final cardWidth = frameSize.width * _cardWidthFraction;
-    final cardHeight = cardWidth / _cardAspectRatio;
-
-    return Rect.fromCenter(
-      center: Offset(
-        frameSize.width / 2,
-        frameSize.height * _cardCenterYFraction,
-      ),
-      width: cardWidth,
-      height: cardHeight,
-    ).deflate(inset);
-  }
-
-  Rect? _combineRects(Iterable<Rect> rects) {
-    Rect? combined;
-    for (final rect in rects) {
-      combined = combined == null ? rect : combined.expandToInclude(rect);
-    }
-    return combined;
-  }
-
-  ({double width, double height}) _computeRectCoverage(
-    List<Rect> rects,
-    Rect guideRect,
-  ) {
-    if (rects.isEmpty) return (width: 0, height: 0);
-
-    double minX = double.infinity;
-    double maxX = 0;
-    double minY = double.infinity;
-    double maxY = 0;
-
-    for (final rect in rects) {
-      if (rect.left < minX) minX = rect.left;
-      if (rect.right > maxX) maxX = rect.right;
-      if (rect.top < minY) minY = rect.top;
-      if (rect.bottom > maxY) maxY = rect.bottom;
-    }
-
-    final widthCoverage = ((maxX - minX) / guideRect.width).clamp(0.0, 1.0);
-    final heightCoverage = ((maxY - minY) / guideRect.height).clamp(0.0, 1.0);
-
-    return (width: widthCoverage, height: heightCoverage);
-  }
-
-  bool _isRectInsideGuide(Rect rect, Rect guideRect) {
-    return rect.left >= guideRect.left - _guideTolerance &&
-        rect.top >= guideRect.top - _guideTolerance &&
-        rect.right <= guideRect.right + _guideTolerance &&
-        rect.bottom <= guideRect.bottom + _guideTolerance;
-  }
-
-  double _intersectionRatio(Rect rect, Rect guideRect) {
-    final intersection = rect.intersect(guideRect);
-    if (intersection.isEmpty) return 0.0;
-
-    final rectArea = rect.width * rect.height;
-    if (rectArea <= 0) return 0.0;
-
-    return (intersection.width * intersection.height) / rectArea;
-  }
-
-  String _buildGuideOverflowHint(Rect rect, Rect guideRect) {
-    final hints = <String>[];
-
-    if (rect.left < guideRect.left - _guideTolerance) {
-      hints.add('Move ID right');
-    }
-    if (rect.right > guideRect.right + _guideTolerance) {
-      hints.add('Move ID left');
-    }
-    if (rect.top < guideRect.top - _guideTolerance) {
-      hints.add('Move ID down');
-    }
-    if (rect.bottom > guideRect.bottom + _guideTolerance) {
-      hints.add('Move ID up');
-    }
-
-    return hints.isEmpty
-        ? 'Move the full ID fully inside the guide'
-        : hints.join(' | ');
-  }
-
-  void _markInvalidQr() {
-    if (_isInvalidQr) return;
-
-    setState(() => _isInvalidQr = true);
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() => _isInvalidQr = false);
+  if (!isInsideBox || !isLargeEnough) {
+    if (_countdownActive) _resetCountdown();
+    setState(() {
+      _qrDetected = false;
+      _detectedQrData = null;
+      if (!isInsideBox) {
+        _statusText = 'Fit ID inside the box';
+        _guidanceText = 'Align the ID card inside the guide frame';
+      } else {
+        _statusText = 'Move closer';
+        _guidanceText = 'Position the ID closer to fill the box';
       }
     });
+    return;
   }
+
+  _detectedQrData = validBarcode.rawValue ?? validBarcode.displayValue;
+
+  setState(() {
+    _qrDetected = true;
+    _statusText = 'ID Aligned! Capturing...';
+    _guidanceText = 'Hold steady for photo';
+  });
+
+  if (!_countdownActive) {
+    _startCaptureCountdown();
+  }
+}
+
+Rect _portraitGuideRect() {
+  final cardHeight = _cardWidthFraction / _cardAspectRatio;
+  return Rect.fromCenter(
+    center: const Offset(0.5, _cardCenterYFraction),
+    width: _cardWidthFraction,
+    height: cardHeight,
+  ).inflate(0.06);
+}
+
+Rect _normalizeRectToPortraitFraction(
+  Rect rect,
+  double frameW,
+  double frameH,
+  int sensorOrientation,
+) {
+  final points = [
+    _normalizePointToPortraitFraction(
+      rect.left,
+      rect.top,
+      frameW,
+      frameH,
+      sensorOrientation,
+    ),
+    _normalizePointToPortraitFraction(
+      rect.right,
+      rect.top,
+      frameW,
+      frameH,
+      sensorOrientation,
+    ),
+    _normalizePointToPortraitFraction(
+      rect.right,
+      rect.bottom,
+      frameW,
+      frameH,
+      sensorOrientation,
+    ),
+    _normalizePointToPortraitFraction(
+      rect.left,
+      rect.bottom,
+      frameW,
+      frameH,
+      sensorOrientation,
+    ),
+  ];
+
+  final xs = points.map((point) => point.dx);
+  final ys = points.map((point) => point.dy);
+
+  return Rect.fromLTRB(
+    xs.reduce((a, b) => a < b ? a : b).clamp(0.0, 1.0),
+    ys.reduce((a, b) => a < b ? a : b).clamp(0.0, 1.0),
+    xs.reduce((a, b) => a > b ? a : b).clamp(0.0, 1.0),
+    ys.reduce((a, b) => a > b ? a : b).clamp(0.0, 1.0),
+  );
+}
+
+Offset _normalizePointToPortraitFraction(
+  double x,
+  double y,
+  double frameW,
+  double frameH,
+  int sensorOrientation,
+) {
+  switch (sensorOrientation) {
+    case 90:
+      return Offset(1.0 - (y / frameH), x / frameW);
+    case 180:
+      return Offset(1.0 - (x / frameW), 1.0 - (y / frameH));
+    case 270:
+      return Offset(y / frameH, 1.0 - (x / frameW));
+    default:
+      return Offset(x / frameW, y / frameH);
+  }
+}
 
   void _startCaptureCountdown() {
     if (_countdownActive) return;
 
     _countdownActive = true;
-    _countdown = 3;
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-
-      setState(() {
-        _countdown--;
-        if (_countdown > 0) {
-          _statusText = 'Capturing in $_countdown...';
-        } else {
-          _statusText = 'Capturing...';
-        }
-      });
-
-      if (_countdown <= 0) {
-        timer.cancel();
-        _captureAndReturn();
-      }
+    _countdown = 1;
+    _countdownTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      _captureAndReturn();
     });
   }
 
@@ -449,7 +324,7 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
     _countdownTimer?.cancel();
     _countdownTimer = null;
     _countdownActive = false;
-    _countdown = 3;
+    _countdown = 1;
   }
 
   Future<void> _captureAndReturn() async {
@@ -460,10 +335,11 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
     try {
       await _controller!.stopImageStream();
       final photo = await _controller!.takePicture();
+      final croppedPath = await _cropToGuideBox(photo.path);
 
       if (mounted) {
         Navigator.of(context).pop(
-          IdBackCaptureResult(qrData: _detectedQrData!, imagePath: photo.path),
+          IdBackCaptureResult(qrData: _detectedQrData!, imagePath: croppedPath),
         );
       }
     } catch (e) {
@@ -473,13 +349,50 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
           _isCapturing = false;
           _qrDetected = false;
           _detectedQrData = null;
-          _stableFrames = 0;
           _statusText = 'Capture failed. Try again';
           _guidanceText = 'Center the full ID back and hold steady';
         });
         _resetCountdown();
         _controller!.startImageStream(_processCameraImage);
       }
+    }
+  }
+
+  /// Crops the full photo to only the region inside the guide box.
+  Future<String> _cropToGuideBox(String imagePath) async {
+    try {
+      final bytes = await File(imagePath).readAsBytes();
+      final original = img.decodeImage(bytes);
+      if (original == null) return imagePath;
+
+      final upright = img.bakeOrientation(original);
+      final iw = upright.width;
+      final ih = upright.height;
+
+      const cardWidthFraction = 0.88;
+      const cardAspectRatio = 1.586;
+      const cardCenterYFraction = 0.42;
+      const cardHeightFraction = cardWidthFraction / cardAspectRatio;
+
+      final left   = ((0.5 - cardWidthFraction / 2) * iw).round().clamp(0, iw);
+      final right  = ((0.5 + cardWidthFraction / 2) * iw).round().clamp(0, iw);
+      final top    = ((cardCenterYFraction - cardHeightFraction / 2) * ih).round().clamp(0, ih);
+      final bottom = ((cardCenterYFraction + cardHeightFraction / 2) * ih).round().clamp(0, ih);
+
+      final cropped = img.copyCrop(
+        upright,
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+      );
+
+      final croppedBytes = img.encodeJpg(cropped, quality: 92);
+      await File(imagePath).writeAsBytes(croppedBytes);
+      return imagePath;
+    } catch (e) {
+      debugPrint('[IdBack] Crop error: $e');
+      return imagePath;
     }
   }
 
@@ -502,7 +415,7 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
             painter: _CardOverlayPainter(
               qrDetected: _qrDetected,
               isInvalid: _isInvalidQr,
-              progress: _qrDetected ? (3 - _countdown) / 3.0 : 0.0,
+              progress: _qrDetected ? (1 - _countdown) / 1.0 : 0.0,
               cardWidthFraction: _cardWidthFraction,
               cardCenterYFraction: _cardCenterYFraction,
               cardAspectRatio: _cardAspectRatio,
@@ -532,9 +445,9 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
             ),
           ),
           Positioned(
-            bottom: 100,
-            left: 40,
-            right: 40,
+            bottom: 40,
+            left: 20,
+            right: 20,
             child: Column(
               children: [
                 if (_qrDetected)
@@ -549,15 +462,15 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
                   _buildStatusChip(
                     _statusText,
                     Colors.white.withValues(alpha: 0.2),
-                    Icons.badge_rounded,
+                    Icons.flip_to_back_rounded,
                   ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Text(
                   _guidanceText,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.plusJakartaSans(
                     color: Colors.white70,
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -567,10 +480,19 @@ class _IdBackCaptureScreenState extends State<IdBackCaptureScreen>
                     'Capturing in $_countdown...',
                     style: GoogleFonts.plusJakartaSans(
                       color: Colors.white,
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.w900,
                     ),
+                  )
+                else
+                  Text(
+                    'Auto-captures when QR is aligned',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      color: Colors.white60,
+                    ),
                   ),
+                const SizedBox(height: 32),
               ],
             ),
           ),

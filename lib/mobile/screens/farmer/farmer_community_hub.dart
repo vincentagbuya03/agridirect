@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
-import '../../../shared/styles/app_theme.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/widgets/create_post_dialog.dart';
 import '../../../shared/widgets/comments_dialog.dart';
 import '../../../shared/data/app_data.dart';
@@ -11,12 +11,11 @@ import '../../../shared/screens/post_detail_screen.dart';
 import '../../../shared/screens/article_detail_screen.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/utils/share_util.dart';
-
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/widgets/forum_video_player.dart';
 
-/// Farmer Community Hub - Professional Social Interface
+/// Farmer Community Hub - Modern Social & Agricultural Knowledge Interface
 class FarmerCommunityHub extends StatefulWidget {
   final String? initialPostId;
   const FarmerCommunityHub({super.key, this.initialPostId});
@@ -31,12 +30,36 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
   final TextEditingController _searchController = TextEditingController();
   late Stream<List<ForumPostItem>> _forumStream;
   String _searchQuery = '';
+  String _selectedCategory = 'All';
+
+  // Topic filter tags
+  final List<String> _topics = [
+    'All',
+    '🌾 Crops',
+    '🐛 Pest Alert',
+    '💧 Irrigation',
+    '💰 Market Rates',
+    '🚜 Tools & Equip',
+    '📢 Advisory',
+  ];
+
+  static const Color _primary = Color(0xFF059669);
+  static const Color _primaryLight = Color(0xFFDCFCE7);
+  static const Color _dark = Color(0xFF0F172A);
+  static const Color _muted = Color(0xFF64748B);
+  static const Color _border = Color(0xFFE2E8F0);
+  static const Color _cardBg = Colors.white;
+  static const Color _bg = Color(0xFFF8FAFC);
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _forumStream = SupabaseDataService().watchForumPosts();
+
     if (widget.initialPostId != null && widget.initialPostId!.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -56,7 +79,7 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
     super.dispose();
   }
 
-  /// Navigate to the public profile of a farmer by their user_id.
+  /// Navigate to farmer public profile
   Future<void> _navigateToFarmerProfile(String? userId) async {
     if (userId == null || userId.isEmpty) return;
     final farmerId = await SupabaseDataService().getFarmerIdByUserId(userId);
@@ -65,31 +88,65 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
       context.push(AppRoutes.farmerProfile(farmerId));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This user does not have a public farm profile.')),
+        const SnackBar(
+          content: Text('This user does not have a public farm profile.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
   }
 
+  String _formatName(String raw) {
+    if (raw.isEmpty) return 'Farmer';
+    return raw.split(' ').map((word) {
+      if (word.isEmpty) return '';
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return 'AD';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final auth = AuthService();
+    final userAvatar = auth.userAvatarUrl;
+    final userName = auth.userName.isNotEmpty ? _formatName(auth.userName) : 'Grower';
+
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          _buildPremiumHeader(),
-          _buildSearchBar(),
-          _buildSleekTabs(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [_buildForumContent(), _buildArticlesContent()],
+      backgroundColor: _bg,
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  _buildHeader(userAvatar, userName),
+                  _buildSearchBar(),
+                  _buildTopicPills(),
+                  _buildSegmentedTab(),
+                  const SizedBox(height: 12),
+                ],
+              ),
             ),
-          ),
-        ],
+          ];
+        },
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildForumFeed(),
+            _buildArticlesFeed(),
+          ],
+        ),
       ),
-      floatingActionButton: AuthService().isSeller
+      floatingActionButton: auth.isSeller
           ? FloatingActionButton.extended(
               onPressed: () async {
+                HapticFeedback.lightImpact();
                 final result = await showDialog<bool>(
                   context: context,
                   builder: (context) => const CreatePostDialog(),
@@ -98,15 +155,16 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
                   setState(() {});
                 }
               },
-              backgroundColor: AppColors.primary,
-              elevation: 6,
-              icon: const Icon(Icons.edit_square, color: Colors.white, size: 20),
+              backgroundColor: _primary,
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              icon: const Icon(Icons.edit_note_rounded, color: Colors.white, size: 22),
               label: Text(
-                'POST QUESTION',
-                style: AppTextStyles.labelSmall.copyWith(
+                'Post Question',
+                style: GoogleFonts.inter(
                   color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
                 ),
               ),
             )
@@ -114,471 +172,274 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
     );
   }
 
-  Widget _buildPremiumHeader() {
+  // ─────────────────────────────────────────────────────────────
+  // HEADER
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildHeader(String userAvatar, String userName) {
     return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.textHeadline.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 12,
+        left: 20,
+        right: 20,
+        bottom: 14,
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 2),
-                    ),
-                    child: const ClipOval(
-                      child: Icon(Icons.person_rounded, color: AppColors.textSubtle),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'COMMUNITY',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      Text(
-                        'AgriDirect Hub',
-                        style: AppTextStyles.headline2.copyWith(fontSize: 22),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              _buildNotificationBadge(),
-            ],
-          ),
-        ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
       ),
-    );
-  }
-
-  Widget _buildNotificationBadge() {
-    return ValueListenableBuilder<int>(
-      valueListenable: NotificationService().unreadCountNotifier,
-      builder: (context, count, _) {
-        return GestureDetector(
-          onTap: () => context.push(AppRoutes.notifications),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
-                ),
-                child: const Icon(Icons.notifications_none_rounded, size: 24, color: AppColors.textHeadline),
-              ),
-              if (count > 0)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: AppColors.error,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-      child: Container(
-        height: 52,
-        decoration: AppDecorations.cardDecoration.copyWith(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: TextField(
-          controller: _searchController,
-          onChanged: (value) {
-            setState(() => _searchQuery = value.trim().toLowerCase());
-          },
-          decoration: InputDecoration(
-            hintText: 'Search pests, crops, or topics...',
-            hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle),
-            prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textSubtle, size: 22),
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 15),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSleekTabs() {
-    return Container(
-      width: double.infinity,
-      color: Colors.transparent,
-      child: TabBar(
-        controller: _tabController,
-        labelColor: AppColors.primary,
-        unselectedLabelColor: AppColors.textSubtle,
-        indicatorColor: AppColors.primary,
-        indicatorSize: TabBarIndicatorSize.label,
-        indicatorWeight: 3,
-        dividerColor: Colors.transparent,
-        labelStyle: AppTextStyles.labelSmall.copyWith(
-          fontWeight: FontWeight.w800,
-          fontSize: 14,
-          letterSpacing: 0.5,
-        ),
-        tabs: const [
-          Tab(text: 'Forum'),
-          Tab(text: 'Articles'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildForumContent() {
-    return StreamBuilder<List<ForumPostItem>>(
-      stream: _forumStream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                'Unable to load community posts right now.',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textSubtle,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          );
-        }
-
-        final posts = (snapshot.data ?? [])
-            .where((post) {
-              if (_searchQuery.isEmpty) return true;
-              final haystack =
-                  '${post.userName} ${post.title} ${post.body}'.toLowerCase();
-              return haystack.contains(_searchQuery);
-            })
-            .toList();
-
-        if (posts.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.forum_outlined, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.3)),
-                const SizedBox(height: 16),
-                Text('No posts yet', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle)),
-              ],
-            ),
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-          physics: const BouncingScrollPhysics(),
-          itemCount: posts.length,
-          itemBuilder: (context, index) {
-            final post = posts[index];
-            return InkWell(
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => PostDetailScreen(post: post),
-                  ),
-                );
-                if (mounted) setState(() {});
-              },
-              borderRadius: BorderRadius.circular(24),
-              child: _buildForumCard(post: post),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildArticlesContent() {
-    return FutureBuilder<List<ArticleItem>>(
-      future: SupabaseDataService().getArticles(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final articles = (snapshot.data ?? [])
-            .where((article) {
-              if (_searchQuery.isEmpty) return true;
-              final haystack =
-                  '${article.title} ${article.author} ${article.excerpt} ${article.content ?? ''}'.toLowerCase();
-              return haystack.contains(_searchQuery);
-            })
-            .toList();
-        if (articles.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.article_outlined, size: 64, color: AppColors.textSubtle.withValues(alpha: 0.3)),
-                const SizedBox(height: 16),
-                Text('No articles yet', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSubtle)),
-              ],
-            ),
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-          physics: const BouncingScrollPhysics(),
-          itemCount: articles.length,
-          itemBuilder: (context, index) {
-            final article = articles[index];
-            return InkWell(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ArticleDetailScreen(article: article)),
-              ),
-              borderRadius: BorderRadius.circular(24),
-              child: _buildArticleCard(article: article),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildForumCard({required ForumPostItem post}) {
-    final cleanTitle = post.title.trim();
-    final cleanBody = post.body.trim();
-    final bool showTitle = cleanTitle.isNotEmpty && cleanBody != cleanTitle;
-    final String displayBody = (cleanBody.startsWith(cleanTitle) && cleanBody != cleanTitle)
-        ? cleanBody.substring(cleanTitle.length).trim()
-        : cleanBody;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      decoration: AppDecorations.cardDecoration.copyWith(
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
+          // User Avatar / Profile
+          GestureDetector(
+            onTap: () => context.push(AppRoutes.profile),
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: _primary.withValues(alpha: 0.35), width: 2),
+              ),
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: _primaryLight,
+                backgroundImage: (userAvatar.isNotEmpty && userAvatar != 'null')
+                    ? CachedNetworkImageProvider(userAvatar)
+                    : null,
+                child: (userAvatar.isEmpty || userAvatar == 'null')
+                    ? Text(
+                        _getInitials(userName),
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: _primary,
+                        ),
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+
+          // Title & Greeting
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => _navigateToFarmerProfile(post.userId),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: AppColors.background,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.textHeadline.withValues(alpha: 0.3)),
-                            ),
-                            child: const Icon(Icons.person_rounded, size: 20, color: AppColors.textSubtle),
-                          ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(post.userName, style: AppTextStyles.headline3.copyWith(fontSize: 15)),
-                                  if (post.isPinned) ...[
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.push_pin_rounded, size: 10, color: AppColors.primary),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'PINNED',
-                                            style: AppTextStyles.labelSmall.copyWith(
-                                              color: AppColors.primary,
-                                              fontSize: 8,
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              Text(post.time, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle, fontSize: 11)),
-                            ],
-                          ),
-                        ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _primaryLight,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'COMMUNITY HUB',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: _primary,
+                          letterSpacing: 0.6,
+                        ),
                       ),
                     ),
-                    const Spacer(),
-                    const Icon(Icons.more_horiz_rounded, color: AppColors.textSubtle),
                   ],
                 ),
-                const SizedBox(height: 16),
-                if (showTitle) ...[
-                  Text(post.title, style: AppTextStyles.headline3.copyWith(fontSize: 17, height: 1.3)),
-                  const SizedBox(height: 8),
-                ],
-                if (displayBody.isNotEmpty)
-                  Text(
-                    displayBody,
-                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHeadline.withValues(alpha: 0.7), height: 1.5),
+                const SizedBox(height: 3),
+                Text(
+                  'AgriDirect Farmers',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: _dark,
+                    letterSpacing: -0.4,
                   ),
-                if (post.videoUrl != null && post.videoUrl!.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: ForumVideoPlayer(videoUrl: post.videoUrl!),
-                  ),
-                ] else if (post.imageUrl != null) ...[
-                  const SizedBox(height: 16),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: CachedNetworkImage(
-                      imageUrl: post.imageUrl!,
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: AppColors.textHeadline.withValues(alpha: 0.1))),
-            ),
-            child: Row(
-              children: [
-                 _buildSocialAction(
-                  post.isLiked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
-                  '${post.likes}',
-                  post.isLiked ? AppColors.primary : AppColors.textSubtle,
-                  onTap: () async {
-                    if (!AuthService().isLoggedIn) {
-                      context.go(AppRoutes.login);
-                      return;
-                    }
-                    await SupabaseDataService().togglePostLike(post.id);
-                    if (mounted) setState(() {});
-                  },
-                ),
-                const SizedBox(width: 24),
-                _buildSocialAction(
-                  Icons.chat_bubble_outline_rounded,
-                  '${post.comments}',
-                  AppColors.textSubtle,
-                  onTap: () async {
-                    if (!AuthService().isLoggedIn) {
-                      context.go(AppRoutes.login);
-                      return;
-                    }
-                    final updated = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => CommentsDialog(postId: post.id),
-                    );
-                    if (updated == true && mounted) {
-                      setState(() {});
-                    }
-                  },
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () async {
-                    final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.community}?post=${post.id}';
-                    final messenger = ScaffoldMessenger.of(context);
-                    await Clipboard.setData(ClipboardData(text: shareUrl));
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('Post link copied to clipboard!')),
-                    );
-                  },
-                  icon: const Icon(Icons.share_outlined, size: 20, color: AppColors.textSubtle),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
           ),
+
+          // Notification Button
+          _buildNotificationButton(),
         ],
       ),
     );
   }
 
-  Widget _buildSocialAction(
-    IconData icon,
-    String label,
-    Color color, {
-    VoidCallback? onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+  Widget _buildNotificationButton() {
+    return ValueListenableBuilder<int>(
+      valueListenable: NotificationService().unreadCountNotifier,
+      builder: (context, count, _) {
+        return InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            context.push(AppRoutes.notifications);
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _border),
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(
+                  Icons.notifications_none_rounded,
+                  size: 22,
+                  color: _dark,
+                ),
+                if (count > 0)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 8, minHeight: 8),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // SEARCH BAR
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: TextField(
+          controller: _searchController,
+          onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+          style: GoogleFonts.inter(fontSize: 14, color: _dark),
+          decoration: InputDecoration(
+            hintText: 'Search posts, crop diagnosis, pests...',
+            hintStyle: GoogleFonts.inter(fontSize: 13, color: _muted),
+            prefixIcon: const Icon(Icons.search_rounded, color: _muted, size: 20),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.cancel_rounded, size: 18, color: _muted),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                  )
+                : null,
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // TOPIC FILTER PILLS
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildTopicPills() {
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        scrollDirection: Axis.horizontal,
+        itemCount: _topics.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final topic = _topics[index];
+          final isSelected = _selectedCategory == topic;
+          return GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() => _selectedCategory = topic);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+              decoration: BoxDecoration(
+                color: isSelected ? _primary : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? _primary : _border,
+                  width: 1,
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: _primary.withValues(alpha: 0.25),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Center(
+                child: Text(
+                  topic,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? Colors.white : const Color(0xFF475569),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // SEGMENTED TAB SWITCHER
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildSegmentedTab() {
+    final activeIndex = _tabController.index;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE2E8F0).withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: AppTextStyles.labelSmall.copyWith(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+            Expanded(
+              child: _buildTabButton(
+                title: 'Discussions',
+                icon: Icons.forum_rounded,
+                isActive: activeIndex == 0,
+                onTap: () => _tabController.animateTo(0),
+              ),
+            ),
+            Expanded(
+              child: _buildTabButton(
+                title: 'Guides & Articles',
+                icon: Icons.menu_book_rounded,
+                isActive: activeIndex == 1,
+                onTap: () => _tabController.animateTo(1),
               ),
             ),
           ],
@@ -587,103 +448,873 @@ class _FarmerCommunityHubState extends State<FarmerCommunityHub>
     );
   }
 
-  Widget _buildArticleCard({required ArticleItem article}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      decoration: AppDecorations.cardDecoration.copyWith(
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+  Widget _buildTabButton({
+    required String title,
+    required IconData icon,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isActive ? _primary : _muted,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                color: isActive ? _dark : _muted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // FORUM FEED
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildForumFeed() {
+    return StreamBuilder<List<ForumPostItem>>(
+      stream: _forumStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingSkeleton();
+        }
+        if (snapshot.hasError) {
+          return _buildErrorState();
+        }
+
+        final posts = (snapshot.data ?? []).where((post) {
+          // Category filter
+          if (_selectedCategory != 'All') {
+            final categoryKeyword = _selectedCategory
+                .replaceAll(RegExp(r'[^\w\s]'), '')
+                .trim()
+                .toLowerCase();
+            final matchesCategory = post.title.toLowerCase().contains(categoryKeyword) ||
+                post.body.toLowerCase().contains(categoryKeyword);
+            if (!matchesCategory) return false;
+          }
+
+          // Search query
+          if (_searchQuery.isEmpty) return true;
+          final haystack = '${post.userName} ${post.title} ${post.body}'.toLowerCase();
+          return haystack.contains(_searchQuery);
+        }).toList();
+
+        if (posts.isEmpty) {
+          return _buildEmptyState(
+            title: 'No discussions found',
+            subtitle: _searchQuery.isNotEmpty
+                ? 'Try searching with different keywords.'
+                : 'Be the first grower to ask a question or share advice!',
+            icon: Icons.chat_bubble_outline_rounded,
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+          physics: const BouncingScrollPhysics(),
+          itemCount: posts.length,
+          itemBuilder: (context, index) {
+            final post = posts[index];
+            return _buildModernPostCard(post);
+          },
+        );
+      },
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // MODERN POST CARD
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildModernPostCard(ForumPostItem post) {
+    final cleanTitle = post.title.trim();
+    final cleanBody = post.body.trim();
+    final bool showTitle = cleanTitle.isNotEmpty && cleanBody != cleanTitle;
+    final String displayBody = (cleanBody.startsWith(cleanTitle) && cleanBody != cleanTitle)
+        ? cleanBody.substring(cleanTitle.length).trim()
+        : cleanBody;
+    final formattedName = _formatName(post.userName);
+    final avatar = post.authorAvatarUrl;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => PostDetailScreen(post: post)),
+            );
+            if (mounted) setState(() {});
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Author Header ──
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => _navigateToFarmerProfile(post.userId),
+                      child: Container(
+                        padding: const EdgeInsets.all(1.5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: _primary.withValues(alpha: 0.3),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: _primaryLight,
+                          backgroundImage: (avatar != null && avatar.isNotEmpty)
+                              ? CachedNetworkImageProvider(avatar)
+                              : null,
+                          child: (avatar == null || avatar.isEmpty)
+                              ? Text(
+                                  _getInitials(formattedName),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: _primary,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _navigateToFarmerProfile(post.userId),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    formattedName,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: _dark,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.verified_rounded,
+                                  size: 14,
+                                  color: _primary,
+                                ),
+                                if (post.isPinned) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: _primaryLight,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.push_pin_rounded, size: 10, color: _primary),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          'PINNED',
+                                          style: GoogleFonts.inter(
+                                            color: _primary,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 1),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.access_time_rounded,
+                                  size: 11,
+                                  color: _muted,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  post.time,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    color: _muted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    _buildPostOptionsMenu(post),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // ── Post Title ──
+                if (showTitle) ...[
                   Text(
-                    'RESOURCE GUIDE',
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 10,
-                      letterSpacing: 1,
+                    cleanTitle,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: _dark,
+                      height: 1.35,
                     ),
                   ),
-                  if (article.audience == 'FARMER') ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'FARMERS ONLY',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.warning,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w900,
-                        ),
+                  const SizedBox(height: 6),
+                ],
+
+                // ── Post Body ──
+                if (displayBody.isNotEmpty)
+                  Text(
+                    displayBody,
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      color: const Color(0xFF334155),
+                      height: 1.5,
+                    ),
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+
+                // ── Video / Media Player ──
+                if (post.videoUrl != null && post.videoUrl!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: ForumVideoPlayer(videoUrl: post.videoUrl!),
+                  ),
+                ] else if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: () => _openFullscreenImage(post.imageUrl!),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Stack(
+                        children: [
+                          CachedNetworkImage(
+                            imageUrl: post.imageUrl!,
+                            height: 210,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              height: 210,
+                              color: const Color(0xFFF1F5F9),
+                              child: const Center(
+                                child: CircularProgressIndicator(strokeWidth: 2, color: _primary),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              height: 160,
+                              color: const Color(0xFFF1F5F9),
+                              child: const Center(
+                                child: Icon(Icons.broken_image_rounded, color: _muted),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.zoom_in_rounded, size: 14, color: Colors.white),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'View Photo',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ] else if (article.audience == 'CUSTOMER') ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'CUSTOMERS ONLY',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.primary,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
+                  ),
+                ],
+
+                const SizedBox(height: 14),
+
+                // ── Action Bar (Like, Comment, Share) ──
+                Container(
+                  padding: const EdgeInsets.only(top: 10),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: Color(0xFFF1F5F9), width: 1),
                     ),
-                  ],
-                  const SizedBox(height: 8),
-                  Text(article.title, style: AppTextStyles.headline3.copyWith(fontSize: 16), maxLines: 2, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 8),
-                  Row(
+                  ),
+                  child: Row(
                     children: [
-                      const CircleAvatar(radius: 8, backgroundColor: AppColors.primary, child: Icon(Icons.spa, size: 8, color: Colors.white)),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          'By ${article.author}',
-                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      // Like Action
+                      _buildActionButton(
+                        icon: post.isLiked ? Icons.thumb_up_alt_rounded : Icons.thumb_up_alt_outlined,
+                        label: '${post.likes} ${post.likes == 1 ? 'Like' : 'Likes'}',
+                        isActive: post.isLiked,
+                        activeColor: _primary,
+                        activeBg: _primaryLight,
+                        onTap: () async {
+                          HapticFeedback.lightImpact();
+                          if (!AuthService().isLoggedIn) {
+                            context.go(AppRoutes.login);
+                            return;
+                          }
+                          await SupabaseDataService().togglePostLike(post.id);
+                          if (mounted) setState(() {});
+                        },
                       ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.circle, size: 3, color: AppColors.textSubtle),
-                      const SizedBox(width: 8),
-                      Text(article.time, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSubtle)),
+
+                      const SizedBox(width: 12),
+
+                      // Comment Action
+                      _buildActionButton(
+                        icon: Icons.chat_bubble_outline_rounded,
+                        label: '${post.comments} ${post.comments == 1 ? 'Reply' : 'Replies'}',
+                        isActive: false,
+                        activeColor: _dark,
+                        activeBg: Colors.transparent,
+                        onTap: () async {
+                          HapticFeedback.selectionClick();
+                          if (!AuthService().isLoggedIn) {
+                            context.go(AppRoutes.login);
+                            return;
+                          }
+                          final updated = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => CommentsDialog(postId: post.id),
+                          );
+                          if (updated == true && mounted) {
+                            setState(() {});
+                          }
+                        },
+                      ),
+
+                      const Spacer(),
+
+                      // Share Action
+                      IconButton(
+                        onPressed: () => _sharePost(post),
+                        icon: const Icon(Icons.share_outlined, size: 18, color: _muted),
+                        constraints: const BoxConstraints(),
+                        padding: const EdgeInsets.all(6),
+                        tooltip: 'Share post',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required Color activeColor,
+    required Color activeBg,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: isActive ? activeBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isActive ? activeColor : _muted,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                color: isActive ? activeColor : const Color(0xFF475569),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPostOptionsMenu(ForumPostItem post) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_horiz_rounded, color: _muted, size: 20),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: (action) {
+        if (action == 'share') {
+          _sharePost(post);
+        } else if (action == 'profile') {
+          _navigateToFarmerProfile(post.userId);
+        } else if (action == 'report') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Thank you. This post has been reported for moderation.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+      itemBuilder: (ctx) => [
+        const PopupMenuItem(
+          value: 'share',
+          child: Row(
+            children: [
+              Icon(Icons.share_outlined, size: 16, color: _dark),
+              SizedBox(width: 8),
+              Text('Share Link', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+        if (post.userId != null)
+          const PopupMenuItem(
+            value: 'profile',
+            child: Row(
+              children: [
+                Icon(Icons.storefront_outlined, size: 16, color: _dark),
+                SizedBox(width: 8),
+                Text('View Farm Profile', style: TextStyle(fontSize: 13)),
+              ],
+            ),
+          ),
+        const PopupMenuItem(
+          value: 'report',
+          child: Row(
+            children: [
+              Icon(Icons.flag_outlined, size: 16, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Report Post', style: TextStyle(fontSize: 13, color: Colors.red)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _sharePost(ForumPostItem post) async {
+    final shareUrl = '${ShareUtil.baseDomain}${AppRoutes.community}?post=${post.id}';
+    final messenger = ScaffoldMessenger.of(context);
+    await Clipboard.setData(ClipboardData(text: shareUrl));
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('🔗 Post link copied to clipboard!'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _openFullscreenImage(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              minScale: 0.8,
+              maxScale: 4.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: CachedNetworkImage(imageUrl: imageUrl, fit: BoxFit.contain),
+              ),
+            ),
+            IconButton(
+              onPressed: () => Navigator.pop(ctx),
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // ARTICLES FEED
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildArticlesFeed() {
+    return FutureBuilder<List<ArticleItem>>(
+      future: SupabaseDataService().getArticles(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingSkeleton();
+        }
+
+        final articles = (snapshot.data ?? []).where((article) {
+          if (_searchQuery.isEmpty) return true;
+          final haystack =
+              '${article.title} ${article.author} ${article.excerpt} ${article.content ?? ''}'.toLowerCase();
+          return haystack.contains(_searchQuery);
+        }).toList();
+
+        if (articles.isEmpty) {
+          return _buildEmptyState(
+            title: 'No articles found',
+            subtitle: 'Agricultural guides and farming tutorials will appear here.',
+            icon: Icons.article_outlined,
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+          physics: const BouncingScrollPhysics(),
+          itemCount: articles.length,
+          itemBuilder: (context, index) {
+            final article = articles[index];
+            return _buildModernArticleCard(article);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildModernArticleCard(ArticleItem article) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => ArticleDetailScreen(article: article)),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Thumbnail image
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 90,
+                    height: 90,
+                    color: const Color(0xFFF1F5F9),
+                    child: (article.imageUrl != null && article.imageUrl!.isNotEmpty)
+                        ? CachedNetworkImage(
+                            imageUrl: article.imageUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => const Center(
+                              child: Icon(Icons.menu_book_rounded, color: _muted),
+                            ),
+                            errorWidget: (context, url, error) => const Center(
+                              child: Icon(Icons.article_rounded, color: _muted),
+                            ),
+                          )
+                        : const Center(
+                            child: Icon(Icons.article_outlined, color: _muted, size: 28),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // Article Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _primaryLight,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'GUIDE',
+                              style: GoogleFonts.inter(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: _primary,
+                              ),
+                            ),
+                          ),
+                          if (article.audience == 'FARMER') ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'FARMERS ONLY',
+                                style: GoogleFonts.inter(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFFD97706),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        article.title,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: _dark,
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              article.author,
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: _muted,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.circle, size: 3, color: _muted),
+                          const SizedBox(width: 6),
+                          Text(
+                            article.time,
+                            style: GoogleFonts.inter(fontSize: 11, color: _muted),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // LOADING / EMPTY / ERROR STATES
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildLoadingSkeleton() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 3,
+      itemBuilder: (context, index) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: _border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(width: 120, height: 12, color: const Color(0xFFF1F5F9)),
+                      const SizedBox(height: 4),
+                      Container(width: 60, height: 10, color: const Color(0xFFF8FAFC)),
                     ],
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 16),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                width: 90,
-                height: 90,
-                color: AppColors.background,
-                child: article.imageUrl != null && article.imageUrl!.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: article.imageUrl!,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => const Icon(Icons.article_outlined, color: AppColors.textSubtle),
-                      errorWidget: (context, url, error) => const Icon(Icons.article_outlined, color: AppColors.textSubtle),
-                    )
-                  : const Icon(Icons.article_outlined, color: AppColors.textSubtle),
+              const SizedBox(height: 16),
+              Container(width: double.infinity, height: 14, color: const Color(0xFFF1F5F9)),
+              const SizedBox(height: 8),
+              Container(width: 200, height: 12, color: const Color(0xFFF8FAFC)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: const BoxDecoration(
+                color: Color(0xFFDCFCE7),
+                shape: BoxShape.circle,
               ),
+              child: Icon(icon, size: 36, color: _primary),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: _dark,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              style: GoogleFonts.inter(fontSize: 13, color: _muted, height: 1.4),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.wifi_off_rounded, size: 42, color: _muted),
+            const SizedBox(height: 12),
+            Text(
+              'Unable to load community posts',
+              style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w700, color: _dark),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Please check your internet connection.',
+              style: GoogleFonts.inter(fontSize: 13, color: _muted),
             ),
           ],
         ),

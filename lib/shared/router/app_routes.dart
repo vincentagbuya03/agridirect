@@ -38,6 +38,8 @@ class AppRoutes {
   static const String farmerFollowers = '/farmer-followers';
   static const String helpCenter = '/help-center';
   static const String appSettings = '/app-settings';
+  static const String updatePhone = '/update-phone';
+  static const String updateEmail = '/update-email';
   static const String changePassword = '/change-password';
   static const String farmerVouchers = '/farmer-vouchers';
   static const String claimedVouchers = '/claimed-vouchers';
@@ -99,6 +101,7 @@ class AppRoutes {
       case 2:
         return community;
       case 3:
+      case 5:
         return profile;
       case 4:
         return cart;

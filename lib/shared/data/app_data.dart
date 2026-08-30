@@ -104,6 +104,8 @@ class ProductItem {
     bool? isFreeShipping,
     bool? isWholesale,
     bool? isFlashSale,
+    DateTime? flashSaleStart,
+    DateTime? flashSaleEnd,
     DateTime? createdAt,
   }) {
     return ProductItem(

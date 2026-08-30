@@ -901,7 +901,18 @@ class SupabaseDataService {
 
     final double rawPrice =
         double.tryParse(item['price']?.toString() ?? '0') ?? 0.0;
-    final bool isFlash = item['is_flash_sale'] == true;
+
+    final DateTime? flashStart = item['flash_sale_start'] != null
+        ? DateTime.tryParse(item['flash_sale_start'].toString())
+        : null;
+    final DateTime? flashEnd = item['flash_sale_end'] != null
+        ? DateTime.tryParse(item['flash_sale_end'].toString())
+        : null;
+
+    final now = DateTime.now();
+    final bool isFlash = item['is_flash_sale'] == true &&
+        (flashEnd == null || flashEnd.isAfter(now)) &&
+        (flashStart == null || flashStart.isBefore(now.add(const Duration(minutes: 1))));
 
     double discountPercent =
         (item['discount_percent'] as num?)?.toDouble() ?? 0.0;
@@ -932,13 +943,6 @@ class SupabaseDataService {
             ((soldCount / (soldCount + stock)) * 100).clamp(15.0, 95.0);
       }
     }
-
-    final DateTime? flashStart = item['flash_sale_start'] != null
-        ? DateTime.tryParse(item['flash_sale_start'].toString())
-        : null;
-    final DateTime? flashEnd = item['flash_sale_end'] != null
-        ? DateTime.tryParse(item['flash_sale_end'].toString())
-        : null;
 
     return ProductItem(
       productId: item['product_id']?.toString(),
@@ -1147,7 +1151,9 @@ class SupabaseDataService {
       }
 
       await _enrichProductItemsWithFarmerProfiles(enrichedItems);
-      return enrichedItems.map((item) => _mapToProductItem(item)).toList();
+      final products =
+          enrichedItems.map((item) => _mapToProductItem(item)).toList();
+      return products.where((p) => p.isFlashSale).toList();
     } catch (e) {
       debugPrint('Error fetching flash sale products: $e');
       return [];

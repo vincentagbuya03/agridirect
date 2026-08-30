@@ -209,9 +209,6 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
     );
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // NAV BAR â€” Glassmorphism floating card (matches Community Hub)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Widget _buildNavBar() {
     return WebConsumerNavBar(
       currentIndex: widget.currentIndex,
@@ -751,8 +748,11 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                   SnackBar(
                     content: const Row(
                       children: [
-                        Icon(Icons.download_rounded,
-                            color: Colors.white, size: 18),
+                        Icon(
+                          Icons.download_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                         SizedBox(width: 8),
                         Text('Downloading AgriDirect APK installer...'),
                       ],
@@ -760,7 +760,8 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                     backgroundColor: const Color(0xFF059669),
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                     duration: const Duration(seconds: 3),
                   ),
                 );
@@ -1215,15 +1216,16 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
     final rawPrice = product.price.replaceAll(RegExp(r'[^0-9.]'), '');
     final double price = double.tryParse(rawPrice) ?? 0.0;
     final int discount = (product.discountPercent ?? 30).toInt();
-    final double origPrice = double.tryParse(
+    final double origPrice =
+        double.tryParse(
           product.originalPrice?.replaceAll(RegExp(r'[^0-9.]'), '') ?? '',
         ) ??
         (price / (1.0 - (discount / 100.0)));
 
-    final double claimProgress =
-        ((product.claimPercentage ?? 60.0) / 100.0).clamp(0.1, 0.95);
-    final int sold = product.soldCount ??
-        (10 + (product.name.hashCode.abs() % 25));
+    final double claimProgress = ((product.claimPercentage ?? 60.0) / 100.0)
+        .clamp(0.1, 0.95);
+    final int sold =
+        product.soldCount ?? (10 + (product.name.hashCode.abs() % 25));
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -2333,7 +2335,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                         crossAxisCount: crossAxisCount,
                         mainAxisSpacing: 16,
                         crossAxisSpacing: 16,
-                        mainAxisExtent: 258,
+                        mainAxisExtent: 268,
                       ),
                       itemCount: farmers.take(6).length,
                       itemBuilder: (context, i) {
@@ -2550,19 +2552,23 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                       ),
                       // Avatar positioned at bottom-left overlapping cover
                       Positioned(
-                        bottom: -16,
-                        left: 12,
+                        bottom: -22,
+                        left: 14,
                         child: Container(
-                          padding: const EdgeInsets.all(2),
+                          padding: const EdgeInsets.all(3),
                           decoration: const BoxDecoration(
                             color: Colors.white,
                             shape: BoxShape.circle,
                             boxShadow: [
-                              BoxShadow(color: Colors.black26, blurRadius: 6),
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
                             ],
                           ),
                           child: CircleAvatar(
-                            radius: 18,
+                            radius: 26,
                             backgroundColor: const Color(0xFFDCFCE7),
                             backgroundImage:
                                 (avatarUrl.isNotEmpty && avatarUrl != 'null')
@@ -2579,7 +2585,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                                                   : 'F'))
                                         .toUpperCase(),
                                     style: GoogleFonts.inter(
-                                      fontSize: 14,
+                                      fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                       color: const Color(0xFF059669),
                                     ),
@@ -2593,7 +2599,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 20, 12, 10),
+                    padding: const EdgeInsets.fromLTRB(14, 26, 14, 10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

@@ -1321,11 +1321,13 @@ class _FarmerOrderDetailsScreenState extends State<FarmerOrderDetailsScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final cleanError = e.toString().replaceFirst('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed: $e'),
-            backgroundColor: Colors.red,
+            content: Text(cleanError),
+            backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
           ),
         );
       }

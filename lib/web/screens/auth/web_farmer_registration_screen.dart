@@ -1,15 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:latlong2/latlong.dart';
-import '../../../shared/models/farmer_registration.dart';
-import '../../../shared/services/auth/auth_service.dart';
-import '../../../shared/services/core/supabase_config.dart';
+import 'package:go_router/go_router.dart';
+import '../../../shared/router/app_routes.dart';
+import '../../../shared/utils/apk_downloader.dart';
 
-/// Web Farmer Registration — Modern 3-step wizard with desktop optimization.
-class WebFarmerRegistrationScreen extends StatefulWidget {
+/// Web Farmer Registration Screen — informs users that farm onboarding & identity verification
+/// are exclusive to the AgriDirect Mobile App with GPS & Camera biometrics.
+class WebFarmerRegistrationScreen extends StatelessWidget {
   final VoidCallback onRegistrationComplete;
 
   const WebFarmerRegistrationScreen({
@@ -17,161 +14,214 @@ class WebFarmerRegistrationScreen extends StatefulWidget {
     required this.onRegistrationComplete,
   });
 
-  @override
-  State<WebFarmerRegistrationScreen> createState() =>
-      _WebFarmerRegistrationScreenState();
-}
-
-class _WebFarmerRegistrationScreenState
-    extends State<WebFarmerRegistrationScreen> {
-  static const Color _primary = Color(0xFF10B981);
-  static const Color _accent = Color(0xFF13EC5B);
-  static const Color _dark = Color(0xFF0F172A);
+  static const Color _primary = Color(0xFF16A34A);
+  static const Color _dark = Color(0xFF111827);
   static const Color _muted = Color(0xFF64748B);
   static const Color _border = Color(0xFFE2E8F0);
   static const Color _surface = Color(0xFFF8FAFC);
 
-  int _currentStep = 0;
-  bool _isSubmitting = false;
-  final _registration = FarmerRegistration();
-
-  // Step 1 controllers
-  final _fullNameController = TextEditingController();
-  final _sexController = TextEditingController();
-  final _placeOfBirthController = TextEditingController();
-  final _pcnController = TextEditingController();
-  String _idType = 'national_id';
-
-  final _birthDateController = TextEditingController();
-  final _yearsController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _farmNameController = TextEditingController();
-  final _specialtyController = TextEditingController();
-  final _livestockController = TextEditingController();
-  final Set<String> _selectedCrops = {};
-  double? _farmLatitude;
-  double? _farmLongitude;
-
-  // Step 3 controllers
-  final _elementaryController = TextEditingController();
-  final _highSchoolController = TextEditingController();
-  final _collegeController = TextEditingController();
-  final _farmingHistoryController = TextEditingController();
-  bool _certificationAccepted = false;
-
-  // Step 2 state
-  bool _faceScanned = false;
-  bool _idUploaded = false;
-  Uint8List? _faceImageBytes;
-  Uint8List? _idImageBytes;
-
-  // Signature
-  final List<Offset?> _signaturePoints = [];
-
-  @override
-  void dispose() {
-    _fullNameController.dispose();
-    _sexController.dispose();
-    _placeOfBirthController.dispose();
-    _pcnController.dispose();
-    _birthDateController.dispose();
-    _yearsController.dispose();
-    _addressController.dispose();
-    _farmNameController.dispose();
-    _specialtyController.dispose();
-    _livestockController.dispose();
-    _elementaryController.dispose();
-    _highSchoolController.dispose();
-    _collegeController.dispose();
-    _farmingHistoryController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 700;
+
     return Scaffold(
       backgroundColor: _surface,
-      body: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 900),
-          margin: const EdgeInsets.all(40),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(32),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 40,
-                offset: const Offset(0, 20),
-              ),
-            ],
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: _dark),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(AppRoutes.home);
+            }
+          },
+        ),
+        title: Text(
+          'Farmer Registration',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: _dark,
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(32),
-            child: Row(
+        ),
+        centerTitle: false,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: _border, height: 1),
+        ),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 32,
+            vertical: 40,
+          ),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 620),
+            padding: EdgeInsets.all(isMobile ? 24 : 40),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: _border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Left Side: Progress & Info (Sidebar)
+                // Visual Badge
                 Container(
-                  width: 300,
-                  color: _primary,
-                  padding: const EdgeInsets.all(40),
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: _primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _primary.withValues(alpha: 0.25),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.agriculture_rounded,
+                    color: _primary,
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Main Heading
+                Text(
+                  'Farm Registration is on Mobile',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: isMobile ? 24 : 28,
+                    fontWeight: FontWeight.w800,
+                    color: _dark,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Subtitle
+                Text(
+                  'To ensure high trust and security, farm verification, live GPS geotagging, and ID biometric scanning require the AgriDirect Mobile App.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    color: _muted,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // Key Requirements list
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: _surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _border),
+                  ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.agriculture_rounded,
-                        size: 48,
-                        color: Colors.white,
+                      _buildReasonRow(
+                        icon: Icons.pin_drop_rounded,
+                        title: 'Live GPS Farm Geolocation',
+                        desc:
+                            'Capture exact farm boundaries and location on-site.',
                       ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Farmer\nOnboarding',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          height: 1.1,
-                        ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Divider(height: 1, color: _border),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Join our community of verified sellers and grow your business.',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          color: Colors.white.withValues(alpha: 0.7),
-                          height: 1.5,
-                        ),
+                      _buildReasonRow(
+                        icon: Icons.document_scanner_rounded,
+                        title: 'PhilSys / Valid ID Verification',
+                        desc:
+                            'Real-time photo ID scanning and face verification.',
                       ),
-                      const Spacer(),
-                      _buildDesktopStep(
-                        0,
-                        'Information',
-                        'Farm & Personal data',
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Divider(height: 1, color: _border),
                       ),
-                      const SizedBox(height: 24),
-                      _buildDesktopStep(
-                        1,
-                        'Verification',
-                        'Identity & Security',
+                      _buildReasonRow(
+                        icon: Icons.store_rounded,
+                        title: 'Mobile Seller Dashboard',
+                        desc:
+                            'Manage crops, orders, and chats directly from your phone.',
                       ),
-                      const SizedBox(height: 24),
-                      _buildDesktopStep(2, 'Submission', 'Review & Signature'),
                     ],
                   ),
                 ),
-                // Right Side: Form
-                Expanded(
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(48),
-                          child: _buildCurrentStep(),
+                const SizedBox(height: 32),
+
+                // CTA Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go(AppRoutes.home);
+                          }
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: const BorderSide(color: _border, width: 1.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: Text(
+                          'Back to Home',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _muted,
+                          ),
                         ),
                       ),
-                      _buildBottomBar(),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          await ApkDownloader.download();
+                        },
+                        icon: const Icon(Icons.download_rounded, size: 18),
+                        label: Text(
+                          'Get Android App',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -181,799 +231,48 @@ class _WebFarmerRegistrationScreenState
     );
   }
 
-  Widget _buildDesktopStep(int index, String title, String subtitle) {
-    final isActive = _currentStep == index;
-    final isDone = _currentStep > index;
-
+  Widget _buildReasonRow({
+    required IconData icon,
+    required String title,
+    required String desc,
+  }) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 32,
-          height: 32,
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isActive
-                ? Colors.white
-                : (isDone ? Colors.white.withValues(alpha: 0.3) : Colors.transparent),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 2),
+            color: _primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
           ),
-          child: Center(
-            child: isDone
-                ? const Icon(Icons.check, size: 16, color: Colors.white)
-                : Text(
-                    '${index + 1}',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: isActive ? _primary : Colors.white,
-                    ),
-                  ),
-          ),
+          child: Icon(icon, color: _primary, size: 20),
         ),
-        const SizedBox(width: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-            Text(
-              subtitle,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 11,
-                color: Colors.white.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCurrentStep() {
-    switch (_currentStep) {
-      case 0:
-        return _buildStep1();
-      case 1:
-        return _buildStep2();
-      case 2:
-        return _buildStep3();
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  Widget _buildStep1() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeader(
-          'Personal & Farm Info',
-          'Tell us about yourself and your agricultural background.',
-        ),
-        const SizedBox(height: 32),
-        _buildSectionTitle('Identity Details'),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'ID Type',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: _dark,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: _surface,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _idType,
-                        isExpanded: true,
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'national_id',
-                            child: Text('National ID (PhilSys)'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'local_id',
-                            child: Text('Local ID / Others'),
-                          ),
-                        ],
-                        onChanged: (v) => setState(() => _idType = v!),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 24),
-            Expanded(
-              child: _buildField(
-                'PCN / ID Number',
-                _pcnController,
-                'Enter ID number',
-                icon: Icons.numbers_rounded,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        _buildField(
-          'Full Legal Name',
-          _fullNameController,
-          'As shown on your ID',
-          icon: Icons.person_rounded,
-        ),
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            Expanded(
-              child: _buildField(
-                'Sex',
-                _sexController,
-                'Male / Female',
-                icon: Icons.wc_rounded,
-              ),
-            ),
-            const SizedBox(width: 24),
-            Expanded(
-              child: _buildField(
-                'Place of Birth',
-                _placeOfBirthController,
-                'City, Province',
-                icon: Icons.location_city_rounded,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 32),
-        const Divider(),
-        const SizedBox(height: 32),
-        _buildSectionTitle('Farm & Contact'),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _buildField(
-                'Birth Date',
-                _birthDateController,
-                'YYYY-MM-DD',
-                icon: Icons.calendar_today_rounded,
-              ),
-            ),
-            const SizedBox(width: 24),
-            Expanded(
-              child: _buildField(
-                'Years in Farming',
-                _yearsController,
-                'e.g. 5+',
-                icon: Icons.history_rounded,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        _buildField(
-          'Residential Address',
-          _addressController,
-          'Full home address',
-          icon: Icons.location_on_rounded,
-          maxLines: 2,
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _openFarmPinPicker,
-            icon: const Icon(Icons.place_rounded),
-            label: Text(
-              _farmLatitude != null && _farmLongitude != null
-                  ? 'Pinned: ${_farmLatitude!.toStringAsFixed(5)}, ${_farmLongitude!.toStringAsFixed(5)}'
-                  : 'Pin Farm Location on Map',
-            ),
-          ),
-        ),
-        const SizedBox(height: 32),
-        const Divider(),
-        const SizedBox(height: 32),
-        Row(
-          children: [
-            Expanded(
-              child: _buildField(
-                'Farm Name',
-                _farmNameController,
-                'Branding name for your farm',
-                icon: Icons.branding_watermark_rounded,
-              ),
-            ),
-            const SizedBox(width: 24),
-            Expanded(
-              child: _buildField(
-                'Specialty',
-                _specialtyController,
-                'e.g. Organic, Grains',
-                icon: Icons.star_rounded,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        _buildField(
-          'Livestock',
-          _livestockController,
-          'e.g. Cattle, Poultry',
-          icon: Icons.pets_rounded,
-        ),
-        const SizedBox(height: 32),
-        Text(
-          'Primary Crops',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: _dark,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            'Rice',
-            'Corn',
-            'Vegetables',
-            'Fruits',
-            'Root Crops',
-          ].map((crop) => _buildCropChip(crop)).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStep2() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeader(
-          'Identity Verification',
-          'We need to verify your identity to ensure a safe marketplace.',
-        ),
-        const SizedBox(height: 48),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _buildUploadCard(
-                'Face Capture',
-                'Take a clear selfie for biometric verification.',
-                Icons.face_unlock_rounded,
-                _faceScanned,
-                () => _handleCapture('face'),
-              ),
-            ),
-            const SizedBox(width: 32),
-            Expanded(
-              child: _buildUploadCard(
-                'Valid ID',
-                'Upload a government-issued identification document.',
-                Icons.badge_rounded,
-                _idUploaded,
-                () => _handleCapture('id'),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStep3() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeader(
-          'Review & Sign',
-          'Almost there! Provide your education and farming history.',
-        ),
-        const SizedBox(height: 32),
-        _buildSectionTitle('Education'),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _buildField(
-                'Elementary',
-                _elementaryController,
-                'School Name',
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildField(
-                'High School',
-                _highSchoolController,
-                'School Name',
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildField(
-                'College',
-                _collegeController,
-                'Degree / University',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 32),
-        _buildField(
-          'Farming History',
-          _farmingHistoryController,
-          'Describe your experience...',
-          maxLines: 3,
-        ),
-        const SizedBox(height: 32),
-        _buildSectionTitle('E-Signature'),
-        const SizedBox(height: 16),
-        Container(
-          height: 200,
-          decoration: BoxDecoration(
-            color: _surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _border),
-          ),
-          child: Stack(
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (_signaturePoints.isEmpty)
-                Center(
-                  child: Text(
-                    'Draw your signature here',
-                    style: TextStyle(color: _muted.withValues(alpha: 0.5)),
-                  ),
-                ),
-              GestureDetector(
-                onPanUpdate: (d) =>
-                    setState(() => _signaturePoints.add(d.localPosition)),
-                onPanEnd: (_) => _signaturePoints.add(null),
-                child: CustomPaint(
-                  painter: _SignaturePainter(_signaturePoints),
-                  size: Size.infinite,
+              Text(
+                title,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _dark,
                 ),
               ),
-              Positioned(
-                top: 10,
-                right: 10,
-                child: IconButton(
-                  icon: const Icon(Icons.refresh_rounded, color: Colors.red),
-                  onPressed: () => setState(() => _signaturePoints.clear()),
+              const SizedBox(height: 2),
+              Text(
+                desc,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: _muted,
+                  height: 1.4,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 32),
-        _buildCertificationCheckbox(),
       ],
-    );
-  }
-
-  Widget _buildHeader(String title, String subtitle) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            color: _dark,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          subtitle,
-          style: GoogleFonts.plusJakartaSans(fontSize: 14, color: _muted),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title.toUpperCase(),
-      style: GoogleFonts.plusJakartaSans(
-        fontSize: 12,
-        fontWeight: FontWeight.w800,
-        color: _primary,
-        letterSpacing: 1.2,
-      ),
-    );
-  }
-
-  Widget _buildField(
-    String label,
-    TextEditingController controller,
-    String hint, {
-    IconData? icon,
-    int maxLines = 1,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: _dark,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          maxLines: maxLines,
-          decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon: icon != null
-                ? Icon(icon, size: 20, color: _primary)
-                : null,
-            filled: true,
-            fillColor: _surface,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
-            contentPadding: const EdgeInsets.all(16),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCropChip(String crop) {
-    final selected = _selectedCrops.contains(crop);
-    return ChoiceChip(
-      label: Text(crop),
-      selected: selected,
-      onSelected: (val) => setState(
-        () => val ? _selectedCrops.add(crop) : _selectedCrops.remove(crop),
-      ),
-      selectedColor: _primary,
-      labelStyle: TextStyle(
-        color: selected ? Colors.white : _dark,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-
-  Widget _buildUploadCard(
-    String title,
-    String subtitle,
-    IconData icon,
-    bool done,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: done ? _primary.withValues(alpha: 0.1) : _surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: done ? _primary : _border, width: 2),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              done ? Icons.check_circle_rounded : icon,
-              size: 48,
-              color: done ? _primary : _muted,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: _dark,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _muted),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCertificationCheckbox() {
-    return Row(
-      children: [
-        Checkbox(
-          value: _certificationAccepted,
-          activeColor: _primary,
-          onChanged: (v) => setState(() => _certificationAccepted = v!),
-        ),
-        const Expanded(
-          child: Text(
-            'I certify that all information is accurate and correct.',
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBottomBar() {
-    final isLast = _currentStep == 2;
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: _border)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          if (_currentStep > 0)
-            TextButton(
-              onPressed: () => setState(() => _currentStep--),
-              child: const Text('Back'),
-            )
-          else
-            const SizedBox.shrink(),
-          GestureDetector(
-            onTap: _isSubmitting
-                ? null
-                : (isLast
-                      ? _handleSubmit
-                      : () => setState(() => _currentStep++)),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [_primary, _accent]),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: _primary.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: _isSubmitting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: AppShimmerLoader(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : Text(
-                      isLast ? 'Submit Application' : 'Next Step',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _handleCapture(String type) async {
-    // In a real web app, we'd use image_picker_web or similar. For now, simulate.
-    setState(() {
-      if (type == 'face') _faceScanned = true;
-      if (type == 'id') _idUploaded = true;
-    });
-  }
-
-  Future<void> _handleSubmit() async {
-    if (!_certificationAccepted) return;
-    setState(() => _isSubmitting = true);
-
-    _registration.idType = _idType;
-    _registration.fullName = _fullNameController.text.trim();
-    _registration.sex = _sexController.text.trim();
-    _registration.placeOfBirth = _placeOfBirthController.text.trim();
-    _registration.pcn = _pcnController.text.trim();
-
-    _registration.farmName = _farmNameController.text.trim();
-    _registration.specialty = _specialtyController.text.trim();
-    _registration.birthDate = _birthDateController.text.trim();
-    _registration.yearsOfExperience = _yearsController.text.trim();
-    _registration.residentialAddress = _addressController.text.trim();
-    _registration.farmLatitude = _farmLatitude;
-    _registration.farmLongitude = _farmLongitude;
-    _registration.farmingHistory = _farmingHistoryController.text.trim();
-    _registration.cropTypes = _selectedCrops.toList();
-    _registration.livestock = _livestockController.text.trim();
-    _registration.elementary = _elementaryController.text.trim();
-    _registration.highSchool = _highSchoolController.text.trim();
-    _registration.college = _collegeController.text.trim();
-
-    try {
-      final auth = AuthService();
-      await SupabaseDatabase.submitFarmerRegistration(
-        userId: auth.userId,
-        registration: _registration,
-        faceImageBytes: _faceImageBytes,
-        idImageBytes: _idImageBytes,
-      );
-      widget.onRegistrationComplete();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-    } finally {
-      setState(() => _isSubmitting = false);
-    }
-  }
-
-  LatLng _defaultPin() {
-    if (_farmLatitude != null && _farmLongitude != null) {
-      return LatLng(_farmLatitude!, _farmLongitude!);
-    }
-    return const LatLng(10.3157, 123.8854);
-  }
-
-  Future<void> _openFarmPinPicker() async {
-    final mapController = MapController();
-    var selectedPin = _defaultPin();
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Dialog(
-              insetPadding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: 760,
-                height: 560,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Pin Farm Location',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: _dark,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => Navigator.of(dialogContext).pop(),
-                            icon: const Icon(Icons.close),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: FlutterMap(
-                            mapController: mapController,
-                            options: MapOptions(
-                              initialCenter: selectedPin,
-                              initialZoom: 14,
-                              onTap: (_, point) {
-                                setModalState(() => selectedPin = point);
-                              },
-                            ),
-                            children: [
-                              TileLayer(
-                                urlTemplate:
-                                    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                                subdomains: const ['a', 'b', 'c', 'd'],
-                                userAgentPackageName: 'com.agridirect.app',
-                                retinaMode: RetinaMode.isHighDensity(context),
-                              ),
-                              MarkerLayer(
-                                markers: [
-                                  Marker(
-                                    width: 48,
-                                    height: 48,
-                                    point: selectedPin,
-                                    child: const Icon(
-                                      Icons.location_on,
-                                      color: _primary,
-                                      size: 40,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () =>
-                                  Navigator.of(dialogContext).pop(),
-                              child: const Text('Cancel'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _farmLatitude = selectedPin.latitude;
-                                  _farmLongitude = selectedPin.longitude;
-                                });
-                                Navigator.of(dialogContext).pop();
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _primary,
-                              ),
-                              child: const Text('Use This Pin'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 }
-
-class _SignaturePainter extends CustomPainter {
-  final List<Offset?> points;
-  _SignaturePainter(this.points);
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-    for (int i = 0; i < points.length - 1; i++) {
-      if (points[i] != null && points[i + 1] != null) {
-        canvas.drawLine(points[i]!, points[i + 1]!, paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-

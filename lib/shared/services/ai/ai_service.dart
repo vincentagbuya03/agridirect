@@ -4,19 +4,14 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../core/supabase_config.dart';
 
-enum AiProvider { groq, openRouter }
-
-/// AI Service for AgriDirect powered by Groq & OpenRouter free-tier vision & text models.
+/// AI Service for AgriDirect powered exclusively by OpenRouter AI models.
 class AiService {
   static const String _defaultOpenRouterKey = '';
 
-  static const String groqApiKey =
-      String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
   static const String openRouterApiKey =
       String.fromEnvironment('OPENROUTER_API_KEY', defaultValue: '');
 
   static String runtimeOpenRouterKey = '';
-  static String runtimeGroqKey = '';
 
   static String get effectiveOpenRouterKey {
     if (runtimeOpenRouterKey.isNotEmpty) return runtimeOpenRouterKey;
@@ -26,29 +21,10 @@ class AiService {
     return _defaultOpenRouterKey;
   }
 
-  static String get effectiveGroqKey =>
-      runtimeGroqKey.isNotEmpty
-          ? runtimeGroqKey
-          : (groqApiKey.isNotEmpty
-              ? groqApiKey
-              : (dotenv.env['GROQ_API_KEY'] ?? ''));
-
-  static String get effectiveGeminiKey =>
-      dotenv.env['GEMINI_API_KEY'] ??
-      const String.fromEnvironment('GEMINI_API_KEY', defaultValue: '');
-
-  final AiProvider provider;
   final String apiKey;
 
-  AiService({AiProvider? provider, String? apiKey})
-      : provider = provider ??
-            (apiKey?.startsWith('sk-or-') == true || effectiveOpenRouterKey.isNotEmpty
-                ? AiProvider.openRouter
-                : AiProvider.groq),
-        apiKey = apiKey ??
-            ((provider == AiProvider.openRouter)
-                ? effectiveOpenRouterKey
-                : effectiveGroqKey);
+  AiService({String? apiKey})
+      : apiKey = apiKey ?? effectiveOpenRouterKey;
 
   /// System prompt tailored for AgriDirect agricultural context.
   static const String _systemPrompt = '''
@@ -64,23 +40,17 @@ Your responsibilities:
 4. Use friendly carabao emojis (🐮, 🌾, 🌱) and natural Taglish (Tagalog/English) when appropriate.
 ''';
 
-  Map<String, String> _buildHeaders({bool forceOpenRouter = false}) {
-    final useOpenRouter = forceOpenRouter || provider == AiProvider.openRouter;
-    final activeKey = useOpenRouter
-        ? effectiveOpenRouterKey
-        : (apiKey.isNotEmpty ? apiKey : effectiveGroqKey);
-    final headers = {
+  Map<String, String> _buildHeaders() {
+    final activeKey = apiKey.isNotEmpty ? apiKey : effectiveOpenRouterKey;
+    return {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $activeKey',
+      'HTTP-Referer': 'https://agridirect.app',
+      'X-Title': 'AgriDirect',
     };
-    if (useOpenRouter) {
-      headers['HTTP-Referer'] = 'https://agridirect.app';
-      headers['X-Title'] = 'AgriDirect';
-    }
-    return headers;
   }
 
-  /// General chat with automatic model fallback cascade.
+  /// General chat using OpenRouter models cascade.
   Future<String> getChatResponse({
     required List<Map<String, String>> conversationHistory,
     String? userPrompt,
@@ -96,56 +66,31 @@ Your responsibilities:
       messages.add({'role': 'user', 'content': userPrompt.trim()});
     }
 
-    // 1. Try Groq fast chat models first
-    final groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
-    for (final currentModel in groqModels) {
-      try {
-        final response = await http.post(
-          Uri.parse('https://api.groq.com/openai/v1/chat/completions'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $groqApiKey',
-          },
-          body: jsonEncode({
-            'model': currentModel,
-            'messages': messages,
-            'temperature': temperature,
-            'max_tokens': 1024,
-          }),
-        ).timeout(const Duration(seconds: 4));
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(utf8.decode(response.bodyBytes));
-          final content = data['choices']?[0]?['message']?['content'] as String?;
-          if (content != null && content.trim().isNotEmpty) {
-            return content.trim();
-          }
-        }
-      } catch (e) {
-        debugPrint('Groq chat error on $currentModel: $e');
-      }
-    }
-
-    // 2. Try OpenRouter free models fallback
-    final openRouterModels = [
-      'nvidia/nemotron-nano-12b-v2-vl:free',
-      'google/gemma-4-26b-a4b-it:free',
-      'google/gemma-4-31b-it:free',
-      'openai/gpt-oss-20b:free',
-    ];
+    final openRouterModels = model != null
+        ? [model]
+        : [
+            'openrouter/free',
+            'deepseek/deepseek-r1:free',
+            'deepseek/deepseek-chat:free',
+            'meta-llama/llama-3.1-8b-instruct:free',
+            'mistralai/mistral-small-24b-instruct-2501:free',
+            'meta-llama/llama-3.2-3b-instruct:free',
+            'openrouter/auto',
+            'meta-llama/llama-3.3-70b-instruct',
+          ];
 
     for (final currentModel in openRouterModels) {
       try {
         final response = await http.post(
           Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
-          headers: _buildHeaders(forceOpenRouter: true),
+          headers: _buildHeaders(),
           body: jsonEncode({
             'model': currentModel,
             'messages': messages,
             'temperature': temperature,
             'max_tokens': 1024,
           }),
-        ).timeout(const Duration(seconds: 4));
+        ).timeout(const Duration(seconds: 15));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -153,6 +98,8 @@ Your responsibilities:
           if (content != null && content.trim().isNotEmpty) {
             return content.trim();
           }
+        } else {
+          debugPrint('OpenRouter error on $currentModel: ${response.statusCode} - ${response.body}');
         }
       } catch (e) {
         debugPrint('OpenRouter chat error on $currentModel: $e');
@@ -171,7 +118,7 @@ Your responsibilities:
     );
   }
 
-  /// Analyze a crop, leaf, grain, or pest image using Vision AI.
+  /// Analyze a crop, leaf, grain, or pest image using Vision AI via OpenRouter.
   Future<String> diagnoseCropImage({
     required Uint8List imageBytes,
     String? additionalNotes,
@@ -182,18 +129,20 @@ Your responsibilities:
         ? 'Please analyze this agricultural image and diagnose the crop, plant, grain, or pest shown. User notes: $additionalNotes'
         : 'Please examine this agricultural image. Identify the crop/plant/grain shown, detect any disease, pest, deficiency, or quality issue, and provide practical organic & farming recommendations for Filipino farmers.';
 
-    // OpenRouter Free Vision Models currently active
     final openRouterVisionModels = model != null
         ? [model]
         : [
+            'openrouter/free',
+            'meta-llama/llama-3.2-11b-vision-instruct:free',
             'nvidia/nemotron-nano-12b-v2-vl:free',
+            'openrouter/auto',
           ];
 
     for (final visionModel in openRouterVisionModels) {
       try {
         final response = await http.post(
           Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
-          headers: _buildHeaders(forceOpenRouter: true),
+          headers: _buildHeaders(),
           body: jsonEncode({
             'model': visionModel,
             'messages': [
@@ -214,9 +163,7 @@ Your responsibilities:
             'temperature': 0.4,
             'max_tokens': 1024,
           }),
-        );
-
-        debugPrint('Vision API response status: ${response.statusCode}');
+        ).timeout(const Duration(seconds: 20));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -225,7 +172,7 @@ Your responsibilities:
             return content.trim();
           }
         } else {
-          debugPrint('Vision API error body: ${response.body}');
+          debugPrint('OpenRouter Vision error on $visionModel: ${response.statusCode} - ${response.body}');
         }
       } catch (e) {
         debugPrint('Error calling vision model $visionModel: $e');
@@ -279,24 +226,28 @@ Live Weather Telemetry:
 - Alert Level: ${alertType ?? 'general'}
 
 Dynamic Guidelines:
-1. TYPHOON & STORM IDENTIFICATION: If a typhoon, tropical storm, or strong gale is detected in the forecast (or winds > 40 km/h), explicitly mention the storm or typhoon advisory (e.g. "Bagyo Warning", "Typhoon Alert", or include the storm name if available in the condition text). Provide urgent advice on canal drainage, staking tall crops (bananas/corn), and securing storage.
+1. TYPHOON & STORM IDENTIFICATION: If a typhoon, tropical storm, or strong gale is detected in the forecast (or winds > 40 km/h), explicitly mention the storm or typhoon advisory (e.g. "Bagyo Warning", "Typhoon Alert"). Provide urgent advice on canal drainage, staking tall crops (bananas/corn), and securing storage.
 2. DYNAMIC & NATURAL VARIETY: Make the message sound fresh, smart, and realistic with the real numbers (${temperature.toStringAsFixed(0)}°C, ${(rainProbability * 100).toStringAsFixed(0)}% rain). Do NOT use generic canned lines. Use natural English or Taglish.
 3. "title": Must start with "🤖 Weather AI:" or "🌾 Weather AI:" followed by emojis (e.g. "🤖 Weather AI: 🌀 Bagyo Alert & Storm Prep", "🌾 Weather AI: 🌧️ Heavy Rain Advisory", "🌾 Weather AI: ☀️ Sunny Harvest Weather", max 45 chars).
 4. "body": 1-2 concise, high-impact sentences for a mobile lock screen (max 150 chars). State the weather and a specific crop action.
 5. Return ONLY valid JSON format: {"title": "...", "body": "..."} without markdown fences.
 ''';
 
-    // 1. Try Groq fast models if key is present
-    if (groqApiKey.isNotEmpty) {
-      final groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
-      for (final currentModel in groqModels) {
+    if (effectiveOpenRouterKey.isNotEmpty) {
+      final openRouterModels = [
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'google/gemini-2.0-flash-exp:free',
+        'deepseek/deepseek-r1:free',
+        'qwen/qwen-2.5-72b-instruct:free',
+        'mistralai/mistral-7b-instruct:free',
+        'openrouter/auto',
+      ];
+
+      for (final currentModel in openRouterModels) {
         try {
           final response = await http.post(
-            Uri.parse('https://api.groq.com/openai/v1/chat/completions'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $groqApiKey',
-            },
+            Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
+            headers: _buildHeaders(),
             body: jsonEncode({
               'model': currentModel,
               'messages': [
@@ -309,7 +260,7 @@ Dynamic Guidelines:
               'temperature': 0.5,
               'max_tokens': 160,
             }),
-          );
+          ).timeout(const Duration(seconds: 12));
 
           if (response.statusCode == 200) {
             final data = jsonDecode(utf8.decode(response.bodyBytes));
@@ -333,119 +284,12 @@ Dynamic Guidelines:
             }
           }
         } catch (e) {
-          debugPrint('Groq weather description error on $currentModel: $e');
+          debugPrint('OpenRouter weather description error on $currentModel: $e');
         }
       }
     }
 
-    // 2. Try OpenRouter free models
-    final openRouterModels = [
-      'meta-llama/llama-3.3-70b-instruct:free',
-      'google/gemma-4-31b-it:free',
-      'google/gemma-4-26b-a4b-it:free',
-      'nvidia/nemotron-nano-12b-v2-vl:free',
-      'openai/gpt-oss-20b:free',
-    ];
-
-    for (final currentModel in openRouterModels) {
-      try {
-        final response = await http.post(
-          Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
-          headers: _buildHeaders(forceOpenRouter: true),
-          body: jsonEncode({
-            'model': currentModel,
-            'messages': [
-              {
-                'role': 'system',
-                'content': 'You are Kiko, an expert AI Agricultural Advisor for Filipino farmers. You respond strictly in JSON.',
-              },
-              {'role': 'user', 'content': prompt},
-            ],
-            'temperature': 0.5,
-            'max_tokens': 160,
-          }),
-        );
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(utf8.decode(response.bodyBytes));
-          String? content = data['choices']?[0]?['message']?['content'] as String?;
-          if (content != null && content.trim().isNotEmpty) {
-            content = content.trim();
-            if (content.startsWith('```json')) {
-              content = content.replaceAll('```json', '').replaceAll('```', '').trim();
-            } else if (content.startsWith('```')) {
-              content = content.replaceAll('```', '').trim();
-            }
-            try {
-              final parsed = jsonDecode(content);
-              if (parsed is Map && parsed['title'] != null && parsed['body'] != null) {
-                return {
-                  'title': parsed['title'].toString().trim(),
-                  'body': parsed['body'].toString().trim(),
-                };
-              }
-            } catch (_) {}
-          }
-        }
-      } catch (e) {
-        debugPrint('OpenRouter weather description error on $currentModel: $e');
-      }
-    }
-
-    // 3. Try Gemini AI (using GEMINI_API_KEY from .env)
-    if (effectiveGeminiKey.isNotEmpty) {
-      try {
-        final geminiUrl = Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$effectiveGeminiKey',
-        );
-        final response = await http.post(
-          geminiUrl,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'contents': [
-              {
-                'role': 'user',
-                'parts': [
-                  {
-                    'text':
-                        'You are Kiko, an expert AI Agricultural Advisor for Filipino farmers. Respond in JSON format only without markdown blocks.\n\n$prompt'
-                  }
-                ]
-              }
-            ],
-            'generationConfig': {
-              'temperature': 0.5,
-              'maxOutputTokens': 200,
-            }
-          }),
-        );
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(utf8.decode(response.bodyBytes));
-          String? text =
-              data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
-          if (text != null && text.trim().isNotEmpty) {
-            text = text.trim();
-            if (text.startsWith('```json')) {
-              text = text.replaceAll('```json', '').replaceAll('```', '').trim();
-            } else if (text.startsWith('```')) {
-              text = text.replaceAll('```', '').trim();
-            }
-            final parsed = jsonDecode(text);
-            if (parsed is Map && parsed['title'] != null && parsed['body'] != null) {
-              return {
-                'title': parsed['title'].toString().trim(),
-                'body': parsed['body'].toString().trim(),
-              };
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('Gemini weather description error: $e');
-      }
-    }
-
-    // 4. Try Supabase Edge Function (uses cloud OPENROUTER_API_KEY secret)
+    // Supabase Edge Function fallback
     try {
       final edgeRes = await SupabaseConfig.client.functions.invoke(
         'daily-weather-check',
@@ -484,9 +328,9 @@ Dynamic Guidelines:
     };
   }
 
-  /// Generate dynamic marketing or official advisory push campaigns via AI
+  /// Generate dynamic marketing or official advisory push campaigns via OpenRouter AI
   Future<Map<String, String>> generateCampaignPush({
-    required String campaignType, // 'rain_promo', 'flash_harvest', 'market_demand', 'da_advisory'
+    required String campaignType,
     String? location,
   }) async {
     final loc = location ?? 'San Carlos City, Pangasinan';
@@ -514,10 +358,9 @@ Rules:
 
     final openRouterModels = [
       'meta-llama/llama-3.3-70b-instruct:free',
-      'google/gemma-4-31b-it:free',
-      'google/gemma-4-26b-a4b-it:free',
-      'nvidia/nemotron-nano-12b-v2-vl:free',
-      'openai/gpt-oss-20b:free',
+      'google/gemini-2.0-flash-exp:free',
+      'qwen/qwen-2.5-72b-instruct:free',
+      'mistralai/mistral-7b-instruct:free',
     ];
 
     if (effectiveOpenRouterKey.isNotEmpty) {
@@ -525,12 +368,7 @@ Rules:
         try {
           final response = await http.post(
             Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $effectiveOpenRouterKey',
-              'HTTP-Referer': 'https://agridirect.app',
-              'X-Title': 'AgriDirect Push Advisor',
-            },
+            headers: _buildHeaders(),
             body: jsonEncode({
               'model': currentModel,
               'messages': [

@@ -8,6 +8,7 @@ import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/widgets/premium_confirm_dialog.dart';
+import '../../widgets/auth/mobile_two_factor_sheet.dart';
 
 class CustomerProfileScreen extends StatefulWidget {
   final VoidCallback onModeChanged;
@@ -405,6 +406,25 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            'Security & Settings',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildListAction(
+            Icons.security_rounded,
+            'Two-Factor Authentication (2FA)',
+            () async {
+              await MobileTwoFactorSheet.show(context, initialIsActive: false);
+            },
+            color: const Color(0xFF059669),
+          ),
+          _buildListAction(Icons.settings_outlined, 'App Settings', () => context.push(AppRoutes.appSettings)),
+          const SizedBox(height: 8),
           Text(
             'Support & Legal',
             style: GoogleFonts.plusJakartaSans(

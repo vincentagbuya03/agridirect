@@ -1450,14 +1450,16 @@ class _FarmerOrdersScreenState extends State<FarmerOrdersScreen> {
               }
             } catch (e) {
               if (mounted) {
+                final cleanError = e.toString().replaceFirst('Exception: ', '');
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Failed to update status: $e'),
-                    backgroundColor: Colors.red,
+                    content: Text(cleanError),
+                    backgroundColor: Colors.red.shade700,
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
+                    duration: const Duration(seconds: 4),
                   ),
                 );
               }

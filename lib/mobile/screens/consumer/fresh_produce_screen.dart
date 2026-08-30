@@ -42,11 +42,12 @@ class _FreshProduceScreenState extends State<FreshProduceScreen> {
 
   Widget _buildSliverAppBar() {
     return SliverAppBar(
-      expandedHeight: 155,
+      expandedHeight: 160,
       pinned: true,
       backgroundColor: const Color(0xFF0D9488),
       iconTheme: const IconThemeData(color: Colors.white),
       flexibleSpace: FlexibleSpaceBar(
+        collapseMode: CollapseMode.parallax,
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -64,13 +65,13 @@ class _FreshProduceScreenState extends State<FreshProduceScreen> {
               ),
               SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(60, 12, 20, 20),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.25),
                           borderRadius: BorderRadius.circular(20),
@@ -78,7 +79,7 @@ class _FreshProduceScreenState extends State<FreshProduceScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.eco_rounded, color: Colors.white, size: 13),
+                            const Icon(Icons.eco_rounded, color: Colors.white, size: 12),
                             const SizedBox(width: 5),
                             Text(
                               'FARM-TO-TABLE',
@@ -92,20 +93,20 @@ class _FreshProduceScreenState extends State<FreshProduceScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
                         'Fresh Produce',
                         style: GoogleFonts.poppins(
                           color: Colors.white,
-                          fontSize: 24,
+                          fontSize: 22,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       Text(
-                        'Freshly harvested from local farms',
+                        'Freshly harvested directly from local farms',
                         style: GoogleFonts.inter(
-                          color: Colors.white.withValues(alpha: 0.85),
-                          fontSize: 13,
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -116,20 +117,6 @@ class _FreshProduceScreenState extends State<FreshProduceScreen> {
             ],
           ),
         ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.eco_rounded, color: Colors.white, size: 18),
-            const SizedBox(width: 6),
-            Text(
-              'Fresh Produce',
-              style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18),
-            ),
-          ],
-        ),
-        centerTitle: false,
-        titlePadding: const EdgeInsetsDirectional.fromSTEB(52, 0, 0, 16),
-        collapseMode: CollapseMode.pin,
       ),
     );
   }

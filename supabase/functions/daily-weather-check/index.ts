@@ -23,8 +23,12 @@ type WeatherAlertPayload = {
   severity: number
 }
 
-async function generateOpenRouterWeatherAlert(
-  apiKey: string | undefined,
+async function generateAiWeatherAlert(
+  envKeys: {
+    geminiKey?: string
+    groqKey?: string
+    openRouterKey?: string
+  },
   farmName: string,
   specialty: string | null | undefined,
   baseAlert: WeatherAlertPayload,
@@ -35,92 +39,123 @@ async function generateOpenRouterWeatherAlert(
     windSpeed: number
   },
 ): Promise<WeatherAlertPayload> {
-  if (!apiKey || apiKey.trim() === '') {
-    return baseAlert
-  }
-
-  const openRouterModels = [
-    'meta-llama/llama-3.3-70b-instruct:free',
-    'google/gemma-4-31b-it:free',
-    'google/gemma-4-26b-a4b-it:free',
-    'nvidia/nemotron-nano-12b-v2-vl:free',
-    'openai/gpt-oss-20b:free',
-  ]
+  const cropLabel = specialty && specialty.trim().length > 0 ? specialty.trim() : 'crops & vegetables'
+  const rainPct = Math.round(weatherSummary.rainProb * 100)
 
   const prompt = `You are Kiko, the AI Agricultural & Weather Advisor for AgriDirect (Philippines).
-Generate a highly engaging, dynamic, and realistic weather push notification tailored specifically for Filipino farmers in "${farmName}".
+Generate a concise, smart, and dynamic weather push notification tailored specifically for Filipino farmers in "${farmName}".
 
 Live Weather Telemetry:
-- Location / Farm: "${farmName}" (Pangasinan)
-- Target Crop: "${specialty || 'High-value crops & vegetables'}"
-- Live Condition: ${weatherSummary.condition}
+- Location / Farm: "${farmName}" (Pangasinan, Philippines)
+- Target Crop / Produce: "${cropLabel}"
+- Current Condition: ${weatherSummary.condition}
 - Temperature: ${weatherSummary.temp.toFixed(1)}°C
-- Rain Probability: ${(weatherSummary.rainProb * 100).toFixed(0)}%
+- Rain Probability: ${rainPct}%
 - Wind Speed: ${weatherSummary.windSpeed.toFixed(1)} km/h
-- Alert Priority: ${baseAlert.notificationCode} (${baseAlert.title})
+- Alert Context: ${baseAlert.notificationCode} (${baseAlert.title})
 
-Dynamic Guidelines:
-1. TYPHOON & STORM IDENTIFICATION: If a typhoon, tropical storm, or strong gale is detected in the forecast (or winds > 40 km/h), explicitly mention the storm or typhoon advisory (e.g. "Bagyo Warning", "Typhoon Alert", or include the storm name if available in the condition text). Provide urgent advice on canal drainage, staking tall crops (bananas/corn), and securing storage.
-2. DYNAMIC & NATURAL VARIETY: Make the message sound fresh, smart, and realistic with the real numbers (${weatherSummary.temp.toFixed(0)}°C, ${(weatherSummary.rainProb * 100).toFixed(0)}% rain). Do NOT use generic canned lines. Use natural English or Taglish.
-3. "title": Must start with "🤖 Weather AI:" or "🌾 Weather AI:" followed by emojis (e.g. "🤖 Weather AI: 🌀 Bagyo Alert & Storm Prep", "🌾 Weather AI: 🌧️ Heavy Rain Advisory", "🌾 Weather AI: ☀️ Sunny Harvest Weather", max 45 chars).
-4. "body": 1-2 concise, high-impact sentences for a mobile lock screen (max 150 chars). State the weather and a specific crop action.
-5. Return ONLY valid JSON format: {"title": "...", "body": "..."} without markdown fences.`
+Requirements:
+1. Title format: Must start with "🤖 Weather AI:" or "🌾 Weather AI:" followed by emojis (e.g. "🌾 Weather AI: 🌧️ Rain in 2 hrs", "🤖 Weather AI: 🌀 Bagyo Alert", "🌾 Weather AI: ☀️ High Heat Warning"). Max 45 characters.
+2. Body format: 1-2 practical, high-impact sentences for mobile lock screen (Max 140 characters). Mention actual metrics (${rainPct}% rain or ${weatherSummary.temp.toFixed(0)}°C) and clear crop action for ${cropLabel} (e.g., clear field canals, delay spraying, harvest early, irrigate early).
+3. Return STRICTLY valid JSON without codeblocks: {"title": "...", "body": "..."}`
 
-  for (const model of openRouterModels) {
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 6000)
+  // 1. Primary: OpenRouter AI
+  if (envKeys.openRouterKey && envKeys.openRouterKey.trim() !== '') {
+    const openRouterModels = [
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'meta-llama/llama-3.1-8b-instruct:free',
+      'google/gemini-2.0-flash-exp:free',
+      'deepseek/deepseek-r1:free',
+      'qwen/qwen-2.5-72b-instruct:free',
+      'mistralai/mistral-7b-instruct:free',
+      'openrouter/auto',
+    ]
 
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://agridirect.app',
-          'X-Title': 'AgriDirect Weather Advisor',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            {
-              role: 'system',
-              content: 'You are Kiko, an expert AI Agricultural Advisor for Filipino farmers. You always reply strictly in JSON.',
-            },
-            { role: 'user', content: prompt },
-          ],
-          temperature: 0.5,
-          max_tokens: 150,
-        }),
-        signal: controller.signal,
-      })
+    for (const model of openRouterModels) {
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 6000)
 
-      clearTimeout(timeoutId)
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${envKeys.openRouterKey.trim()}`,
+            'HTTP-Referer': 'https://agridirect.app',
+            'X-Title': 'AgriDirect Weather Advisor',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: 'You are Kiko, an expert AI Agricultural Advisor for Filipino farmers. You always reply strictly in JSON.' },
+              { role: 'user', content: prompt },
+            ],
+            temperature: 0.5,
+            max_tokens: 150,
+          }),
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
 
-      if (response.ok) {
-        const data = await response.json()
-        let rawContent = data.choices?.[0]?.message?.content?.trim() || ''
-        if (rawContent.startsWith('```json')) {
-          rawContent = rawContent.replace(/^```json/, '').replace(/```$/, '').trim()
-        } else if (rawContent.startsWith('```')) {
-          rawContent = rawContent.replace(/^```/, '').replace(/```$/, '').trim()
-        }
+        if (response.ok) {
+          const data = await response.json()
+          let rawContent = data.choices?.[0]?.message?.content?.trim() || ''
+          if (rawContent.startsWith('```json')) {
+            rawContent = rawContent.replace(/^```json/, '').replace(/```$/, '').trim()
+          } else if (rawContent.startsWith('```')) {
+            rawContent = rawContent.replace(/^```/, '').replace(/```$/, '').trim()
+          }
 
-        const parsed = JSON.parse(rawContent)
-        if (parsed.title && parsed.body) {
-          return {
-            title: String(parsed.title).trim(),
-            body: String(parsed.body).trim(),
-            notificationCode: baseAlert.notificationCode,
-            severity: baseAlert.severity,
+          const parsed = JSON.parse(rawContent)
+          if (parsed.title && parsed.body) {
+            return {
+              title: String(parsed.title).trim(),
+              body: String(parsed.body).trim(),
+              notificationCode: baseAlert.notificationCode,
+              severity: baseAlert.severity,
+            }
           }
         }
+      } catch (err) {
+        console.warn(`[OpenRouter (${model})]:`, err)
       }
-    } catch (err) {
-      console.warn(`[OpenRouter fallback on ${model}]:`, err)
     }
   }
 
-  return baseAlert
+  // 2. Intelligent AI-Style Template fallback if OpenRouter is unreachable
+  const isRain = baseAlert.notificationCode.includes('rain')
+  const isStorm = baseAlert.notificationCode.includes('storm') || baseAlert.notificationCode.includes('typhoon')
+  const isHeat = baseAlert.notificationCode.includes('heat') || baseAlert.notificationCode.includes('temp')
+
+  if (isStorm) {
+    return {
+      title: '🤖 Weather AI: 🌀 Bagyo & Storm Alert',
+      body: `Storm telemetry detected near ${farmName} (${Math.round(weatherSummary.windSpeed)} km/h winds). Clear canals and secure ${cropLabel} immediately.`,
+      notificationCode: baseAlert.notificationCode,
+      severity: baseAlert.severity,
+    }
+  } else if (isRain) {
+    return {
+      title: '🌾 Weather AI: 🌧️ Rain Advisory',
+      body: `AI detects ${rainPct}% rain probability (${weatherSummary.condition}) near ${farmName}. Check drainage and harvest ripe ${cropLabel} early.`,
+      notificationCode: baseAlert.notificationCode,
+      severity: baseAlert.severity,
+    }
+  } else if (isHeat) {
+    return {
+      title: '🌾 Weather AI: ☀️ High Heat Advisory',
+      body: `Forecast peaks at ${weatherSummary.temp.toFixed(0)}°C near ${farmName}. Irrigate early morning to prevent heat stress on ${cropLabel}.`,
+      notificationCode: baseAlert.notificationCode,
+      severity: baseAlert.severity,
+    }
+  }
+
+  return {
+    title: '🌾 Weather AI: Daily Farm Briefing',
+    body: `${farmName}: ${weatherSummary.condition}, ${weatherSummary.temp.toFixed(0)}°C with ${rainPct}% rain chance. Good conditions for ${cropLabel} maintenance.`,
+    notificationCode: baseAlert.notificationCode,
+    severity: baseAlert.severity,
+  }
 }
 
 function getCropLabel(specialty?: string | null): string {
@@ -293,6 +328,14 @@ Deno.serve(async (request: Request) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     const OPENWEATHER_API_KEY = Deno.env.get('OPENWEATHER_API_KEY')
     const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY')
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
+    const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')
+
+    const aiEnvKeys = {
+      geminiKey: GEMINI_API_KEY,
+      groqKey: GROQ_API_KEY,
+      openRouterKey: OPENROUTER_API_KEY,
+    }
 
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !OPENWEATHER_API_KEY) {
       throw new Error('Missing required weather function environment variables.')
@@ -318,8 +361,8 @@ Deno.serve(async (request: Request) => {
         severity: Number(reqBody.severity ?? 0.6),
       }
 
-      const generated = await generateOpenRouterWeatherAlert(
-        OPENROUTER_API_KEY,
+      const generated = await generateAiWeatherAlert(
+        aiEnvKeys,
         reqBody.farmName ?? 'your farm',
         reqBody.specialty ?? 'High-value crops',
         baseAlert,
@@ -381,9 +424,9 @@ Deno.serve(async (request: Request) => {
       }
 
       for (const baseAlert of rawAlerts) {
-        // Enhance with OpenRouter AI for actionable, crop-specific description
-        const alert = await generateOpenRouterWeatherAlert(
-          OPENROUTER_API_KEY,
+        // Enhance with multi-model AI (Gemini, Groq, OpenRouter)
+        const alert = await generateAiWeatherAlert(
+          aiEnvKeys,
           farmName,
           farmer.specialty,
           baseAlert,

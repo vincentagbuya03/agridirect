@@ -68,9 +68,12 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_controller == null || !_controller!.value.isInitialized) return;
-    if (state == AppLifecycleState.inactive) {
-      _controller?.dispose();
+    final cameraController = _controller;
+    if (cameraController == null || !cameraController.value.isInitialized) return;
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      setState(() => _isCameraReady = false);
+      cameraController.dispose();
+      _controller = null;
     } else if (state == AppLifecycleState.resumed) {
       _initCamera();
     }
@@ -424,7 +427,10 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _countdownTimer?.cancel();
-    _controller?.dispose();
+    final cameraController = _controller;
+    _controller = null;
+    _isCameraReady = false;
+    cameraController?.dispose();
     _faceDetector.close();
     super.dispose();
   }
@@ -440,7 +446,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen>
         fit: StackFit.expand,
         children: [
           // Camera preview
-          if (_isCameraReady && _controller != null)
+          if (_isCameraReady && _controller != null && _controller!.value.isInitialized)
             Center(
               child: AspectRatio(
                 aspectRatio: 1 / _controller!.value.aspectRatio,

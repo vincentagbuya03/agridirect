@@ -137,26 +137,8 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
     if (widget.onNavigate != null) {
       widget.onNavigate!(index);
     } else {
-      switch (index) {
-        case 0:
-          context.go(AppRoutes.home);
-          break;
-        case 1:
-          context.go(AppRoutes.shop);
-          break;
-        case 2:
-          context.go(AppRoutes.community);
-          break;
-        case 3:
-          // Already on Find Farmer
-          break;
-        case 4:
-          context.go(AppRoutes.cart);
-          break;
-        case 5:
-          context.go(AppRoutes.profile);
-          break;
-      }
+      final isFarmer = AuthService().isViewingAsFarmer;
+      context.go(AppRoutes.webTabRoute(index, isFarmer: isFarmer));
     }
   }
 
@@ -456,9 +438,15 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
     final location = farmer['location']?.toString() ?? 'Philippines';
     final specialty = farmer['specialty']?.toString() ?? 'Fresh Produce';
     final ratingVal = farmer['average_rating'] ?? 4.9;
-    final farmerId = farmer['farmer_id']?.toString() ?? '';
+    final farmerId = farmer['farmer_id']?.toString() ??
+        farmer['user_id']?.toString() ??
+        farmer['id']?.toString() ??
+        '';
     final imageUrl = farmer['image_url']?.toString();
-    final isSelected = _selectedFarmer != null && _selectedFarmer!['farmer_id'] == farmerId;
+    final isSelected = _selectedFarmer != null &&
+        (_selectedFarmer!['farmer_id'] == farmerId ||
+            _selectedFarmer!['user_id'] == farmerId ||
+            _selectedFarmer!['id'] == farmerId);
 
     return GestureDetector(
       onTap: () => _focusFarmerOnMap(farmer),

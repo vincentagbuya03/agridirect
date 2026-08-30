@@ -51,30 +51,8 @@ class WebMoreActionsDialog extends StatelessWidget {
             const Divider(height: 1),
             _buildActionRow(
               context,
-              title: 'Equipment Rental',
-              subtitle: 'Rent tractors, plows, and more',
-              icon: Icons.handyman_rounded,
-              color: const Color(0xFF3B82F6),
-              onTap: () {
-                Navigator.of(context).pop();
-                // Go to equipment rental web screen
-              },
-            ),
-            _buildActionRow(
-              context,
-              title: 'Farm Services',
-              subtitle: 'Hire experts and laborers',
-              icon: Icons.engineering_rounded,
-              color: const Color(0xFF8B5CF6),
-              onTap: () {
-                Navigator.of(context).pop();
-                // Go to farm services web screen
-              },
-            ),
-            _buildActionRow(
-              context,
               title: 'Community Forum',
-              subtitle: 'Connect with other farmers',
+              subtitle: 'Connect with other farmers & buyers',
               icon: Icons.forum_rounded,
               color: const Color(0xFF10B981),
               onTap: () {

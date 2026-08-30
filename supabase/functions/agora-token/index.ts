@@ -14,10 +14,26 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const appId = Deno.env.get("AGORA_APP_ID")?.trim();
     const appCert = Deno.env.get("AGORA_APP_CERT")?.trim();
+
     if (!appId || !appCert) {
       throw new Error("AGORA_APP_ID and AGORA_APP_CERT must be set");
+    }
+
+    // Verify caller authentication if Supabase keys are configured
+    if (supabaseUrl && supabaseAnonKey) {
+      const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
+      const jwt = authHeader?.startsWith("Bearer ") ? authHeader.substring(7).trim() : authHeader?.trim();
+
+      if (!jwt) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized: Missing Authorization header." }),
+          { status: 401, headers: { ...cors, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     const {

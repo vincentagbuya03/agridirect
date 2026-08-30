@@ -393,6 +393,39 @@ class OrderService {
       final currentStatus = currentOrder?.status.toLowerCase() ?? '';
       final targetStatus = newStatus.trim().toLowerCase();
 
+      bool isDeductedStatus(String s) =>
+          s == 'confirmed' ||
+          s == 'processing' ||
+          s == 'shipped' ||
+          s == 'completed';
+
+      // Validate stock availability BEFORE confirming order
+      if (!isDeductedStatus(currentStatus) && isDeductedStatus(targetStatus)) {
+        final items = await getOrderItems(orderId);
+        for (final item in items) {
+          final inv = await _supabase
+              .from('product_inventory')
+              .select('available_quantity')
+              .eq('product_id', item.productId)
+              .maybeSingle();
+
+          final available = (inv?['available_quantity'] as num?)?.toDouble() ?? 0.0;
+          if (available < item.quantity) {
+            final prod = await _supabase
+                .from('products')
+                .select('name')
+                .eq('product_id', item.productId)
+                .maybeSingle();
+            final prodName = prod?['name']?.toString() ?? 'Product';
+            throw Exception(
+              'Hindi maaring i-confirm ang order: Walang sapat na stock para sa "$prodName". '
+              'Kailangan: ${item.quantity.toStringAsFixed(0)}, Natitirang Stock: ${available.toStringAsFixed(0)}. '
+              'Mangyaring mag-restock muna bago i-confirm o tanggihan ang order.',
+            );
+          }
+        }
+      }
+
       final orderStatusId = await _getOrderStatusId(newStatus);
       final updatePayload = <String, dynamic>{'order_status_id': orderStatusId};
       if (targetStatus == 'cancelled' &&
@@ -411,12 +444,6 @@ class OrderService {
       if (updatedOrder == null) {
         throw Exception('Order was updated but could not be reloaded');
       }
-
-      bool isDeductedStatus(String s) =>
-          s == 'confirmed' ||
-          s == 'processing' ||
-          s == 'shipped' ||
-          s == 'completed';
 
       // If transitioning from PENDING to CONFIRMED (or processing/shipped/completed), deduct stock
       if (!isDeductedStatus(currentStatus) && isDeductedStatus(targetStatus)) {

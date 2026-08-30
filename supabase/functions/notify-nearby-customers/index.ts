@@ -320,6 +320,31 @@ Deno.serve(async (request: Request) => {
 
     const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+    // 1. Authenticate caller
+    const authHeader = request.headers.get("authorization") ?? request.headers.get("Authorization");
+    const jwt = authHeader?.startsWith("Bearer ") ? authHeader.substring(7).trim() : authHeader?.trim();
+
+    if (!jwt) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: Missing Authorization header." }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    let callerUserId = "";
+    if (jwt === supabaseServiceRoleKey) {
+      callerUserId = "service_role";
+    } else {
+      const userRes = await adminClient.auth.getUser(jwt);
+      if (userRes.error || !userRes.data?.user) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized: Invalid token." }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      callerUserId = userRes.data.user.id;
+    }
+
     const payload = await request.json() as NearbyProductPayload;
     const productId = payload.productId?.trim() || "";
     const productName = payload.productName?.trim() || "New product";
@@ -364,6 +389,23 @@ Deno.serve(async (request: Request) => {
     }
 
     const farmer = farmerDetailsResponse.data as FarmerRow;
+
+    // 2. Verify caller ownership (must be product owner or admin)
+    if (callerUserId !== "service_role" && callerUserId !== farmer.user_id) {
+      const adminRecord = await adminClient
+        .from("admins")
+        .select("admin_id")
+        .eq("user_id", callerUserId)
+        .maybeSingle();
+
+      if (!adminRecord.data) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden: You are not authorized to trigger notifications for this product." }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     const effectiveFarmName = (farmer.farm_name?.trim() || farmName || "Nearby farmer");
 
     const customersResponse = await adminClient

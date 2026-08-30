@@ -839,19 +839,19 @@ class _WebShopCardState extends State<_WebShopCard> {
                       ),
                     ),
                     Positioned(
-                      bottom: -18,
+                      bottom: -22,
                       left: 14,
                       child: Container(
-                        width: 44,
-                        height: 44,
+                        width: 54,
+                        height: 54,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.white,
                           border: Border.all(color: Colors.white, width: 2.5),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.12),
-                              blurRadius: 6,
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
                           ],
@@ -905,7 +905,7 @@ class _WebShopCardState extends State<_WebShopCard> {
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 22, 14, 10),
+                    padding: const EdgeInsets.fromLTRB(14, 26, 14, 10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

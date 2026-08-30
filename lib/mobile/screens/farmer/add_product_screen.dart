@@ -121,7 +121,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _isPreorder = prod['is_preorder'] == true;
     _isFreeShipping = prod['is_free_shipping'] == true;
     _isWholesale = prod['is_wholesale'] == true;
-    _isFlashSale = prod['is_flash_sale'] == true;
+
+    final flashEndStr = prod['flash_sale_end']?.toString();
+    final flashEnd = flashEndStr != null ? DateTime.tryParse(flashEndStr) : null;
+    final isFlashExpired = flashEnd != null && flashEnd.isBefore(DateTime.now());
+    _isFlashSale = prod['is_flash_sale'] == true && !isFlashExpired;
     final disc = prod['discount_percent'] ?? prod['discount_percentage'];
     if (disc != null) {
       _discountPercentController.text = disc.toString();
