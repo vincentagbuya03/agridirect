@@ -57,7 +57,6 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   int? _touchedChartIndex;
 
   late Stream<int> _unreadMessagesStream;
-  late Stream<int> _unreadNotificationsStream;
 
   @override
   void initState() {
@@ -65,7 +64,6 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     _unreadMessagesStream = MessageService().watchTotalUnreadCount(
       asFarmer: true,
     );
-    _unreadNotificationsStream = NotificationService().watchUnreadCount();
     _loadCachedDbAvatar();
     _loadFarmerProfile();
     _loadDashboardStats();
@@ -509,10 +507,9 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
             const SizedBox(width: 8),
 
             // Notifications
-            StreamBuilder<int>(
-              stream: _unreadNotificationsStream,
-              builder: (context, snapshot) {
-                final unread = snapshot.data ?? 0;
+            ValueListenableBuilder<int>(
+              valueListenable: NotificationService().unreadCountNotifier,
+              builder: (context, unread, _) {
                 return _buildHeaderIconButton(
                   icon: Icons.notifications_none_rounded,
                   badgeCount: unread,

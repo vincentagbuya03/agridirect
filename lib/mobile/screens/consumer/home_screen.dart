@@ -20,7 +20,6 @@ import '../../../shared/screens/post_detail_screen.dart';
 import 'product_view_screen.dart';
 import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/services/community/message_service.dart';
-import '../../../shared/services/auth/auth_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'promo_action_screen.dart';
 import 'free_shipping_screen.dart';
@@ -1122,11 +1121,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCompactHeaderNotification(BuildContext context) {
-    final userId = AuthService().userId;
-    return FutureBuilder<int>(
-      future: NotificationService().getUnreadNotificationCount(userId),
-      builder: (context, snapshot) {
-        final count = snapshot.data ?? 0;
+    return ValueListenableBuilder<int>(
+      valueListenable: NotificationService().unreadCountNotifier,
+      builder: (context, count, _) {
         return _buildCompactHeaderAction(
           Icons.notifications_none_rounded,
           count > 0,

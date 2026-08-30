@@ -265,6 +265,18 @@ class _AdminLogsTabState extends State<AdminLogsTab> {
       severity: _LogSeverity.info,
       icon: Icons.campaign_rounded,
     ),
+    'send_push_campaign': _ActionMeta(
+      label: 'Push Campaign Dispatched',
+      domain: 'System',
+      severity: _LogSeverity.info,
+      icon: Icons.campaign_rounded,
+    ),
+    'test_push_notification': _ActionMeta(
+      label: 'Test Push Dispatched',
+      domain: 'System',
+      severity: _LogSeverity.info,
+      icon: Icons.notifications_active_rounded,
+    ),
 
     // Sessions & Traffic
     'user_session_start': _ActionMeta(

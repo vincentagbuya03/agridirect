@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/commerce/product_service.dart';
+import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/auth/auth_service.dart';
@@ -1497,13 +1498,13 @@ class _WebFarmerPreordersTabState extends State<WebFarmerPreordersTab> {
           .toSet();
 
       for (final customerId in uniqueCustomerIds) {
-        await _supabase.from('notifications').insert({
-          'user_id': customerId,
-          'title': '🍏 Crop Harvested!',
-          'message': 'Your pre-ordered $cropName has been harvested and is ready for fulfillment!',
-          'link_type': 'orders',
-          'is_read': false,
-        });
+        await NotificationService().createNotification(
+          userId: customerId,
+          title: '🍏 Crop Harvested!',
+          content: 'Your pre-ordered $cropName has been harvested and is ready for fulfillment!',
+          type: 'order_status',
+          linkType: 'orders',
+        );
       }
 
       await _loadPreorders();

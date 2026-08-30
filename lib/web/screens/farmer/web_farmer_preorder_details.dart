@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/commerce/product_service.dart';
+import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
 import '../../widgets/crop_milestones_timeline.dart';
 import '../../../shared/models/product/crop_milestone_model.dart';
@@ -591,15 +592,15 @@ class _WebFarmerPreorderDetailsState extends State<WebFarmerPreorderDetails> {
           .whereType<String>()
           .toSet();
 
-      // 3. Send Notification to each reserving customer
+      // 3. Send Push Notification to each reserving customer
       for (final customerId in uniqueCustomerIds) {
-        await _supabase.from('notifications').insert({
-          'user_id': customerId,
-          'title': '🍏 Crop Harvested!',
-          'message': 'Your pre-ordered $cropName has been harvested and is ready for delivery/pickup!',
-          'link_type': 'orders',
-          'is_read': false,
-        });
+        await NotificationService().createNotification(
+          userId: customerId,
+          title: '🍏 Crop Harvested!',
+          content: 'Your pre-ordered $cropName has been harvested and is ready for delivery/pickup!',
+          type: 'order_status',
+          linkType: 'orders',
+        );
       }
 
       if (!mounted) return;

@@ -19,6 +19,7 @@ import 'admin_logs_tab.dart';
 import 'admin_announcements_tab.dart';
 import 'admin_settings_tab.dart';
 import 'admin_support_tab.dart';
+import 'admin_how_it_works_tab.dart';
 import 'package:agridirect/shared/widgets/premium_confirm_dialog.dart';
 
 class AdminDashboardRedesigned extends StatefulWidget {
@@ -834,7 +835,8 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
                   _buildNavItem(6, 'System Logs', Icons.history_rounded),
                   _buildNavItem(7, 'Push & Weather', Icons.campaign_rounded),
                   _buildNavItem(8, 'Support Tickets', Icons.support_agent_rounded),
-                  _buildNavItem(9, 'Settings', Icons.settings_rounded),
+                  _buildNavItem(9, 'How It Works', Icons.menu_book_rounded),
+                  _buildNavItem(10, 'Settings', Icons.settings_rounded),
                   const SizedBox(height: 12),
                   const Divider(height: 1, color: AdminUi.border),
                   const SizedBox(height: 8),
@@ -981,6 +983,11 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
       case 8:
         return AdminSupportTab(adminService: _adminService);
       case 9:
+        return AdminHowItWorksTab(
+          adminService: _adminService,
+          onNavigateTab: (tabIndex) => setState(() => _selectedIndex = tabIndex),
+        );
+      case 10:
         return const AdminSettingsTab();
       default:
         return _buildDashboardView();
@@ -2160,27 +2167,6 @@ class _AdminDashboardRedesignedState extends State<AdminDashboardRedesigned> {
   }
 
   void _showDocumentationDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: AdminUi.radiusMd),
-        title: Text('AgriDirect Admin Documentation', style: AdminUi.title(size: 18)),
-        content: Text(
-          'AgriDirect Enterprise Console Documentation:\n\n'
-          '• Push & Weather Hub: Run manual or scheduled weather-based push notifications.\n'
-          '• Farmers & Verification: Review and approve farmer KYC and farm profiles.\n'
-          '• Customers & Moderation: Manage accounts, permissions, and moderation reports.\n'
-          '• Data Reports: Export live revenue and transaction data to CSV format.',
-          style: AdminUi.body(size: 13),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            style: AdminUi.primaryButton,
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
+    setState(() => _selectedIndex = 9);
   }
 }

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/supabase_config.dart';
 import '../community/analytics_service.dart';
+import '../community/notification_service.dart';
 import '../offline/network_status_service.dart';
 import 'onboarding_service.dart';
 
@@ -743,6 +744,7 @@ class AuthService extends ChangeNotifier {
 
       await _persistCachedUserState();
       await AnalyticsService().startSession(userId: user.id);
+      NotificationService().syncDeviceToken();
       _isInitialized = true;
       notifyListeners();
     } else {
@@ -882,7 +884,7 @@ class AuthService extends ChangeNotifier {
 
       // Check if MFA is required
       if (_sessionRequiresMfa()) {
-        debugPrint('🟡 AuthService.login: MFA required (AAL2)');
+        debugPrint('🟡 AuthService.login: MFA required (AAL2) Failed to Log In');
         _requiresMfa = true;
         _isLoading = false;
         notifyListeners();
@@ -1224,9 +1226,13 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  static const String _googleWebClientId =
+      '971354937445-069lmm2u0u2sn8819f4oebotnait2b1m.apps.googleusercontent.com';
+
   Future<bool> _signInWithGoogleMobile() async {
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: _googleWebClientId,
         scopes: ['email', 'profile'],
       );
       await googleSignIn.signOut();
@@ -1242,10 +1248,16 @@ class AuthService extends ChangeNotifier {
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
       if (googleAuth.idToken == null) {
-        _errorMessage = 'Failed to get authentication token from Google';
+        // Fallback to Supabase Browser OAuth with mobile custom scheme
+        debugPrint('⚠️ Google idToken is null, falling back to mobile browser OAuth...');
+        await _client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: 'agridirect://login-callback',
+          queryParams: const {'prompt': 'select_account'},
+        );
         _isLoading = false;
         notifyListeners();
-        return false;
+        return true;
       }
 
       final response = await _client.auth.signInWithIdToken(

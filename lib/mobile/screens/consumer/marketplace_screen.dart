@@ -52,11 +52,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   Position? _userPosition;
 
   Widget _buildHeaderNotification(BuildContext context) {
-    final userId = AuthService().userId;
-    return FutureBuilder<int>(
-      future: NotificationService().getUnreadNotificationCount(userId),
-      builder: (context, snapshot) {
-        final count = snapshot.data ?? 0;
+    return ValueListenableBuilder<int>(
+      valueListenable: NotificationService().unreadCountNotifier,
+      builder: (context, count, _) {
         return GestureDetector(
           onTap: () => context.push(AppRoutes.notifications),
           child: Container(

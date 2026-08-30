@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -239,12 +240,18 @@ class NotificationService {
     await androidPlugin?.createNotificationChannel(_androidChannel);
   }
 
+  // Force sync FCM token on device startup / user login
+  Future<void> syncDeviceToken() async {
+    if (_isWeb) return;
+    await _getFCMToken();
+  }
+
   // Get and save FCM token
   Future<void> _getFCMToken() async {
     try {
       final token = await messaging.getToken();
       if (token != null) {
-        debugPrint('FCM Token: $token');
+        debugPrint('📲 FCM Device Token: $token');
         await _saveFCMTokenToDatabase(token);
       }
     } catch (e) {
@@ -529,7 +536,6 @@ class NotificationService {
     _messageSubscription = null;
   }
 
-
   // Handle foreground messages
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     debugPrint('Got a message whilst in the foreground!');
@@ -545,47 +551,82 @@ class NotificationService {
       return;
     }
 
-    if (message.notification != null) {
-      debugPrint('Message notification: ${message.notification}');
-
-      final senderName = message.data['sender_name']?.toString().trim();
-      final conversationId = message.data['conversation_id']?.toString();
-      
-      // Suppress notification if we are already in the conversation
-      if (conversationId != null && conversationId == _activeConversationId) {
-        debugPrint('Suppressed notification for active conversation: $conversationId');
-        return;
-      }
-
-      final title = senderName != null && senderName.isNotEmpty
-          ? 'New message from $senderName'
-          : message.notification!.title;
-
-      // Show local notification
-      await flutterLocalNotificationsPlugin.show(
-        message.hashCode,
-        title,
-        message.notification!.body,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            channelId,
-            channelName,
-            channelDescription: channelDescription,
-            importance: Importance.max,
-            priority: Priority.high,
-            playSound: true,
-            enableVibration: true,
-            icon: '@mipmap/ic_launcher',
-          ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
-        payload: _getPayload(message),
-      );
+    final senderName = message.data['sender_name']?.toString().trim();
+    final conversationId = message.data['conversation_id']?.toString();
+    
+    // Suppress notification if we are already in the conversation
+    if (conversationId != null && conversationId == _activeConversationId) {
+      debugPrint('Suppressed notification for active conversation: $conversationId');
+      return;
     }
+
+    final title = (senderName != null && senderName.isNotEmpty)
+        ? 'New message from $senderName'
+        : (message.notification?.title ?? message.data['title']?.toString() ?? 'AgriDirect Alert');
+
+    final body = message.notification?.body ??
+        message.data['body']?.toString() ??
+        message.data['message']?.toString() ??
+        '';
+
+    if (body.isEmpty && (message.notification?.title == null && message.data['title'] == null)) {
+      return;
+    }
+
+    final imageUrl = message.notification?.android?.imageUrl ??
+        message.data['image_url']?.toString() ??
+        message.data['imageUrl']?.toString() ??
+        message.data['image']?.toString();
+
+    final imageBytes = await _downloadImageBytes(imageUrl);
+    final androidBitmap = imageBytes != null ? ByteArrayAndroidBitmap(imageBytes) : null;
+
+    // Show local notification on device system tray with high priority and big banner image
+    await flutterLocalNotificationsPlugin.show(
+      message.hashCode,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          channelName,
+          channelDescription: channelDescription,
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+          icon: '@mipmap/ic_launcher',
+          largeIcon: androidBitmap,
+          styleInformation: androidBitmap != null
+              ? BigPictureStyleInformation(
+                  androidBitmap,
+                  contentTitle: title,
+                  summaryText: body,
+                  hideExpandedLargeIcon: false,
+                )
+              : BigTextStyleInformation(body, contentTitle: title),
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: _getPayload(message),
+    );
+  }
+
+  Future<Uint8List?> _downloadImageBytes(String? url) async {
+    if (url == null || url.isEmpty || kIsWeb) return null;
+    try {
+      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+        return res.bodyBytes;
+      }
+    } catch (e) {
+      debugPrint('Error downloading notification image bytes: $e');
+    }
+    return null;
   }
 
   // Handle notification tap
@@ -927,13 +968,28 @@ class NotificationService {
   }
 
 
-  // Watch unread notification count
+  final ValueNotifier<int> unreadCountNotifier = ValueNotifier<int>(0);
+  final StreamController<int> _unreadCountController = StreamController<int>.broadcast();
+
+  // Watch unread notification count with realtime live emissions
   Stream<int> watchUnreadCount({String? userId}) {
     final uid = userId ?? supabase.auth.currentUser?.id;
-    if (uid == null || uid.isEmpty) {
-      return Stream.value(0);
+    if (uid != null && uid.isNotEmpty) {
+      refreshUnreadCount(userId: uid);
     }
-    return Stream.fromFuture(getUnreadNotificationCount(uid)).asBroadcastStream();
+    return _unreadCountController.stream;
+  }
+
+  // Refresh unread count and notify all listeners across the app
+  Future<int> refreshUnreadCount({String? userId}) async {
+    final uid = userId ?? supabase.auth.currentUser?.id;
+    if (uid == null || uid.isEmpty) return 0;
+    final count = await getUnreadNotificationCount(uid);
+    unreadCountNotifier.value = count;
+    if (!_unreadCountController.isClosed) {
+      _unreadCountController.add(count);
+    }
+    return count;
   }
 
   // Get unread notification count
@@ -946,6 +1002,7 @@ class NotificationService {
           .eq('is_read', false)
           .neq('link_type', 'conversation');
 
+      unreadCountNotifier.value = count;
       return count;
     } catch (e) {
       debugPrint('Error getting unread notification count: $e');
@@ -976,6 +1033,10 @@ class NotificationService {
         debugPrint('Error marking notification as read: $e2');
       }
     }
+    final uid = supabase.auth.currentUser?.id;
+    if (uid != null) {
+      unawaited(refreshUnreadCount(userId: uid));
+    }
   }
 
   // Mark all notifications as read
@@ -992,6 +1053,11 @@ class NotificationService {
     } catch (e) {
       debugPrint('Error marking all notifications as read: $e');
     }
+    unreadCountNotifier.value = 0;
+    if (!_unreadCountController.isClosed) {
+      _unreadCountController.add(0);
+    }
+    unawaited(refreshUnreadCount(userId: userId));
   }
 
   // Delete notification
@@ -1011,6 +1077,10 @@ class NotificationService {
         debugPrint('Error deleting notification: $e2');
       }
     }
+    final uid = supabase.auth.currentUser?.id;
+    if (uid != null) {
+      unawaited(refreshUnreadCount(userId: uid));
+    }
   }
 
   // Delete all notifications for a user
@@ -1023,9 +1093,30 @@ class NotificationService {
     } catch (e) {
       debugPrint('Error deleting all notifications: $e');
     }
+    unreadCountNotifier.value = 0;
+    if (!_unreadCountController.isClosed) {
+      _unreadCountController.add(0);
+    }
+    unawaited(refreshUnreadCount(userId: userId));
   }
 
-  // Insert a notification into the database
+  // Insert a notification into the database and dispatch push notification
+  Future<void> createNotification({
+    required String userId,
+    required String title,
+    required String content,
+    String type = 'system',
+    String? linkType,
+    String? linkId,
+  }) => insertNotification(
+        userId: userId,
+        title: title,
+        content: content,
+        type: type,
+        linkType: linkType,
+        linkId: linkId,
+      );
+
   Future<void> insertNotification({
     required String userId,
     required String title,
@@ -1311,6 +1402,12 @@ class NotificationService {
             final title = payload.newRecord['title']?.toString() ?? 'AgriDirect';
             final body = payload.newRecord['body']?.toString() ?? '';
             final linkId = payload.newRecord['link_id']?.toString() ?? '';
+            final imageUrl = payload.newRecord['image_url']?.toString() ??
+                payload.newRecord['metadata']?['image_url']?.toString() ??
+                payload.newRecord['metadata']?['imageUrl']?.toString();
+
+            final imageBytes = await _downloadImageBytes(imageUrl);
+            final androidBitmap = imageBytes != null ? ByteArrayAndroidBitmap(imageBytes) : null;
 
             // Show local notification
             await flutterLocalNotificationsPlugin.show(
@@ -1327,6 +1424,15 @@ class NotificationService {
                   playSound: true,
                   enableVibration: true,
                   icon: '@mipmap/ic_launcher',
+                  largeIcon: androidBitmap,
+                  styleInformation: androidBitmap != null
+                      ? BigPictureStyleInformation(
+                          androidBitmap,
+                          contentTitle: title,
+                          summaryText: body,
+                          hideExpandedLargeIcon: false,
+                        )
+                      : BigTextStyleInformation(body, contentTitle: title),
                 ),
                 iOS: const DarwinNotificationDetails(
                   presentAlert: true,

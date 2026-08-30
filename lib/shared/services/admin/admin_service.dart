@@ -4142,35 +4142,146 @@ class AdminService extends ChangeNotifier {
     String? notificationCode,
   }) async {
     try {
+      final currentAdminId = _client.auth.currentUser?.id;
+      final effectiveTargetUserId = (audience == 'test_me' || targetUserId != null)
+          ? (targetUserId ?? currentAdminId)
+          : null;
+
       final res = await _client.functions.invoke(
-        'push-dispatcher',
+        'send-push-notification',
         body: {
           'title': title,
-          'message': message,
-          'audience': audience,
-          'target_user_id': targetUserId,
-          'image_url': imageUrl,
-          'link_type': linkType,
-          'link_id': linkId,
-          'notification_code': notificationCode,
+          'body': message,
+          'audience': effectiveTargetUserId != null
+              ? null
+              : (audience == 'farmers'
+                  ? 'farmers'
+                  : (audience == 'customers' ? 'customers' : 'all')),
+          'targetUserId': effectiveTargetUserId,
+          'imageUrl': imageUrl,
+          'linkType': linkType,
+          'linkId': linkId,
+          'notificationCode': notificationCode ?? 'announcement',
+          'data': {
+            'isTest': (audience == 'test_me').toString(),
+            'source': 'admin_studio',
+          },
         },
       );
       if (res.status == 200 && res.data is Map) {
-        return Map<String, dynamic>.from(res.data as Map);
+        final data = Map<String, dynamic>.from(res.data as Map);
+
+        // Record admin audit log
+        if (effectiveTargetUserId != null) {
+          unawaited(
+            _logAdminAction(
+              'test_push_notification',
+              'Sent test push to $effectiveTargetUserId: ${title.trim()}',
+              effectiveTargetUserId,
+            ),
+          );
+        } else {
+          unawaited(
+            _logAdminAction(
+              'send_push_campaign',
+              'Broadcast [$audience] (${notificationCode ?? "announcement"}): ${title.trim()}',
+              null,
+            ),
+          );
+        }
+
+        notifyListeners();
+        return {
+          'success': data['success'] ?? true,
+          'fcm_sent_count': data['sent'] ?? data['fcm_sent_count'] ?? 1,
+          'total': data['total'] ?? 1,
+          'reason': data['reason'],
+        };
       }
+
+      // Record admin audit log
+      if (effectiveTargetUserId != null) {
+        unawaited(
+          _logAdminAction(
+            'test_push_notification',
+            'Sent test push to $effectiveTargetUserId: ${title.trim()}',
+            effectiveTargetUserId,
+          ),
+        );
+      } else {
+        unawaited(
+          _logAdminAction(
+            'send_push_campaign',
+            'Broadcast [$audience] (${notificationCode ?? "announcement"}): ${title.trim()}',
+            null,
+          ),
+        );
+      }
+
+      notifyListeners();
       return {'success': true, 'fcm_sent_count': 1};
     } catch (e) {
+      debugPrint('⚠️ send-push-notification function error: $e, falling back to direct insert');
       try {
-        await _client.from('notifications').insert({
+        final currentAdminId = _client.auth.currentUser?.id;
+        List<String> targetUserIds = [];
+
+        if (audience == 'test_me' || targetUserId != null) {
+          final uid = targetUserId ?? currentAdminId;
+          if (uid != null && uid.isNotEmpty) {
+            targetUserIds.add(uid);
+          }
+        } else if (audience == 'farmers') {
+          final farmers = await _client.from('farmers').select('user_id');
+          targetUserIds = (farmers as List)
+              .map((f) => f['user_id']?.toString())
+              .whereType<String>()
+              .toList();
+        } else {
+          // Customers or all users
+          final users = await _client.from('users').select('user_id');
+          targetUserIds = (users as List)
+              .map((u) => u['user_id']?.toString())
+              .whereType<String>()
+              .toList();
+        }
+
+        if (targetUserIds.isEmpty && currentAdminId != null) {
+          targetUserIds.add(currentAdminId);
+        }
+
+        // Query notification_type_id for the given code or default to 1
+        int typeId = 1;
+        try {
+          final typeRes = await _client
+              .from('notification_types')
+              .select('notification_type_id')
+              .eq('code', notificationCode ?? 'announcement')
+              .limit(1)
+              .maybeSingle();
+          if (typeRes != null && typeRes['notification_type_id'] != null) {
+            typeId = (typeRes['notification_type_id'] as num).toInt();
+          }
+        } catch (_) {}
+
+        final inserts = targetUserIds.map((uid) => {
+          'user_id': uid,
           'title': title,
-          'message': message,
+          'body': message,
+          'notification_type_id': typeId,
           'link_type': linkType ?? 'weather',
           'link_id': linkId,
-          'image_url': imageUrl,
           'is_read': false,
-        });
-        return {'success': true, 'fcm_sent_count': 1};
+          'created_at': DateTime.now().toIso8601String(),
+        }).toList();
+
+        if (inserts.isNotEmpty) {
+          await _client.from('notifications').insert(inserts);
+        }
+
+        return {'success': true, 'fcm_sent_count': inserts.length};
       } catch (err) {
+        debugPrint('Direct notification insert error: $err');
         return {'success': false, 'error': err.toString()};
       }
     }
