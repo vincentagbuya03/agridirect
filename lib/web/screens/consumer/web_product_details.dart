@@ -198,21 +198,22 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     }
 
     final isCompact = MediaQuery.of(context).size.width < 980;
+    final isMobile = MediaQuery.of(context).size.width < 768;
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: AppOpenBanner(
         child: Column(
           children: [
-            _buildTopBar(),
+            _buildTopBar(isMobile),
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.fromLTRB(
-                  isCompact ? 16 : 32,
-                  16,
-                  isCompact ? 16 : 32,
-                  64,
+                  isMobile ? 16 : (isCompact ? 24 : 32),
+                  isMobile ? 12 : 16,
+                  isMobile ? 16 : (isCompact ? 24 : 32),
+                  isMobile ? 32 : 64,
                 ),
                 child: Center(
                   child: ConstrainedBox(
@@ -220,30 +221,30 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildBreadcrumbs(),
-                        const SizedBox(height: 32),
+                        _buildBreadcrumbs(isMobile),
+                        SizedBox(height: isMobile ? 16 : 32),
                         isCompact
                             ? Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildImageGallery(),
-                                  const SizedBox(height: 32),
-                                  _buildDetailsCard(),
+                                  _buildImageGallery(isMobile),
+                                  SizedBox(height: isMobile ? 20 : 32),
+                                  _buildDetailsCard(isMobile),
                                 ],
                               )
                             : Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(flex: 4, child: _buildImageGallery()),
+                                  Expanded(flex: 4, child: _buildImageGallery(isMobile)),
                                   const SizedBox(width: 48),
-                                  Expanded(flex: 5, child: _buildDetailsCard()),
+                                  Expanded(flex: 5, child: _buildDetailsCard(isMobile)),
                                 ],
                               ),
-                        const SizedBox(height: 64),
-                        _buildSellerSection(),
-                        const SizedBox(height: 48),
-                        _buildReviewsSection(),
-                        const SizedBox(height: 64),
+                        SizedBox(height: isMobile ? 32 : 64),
+                        _buildSellerSection(isMobile),
+                        SizedBox(height: isMobile ? 24 : 48),
+                        _buildReviewsSection(isMobile),
+                        SizedBox(height: isMobile ? 32 : 64),
                         _buildMoreFromFarmerSection(),
                       ],
                     ),
@@ -257,11 +258,14 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(bool isMobile) {
     return SafeArea(
       bottom: false,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 16 : 24,
+          vertical: isMobile ? 10 : 16,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border(bottom: BorderSide(color: _border.withValues(alpha: 0.5))),
@@ -269,25 +273,34 @@ class _WebProductDetailsState extends State<WebProductDetails> {
         child: Row(
           children: [
             IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
               onPressed: () => context.canPop() ? context.pop() : context.go(AppRoutes.shop),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _dark, size: 20),
+              icon: Icon(Icons.arrow_back_ios_new_rounded, color: _dark, size: isMobile ? 18 : 20),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: isMobile ? 10 : 12),
             Text(
               'Product Details',
               style: GoogleFonts.nunitoSans(
-                fontSize: 18,
+                fontSize: isMobile ? 16 : 18,
                 fontWeight: FontWeight.w800,
                 color: _dark,
               ),
             ),
             const Spacer(),
             TextButton.icon(
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
+              ),
               onPressed: () => context.go(AppRoutes.cart),
-              icon: const Icon(Icons.shopping_cart_outlined, color: _primary),
+              icon: Icon(Icons.shopping_cart_outlined, color: _primary, size: isMobile ? 18 : 20),
               label: Text(
                 'Cart',
-                style: GoogleFonts.nunitoSans(color: _primary, fontWeight: FontWeight.w800),
+                style: GoogleFonts.nunitoSans(
+                  color: _primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: isMobile ? 14 : 15,
+                ),
               ),
             ),
           ],
@@ -296,20 +309,20 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     );
   }
 
-  Widget _buildBreadcrumbs() {
+  Widget _buildBreadcrumbs(bool isMobile) {
     return Row(
       children: [
-        _breadcrumb('Marketplace', () => context.go(AppRoutes.marketplace)),
-        _crumbArrow(),
-        _breadcrumb('Shop', () => context.go(AppRoutes.shop)),
-        _crumbArrow(),
+        _breadcrumb('Marketplace', () => context.go(AppRoutes.marketplace), isMobile),
+        _crumbArrow(isMobile),
+        _breadcrumb('Shop', () => context.go(AppRoutes.shop), isMobile),
+        _crumbArrow(isMobile),
         Expanded(
           child: Text(
             _product!.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 13,
+            style: TextStyle(
+              fontSize: isMobile ? 12 : 13,
               fontWeight: FontWeight.w700,
               color: _dark,
             ),
@@ -319,34 +332,34 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     );
   }
 
-  Widget _breadcrumb(String label, VoidCallback onTap) {
+  Widget _breadcrumb(String label, VoidCallback onTap, bool isMobile) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onTap,
         child: Text(
           label,
-          style: const TextStyle(fontSize: 13, color: _primary),
+          style: TextStyle(fontSize: isMobile ? 12 : 13, color: _primary),
         ),
       ),
     );
   }
 
-  Widget _crumbArrow() =>
-      const Icon(Icons.chevron_right_rounded, size: 18, color: _muted);
+  Widget _crumbArrow(bool isMobile) =>
+      Icon(Icons.chevron_right_rounded, size: isMobile ? 14 : 18, color: _muted);
 
-  Widget _buildImageGallery() {
+  Widget _buildImageGallery(bool isMobile) {
     final productImage = (_product?.imageUrl ?? '').trim();
 
     return AspectRatio(
-      aspectRatio: 1.0,
+      aspectRatio: isMobile ? 1.15 : 1.0,
       child: Container(
         decoration: BoxDecoration(
           color: _surface,
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(isMobile ? 20 : 32),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(isMobile ? 20 : 32),
           child: productImage.isNotEmpty
               ? SafeNetworkImage(
                   imageUrl: productImage,
@@ -369,7 +382,7 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     );
   }
 
-  Widget _buildDetailsCard() {
+  Widget _buildDetailsCard(bool isMobile) {
     final averageRating = _averageReviewRating();
     final reviewCount = _reviews.isNotEmpty
         ? _reviews.length
@@ -379,7 +392,10 @@ class _WebProductDetailsState extends State<WebProductDetails> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 10 : 14,
+            vertical: isMobile ? 5 : 8,
+          ),
           decoration: BoxDecoration(
             color: _primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(999),
@@ -387,46 +403,47 @@ class _WebProductDetailsState extends State<WebProductDetails> {
           child: Text(
             (_product!.categoryName ?? 'Product').toUpperCase(),
             style: GoogleFonts.nunitoSans(
-              fontSize: 11,
+              fontSize: isMobile ? 10 : 11,
               fontWeight: FontWeight.w900,
-              letterSpacing: 1.0,
+              letterSpacing: 0.8,
               color: _primary,
             ),
           ),
         ),
-        const SizedBox(height: 24),
+        SizedBox(height: isMobile ? 12 : 24),
         Text(
           _product!.name,
           style: GoogleFonts.nunitoSans(
-            fontSize: 28,
+            fontSize: isMobile ? 22 : 28,
             fontWeight: FontWeight.w900,
             color: _dark,
             height: 1.2,
-            letterSpacing: -0.5,
+            letterSpacing: -0.3,
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: isMobile ? 10 : 16),
         Wrap(
-          spacing: 24,
-          runSpacing: 12,
+          spacing: isMobile ? 14 : 24,
+          runSpacing: isMobile ? 8 : 12,
           children: [
-            _metaRow(Icons.storefront_rounded, _farmName(), _primary),
+            _metaRow(Icons.storefront_rounded, _farmName(), _primary, isMobile: isMobile),
             _metaRow(
               Icons.star_rounded,
               averageRating.toStringAsFixed(1),
               const Color(0xFFF59E0B),
+              isMobile: isMobile,
             ),
-            _metaRow(Icons.reviews_rounded, '$reviewCount reviews', _dark),
+            _metaRow(Icons.reviews_rounded, '$reviewCount reviews', _dark, isMobile: isMobile),
           ],
         ),
-        const SizedBox(height: 32),
+        SizedBox(height: isMobile ? 16 : 32),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
               _currencyLabel(_product!.price),
               style: GoogleFonts.nunitoSans(
-                fontSize: 32,
+                fontSize: isMobile ? 24 : 32,
                 fontWeight: FontWeight.w900,
                 color: _primary,
                 letterSpacing: -0.5,
@@ -435,11 +452,11 @@ class _WebProductDetailsState extends State<WebProductDetails> {
             ),
             const SizedBox(width: 8),
             Padding(
-              padding: const EdgeInsets.only(bottom: 6),
+              padding: EdgeInsets.only(bottom: isMobile ? 3 : 6),
               child: Text(
                 _product!.unit.isNotEmpty ? 'per ${_product!.unit}' : 'per unit',
                 style: GoogleFonts.nunitoSans(
-                  fontSize: 16,
+                  fontSize: isMobile ? 13 : 16,
                   fontWeight: FontWeight.w700,
                   color: _muted,
                 ),
@@ -447,19 +464,19 @@ class _WebProductDetailsState extends State<WebProductDetails> {
             ),
           ],
         ),
-        const SizedBox(height: 32),
+        SizedBox(height: isMobile ? 16 : 32),
         Text(
           _product!.description?.trim().isNotEmpty == true
               ? _product!.description!
               : 'Fresh produce from local farmers. High quality and organically grown.',
           style: GoogleFonts.inter(
-            fontSize: 16,
+            fontSize: isMobile ? 14 : 16,
             color: _dark.withValues(alpha: 0.8),
-            height: 1.7,
+            height: 1.55,
             fontWeight: FontWeight.w400,
           ),
         ),
-        const SizedBox(height: 40),
+        SizedBox(height: isMobile ? 20 : 40),
         Row(
           children: [
             Expanded(
@@ -467,9 +484,10 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                 Icons.schedule_rounded,
                 'Availability',
                 _product!.targetQuantity != null ? 'Pre-order' : 'Available now',
+                isMobile,
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: isMobile ? 10 : 16),
             Expanded(
               child: _infoTile(
                 Icons.inventory_2_rounded,
@@ -479,105 +497,110 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                     : (_product!.stockQuantity != null && _product!.stockQuantity! > 0
                         ? '${_product!.stockQuantity!.toStringAsFixed(0)} items'
                         : 'Out of stock'),
+                isMobile,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 32),
+        SizedBox(height: isMobile ? 18 : 32),
         _buildProductVouchersSection(),
-        const SizedBox(height: 32),
+        SizedBox(height: isMobile ? 18 : 32),
         Row(
           children: [
             Text(
               'Quantity',
               style: GoogleFonts.nunitoSans(
-                fontSize: 16,
+                fontSize: isMobile ? 14 : 16,
                 fontWeight: FontWeight.w800,
                 color: _dark,
               ),
             ),
-              const Spacer(),
-              Container(
-                decoration: BoxDecoration(
-                  color: _surface,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  children: [
-                    _qtyButton(Icons.remove_rounded, () {
-                      if (_quantity > 1) setState(() => _quantity--);
-                    }),
-                    Container(
-                      constraints: const BoxConstraints(minWidth: 48),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '$_quantity',
-                        style: GoogleFonts.nunitoSans(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: _dark,
-                        ),
+            const Spacer(),
+            Container(
+              decoration: BoxDecoration(
+                color: _surface,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                children: [
+                  _qtyButton(Icons.remove_rounded, () {
+                    if (_quantity > 1) setState(() => _quantity--);
+                  }),
+                  Container(
+                    constraints: BoxConstraints(minWidth: isMobile ? 36 : 48),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '$_quantity',
+                      style: GoogleFonts.nunitoSans(
+                        fontSize: isMobile ? 16 : 20,
+                        fontWeight: FontWeight.w900,
+                        color: _dark,
                       ),
                     ),
-                    _qtyButton(Icons.add_rounded, () {
-                      final isPreorder = _product?.targetQuantity != null || (_product?.isPreorder ?? false);
-                      final maxQty = isPreorder ? 999 : (_product?.stockQuantity?.toInt() ?? 0);
-                      if (!isPreorder && _quantity >= maxQty) {
-                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Only $maxQty item(s) available in stock.'),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                        return;
-                      }
-                      setState(() => _quantity++);
-                    }),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                _unitLabel(),
-                style: GoogleFonts.nunitoSans(fontSize: 15, fontWeight: FontWeight.w700, color: _muted),
-              ),
-            ],
-          ),
-          const SizedBox(height: 48),
-          if (_product?.farmerId != null && _product?.farmerId == SupabaseConfig.currentUser?.id)
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade50.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.info_rounded, color: Colors.amber),
-                        const SizedBox(width: 12),
-                        Text(
-                          'This is your product.',
-                          style: GoogleFonts.nunitoSans(
-                            color: Colors.amber.shade900,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                          ),
+                  ),
+                  _qtyButton(Icons.add_rounded, () {
+                    final isPreorder = _product?.targetQuantity != null || (_product?.isPreorder ?? false);
+                    final maxQty = isPreorder ? 999 : (_product?.stockQuantity?.toInt() ?? 0);
+                    if (!isPreorder && _quantity >= maxQty) {
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Only $maxQty item(s) available in stock.'),
+                          duration: const Duration(seconds: 2),
                         ),
-                      ],
-                    ),
+                      );
+                      return;
+                    }
+                    setState(() => _quantity++);
+                  }),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              _unitLabel(),
+              style: GoogleFonts.nunitoSans(
+                fontSize: isMobile ? 13 : 15,
+                fontWeight: FontWeight.w700,
+                color: _muted,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: isMobile ? 24 : 48),
+        if (_product?.farmerId != null && _product?.farmerId == SupabaseConfig.currentUser?.id)
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.symmetric(vertical: isMobile ? 14 : 20),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(isMobile ? 16 : 24),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.info_rounded, color: Colors.amber, size: 20),
+                      const SizedBox(width: 10),
+                      Text(
+                        'This is your product.',
+                        style: GoogleFonts.nunitoSans(
+                          color: Colors.amber.shade900,
+                          fontWeight: FontWeight.w800,
+                          fontSize: isMobile ? 14 : 16,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            )
-          else
-            _buildActionsRow(),
-        ],
-      );
+              ),
+            ],
+          )
+        else
+          _buildActionsRow(isMobile),
+      ],
+    );
   }
 
   bool _isHarvested(ProductItem? product) {
@@ -593,7 +616,7 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     return false;
   }
 
-  Widget _buildActionButtonsSection() {
+  Widget _buildActionButtonsSection(bool isMobile) {
     final isPreOrder = _product?.targetQuantity != null;
     final harvested = _isHarvested(_product);
 
@@ -609,14 +632,20 @@ class _WebProductDetailsState extends State<WebProductDetails> {
               },
               style: FilledButton.styleFrom(
                 backgroundColor: _dark,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 16 : 24,
+                  vertical: isMobile ? 14 : 16,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
               child: Text(
                 'Pre-Order Now',
-                style: GoogleFonts.nunitoSans(fontSize: 16, fontWeight: FontWeight.w900),
+                style: GoogleFonts.nunitoSans(
+                  fontSize: isMobile ? 14 : 16,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
           ),
@@ -632,19 +661,22 @@ class _WebProductDetailsState extends State<WebProductDetails> {
             style: OutlinedButton.styleFrom(
               foregroundColor: _primary,
               side: BorderSide(color: _primary.withValues(alpha: 0.35)),
-              padding: const EdgeInsets.symmetric(vertical: 18),
+              padding: EdgeInsets.symmetric(vertical: isMobile ? 14 : 18),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(isMobile ? 14 : 18),
               ),
             ),
-            icon: const Icon(Icons.shopping_cart_outlined),
+            icon: Icon(Icons.shopping_cart_outlined, size: isMobile ? 18 : 20),
             label: Text(
               'Add to Cart',
-              style: GoogleFonts.nunitoSans(fontSize: 16, fontWeight: FontWeight.w900),
+              style: GoogleFonts.nunitoSans(
+                fontSize: isMobile ? 13 : 16,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ),
-        const SizedBox(width: 14),
+        SizedBox(width: isMobile ? 10 : 14),
         Expanded(
           child: FilledButton(
             onPressed: () {
@@ -656,14 +688,17 @@ class _WebProductDetailsState extends State<WebProductDetails> {
             style: FilledButton.styleFrom(
               backgroundColor: _primary,
               foregroundColor: _white,
-              padding: const EdgeInsets.symmetric(vertical: 22),
+              padding: EdgeInsets.symmetric(vertical: isMobile ? 15 : 22),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-              child: Text(
-                'Buy Now',
-                style: GoogleFonts.nunitoSans(fontSize: 16, fontWeight: FontWeight.w900),
+            child: Text(
+              'Buy Now',
+              style: GoogleFonts.nunitoSans(
+                fontSize: isMobile ? 14 : 16,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ),
@@ -671,16 +706,16 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     );
   }
 
-  Widget _buildActionsRow() {
+  Widget _buildActionsRow(bool isMobile) {
     return Row(
       children: [
-        Expanded(child: _buildActionButtonsSection()),
-        const SizedBox(width: 12),
+        Expanded(child: _buildActionButtonsSection(isMobile)),
+        SizedBox(width: isMobile ? 8 : 12),
         IconButton.outlined(
           onPressed: _openShareDialog,
-          icon: const Icon(Icons.ios_share_rounded, color: _primary),
+          icon: Icon(Icons.ios_share_rounded, color: _primary, size: isMobile ? 18 : 22),
           style: IconButton.styleFrom(
-            padding: const EdgeInsets.all(22),
+            padding: EdgeInsets.all(isMobile ? 14 : 22),
             backgroundColor: _surface,
             shape: const CircleBorder(),
           ),
@@ -710,35 +745,35 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     );
   }
 
-  Widget _infoTile(IconData icon, String label, String value) {
+  Widget _infoTile(IconData icon, String label, String value, bool isMobile) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 14 : 24),
       decoration: BoxDecoration(
         color: _surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(isMobile ? 16 : 24),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 18, color: _primary),
-              const SizedBox(width: 8),
+              Icon(icon, size: isMobile ? 15 : 18, color: _primary),
+              const SizedBox(width: 6),
               Text(
                 label,
                 style: GoogleFonts.inter(
-                  fontSize: 14,
+                  fontSize: isMobile ? 11 : 14,
                   fontWeight: FontWeight.w700,
                   color: _muted,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isMobile ? 6 : 12),
           Text(
             value,
             style: GoogleFonts.nunitoSans(
-              fontSize: 20,
+              fontSize: isMobile ? 14 : 20,
               fontWeight: FontWeight.w900,
               color: _dark,
             ),
@@ -753,16 +788,17 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     String label,
     Color color, {
     VoidCallback? onTap,
+    bool isMobile = false,
   }) {
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 20, color: color),
-        const SizedBox(width: 8),
+        Icon(icon, size: isMobile ? 16 : 20, color: color),
+        const SizedBox(width: 6),
         Text(
           label,
           style: GoogleFonts.inter(
-            fontSize: 15,
+            fontSize: isMobile ? 13 : 15,
             fontWeight: FontWeight.w700,
             color: _dark,
           ),
@@ -774,7 +810,7 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     return InkWell(onTap: onTap, child: content);
   }
 
-  Widget _buildSellerSection() {
+  Widget _buildSellerSection(bool isMobile) {
     if (_farmerProfile == null) return const SizedBox.shrink();
 
     final avatarUrl =
@@ -783,20 +819,20 @@ class _WebProductDetailsState extends State<WebProductDetails> {
         '';
 
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: EdgeInsets.all(isMobile ? 18 : 32),
       decoration: BoxDecoration(
         color: _surface,
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(isMobile ? 20 : 32),
       ),
       child: Row(
         children: [
           SafeCircleAvatar(
             imageUrl: avatarUrl,
-            radius: 30,
+            radius: isMobile ? 22 : 30,
             backgroundColor: _surface,
-            child: const Icon(Icons.storefront_rounded, color: _primary),
+            child: Icon(Icons.storefront_rounded, color: _primary, size: isMobile ? 20 : 28),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: isMobile ? 12 : 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -804,19 +840,23 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                 Text(
                   _farmName(),
                   style: GoogleFonts.nunitoSans(
-                    fontSize: 24,
+                    fontSize: isMobile ? 17 : 24,
                     fontWeight: FontWeight.w900,
                     color: _dark,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   _specialty(),
-                  style: GoogleFonts.inter(fontSize: 15, color: _muted),
+                  style: GoogleFonts.inter(
+                    fontSize: isMobile ? 12 : 15,
+                    color: _muted,
+                  ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           FilledButton(
             onPressed: () {
               final farmerId = _farmerProfile!['farmer_id']?.toString();
@@ -825,25 +865,32 @@ class _WebProductDetailsState extends State<WebProductDetails> {
             },
             style: FilledButton.styleFrom(
               backgroundColor: _primary,
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 12 : 16,
+                vertical: isMobile ? 8 : 12,
+              ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(isMobile ? 10 : 14),
               ),
             ),
-            child: const Text('View Farm'),
+            child: Text(
+              'View Farm',
+              style: TextStyle(fontSize: isMobile ? 12 : 14),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildReviewsSection() {
+  Widget _buildReviewsSection(bool isMobile) {
     final reviews = _reviews.take(4).toList();
 
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: EdgeInsets.all(isMobile ? 18 : 32),
       decoration: BoxDecoration(
         color: _surface,
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(isMobile ? 20 : 32),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -854,7 +901,7 @@ class _WebProductDetailsState extends State<WebProductDetails> {
               Text(
                 'Reviews & Ratings',
                 style: GoogleFonts.nunitoSans(
-                  fontSize: 22,
+                  fontSize: isMobile ? 17 : 22,
                   fontWeight: FontWeight.w900,
                   color: _dark,
                 ),
@@ -866,14 +913,21 @@ class _WebProductDetailsState extends State<WebProductDetails> {
                     backgroundColor: _primary.withValues(alpha: 0.1),
                     foregroundColor: _primary,
                     elevation: 0,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 10 : 14,
+                      vertical: isMobile ? 6 : 10,
+                    ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(isMobile ? 10 : 12),
                     ),
                   ),
-                  icon: const Icon(Icons.edit_note_rounded, size: 18),
+                  icon: Icon(Icons.edit_note_rounded, size: isMobile ? 16 : 18),
                   label: Text(
-                    'Write a Review',
-                    style: GoogleFonts.nunitoSans(fontWeight: FontWeight.w800),
+                    'Write Review',
+                    style: GoogleFonts.nunitoSans(
+                      fontWeight: FontWeight.w800,
+                      fontSize: isMobile ? 12 : 14,
+                    ),
                   ),
                 ),
             ],

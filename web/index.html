@@ -140,6 +140,146 @@
       }
     }
 
+    /* Loading Splash Screen */
+    #loading-splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f8fafc;
+      z-index: 99999;
+      transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .splash-card {
+      width: 90%;
+      max-width: 440px;
+      background: #ffffff;
+      border-radius: 24px;
+      box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(226, 232, 240, 0.8);
+      overflow: hidden;
+      text-align: center;
+      animation: splashAppear 0.5s ease-out;
+    }
+
+    .splash-top-bar {
+      height: 5px;
+      background: linear-gradient(90deg, #10b981, #34d399, #059669);
+    }
+
+    .splash-content {
+      padding: 32px 28px 24px;
+    }
+
+    .splash-logo-container {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      background: #f0fdf4;
+      border: 2px solid #dcfce7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.15);
+    }
+
+    .splash-logo-container img {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      object-fit: cover;
+    }
+
+    .splash-title {
+      font-family: "Inter", sans-serif;
+      font-size: 26px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+    }
+
+    .splash-title span {
+      color: #10b981;
+    }
+
+    .splash-subtitle {
+      font-family: "Inter", sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+
+    .splash-progress-track {
+      width: 85%;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 10px;
+      margin: 0 auto 10px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .splash-progress-bar {
+      width: 45%;
+      height: 100%;
+      background: linear-gradient(90deg, #10b981, #34d399);
+      border-radius: 10px;
+      position: absolute;
+      animation: indeterminateProgress 1.6s infinite ease-in-out;
+    }
+
+    .splash-status {
+      font-size: 12px;
+      font-weight: 500;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+
+    .splash-footer {
+      border-top: 1px solid #f1f5f9;
+      padding: 14px 20px;
+      background: #f8fafc;
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 500;
+      letter-spacing: 0.2px;
+    }
+
+    @keyframes indeterminateProgress {
+      0% {
+        left: -45%;
+        width: 30%;
+      }
+      50% {
+        left: 30%;
+        width: 55%;
+      }
+      100% {
+        left: 100%;
+        width: 30%;
+      }
+    }
+
+    @keyframes splashAppear {
+      from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
     body {
       animation: fadeIn 0.3s ease-in-out;
     }
@@ -150,6 +290,27 @@
 </head>
 
 <body>
+  <!-- High-End Branded Loading Splash Screen -->
+  <div id="loading-splash">
+    <div class="splash-card">
+      <div class="splash-top-bar"></div>
+      <div class="splash-content">
+        <div class="splash-logo-container">
+          <img src="icons/Icon-192.png" alt="AgriDirect Logo" />
+        </div>
+        <div class="splash-title">Agri<span>Direct</span></div>
+        <div class="splash-subtitle">Farm Direct E-Commerce Platform</div>
+        <div class="splash-progress-track">
+          <div class="splash-progress-bar"></div>
+        </div>
+        <div class="splash-status">Loading Marketplace...</div>
+      </div>
+      <div class="splash-footer">
+        Connecting Filipino Farmers Directly with Consumers
+      </div>
+    </div>
+  </div>
+
   <div id="app">
     <!-- Static SEO content for search engine crawlers -->
     <div style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;">
@@ -158,6 +319,21 @@
       <a href="https://agridirect-app.vercel.app">AgriDirect Web App</a>
     </div>
   </div>
+
+  <script>
+    function removeSplash() {
+      const splash = document.getElementById('loading-splash');
+      if (splash) {
+        splash.style.opacity = '0';
+        splash.style.pointerEvents = 'none';
+        setTimeout(() => splash.remove(), 450);
+      }
+    }
+
+    window.addEventListener('flutter-first-frame', removeSplash);
+    // Safety fallback
+    setTimeout(removeSplash, 10000);
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 
