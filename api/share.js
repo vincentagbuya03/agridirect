@@ -10,9 +10,18 @@ export default async function handler(req, res) {
   const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZnBwZ2Fyenlrc2FjZ2Jlc21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NzEzMjcsImV4cCI6MjA4NzM0NzMyN30.aX1HIacJsHV8gU-9tGONnDpucE9vePWOrJbgMR4fSzs';
 
   function resolveImageUrl(url) {
-    if (!url) return DEFAULT_IMAGE;
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    return `${supabaseUrl}/storage/v1/object/public/uploads/${url}`;
+    if (!url || typeof url !== 'string') return DEFAULT_IMAGE;
+    const clean = url.trim();
+    if (clean.length === 0) return DEFAULT_IMAGE;
+    if (clean.startsWith('http://') || clean.startsWith('https://')) return clean;
+
+    if (clean.startsWith('avatars/')) {
+      return `${supabaseUrl}/storage/v1/object/public/avatars/${encodeURIComponent(clean.replace(/^avatars\//, ''))}`;
+    }
+    if (clean.startsWith('uploads/')) {
+      return `${supabaseUrl}/storage/v1/object/public/uploads/${encodeURIComponent(clean.replace(/^uploads\//, ''))}`;
+    }
+    return `${supabaseUrl}/storage/v1/object/public/uploads/${encodeURIComponent(clean)}`;
   }
 
   // Always serve HTML so crawlers (Facebook, Messenger, Twitter, etc.) read the OpenGraph tags.
@@ -23,7 +32,7 @@ export default async function handler(req, res) {
     const safeCanonical = canonicalUrl || redirectUrl;
 
     const html = `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" prefix="og: https://ogp.me/ns#">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -36,8 +45,7 @@ export default async function handler(req, res) {
     <meta property="og:description" content="${safeDesc}">
     <meta property="og:image" content="${safeImage}">
     <meta property="og:image:secure_url" content="${safeImage}">
-    <meta property="og:image:width" content="600">
-    <meta property="og:image:height" content="600">
+    <meta property="og:image:alt" content="${safeTitle}">
     <meta property="og:site_name" content="AgriDirect Philippines">
     <meta property="og:locale" content="en_PH">
 
@@ -110,12 +118,12 @@ export default async function handler(req, res) {
       if (targetUserId) {
         try {
           const r2 = await fetch(
-            `${supabaseUrl}/rest/v1/users?id=eq.${encodeURIComponent(targetUserId)}&select=name,avatar_url&limit=1`,
+            `${supabaseUrl}/rest/v1/users?id=eq.${encodeURIComponent(targetUserId)}&select=name,avatar_url,face_photo_path&limit=1`,
             { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
           );
           const data2 = await r2.json();
           if (Array.isArray(data2) && data2.length > 0) {
-            avatarUrl = data2[0].avatar_url;
+            avatarUrl = data2[0].avatar_url || data2[0].face_photo_path;
             if (!farmer) {
               farmer = { farm_name: data2[0].name };
             } else if (!farmer.farm_name) {
