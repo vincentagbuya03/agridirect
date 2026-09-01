@@ -11,6 +11,7 @@ import '../../../shared/router/app_router.dart';
 import '../../../shared/widgets/brand_logo.dart';
 import '../../widgets/web_mfa_challenge_dialog.dart';
 import 'web_otp_verification_screen.dart';
+import '../../../shared/widgets/recaptcha_v2_widget.dart';
 
 /// Web Login / Register screen.
 /// Modern split layout with animated branding on left, form on right.
@@ -42,6 +43,8 @@ class _WebLoginScreenState extends State<WebLoginScreen>
   bool _registerObscure = true;
   bool _registerLoading = false;
   bool _loginLoading = false;
+  String? _loginCaptchaToken;
+  String? _registerCaptchaToken;
 
   // 2025 Modern color palette
   static const Color _primary = Color(0xFF16A34A);
@@ -88,6 +91,10 @@ class _WebLoginScreenState extends State<WebLoginScreen>
     final password = _loginPasswordController.text.trim();
     if (email.isEmpty || password.isEmpty) {
       _showSnackBar('Please fill in all fields');
+      return;
+    }
+    if (_loginCaptchaToken == null) {
+      _showSnackBar('Please verify the reCAPTCHA box to continue');
       return;
     }
     setState(() => _loginLoading = true);
@@ -283,6 +290,10 @@ class _WebLoginScreenState extends State<WebLoginScreen>
     }
     if (password.length < 6) {
       _showSnackBar('Password must be at least 6 characters');
+      return;
+    }
+    if (_registerCaptchaToken == null) {
+      _showSnackBar('Please verify the reCAPTCHA box to continue');
       return;
     }
 
@@ -769,10 +780,16 @@ class _WebLoginScreenState extends State<WebLoginScreen>
             ),
           ),
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 20),
+        RecaptchaV2Widget(
+          siteKey: '6Le_YaEtAAAAAFHKCbBarYQN8bJYv714nUqxSGSM',
+          onVerified: (token) => setState(() => _loginCaptchaToken = token),
+          onExpired: () => setState(() => _loginCaptchaToken = null),
+        ),
+        const SizedBox(height: 20),
         _buildModernButton(
           text: 'Sign In',
-          onPressed: _handleLogin,
+          onPressed: (_loginLoading || _loginCaptchaToken == null) ? null : _handleLogin,
           isLoading: _loginLoading,
         ),
         const SizedBox(height: 24),
@@ -878,10 +895,18 @@ class _WebLoginScreenState extends State<WebLoginScreen>
           icon: Icons.lock_outline_rounded,
           obscure: _registerObscure,
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 20),
+        RecaptchaV2Widget(
+          siteKey: '6Le_YaEtAAAAAFHKCbBarYQN8bJYv714nUqxSGSM',
+          onVerified: (token) => setState(() => _registerCaptchaToken = token),
+          onExpired: () => setState(() => _registerCaptchaToken = null),
+        ),
+        const SizedBox(height: 20),
         _buildModernButton(
           text: _registerLoading ? 'Sending verification...' : 'Create Account',
-          onPressed: _registerLoading ? null : _handleRegister,
+          onPressed: (_registerLoading || _registerCaptchaToken == null)
+              ? null
+              : _handleRegister,
           isLoading: _registerLoading,
         ),
         const SizedBox(height: 28),
@@ -962,7 +987,8 @@ class _WebLoginScreenState extends State<WebLoginScreen>
         style: ElevatedButton.styleFrom(
           backgroundColor: _primary,
           foregroundColor: Colors.white,
-          disabledBackgroundColor: _primary.withValues(alpha: 0.5),
+          disabledBackgroundColor: const Color(0xFFE5E7EB),
+          disabledForegroundColor: const Color(0xFF9CA3AF),
           elevation: 0,
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(

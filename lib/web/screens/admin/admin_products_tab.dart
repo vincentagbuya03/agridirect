@@ -42,7 +42,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
 
   @override
   void dispose() {
-    widget.adminService.dataVersionListenable.removeListener(_dataRefreshListener);
+    widget.adminService.dataVersionListenable.removeListener(
+      _dataRefreshListener,
+    );
     _searchController.dispose();
     super.dispose();
   }
@@ -101,30 +103,53 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
           children: [
             AdminDashboardHeader(
               title: 'Product & Pre-Order Catalog',
-              subtitle: 'Oversee inventory, live harvest campaigns, and marketplace produce quotas.',
+              subtitle:
+                  'Oversee inventory, live harvest campaigns, and marketplace produce quotas.',
               actions: [
                 OutlinedButton.icon(
                   onPressed: _exportProductsCSV,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AdminUi.brand,
                     side: const BorderSide(color: Color(0xFFD3DFD7)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   icon: const Icon(Icons.file_download_outlined, size: 16),
-                  label: Text('Export CSV', style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700)),
+                  label: Text(
+                    'Export CSV',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
                 ElevatedButton.icon(
                   onPressed: _loadData,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AdminUi.brand,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   icon: const Icon(Icons.sync_rounded, size: 16),
-                  label: Text('Sync Catalog', style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700)),
+                  label: Text(
+                    'Sync Catalog',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -246,10 +271,17 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                           color: color.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(icon, size: isCompact ? 18 : 20, color: color),
+                        child: Icon(
+                          icon,
+                          size: isCompact ? 18 : 20,
+                          color: color,
+                        ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: color.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
@@ -304,26 +336,56 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // 2. HORIZONTALLY SCROLLABLE SEGMENTED FILTER TABS
-  // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildSegmentedFilterTabs() {
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _productsFuture,
       builder: (context, snapshot) {
         final products = snapshot.data ?? [];
         final totalCount = products.length;
-        final instantCount = products.where((p) => p['is_preorder'] != true).length;
-        final preorderCount = products.where((p) => p['is_preorder'] == true).length;
-        final featuredCount = products.where((p) => p['is_featured'] == true).length;
-        final restockCount = products.where((p) => (p['stock_quantity'] ?? 0) <= 0).length;
+        final instantCount = products
+            .where((p) => p['is_preorder'] != true)
+            .length;
+        final preorderCount = products
+            .where((p) => p['is_preorder'] == true)
+            .length;
+        final featuredCount = products
+            .where((p) => p['is_featured'] == true)
+            .length;
+        final restockCount = products
+            .where((p) => (p['stock_quantity'] ?? 0) <= 0)
+            .length;
 
         final tabs = [
-          {'id': 'all', 'label': 'All Products', 'count': totalCount, 'icon': Icons.grid_view_rounded},
-          {'id': 'instant', 'label': '⚡ Instant Inventory', 'count': instantCount, 'icon': Icons.bolt_rounded},
-          {'id': 'preorder', 'label': '🌱 Pre-Order Campaigns', 'count': preorderCount, 'icon': Icons.eco_rounded},
-          {'id': 'featured', 'label': '⭐ Featured Items', 'count': featuredCount, 'icon': Icons.star_rounded},
-          {'id': 'low_stock', 'label': '⚠️ Restock Queue', 'count': restockCount, 'icon': Icons.warning_amber_rounded},
+          {
+            'id': 'all',
+            'label': 'All Products',
+            'count': totalCount,
+            'icon': Icons.grid_view_rounded,
+          },
+          {
+            'id': 'instant',
+            'label': '⚡ Instant Inventory',
+            'count': instantCount,
+            'icon': Icons.bolt_rounded,
+          },
+          {
+            'id': 'preorder',
+            'label': '🌱 Pre-Order Campaigns',
+            'count': preorderCount,
+            'icon': Icons.eco_rounded,
+          },
+          {
+            'id': 'featured',
+            'label': '⭐ Featured Items',
+            'count': featuredCount,
+            'icon': Icons.star_rounded,
+          },
+          {
+            'id': 'low_stock',
+            'label': '⚠️ Restock Queue',
+            'count': restockCount,
+            'icon': Icons.warning_amber_rounded,
+          },
         ];
 
         return SingleChildScrollView(
@@ -343,16 +405,33 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                   borderRadius: BorderRadius.circular(10),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 9,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected ? AdminUi.brand : Colors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isSelected ? AdminUi.brand : const Color(0xFFE2E9E4),
+                        color: isSelected
+                            ? AdminUi.brand
+                            : const Color(0xFFE2E9E4),
                       ),
                       boxShadow: isSelected
-                          ? const [BoxShadow(color: Color(0x1A1B5E20), blurRadius: 8, offset: Offset(0, 2))]
-                          : const [BoxShadow(color: Color(0x04000000), blurRadius: 4, offset: Offset(0, 1))],
+                          ? const [
+                              BoxShadow(
+                                color: Color(0x1A1B5E20),
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ]
+                          : const [
+                              BoxShadow(
+                                color: Color(0x04000000),
+                                blurRadius: 4,
+                                offset: Offset(0, 1),
+                              ),
+                            ],
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -360,20 +439,29 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                         Icon(
                           t['icon'] as IconData,
                           size: 15,
-                          color: isSelected ? Colors.white : AdminUi.textSecondary,
+                          color: isSelected
+                              ? Colors.white
+                              : AdminUi.textSecondary,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           t['label'] as String,
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                            color: isSelected ? Colors.white : AdminUi.textPrimary,
+                            fontWeight: isSelected
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                            color: isSelected
+                                ? Colors.white
+                                : AdminUi.textPrimary,
                           ),
                         ),
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? Colors.white.withValues(alpha: 0.25)
@@ -385,7 +473,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
-                              color: isSelected ? Colors.white : AdminUi.brandDark,
+                              color: isSelected
+                                  ? Colors.white
+                                  : AdminUi.brandDark,
                             ),
                           ),
                         ),
@@ -407,7 +497,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
   Widget _buildMainTableContainer() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final tableWidth = constraints.maxWidth < 980 ? 980.0 : constraints.maxWidth;
+        final tableWidth = constraints.maxWidth < 980
+            ? 980.0
+            : constraints.maxWidth;
 
         return Container(
           decoration: BoxDecoration(
@@ -476,8 +568,15 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'Search title, farm, category...',
-                    hintStyle: GoogleFonts.inter(fontSize: 12, color: AdminUi.textMuted),
-                    prefixIcon: const Icon(Icons.search_rounded, color: AdminUi.textMuted, size: 18),
+                    hintStyle: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: AdminUi.textMuted,
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      color: AdminUi.textMuted,
+                      size: 18,
+                    ),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear_rounded, size: 16),
@@ -489,7 +588,10 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                         : null,
                     filled: true,
                     fillColor: const Color(0xFFF7FAF8),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(color: Color(0xFFE2E9E4)),
@@ -500,7 +602,10 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AdminUi.brand, width: 1.5),
+                      borderSide: const BorderSide(
+                        color: AdminUi.brand,
+                        width: 1.5,
+                      ),
                     ),
                   ),
                   onChanged: (v) => setState(() {
@@ -525,9 +630,15 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                       border: Border.all(color: const Color(0xFFE2E9E4)),
                     ),
                     child: DropdownButton<String>(
-                      value: categories.contains(_selectedCategory) ? _selectedCategory : 'All Categories',
+                      value: categories.contains(_selectedCategory)
+                          ? _selectedCategory
+                          : 'All Categories',
                       underline: const SizedBox(),
-                      icon: const Icon(Icons.tune_rounded, size: 16, color: AdminUi.textSecondary),
+                      icon: const Icon(
+                        Icons.tune_rounded,
+                        size: 16,
+                        color: AdminUi.textSecondary,
+                      ),
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         color: AdminUi.textPrimary,
@@ -554,7 +665,11 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                     child: DropdownButton<String>(
                       value: _sortBy,
                       underline: const SizedBox(),
-                      icon: const Icon(Icons.sort_rounded, size: 16, color: AdminUi.textSecondary),
+                      icon: const Icon(
+                        Icons.sort_rounded,
+                        size: 16,
+                        color: AdminUi.textSecondary,
+                      ),
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         color: AdminUi.textPrimary,
@@ -562,11 +677,26 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                       ),
                       onChanged: (v) => setState(() => _sortBy = v ?? 'newest'),
                       items: const [
-                        DropdownMenuItem(value: 'newest', child: Text('Sort: Newest First')),
-                        DropdownMenuItem(value: 'price_asc', child: Text('Price: Low to High')),
-                        DropdownMenuItem(value: 'price_desc', child: Text('Price: High to Low')),
-                        DropdownMenuItem(value: 'stock_asc', child: Text('Stock Level')),
-                        DropdownMenuItem(value: 'rating', child: Text('Highest Rated')),
+                        DropdownMenuItem(
+                          value: 'newest',
+                          child: Text('Sort: Newest First'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'price_asc',
+                          child: Text('Price: Low to High'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'price_desc',
+                          child: Text('Price: High to Low'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'stock_asc',
+                          child: Text('Stock Level'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'rating',
+                          child: Text('Highest Rated'),
+                        ),
                       ],
                     ),
                   ),
@@ -596,7 +726,11 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
     );
   }
 
-  Widget _headerCell(String text, {int flex = 1, TextAlign align = TextAlign.left}) {
+  Widget _headerCell(
+    String text, {
+    int flex = 1,
+    TextAlign align = TextAlign.left,
+  }) {
     return Expanded(
       flex: flex,
       child: Text(
@@ -632,7 +766,11 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
             child: Center(
               child: Column(
                 children: [
-                  Icon(Icons.inventory_2_outlined, size: 48, color: AdminUi.border),
+                  Icon(
+                    Icons.inventory_2_outlined,
+                    size: 48,
+                    color: AdminUi.border,
+                  ),
                   const SizedBox(height: 14),
                   Text(
                     'No produce listings found matching the current criteria.',
@@ -651,7 +789,8 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
           physics: const NeverScrollableScrollPhysics(),
           padding: EdgeInsets.zero,
           itemCount: paginated.length,
-          separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFEBEFEA)),
+          separatorBuilder: (context, index) =>
+              const Divider(height: 1, color: Color(0xFFEBEFEA)),
           itemBuilder: (context, index) => _buildProductRow(paginated[index]),
         );
       },
@@ -682,7 +821,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
       stockLabel = isPreorder ? '$stock Slots Left' : '$stock $unit (Low)';
     } else {
       stockColor = AdminUi.success;
-      stockLabel = isPreorder ? '$stock Pre-Order Slots' : '$stock $unit in Stock';
+      stockLabel = isPreorder
+          ? '$stock Pre-Order Slots'
+          : '$stock $unit in Stock';
     }
 
     return Material(
@@ -705,7 +846,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                       imageUrl: imageUrl,
                       defaultBucket: 'products',
                       child: Icon(
-                        isPreorder ? Icons.eco_rounded : Icons.inventory_2_rounded,
+                        isPreorder
+                            ? Icons.eco_rounded
+                            : Icons.inventory_2_rounded,
                         color: AdminUi.brand,
                         size: 20,
                       ),
@@ -720,20 +863,31 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                               Flexible(
                                 child: Text(
                                   name,
-                                  style: AdminUi.label(size: 13, color: AdminUi.textPrimary, weight: FontWeight.w700),
+                                  style: AdminUi.label(
+                                    size: 13,
+                                    color: AdminUi.textPrimary,
+                                    weight: FontWeight.w700,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               if (isFeatured) ...[
                                 const SizedBox(width: 4),
-                                const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                                const Icon(
+                                  Icons.star_rounded,
+                                  size: 14,
+                                  color: Colors.amber,
+                                ),
                               ],
                             ],
                           ),
                           const SizedBox(height: 2),
                           Text(
                             '$farmName • $category',
-                            style: AdminUi.body(size: 11, color: AdminUi.textSecondary),
+                            style: AdminUi.body(
+                              size: 11,
+                              color: AdminUi.textSecondary,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
@@ -749,7 +903,10 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: isPreorder
                           ? AdminUi.brandSecondary.withValues(alpha: 0.12)
@@ -775,7 +932,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
-                            color: isPreorder ? AdminUi.brandDark : AdminUi.info,
+                            color: isPreorder
+                                ? AdminUi.brandDark
+                                : AdminUi.info,
                             letterSpacing: 0.4,
                           ),
                         ),
@@ -802,7 +961,10 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                     ),
                     Text(
                       'per $unit',
-                      style: GoogleFonts.inter(fontSize: 10, color: AdminUi.textMuted),
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: AdminUi.textMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -849,14 +1011,19 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                         activeThumbColor: AdminUi.brand,
                         activeTrackColor: AdminUi.brand.withValues(alpha: 0.3),
                         onChanged: (val) async {
-                          final ok = await widget.adminService.toggleProductActiveStatus(productId, val);
+                          final ok = await widget.adminService
+                              .toggleProductActiveStatus(productId, val);
                           if (!mounted || !context.mounted) return;
                           if (ok) {
                             _loadData();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 backgroundColor: AdminUi.brand,
-                                content: Text(val ? '✅ Product activated' : '⚠️ Product deactivated'),
+                                content: Text(
+                                  val
+                                      ? '✅ Product activated'
+                                      : '⚠️ Product deactivated',
+                                ),
                               ),
                             );
                           }
@@ -883,27 +1050,40 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                   children: [
                     IconButton(
                       icon: Icon(
-                        isFeatured ? Icons.star_rounded : Icons.star_outline_rounded,
+                        isFeatured
+                            ? Icons.star_rounded
+                            : Icons.star_outline_rounded,
                         color: isFeatured ? Colors.amber : AdminUi.textMuted,
                         size: 20,
                       ),
-                      tooltip: isFeatured ? 'Unfeature Produce' : 'Feature on Marketplace',
+                      tooltip: isFeatured
+                          ? 'Unfeature Produce'
+                          : 'Feature on Marketplace',
                       onPressed: () async {
-                        final ok = await widget.adminService.toggleFeaturedProduct(productId, !isFeatured);
+                        final ok = await widget.adminService
+                            .toggleFeaturedProduct(productId, !isFeatured);
                         if (!mounted || !context.mounted) return;
                         if (ok) {
                           _loadData();
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               backgroundColor: AdminUi.brand,
-                              content: Text(isFeatured ? 'Product removed from featured' : '⭐ Product featured!'),
+                              content: Text(
+                                isFeatured
+                                    ? 'Product removed from featured'
+                                    : '⭐ Product featured!',
+                              ),
                             ),
                           );
                         }
                       },
                     ),
                     IconButton(
-                      icon: const Icon(Icons.info_outline_rounded, color: AdminUi.textSecondary, size: 20),
+                      icon: const Icon(
+                        Icons.info_outline_rounded,
+                        color: AdminUi.textSecondary,
+                        size: 20,
+                      ),
                       tooltip: 'View Full Product Details',
                       onPressed: () => _showProductInspectorDialog(product),
                     ),
@@ -928,8 +1108,12 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
         final total = products.length;
         final totalPages = total <= 0 ? 1 : ((total - 1) ~/ _rowsPerPage) + 1;
         final safeCurrentPage = _currentPage.clamp(1, totalPages);
-        final start = total == 0 ? 0 : ((safeCurrentPage - 1) * _rowsPerPage) + 1;
-        final end = safeCurrentPage * _rowsPerPage > total ? total : safeCurrentPage * _rowsPerPage;
+        final start = total == 0
+            ? 0
+            : ((safeCurrentPage - 1) * _rowsPerPage) + 1;
+        final end = safeCurrentPage * _rowsPerPage > total
+            ? total
+            : safeCurrentPage * _rowsPerPage;
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -950,11 +1134,15 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                     '<',
                     false,
                     enabled: safeCurrentPage > 1,
-                    onTap: () => setState(() => _currentPage = safeCurrentPage - 1),
+                    onTap: () =>
+                        setState(() => _currentPage = safeCurrentPage - 1),
                   ),
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: AdminUi.brandSoft,
                       borderRadius: BorderRadius.circular(8),
@@ -973,7 +1161,8 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                     '>',
                     false,
                     enabled: safeCurrentPage < totalPages,
-                    onTap: () => setState(() => _currentPage = safeCurrentPage + 1),
+                    onTap: () =>
+                        setState(() => _currentPage = safeCurrentPage + 1),
                   ),
                 ],
               ),
@@ -984,7 +1173,12 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
     );
   }
 
-  Widget _pageButton(String label, bool active, {VoidCallback? onTap, bool enabled = true}) {
+  Widget _pageButton(
+    String label,
+    bool active, {
+    VoidCallback? onTap,
+    bool enabled = true,
+  }) {
     final canTap = enabled && onTap != null;
     return InkWell(
       onTap: canTap ? onTap : null,
@@ -1002,7 +1196,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
           label,
           style: GoogleFonts.plusJakartaSans(
             fontSize: 12,
-            color: active ? Colors.white : (canTap ? AdminUi.textPrimary : AdminUi.textMuted),
+            color: active
+                ? Colors.white
+                : (canTap ? AdminUi.textPrimary : AdminUi.textMuted),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -1046,9 +1242,15 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Text('🌱 Pre-Order Harvest Pipeline', style: AdminUi.title(size: 15, color: Colors.white)),
+                  Text(
+                    '🌱 Pre-Order Harvest Pipeline',
+                    style: AdminUi.title(size: 15, color: Colors.white),
+                  ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: AdminUi.brandSecondary.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(6),
@@ -1068,7 +1270,10 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
               const SizedBox(height: 6),
               Text(
                 'Monitor seasonal crops, reserved batch allocations, and estimated harvest delivery fulfillment.',
-                style: AdminUi.body(size: 11, color: Colors.white.withValues(alpha: 0.8)),
+                style: AdminUi.body(
+                  size: 11,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
               ),
               const SizedBox(height: 18),
               OutlinedButton.icon(
@@ -1076,13 +1281,21 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
                   side: const BorderSide(color: Color(0xFF388E3C)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 icon: const Icon(Icons.visibility_rounded, size: 14),
                 label: Text(
                   'INSPECT HARVEST CAMPAIGNS',
-                  style: GoogleFonts.plusJakartaSans(fontSize: 10, fontWeight: FontWeight.w800),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],
@@ -1113,7 +1326,10 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Text('⚠️ Critical Stock Alerts', style: AdminUi.title(size: 15)),
+                  Text(
+                    '⚠️ Critical Stock Alerts',
+                    style: AdminUi.title(size: 15),
+                  ),
                   InkWell(
                     onTap: () => setState(() => _selectedTab = 'low_stock'),
                     child: Text(
@@ -1149,9 +1365,16 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.check_circle_outline_rounded, color: AdminUi.success, size: 16),
+                          const Icon(
+                            Icons.check_circle_outline_rounded,
+                            color: AdminUi.success,
+                            size: 16,
+                          ),
                           const SizedBox(width: 8),
-                          Text('All products have adequate stock quotas.', style: AdminUi.body(size: 12)),
+                          Text(
+                            'All products have adequate stock quotas.',
+                            style: AdminUi.body(size: 12),
+                          ),
                         ],
                       ),
                     );
@@ -1162,7 +1385,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                       final stock = p['stock_quantity'] ?? 0;
                       final unit = p['unit_abbr'] ?? "units";
                       final name = p['name'] ?? 'Product';
-                      final color = stock == 0 ? AdminUi.danger : AdminUi.warning;
+                      final color = stock == 0
+                          ? AdminUi.danger
+                          : AdminUi.warning;
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
@@ -1171,7 +1396,10 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                             Container(
                               width: 7,
                               height: 7,
-                              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                              ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
@@ -1179,7 +1407,11 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                                 name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: AdminUi.label(size: 12, color: AdminUi.textPrimary, weight: FontWeight.w700),
+                                style: AdminUi.label(
+                                  size: 12,
+                                  color: AdminUi.textPrimary,
+                                  weight: FontWeight.w700,
+                                ),
                               ),
                             ),
                             Text(
@@ -1241,7 +1473,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
     final isFlashSale = product['is_flash_sale'] == true;
     final discountPercent = (product['discount_percent'] as num? ?? 0).toInt();
     final harvestDays = (product['harvest_days'] as num? ?? 30).toInt();
-    final totalSold = (product['sold_count'] as num? ?? product['total_sold'] as num? ?? 0).toDouble();
+    final totalSold =
+        (product['sold_count'] as num? ?? product['total_sold'] as num? ?? 0)
+            .toDouble();
     final grossVolume = totalSold * price;
     final description = (product['description'] ?? '').toString().trim().isEmpty
         ? 'Fresh from farm to table! Grown with sustainable and organic farming practices.'
@@ -1250,7 +1484,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
     final reviews = product['review_count']?.toString() ?? '0';
     final imageUrl = product['image_url']?.toString();
     final createdAtStr = product['created_at'] != null
-        ? DateFormat('MMMM d, yyyy').format(DateTime.parse(product['created_at']))
+        ? DateFormat(
+            'MMMM d, yyyy',
+          ).format(DateTime.parse(product['created_at']))
         : 'N/A';
 
     final shortSku = productId.length > 12
@@ -1259,7 +1495,8 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
 
     DateTime? estHarvestDate;
     if (isPreorder && product['created_at'] != null) {
-      final baseDate = DateTime.tryParse(product['created_at']) ?? DateTime.now();
+      final baseDate =
+          DateTime.tryParse(product['created_at']) ?? DateTime.now();
       estHarvestDate = baseDate.add(Duration(days: harvestDays));
     }
 
@@ -1271,8 +1508,13 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
         final isMobile = screenWidth < 740;
 
         return Dialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24, vertical: 24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 12 : 24,
+            vertical: 24,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
           child: Container(
             width: isMobile ? screenWidth * 0.96 : 840,
             constraints: BoxConstraints(maxHeight: screenHeight * 0.88),
@@ -1285,11 +1527,18 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
               children: [
                 // ── 1. Top Header Bar ──
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
                   decoration: const BoxDecoration(
                     color: Color(0xFFF7FAF8),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-                    border: Border(bottom: BorderSide(color: Color(0xFFE6EDE8))),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(22),
+                    ),
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFFE6EDE8)),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -1300,15 +1549,22 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
                               decoration: BoxDecoration(
                                 color: isPreorder
-                                    ? AdminUi.brandSecondary.withValues(alpha: 0.15)
+                                    ? AdminUi.brandSecondary.withValues(
+                                        alpha: 0.15,
+                                      )
                                     : AdminUi.brandSoft,
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
                                   color: isPreorder
-                                      ? AdminUi.brandSecondary.withValues(alpha: 0.3)
+                                      ? AdminUi.brandSecondary.withValues(
+                                          alpha: 0.3,
+                                        )
                                       : AdminUi.brand.withValues(alpha: 0.25),
                                 ),
                               ),
@@ -1316,17 +1572,25 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    isPreorder ? Icons.eco_rounded : Icons.bolt_rounded,
+                                    isPreorder
+                                        ? Icons.eco_rounded
+                                        : Icons.bolt_rounded,
                                     size: 13,
-                                    color: isPreorder ? AdminUi.brandDark : AdminUi.brand,
+                                    color: isPreorder
+                                        ? AdminUi.brandDark
+                                        : AdminUi.brand,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    isPreorder ? 'PRE-ORDER HARVEST CAMPAIGN' : 'INSTANT DISPATCH PRODUCE',
+                                    isPreorder
+                                        ? 'PRE-ORDER HARVEST CAMPAIGN'
+                                        : 'INSTANT DISPATCH PRODUCE',
                                     style: GoogleFonts.plusJakartaSans(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w800,
-                                      color: isPreorder ? AdminUi.brandDark : AdminUi.brand,
+                                      color: isPreorder
+                                          ? AdminUi.brandDark
+                                          : AdminUi.brand,
                                       letterSpacing: 0.4,
                                     ),
                                   ),
@@ -1335,16 +1599,25 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                             ),
                             if (isFeatured)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 5,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.amber.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                                  border: Border.all(
+                                    color: Colors.amber.withValues(alpha: 0.3),
+                                  ),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.star_rounded, size: 13, color: Colors.amber),
+                                    const Icon(
+                                      Icons.star_rounded,
+                                      size: 13,
+                                      color: Colors.amber,
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
                                       'FEATURED IN STORE',
@@ -1359,11 +1632,16 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                               ),
                             if (isFreeShipping)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 5,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.blue.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.blue.withValues(alpha: 0.25)),
+                                  border: Border.all(
+                                    color: Colors.blue.withValues(alpha: 0.25),
+                                  ),
                                 ),
                                 child: Text(
                                   '🚚 FREE SHIPPING',
@@ -1376,11 +1654,18 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                               ),
                             if (isWholesale)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 5,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AdminUi.brand.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: AdminUi.brand.withValues(alpha: 0.25)),
+                                  border: Border.all(
+                                    color: AdminUi.brand.withValues(
+                                      alpha: 0.25,
+                                    ),
+                                  ),
                                 ),
                                 child: Text(
                                   '🏷️ WHOLESALE AVAILABLE',
@@ -1393,11 +1678,20 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                               ),
                             if (isFlashSale)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 5,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: Colors.deepOrange.withValues(alpha: 0.12),
+                                  color: Colors.deepOrange.withValues(
+                                    alpha: 0.12,
+                                  ),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.25)),
+                                  border: Border.all(
+                                    color: Colors.deepOrange.withValues(
+                                      alpha: 0.25,
+                                    ),
+                                  ),
                                 ),
                                 child: Text(
                                   '⚡ FLASH SALE ($discountPercent% OFF)',
@@ -1412,7 +1706,11 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 20, color: AdminUi.textSecondary),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          size: 20,
+                          color: AdminUi.textSecondary,
+                        ),
                         onPressed: () => Navigator.of(context).pop(),
                         tooltip: 'Close Modal',
                       ),
@@ -1428,16 +1726,44 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                         ? Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildProductVisualCard(imageUrl, isPreorder, category),
+                              _buildProductVisualCard(
+                                imageUrl,
+                                isPreorder,
+                                category,
+                              ),
                               const SizedBox(height: 16),
-                              _buildTitleAndFarmHeader(name, farmName, category, shortSku, productId, createdAtStr),
+                              _buildTitleAndFarmHeader(
+                                name,
+                                farmName,
+                                category,
+                                shortSku,
+                                productId,
+                                createdAtStr,
+                              ),
                               const SizedBox(height: 16),
-                              _buildPricingAndInventoryCard(price, unit, unitName, stock, isPreorder),
+                              _buildPricingAndInventoryCard(
+                                price,
+                                unit,
+                                unitName,
+                                stock,
+                                isPreorder,
+                              ),
                               const SizedBox(height: 16),
-                              _buildFourBentoMetrics(totalSold, unit, grossVolume, rating, reviews, isPreorder, isFreeShipping),
+                              _buildFourBentoMetrics(
+                                totalSold,
+                                unit,
+                                grossVolume,
+                                rating,
+                                reviews,
+                                isPreorder,
+                                isFreeShipping,
+                              ),
                               if (isPreorder) ...[
                                 const SizedBox(height: 16),
-                                _buildPreorderTimelineBanner(harvestDays, estHarvestDate),
+                                _buildPreorderTimelineBanner(
+                                  harvestDays,
+                                  estHarvestDate,
+                                ),
                               ],
                               const SizedBox(height: 16),
                               _buildDescriptionNotes(description),
@@ -1450,11 +1776,22 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                               SizedBox(
                                 width: 280,
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
-                                    _buildProductVisualCard(imageUrl, isPreorder, category),
+                                    _buildProductVisualCard(
+                                      imageUrl,
+                                      isPreorder,
+                                      category,
+                                    ),
                                     const SizedBox(height: 14),
-                                    _buildPricingAndInventoryCard(price, unit, unitName, stock, isPreorder),
+                                    _buildPricingAndInventoryCard(
+                                      price,
+                                      unit,
+                                      unitName,
+                                      stock,
+                                      isPreorder,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -1465,12 +1802,30 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _buildTitleAndFarmHeader(name, farmName, category, shortSku, productId, createdAtStr),
+                                    _buildTitleAndFarmHeader(
+                                      name,
+                                      farmName,
+                                      category,
+                                      shortSku,
+                                      productId,
+                                      createdAtStr,
+                                    ),
                                     const SizedBox(height: 16),
-                                    _buildFourBentoMetrics(totalSold, unit, grossVolume, rating, reviews, isPreorder, isFreeShipping),
+                                    _buildFourBentoMetrics(
+                                      totalSold,
+                                      unit,
+                                      grossVolume,
+                                      rating,
+                                      reviews,
+                                      isPreorder,
+                                      isFreeShipping,
+                                    ),
                                     if (isPreorder) ...[
                                       const SizedBox(height: 14),
-                                      _buildPreorderTimelineBanner(harvestDays, estHarvestDate),
+                                      _buildPreorderTimelineBanner(
+                                        harvestDays,
+                                        estHarvestDate,
+                                      ),
                                     ],
                                     const SizedBox(height: 14),
                                     _buildDescriptionNotes(description),
@@ -1484,10 +1839,15 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
 
                 // ── 3. Bottom Footer Actions ──
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
                   decoration: const BoxDecoration(
                     color: Color(0xFFF7FAF8),
-                    borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+                    borderRadius: BorderRadius.vertical(
+                      bottom: Radius.circular(22),
+                    ),
                     border: Border(top: BorderSide(color: Color(0xFFE6EDE8))),
                   ),
                   child: Wrap(
@@ -1504,17 +1864,23 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                             width: 8,
                             height: 8,
                             decoration: BoxDecoration(
-                              color: isActive ? AdminUi.success : AdminUi.danger,
+                              color: isActive
+                                  ? AdminUi.success
+                                  : AdminUi.danger,
                               shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            isActive ? 'Live on Storefront' : 'Hidden from Storefront',
+                            isActive
+                                ? 'Live on Storefront'
+                                : 'Hidden from Storefront',
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: isActive ? AdminUi.success : AdminUi.danger,
+                              color: isActive
+                                  ? AdminUi.success
+                                  : AdminUi.danger,
                             ),
                           ),
                         ],
@@ -1528,15 +1894,30 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                           OutlinedButton(
                             onPressed: () => Navigator.of(context).pop(),
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
                               side: const BorderSide(color: Color(0xFFD3DFD7)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
-                            child: Text('Close', style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600)),
+                            child: Text(
+                              'Close',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                           ElevatedButton.icon(
                             onPressed: () async {
-                              final ok = await widget.adminService.toggleFeaturedProduct(productId, !isFeatured);
+                              final ok = await widget.adminService
+                                  .toggleFeaturedProduct(
+                                    productId,
+                                    !isFeatured,
+                                  );
                               if (!mounted || !context.mounted) return;
                               Navigator.of(context).pop();
                               if (ok) {
@@ -1544,22 +1925,41 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     backgroundColor: AdminUi.brand,
-                                    content: Text(isFeatured ? 'Product unfeatured from home' : '⭐ Product featured on home!'),
+                                    content: Text(
+                                      isFeatured
+                                          ? 'Product unfeatured from home'
+                                          : '⭐ Product featured on home!',
+                                    ),
                                   ),
                                 );
                               }
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: isFeatured ? Colors.orange.shade800 : AdminUi.brand,
+                              backgroundColor: isFeatured
+                                  ? Colors.orange.shade800
+                                  : AdminUi.brand,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
                               elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
-                            icon: Icon(isFeatured ? Icons.star_border_rounded : Icons.star_rounded, size: 16),
+                            icon: Icon(
+                              isFeatured
+                                  ? Icons.star_border_rounded
+                                  : Icons.star_rounded,
+                              size: 16,
+                            ),
                             label: Text(
                               isFeatured ? 'Unfeature' : 'Feature Product',
-                              style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w800),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
                         ],
@@ -1575,7 +1975,11 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
     );
   }
 
-  Widget _buildProductVisualCard(String? imageUrl, bool isPreorder, String category) {
+  Widget _buildProductVisualCard(
+    String? imageUrl,
+    bool isPreorder,
+    String category,
+  ) {
     return Container(
       height: 190,
       decoration: BoxDecoration(
@@ -1591,7 +1995,8 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
             Image.network(
               imageUrl,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => _fallbackImagePlaceholder(isPreorder),
+              errorBuilder: (context, error, stackTrace) =>
+                  _fallbackImagePlaceholder(isPreorder),
             )
           else
             _fallbackImagePlaceholder(isPreorder),
@@ -1608,7 +2013,11 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.category_outlined, size: 12, color: Colors.white),
+                  const Icon(
+                    Icons.category_outlined,
+                    size: 12,
+                    color: Colors.white,
+                  ),
                   const SizedBox(width: 5),
                   Text(
                     category,
@@ -1672,7 +2081,11 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.agriculture_rounded, size: 14, color: AdminUi.brand),
+                  const Icon(
+                    Icons.agriculture_rounded,
+                    size: 14,
+                    color: AdminUi.brand,
+                  ),
                   const SizedBox(width: 5),
                   Text(
                     farmName,
@@ -1689,7 +2102,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
               onTap: () {
                 Clipboard.setData(ClipboardData(text: productId));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Copied Product ID to clipboard!')),
+                  const SnackBar(
+                    content: Text('Copied Product ID to clipboard!'),
+                  ),
                 );
               },
               borderRadius: BorderRadius.circular(6),
@@ -1705,10 +2120,18 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                   children: [
                     Text(
                       'SKU: $shortSku',
-                      style: GoogleFonts.robotoMono(fontSize: 10, color: AdminUi.textMuted, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.robotoMono(
+                        fontSize: 10,
+                        color: AdminUi.textMuted,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(width: 5),
-                    const Icon(Icons.copy_rounded, size: 11, color: AdminUi.textMuted),
+                    const Icon(
+                      Icons.copy_rounded,
+                      size: 11,
+                      color: AdminUi.textMuted,
+                    ),
                   ],
                 ),
               ),
@@ -1723,8 +2146,16 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
     );
   }
 
-  Widget _buildPricingAndInventoryCard(double price, String unit, String unitName, int stock, bool isPreorder) {
-    final stockColor = stock <= 0 ? AdminUi.danger : (stock < 10 ? AdminUi.warning : AdminUi.success);
+  Widget _buildPricingAndInventoryCard(
+    double price,
+    String unit,
+    String unitName,
+    int stock,
+    bool isPreorder,
+  ) {
+    final stockColor = stock <= 0
+        ? AdminUi.danger
+        : (stock < 10 ? AdminUi.warning : AdminUi.success);
     final stockText = stock <= 0
         ? (isPreorder ? '0 Slots Available' : 'Out of Stock')
         : (isPreorder ? '$stock Pre-Order Slots' : '$stock $unit in Stock');
@@ -1739,7 +2170,14 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('COMMERCIAL PRICING', style: AdminUi.label(size: 9, color: AdminUi.textMuted, weight: FontWeight.w800)),
+          Text(
+            'COMMERCIAL PRICING',
+            style: AdminUi.label(
+              size: 9,
+              color: AdminUi.textMuted,
+              weight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(height: 3),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -1756,7 +2194,10 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
               const SizedBox(width: 4),
               Text(
                 'per $unit ($unitName)',
-                style: GoogleFonts.inter(fontSize: 11, color: AdminUi.textSecondary),
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: AdminUi.textSecondary,
+                ),
               ),
             ],
           ),
@@ -1768,7 +2209,11 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
             children: [
               Text(
                 isPreorder ? 'ALLOCATED CAPACITY' : 'INVENTORY HEALTH',
-                style: AdminUi.label(size: 9, color: AdminUi.textMuted, weight: FontWeight.w800),
+                style: AdminUi.label(
+                  size: 9,
+                  color: AdminUi.textMuted,
+                  weight: FontWeight.w800,
+                ),
               ),
               Text(
                 stockText,
@@ -1858,7 +2303,13 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
     );
   }
 
-  Widget _bentoTile(IconData icon, String label, String value, String subvalue, Color color) {
+  Widget _bentoTile(
+    IconData icon,
+    String label,
+    String value,
+    String subvalue,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1903,14 +2354,20 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
             subvalue,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(fontSize: 10, color: AdminUi.textSecondary),
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              color: AdminUi.textSecondary,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPreorderTimelineBanner(int harvestDays, DateTime? estHarvestDate) {
+  Widget _buildPreorderTimelineBanner(
+    int harvestDays,
+    DateTime? estHarvestDate,
+  ) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1930,7 +2387,11 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.calendar_today_rounded, size: 14, color: Colors.white),
+                  const Icon(
+                    Icons.calendar_today_rounded,
+                    size: 14,
+                    color: Colors.white,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'Harvest Lifecycle Timeline',
@@ -1964,7 +2425,10 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
             estHarvestDate != null
                 ? 'Target Batch Delivery Date: ${DateFormat('MMMM d, yyyy').format(estHarvestDate)}'
                 : 'Batch pre-order crop cycle is active.',
-            style: GoogleFonts.inter(fontSize: 11, color: Colors.white.withValues(alpha: 0.85)),
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
           ),
         ],
       ),
@@ -1977,7 +2441,11 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
       children: [
         Text(
           'Agricultural Description & Quality Notes',
-          style: AdminUi.label(size: 11, color: AdminUi.textPrimary, weight: FontWeight.w800),
+          style: AdminUi.label(
+            size: 11,
+            color: AdminUi.textPrimary,
+            weight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 6),
         Container(
@@ -1990,7 +2458,11 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
           ),
           child: Text(
             description,
-            style: GoogleFonts.inter(fontSize: 12, height: 1.45, color: AdminUi.textSecondary),
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              height: 1.45,
+              color: AdminUi.textSecondary,
+            ),
           ),
         ),
       ],
@@ -2008,7 +2480,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
       }
 
       final csvContent = StringBuffer();
-      csvContent.writeln('ID,Product Name,Farm,Category,Mode,Price,Stock,Status');
+      csvContent.writeln(
+        'ID,Product Name,Farm,Category,Mode,Price,Stock,Status',
+      );
       for (final p in products) {
         final mode = p['is_preorder'] == true ? 'Pre-Order' : 'Instant';
         final status = p['is_active'] != false ? 'Active' : 'Hidden';
@@ -2021,7 +2495,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AdminUi.brand,
-          content: Text('📥 Exported ${products.length} products to CSV buffer!'),
+          content: Text(
+            '📥 Exported ${products.length} products to CSV buffer!',
+          ),
         ),
       );
     });
@@ -2030,13 +2506,17 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
   // ═══════════════════════════════════════════════════════════════════════════
   // FILTERING & PAGINATION HELPERS
   // ═══════════════════════════════════════════════════════════════════════════
-  List<Map<String, dynamic>> _filterAndSortProducts(List<Map<String, dynamic>> products) {
+  List<Map<String, dynamic>> _filterAndSortProducts(
+    List<Map<String, dynamic>> products,
+  ) {
     var filtered = products.where((p) {
       // 1. Tab filter
       if (_selectedTab == 'instant' && p['is_preorder'] == true) return false;
       if (_selectedTab == 'preorder' && p['is_preorder'] != true) return false;
       if (_selectedTab == 'featured' && p['is_featured'] != true) return false;
-      if (_selectedTab == 'low_stock' && (p['stock_quantity'] ?? 0) > 0) return false;
+      if (_selectedTab == 'low_stock' && (p['stock_quantity'] ?? 0) > 0) {
+        return false;
+      }
 
       // 2. Category filter
       if (_selectedCategory != 'All Categories') {
@@ -2049,7 +2529,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
         final name = (p['name'] ?? '').toString().toLowerCase();
         final farm = (p['farm_name'] ?? '').toString().toLowerCase();
         final cat = (p['category_name'] ?? '').toString().toLowerCase();
-        if (!name.contains(_searchQuery) && !farm.contains(_searchQuery) && !cat.contains(_searchQuery)) {
+        if (!name.contains(_searchQuery) &&
+            !farm.contains(_searchQuery) &&
+            !cat.contains(_searchQuery)) {
           return false;
         }
       }
@@ -2059,18 +2541,36 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
 
     // Sorting
     if (_sortBy == 'price_asc') {
-      filtered.sort((a, b) => ((a['price'] as num?) ?? 0).compareTo((b['price'] as num?) ?? 0));
+      filtered.sort(
+        (a, b) =>
+            ((a['price'] as num?) ?? 0).compareTo((b['price'] as num?) ?? 0),
+      );
     } else if (_sortBy == 'price_desc') {
-      filtered.sort((a, b) => ((b['price'] as num?) ?? 0).compareTo((a['price'] as num?) ?? 0));
+      filtered.sort(
+        (a, b) =>
+            ((b['price'] as num?) ?? 0).compareTo((a['price'] as num?) ?? 0),
+      );
     } else if (_sortBy == 'stock_asc') {
-      filtered.sort((a, b) => ((a['stock_quantity'] as num?) ?? 0).compareTo((b['stock_quantity'] as num?) ?? 0));
+      filtered.sort(
+        (a, b) => ((a['stock_quantity'] as num?) ?? 0).compareTo(
+          (b['stock_quantity'] as num?) ?? 0,
+        ),
+      );
     } else if (_sortBy == 'rating') {
-      filtered.sort((a, b) => ((b['average_rating'] as num?) ?? 0).compareTo((a['average_rating'] as num?) ?? 0));
+      filtered.sort(
+        (a, b) => ((b['average_rating'] as num?) ?? 0).compareTo(
+          (a['average_rating'] as num?) ?? 0,
+        ),
+      );
     } else {
       // newest
       filtered.sort((a, b) {
-        final da = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(2000);
-        final db = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(2000);
+        final da =
+            DateTime.tryParse(a['created_at']?.toString() ?? '') ??
+            DateTime(2000);
+        final db =
+            DateTime.tryParse(b['created_at']?.toString() ?? '') ??
+            DateTime(2000);
         return db.compareTo(da);
       });
     }
@@ -2078,7 +2578,9 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
     return filtered;
   }
 
-  List<Map<String, dynamic>> _getPaginatedProducts(List<Map<String, dynamic>> all) {
+  List<Map<String, dynamic>> _getPaginatedProducts(
+    List<Map<String, dynamic>> all,
+  ) {
     final start = (_currentPage - 1) * _rowsPerPage;
     var end = start + _rowsPerPage;
     if (end > all.length) end = all.length;

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/services/admin/admin_service.dart';
+import '../../../shared/services/core/supabase_config.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'admin_ui.dart';
 
@@ -15,6 +16,31 @@ class AdminUsersTab extends StatefulWidget {
 }
 
 class _AdminUsersTabState extends State<AdminUsersTab> {
+  static String? resolveAvatarUrl(dynamic rawUrl) {
+    if (rawUrl == null) return null;
+    final url = rawUrl.toString().trim();
+    if (url.isEmpty) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    try {
+      String cleanPath = url;
+      String bucket = 'customer-profiles';
+      if (cleanPath.startsWith('uploads/')) {
+        cleanPath = cleanPath.replaceFirst('uploads/', '');
+      }
+      if (cleanPath.startsWith('customer-profiles/')) {
+        cleanPath = cleanPath.replaceFirst('customer-profiles/', '');
+      } else if (cleanPath.startsWith('avatars/')) {
+        bucket = 'avatars';
+        cleanPath = cleanPath.replaceFirst('avatars/', '');
+      }
+      return SupabaseConfig.client.storage.from(bucket).getPublicUrl(cleanPath);
+    } catch (_) {
+      return null;
+    }
+  }
+
   late Future<List<Map<String, dynamic>>> _usersFuture;
 
   String _searchQuery = '';
@@ -829,18 +855,21 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: AdminUi.brandSoft,
-                    backgroundImage: user['avatar_url'] != null && user['avatar_url'].toString().isNotEmpty
-                        ? NetworkImage(user['avatar_url'])
-                        : null,
-                    child: (user['avatar_url'] == null || user['avatar_url'].toString().isEmpty)
-                        ? Text(
-                            name.isNotEmpty ? name[0].toUpperCase() : 'B',
-                            style: AdminUi.label(color: AdminUi.brand, weight: FontWeight.w800, size: 14),
-                          )
-                        : null,
+                  Builder(
+                    builder: (context) {
+                      final avatarUrl = resolveAvatarUrl(user['avatar_url']);
+                      return CircleAvatar(
+                        radius: 20,
+                        backgroundColor: AdminUi.brandSoft,
+                        backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                        child: avatarUrl == null
+                            ? Text(
+                                name.isNotEmpty ? name[0].toUpperCase() : 'B',
+                                style: AdminUi.label(color: AdminUi.brand, weight: FontWeight.w800, size: 14),
+                              )
+                            : null,
+                      );
+                    },
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1110,18 +1139,21 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                 flex: 3,
                 child: Row(
                   children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: AdminUi.brandSoft,
-                      backgroundImage: user['avatar_url'] != null && user['avatar_url'].toString().isNotEmpty
-                          ? NetworkImage(user['avatar_url'])
-                          : null,
-                      child: (user['avatar_url'] == null || user['avatar_url'].toString().isEmpty)
-                          ? Text(
-                              name.isNotEmpty ? name[0].toUpperCase() : 'B',
-                              style: AdminUi.label(color: AdminUi.brand, weight: FontWeight.w800, size: 14),
-                            )
-                          : null,
+                    Builder(
+                      builder: (context) {
+                        final avatarUrl = resolveAvatarUrl(user['avatar_url']);
+                        return CircleAvatar(
+                          radius: 20,
+                          backgroundColor: AdminUi.brandSoft,
+                          backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                          child: avatarUrl == null
+                              ? Text(
+                                  name.isNotEmpty ? name[0].toUpperCase() : 'B',
+                                  style: AdminUi.label(color: AdminUi.brand, weight: FontWeight.w800, size: 14),
+                                )
+                              : null,
+                        );
+                      },
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -1419,18 +1451,21 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        CircleAvatar(
-                          radius: isMobile ? 22 : 28,
-                          backgroundColor: AdminUi.brandSoft,
-                          backgroundImage: profile['avatar_url'] != null && profile['avatar_url'].toString().isNotEmpty
-                              ? NetworkImage(profile['avatar_url'])
-                              : null,
-                          child: (profile['avatar_url'] == null || profile['avatar_url'].toString().isEmpty)
-                              ? Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : 'B',
-                                  style: AdminUi.title(size: isMobile ? 18 : 22, color: AdminUi.brand),
-                                )
-                              : null,
+                        Builder(
+                          builder: (context) {
+                            final avatarUrl = resolveAvatarUrl(profile['avatar_url']);
+                            return CircleAvatar(
+                              radius: isMobile ? 22 : 28,
+                              backgroundColor: AdminUi.brandSoft,
+                              backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                              child: avatarUrl == null
+                                  ? Text(
+                                      name.isNotEmpty ? name[0].toUpperCase() : 'B',
+                                      style: AdminUi.title(size: isMobile ? 18 : 22, color: AdminUi.brand),
+                                    )
+                                  : null,
+                            );
+                          },
                         ),
                         const SizedBox(width: 14),
                         Expanded(
