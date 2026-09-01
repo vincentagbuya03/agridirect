@@ -2392,24 +2392,39 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
 
     final rawAvatar =
         (farmer['avatar_url'] ??
+                farmer['users']?['avatar_url'] ??
+                farmer['user']?['avatar_url'] ??
                 farmer['face_photo_path'] ??
                 farmer['profile_picture'] ??
-                farmer['user']?['avatar_url'] ??
                 '')
             .toString()
             .trim();
     final avatarUrl = _resolveImageUrl(rawAvatar) ?? '';
 
+    // Farmer cover photo (strictly separate from personal avatar, only if uploaded)
     final rawCover =
         (farmer['image_url'] ??
                 farmer['cover_image_url'] ??
+                farmer['cover_url'] ??
+                farmer['farm_photo_path'] ??
                 farmer['farm_image_url'] ??
                 farmer['farm_banner_url'] ??
                 farmer['banner_url'] ??
                 '')
             .toString()
             .trim();
-    final coverUrl = _resolveImageUrl(rawCover) ?? '';
+    String coverUrl = _resolveImageUrl(rawCover) ?? '';
+
+    final bool isAvatarAsCover = coverUrl.isNotEmpty &&
+        (coverUrl == avatarUrl ||
+         coverUrl.toLowerCase().contains('face_photo') ||
+         coverUrl.toLowerCase().contains('avatar') ||
+         coverUrl.toLowerCase().contains('profile_picture') ||
+         coverUrl.toLowerCase().contains('selfie'));
+
+    if (isAvatarAsCover) {
+      coverUrl = '';
+    }
 
     final rawRating = (farmer['average_rating'] ?? farmer['rating'])
         ?.toString();
@@ -2716,7 +2731,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF065F46), Color(0xFF047857), Color(0xFF059669)],
+          colors: [Color(0xFF064E3B), Color(0xFF065F46), Color(0xFF047857)],
         ),
       ),
       child: Center(

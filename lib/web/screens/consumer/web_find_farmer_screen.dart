@@ -442,7 +442,9 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
         farmer['user_id']?.toString() ??
         farmer['id']?.toString() ??
         '';
-    final imageUrl = farmer['image_url']?.toString();
+    final imageUrl = farmer['avatar_url']?.toString() ??
+        farmer['face_photo_path']?.toString() ??
+        farmer['profile_picture']?.toString();
     final isSelected = _selectedFarmer != null &&
         (_selectedFarmer!['farmer_id'] == farmerId ||
             _selectedFarmer!['user_id'] == farmerId ||
@@ -606,7 +608,9 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
       if (lat is! num || lng is! num) return null;
 
       final isSelected = _selectedFarmer != null && _selectedFarmer!['farmer_id'] == f['farmer_id'];
-      final imageUrl = f['image_url']?.toString() ?? f['avatar_url']?.toString();
+      final imageUrl = f['avatar_url']?.toString() ??
+          f['face_photo_path']?.toString() ??
+          f['profile_picture']?.toString();
 
       return Marker(
         point: LatLng(lat.toDouble(), lng.toDouble()),
@@ -746,7 +750,9 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
                     child: Row(
                       children: [
                         SafeCircleAvatar(
-                          imageUrl: _selectedFarmer!['image_url']?.toString() ?? _selectedFarmer!['avatar_url']?.toString(),
+                          imageUrl: _selectedFarmer!['avatar_url']?.toString() ??
+                              _selectedFarmer!['face_photo_path']?.toString() ??
+                              _selectedFarmer!['profile_picture']?.toString(),
                           radius: 20,
                           defaultBucket: 'uploads',
                           child: const Icon(Icons.agriculture_rounded, color: primary, size: 18),

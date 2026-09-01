@@ -816,6 +816,7 @@ GoRouter createAppRouter({String? initialRoute}) {
 
             if (!isMobile) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!context.mounted) return;
                 if (!auth.isLoggedIn) {
                   context.go(AppRoutes.webWelcome);
                   return;
@@ -886,7 +887,13 @@ GoRouter createAppRouter({String? initialRoute}) {
         ),
       ),
 
-      // â”€â”€ Registration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // MFA Challenge
+      GoRoute(
+        path: AppRoutes.mfaChallenge,
+        builder: (context, state) => const MfaChallengeScreen(),
+      ),
+
+      // Registration
       GoRoute(
         path: AppRoutes.register,
         builder: (context, state) => LayoutBuilder(

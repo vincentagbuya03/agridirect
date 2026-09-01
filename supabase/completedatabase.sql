@@ -97,6 +97,9 @@ CREATE TABLE public.units (
   CONSTRAINT units_pkey PRIMARY KEY (unit_id)
 );
 CREATE TABLE public.products (
+  discount_percent numeric DEFAULT 30,
+  flash_sale_start timestamp with time zone DEFAULT now(),
+  flash_sale_end timestamp with time zone DEFAULT (now() + '24:00:00'::interval),
   name text NOT NULL,
   description text,
   price numeric NOT NULL CHECK (price > 0::numeric),

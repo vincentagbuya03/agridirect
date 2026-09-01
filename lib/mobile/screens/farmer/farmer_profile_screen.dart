@@ -28,6 +28,7 @@ class FarmerProfileScreen extends StatefulWidget {
 class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
   String? _farmerName;
   String? _farmerImageUrl;
+  String? _farmerCoverUrl;
   String? _farmerLocation;
   String? _farmerSpecialty;
   String? _farmerHistory;
@@ -109,21 +110,28 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
           .limit(1);
 
       if (farmers.isNotEmpty && mounted) {
+        final rawCover = farmers[0]['image_url'] as String?;
+        final safeCoverUrl = await SupabaseDatabase.getSafeUrl(
+          rawCover,
+          defaultBucket: 'uploads',
+        );
         setState(() {
           _farmerName = farmers[0]['farm_name'] as String?;
           _farmerLocation = farmers[0]['location'] as String?;
           _farmerSpecialty = farmers[0]['specialty'] as String?;
           _farmerHistory = farmers[0]['farming_history'] as String?;
           _yearsExperience = farmers[0]['years_of_experience'] as int?;
+          _farmerCoverUrl = safeCoverUrl.isNotEmpty ? safeCoverUrl : null;
         });
-        final rawUrl = farmers[0]['image_url'] as String?;
+        final userProfile = await SupabaseDatabase.getUserProfile(userId);
+        final rawAvatarUrl = (userProfile?['avatar_url'] as String?)?.trim() ?? auth.userAvatarUrl;
         final safeUrl = await SupabaseDatabase.getSafeUrl(
-          rawUrl,
+          rawAvatarUrl,
           defaultBucket: 'uploads',
         );
         if (mounted) {
           setState(() {
-            _farmerImageUrl = safeUrl;
+            _farmerImageUrl = safeUrl.isNotEmpty ? safeUrl : (auth.userAvatarUrl.isNotEmpty ? auth.userAvatarUrl : null);
           });
         }
       }
@@ -194,17 +202,52 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
   Widget _buildHeroHeader(AuthService auth) {
     final displayName = _farmerName ?? auth.userName;
 
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF059669), Color(0xFF10B981)],
+    return Stack(
+      children: [
+        // Background Cover Photo or Emerald Gradient
+        Positioned.fill(
+          child: (_farmerCoverUrl != null && _farmerCoverUrl!.isNotEmpty)
+              ? CachedNetworkImage(
+                  imageUrl: _farmerCoverUrl!,
+                  fit: BoxFit.cover,
+                  errorWidget: (context, url, error) => Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF064E3B), Color(0xFF059669)],
+                      ),
+                    ),
+                  ),
+                )
+              : Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF059669), Color(0xFF10B981)],
+                    ),
+                  ),
+                ),
         ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
+        // Dark gradient overlay for contrast & readability
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.35),
+                  Colors.black.withValues(alpha: 0.78),
+                ],
+              ),
+            ),
+          ),
+        ),
+        SafeArea(
+          bottom: false,
+          child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           child: Column(
             children: [
@@ -354,8 +397,9 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
           ),
         ),
       ),
-    );
-  }
+    ],
+  );
+}
 
   // ─── Farm Stats Section ───
   Widget _buildShopStats() {

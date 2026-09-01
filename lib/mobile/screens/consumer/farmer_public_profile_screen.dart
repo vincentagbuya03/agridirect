@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/styles/app_theme.dart';
@@ -14,9 +17,8 @@ import 'cart_screen.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/social/follow_service.dart';
 import '../../../shared/widgets/image_widgets.dart';
-import '../../../shared/services/commerce/voucher_service.dart';
+import '../../../shared/widgets/share_bottom_sheet.dart';
 import '../../../shared/utils/share_util.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../../shared/widgets/flying_icon_animation.dart';
 
 /// Full-screen public profile for a farmer, with Products & Posts tabs.
@@ -33,6 +35,8 @@ class FarmerPublicProfileScreen extends StatefulWidget {
 class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
   final GlobalKey _cartKey = GlobalKey();
   final List<OverlayEntry> _flyingOverlayEntries = [];
   String _calculatedDistance = 'Nearby';
@@ -41,6 +45,76 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
   bool _isFollowBusy = false;
   int _followerCount = 0;
   int _followingCount = 0;
+  bool _isUploadingCover = false;
+  String? _customCoverUrl;
+
+  Future<void> _pickAndUploadCoverPhoto() async {
+    if (_isUploadingCover) return;
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1920,
+      imageQuality: 85,
+    );
+    if (image == null) return;
+
+    setState(() => _isUploadingCover = true);
+    try {
+      final bytes = await image.readAsBytes();
+      final ext = image.name.split('.').last;
+      final fileName = 'cover_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final path = 'covers/$fileName';
+
+      await SupabaseConfig.client.storage
+          .from('uploads')
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(
+              contentType: 'image/${ext == "png" ? "png" : "jpeg"}',
+              upsert: true,
+            ),
+          );
+
+      final publicUrl = SupabaseConfig.client.storage
+          .from('uploads')
+          .getPublicUrl(path);
+
+      final userId = AuthService().userId;
+      if (userId.isNotEmpty) {
+        await SupabaseConfig.client
+            .from('farmers')
+            .update({
+              'image_url': publicUrl,
+            })
+            .eq('user_id', userId);
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _customCoverUrl = publicUrl;
+        _isUploadingCover = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Farm cover photo updated successfully!'),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error uploading cover photo: $e');
+      if (!mounted) return;
+      setState(() => _isUploadingCover = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload cover photo: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
 
   Map<String, dynamic> get f => widget.farmer;
   bool get _isOwnProfile =>
@@ -162,6 +236,7 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
 
   @override
   void dispose() {
+    _searchController.dispose();
     for (final entry in _flyingOverlayEntries) {
       if (entry.mounted) {
         entry.remove();
@@ -195,49 +270,7 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 
-  Widget _buildStat(IconData icon, String value, String label, Color iconColor) {
-    return Expanded(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textHeadline,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSubtle,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildDivider() => Container(
-        width: 1,
-        height: 32,
-        color: AppColors.textSubtle.withValues(alpha: 0.1),
-      );
 
   Widget _emptyState(IconData icon, String title, String subtitle) {
     return Center(
@@ -266,17 +299,19 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF8FAFC),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           _buildSliverAppBar(context, innerBoxIsScrolled),
-          _buildProfileCard(context),
           _buildTabBarHeader(context),
         ],
         body: TabBarView(
           controller: _tabController,
           children: [
-            _ProductsTab(farmerId: f['farmerId']?.toString() ?? ''),
+            _ProductsTab(
+              farmerId: f['farmerId']?.toString() ?? '',
+              searchQuery: _searchQuery,
+            ),
             _PostsTab(farmerUserId: f['farmerUserId']?.toString() ?? ''),
           ],
         ),
@@ -286,142 +321,138 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
 
   SliverAppBar _buildSliverAppBar(BuildContext context, bool innerBoxIsScrolled) {
     final imageUrl = f['imageUrl']?.toString();
+    final avatarUrl = (f['avatar_url'] ?? f['avatarUrl'] ?? f['face_photo_path'])?.toString();
+
     return SliverAppBar(
-      expandedHeight: 120,
+      expandedHeight: 180,
       pinned: true,
       stretch: true,
-      backgroundColor: AppColors.primary,
+      backgroundColor: const Color(0xFF0F172A),
       elevation: 0,
-      leadingWidth: 70,
-      leading: Center(
-        child: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
-              shape: BoxShape.circle,
+      leading: IconButton(
+        onPressed: () => Navigator.pop(context),
+        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
+      ),
+      title: Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.search_rounded, size: 16, color: Colors.white70),
+            const SizedBox(width: 6),
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                onChanged: (val) {
+                  setState(() {
+                    _searchQuery = val.trim();
+                  });
+                },
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontSize: 12,
+                ),
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  border: InputBorder.none,
+                  hintText: 'Search in shop...',
+                  hintStyle: GoogleFonts.inter(
+                    color: Colors.white60,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
             ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded,
-                size: 18, color: Colors.white),
-          ),
+            if (_searchQuery.isNotEmpty)
+              GestureDetector(
+                onTap: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
+                child: const Icon(Icons.close_rounded, size: 16, color: Colors.white70),
+              ),
+          ],
         ),
       ),
       actions: [
-        Center(
-          child: Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ListenableBuilder(
-              listenable: CartService(),
-              builder: (context, _) {
-                final count = CartService().itemCount;
-                return IconButton(
-                  key: _cartKey,
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const CartScreen()),
-                  ),
-                  icon: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        const Icon(Icons.shopping_cart_outlined,
-                            size: 18, color: Colors.white),
-                        if (count > 0)
-                          Positioned(
-                            top: -4,
-                            right: -4,
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: const BoxDecoration(
-                                  color: AppColors.accent, shape: BoxShape.circle),
-                              constraints: const BoxConstraints(
-                                  minWidth: 12, minHeight: 12),
-                              child: Text(
-                                '$count',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.bold),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
+        ListenableBuilder(
+          listenable: CartService(),
+          builder: (context, _) {
+            final count = CartService().itemCount;
+            return IconButton(
+              key: _cartKey,
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CartScreen()),
+              ),
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.shopping_cart_outlined, size: 20, color: Colors.white),
+                  if (count > 0)
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFEF4444),
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
                           ),
-                      ],
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        Center(
-          child: Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              onPressed: () async {
-                final farmerId = f['farmerId']?.toString();
-                if (farmerId != null) {
-                  final url = ShareUtil.generateFarmerShareLink(farmerId);
-                  final farmerName = f['farm_name']?.toString() ?? 'Farm';
-                  // ignore: deprecated_member_use
-                  await Share.share('Check out $farmerName on AgriDirect!\n$url');
-                }
-              },
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.share_outlined,
-                    size: 18, color: Colors.white),
+                ],
               ),
-              tooltip: 'Share Farm',
-            ),
-          ),
+            );
+          },
         ),
-        Center(
-          child: Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: IconButton(
-              onPressed: () {
-                final farmerId = f['farmerId']?.toString();
-                if (farmerId != null) {
-                  context.push(AppRoutes.customerMessages,
-                      extra: {'farmerId': farmerId});
-                }
-              },
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.chat_bubble_outline_rounded,
-                    size: 18, color: Colors.white),
-              ),
-            ),
+        if (_isOwnProfile)
+          IconButton(
+            onPressed: _pickAndUploadCoverPhoto,
+            icon: _isUploadingCover
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.camera_alt_outlined, size: 20, color: Colors.white),
+            tooltip: 'Change Cover Photo',
           ),
+        IconButton(
+          onPressed: () {
+            final farmerId = f['farmerId']?.toString();
+            if (farmerId == null || farmerId.isEmpty) return;
+            final shareUrl = ShareUtil.generateFarmerShareLink(farmerId);
+            final farmerName = f['name'] ?? f['farm_name'] ?? 'Farm';
+
+            ShareBottomSheet.show(
+              context: context,
+              shareUrl: shareUrl,
+              title: 'Share Farm Store',
+              subtitle: 'Let others scan this QR code or share the link to $farmerName.',
+              shareSubject: 'Check out $farmerName on AgriDirect!',
+            );
+          },
+          icon: const Icon(Icons.share_outlined, size: 20, color: Colors.white),
+          tooltip: 'Share Farm',
         ),
+        const SizedBox(width: 4),
       ],
-      title: AnimatedOpacity(
-        opacity: innerBoxIsScrolled ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 200),
-        child: Text(
-          _titleCase(f['name'] ?? 'Farm'),
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
-            color: Colors.white,
-          ),
-        ),
-      ),
-      centerTitle: true,
       flexibleSpace: FlexibleSpaceBar(
         collapseMode: CollapseMode.pin,
         stretchModes: const [StretchMode.zoomBackground],
@@ -431,29 +462,234 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
             Hero(
               tag: 'farmer_${f['farmerId']}',
               child: SafeNetworkImage(
-                imageUrl: imageUrl,
+                imageUrl: _customCoverUrl ?? imageUrl,
                 defaultBucket: 'uploads',
                 fit: BoxFit.cover,
                 placeholder: _imagePlaceholder(),
                 errorWidget: _imagePlaceholder(),
               ),
             ),
-            // Premium Gradient Overlay
+            // Dark Gradient Scrim (Shopee style)
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  stops: const [0.0, 0.5, 1.0],
                   colors: [
-                    Colors.black.withValues(alpha: 0.4),
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.6),
+                    Colors.black.withValues(alpha: 0.65),
+                    Colors.black.withValues(alpha: 0.45),
+                    Colors.black.withValues(alpha: 0.85),
                   ],
                 ),
               ),
             ),
+            // Integrated Farm Identity & Action Row (Positioned at bottom of header)
+            Positioned(
+              left: 14,
+              right: 14,
+              bottom: 10,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Circular Farm Logo
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: avatarUrl != null && avatarUrl.isNotEmpty
+                          ? SafeNetworkImage(
+                              imageUrl: avatarUrl,
+                              defaultBucket: 'uploads',
+                              fit: BoxFit.cover,
+                              errorWidget: _buildLogoFallback(),
+                            )
+                          : _buildLogoFallback(),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+
+                  // Store Title & Meta
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _titleCase(f['name'] ?? 'Farm'),
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: Colors.white,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (f['badge'] == 'VERIFIED' || f['is_verified'] == true) ...[
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.verified_rounded,
+                                color: Color(0xFF10B981),
+                                size: 16,
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            const Icon(Icons.star_rounded, size: 13, color: Color(0xFFFBBF24)),
+                            const SizedBox(width: 2),
+                            Text(
+                              f['rating']?.toString() ?? '5.0',
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Flexible(
+                              child: Text(
+                                ' | $_followerCount Followers${_calculatedDistance.isNotEmpty ? ' | $_calculatedDistance' : ''}',
+                                style: GoogleFonts.inter(
+                                  color: Colors.white70,
+                                  fontSize: 10.5,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Compact Action Buttons (Shopee Style)
+                  if (!_isOwnProfile) ...[
+                    const SizedBox(width: 6),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          height: 28,
+                          child: OutlinedButton(
+                            onPressed: _isFollowBusy ? null : _toggleFollow,
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: _isFollowing ? Colors.white.withValues(alpha: 0.15) : Colors.white,
+                              foregroundColor: _isFollowing ? Colors.white : const Color(0xFF0F172A),
+                              side: BorderSide(
+                                color: _isFollowing ? Colors.white.withValues(alpha: 0.4) : Colors.white,
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 7),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: _isFollowBusy
+                                ? const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white),
+                                  )
+                                : Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        _isFollowing ? Icons.check_rounded : Icons.add_rounded,
+                                        size: 12,
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        _isFollowing ? 'Following' : 'Follow',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        SizedBox(
+                          height: 28,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              final farmerId = f['farmerId']?.toString();
+                              if (farmerId != null) {
+                                context.push(AppRoutes.customerMessages, extra: {'farmerId': farmerId});
+                              }
+                            },
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.black.withValues(alpha: 0.3),
+                              foregroundColor: Colors.white,
+                              side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
+                              padding: const EdgeInsets.symmetric(horizontal: 7),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.chat_bubble_outline_rounded, size: 12),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'Chat',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogoFallback() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF059669), Color(0xFF10B981)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          _getInitials(f['name'] ?? 'Farm'),
+          style: GoogleFonts.plusJakartaSans(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+          ),
         ),
       ),
     );
@@ -517,233 +753,24 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
     }
   }
 
-  Widget _buildProfileCard(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-        child: Column(
-          children: [
-            // Centered Avatar
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFF1F5F9), width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-                gradient: const LinearGradient(
-                  colors: [AppColors.primary, AppColors.secondary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  _getInitials(f['name'] ?? 'Farm'),
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 26,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Flexible(
-                  child: Text(
-                    _titleCase(f['name'] ?? 'Farm'),
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textHeadline,
-                      letterSpacing: -0.5,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (f['badge'] == 'VERIFIED') ...[
-                  const SizedBox(width: 8),
-                  const Icon(Icons.verified_rounded,
-                      size: 20, color: AppColors.secondary),
-                ],
-              ],
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(100),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.15),
-                  width: 1,
-                ),
-              ),
-              child: Text(
-                _titleCase(f['specialty'] ?? 'Fresh Produce'),
-                style: GoogleFonts.plusJakartaSans(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                  letterSpacing: 0.1,
-                ),
-              ),
-            ),
-            if (!_isOwnProfile) ...[
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 48,
-                      child: FilledButton.icon(
-                        onPressed: _isFollowBusy ? null : _toggleFollow,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _isFollowing
-                              ? Colors.white
-                              : AppColors.primary,
-                          foregroundColor: _isFollowing
-                              ? AppColors.textHeadline
-                              : Colors.white,
-                          side: BorderSide(
-                            color: _isFollowing
-                                ? AppColors.textSubtle.withValues(alpha: 0.2)
-                                : AppColors.primary,
-                            width: 1,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          elevation: 0,
-                        ),
-                        icon: _isFollowBusy
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.primary,
-                                ),
-                              )
-                            : Icon(
-                                _isFollowing
-                                    ? Icons.check_rounded
-                                    : Icons.person_add_alt_1_rounded,
-                                size: 18,
-                              ),
-                        label: Text(
-                          _isFollowing ? 'Following' : 'Follow Farm',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: IconButton(
-                      onPressed: () {
-                        final farmerId = f['farmerId']?.toString();
-                        if (farmerId != null) {
-                          context.push(AppRoutes.customerMessages,
-                              extra: {'farmerId': farmerId});
-                        }
-                      },
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.08),
-                        foregroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      icon: const Icon(
-                        Icons.chat_bubble_outline_rounded,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 20),
-            // Stats Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: const Color(0xFFE2E8F0),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  _buildStat(Icons.star_rounded, f['rating']?.toString() ?? '0.0', 'Rating', AppColors.accent),
-                  _buildDivider(),
-                  _buildStat(Icons.location_on_rounded, _calculatedDistance, 'Distance', AppColors.primary),
-                  _buildDivider(),
-                  _buildStat(
-                    Icons.group_rounded,
-                    _followerCount.toString(),
-                    'Followers',
-                    AppColors.secondary,
-                  ),
-                ],
-              ),
-            ),
-            _buildVouchersSection(),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildTabBarHeader(BuildContext context) {
     return SliverPersistentHeader(
       pinned: true,
       delegate: _SliverTabBarDelegate(
         child: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
+          preferredSize: const Size.fromHeight(44),
           child: Container(
             width: double.infinity,
             decoration: const BoxDecoration(
               color: Colors.white,
-              border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
+              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
             ),
             child: TabBar(
               controller: _tabController,
-              labelColor: AppColors.primary,
-              unselectedLabelColor: AppColors.textSubtle,
-              indicatorColor: AppColors.primary,
-              indicatorWeight: 3,
+              labelColor: const Color(0xFF059669),
+              unselectedLabelColor: const Color(0xFF64748B),
+              indicatorColor: const Color(0xFF059669),
+              indicatorWeight: 2.5,
               indicatorSize: TabBarIndicatorSize.label,
               labelStyle: GoogleFonts.plusJakartaSans(
                 fontWeight: FontWeight.w800,
@@ -755,7 +782,7 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
               ),
               tabs: const [
                 Tab(text: 'Products'),
-                Tab(text: 'Posts'),
+                Tab(text: 'Posts & Updates'),
               ],
             ),
           ),
@@ -763,231 +790,6 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
       ),
     );
   }
-  Widget _buildVouchersSection() {
-    final currentUserId = AuthService().userId;
-    final farmerId = f['farmerId']?.toString();
-    if (currentUserId.isEmpty || farmerId == null || farmerId.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: VoucherService().getFarmerVouchersForUser(
-        farmerId: farmerId,
-        userId: currentUserId,
-      ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData) {
-          return const SizedBox.shrink();
-        }
-
-        final vouchers = snapshot.data!;
-        if (vouchers.isEmpty) return const SizedBox.shrink();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                const Icon(Icons.confirmation_number_outlined, color: AppColors.primary, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  'Shop Vouchers',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textHeadline,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 76,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: vouchers.length,
-                itemBuilder: (context, index) {
-                  final v = vouchers[index];
-                  final code = v['code'] ?? '';
-                  final val = (v['discount_value'] as num).toDouble();
-                  final type = v['discount_type'] ?? '';
-                  final minSpend = (v['min_spend'] as num).toDouble();
-                  bool isClaimed = v['is_claimed'] as bool? ?? false;
-
-                  return StatefulBuilder(
-                    builder: (context, setVoucherState) {
-                      return Container(
-                        margin: const EdgeInsets.only(right: 12),
-                        width: 220,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
-                          color: isClaimed ? const Color(0xFFF8FAFC) : Colors.white,
-                        ),
-                        child: Row(
-                          children: [
-                            // Left discount display
-                            Container(
-                              width: 66,
-                              decoration: BoxDecoration(
-                                color: isClaimed 
-                                    ? const Color(0xFFE2E8F0)
-                                    : AppColors.primary.withValues(alpha: 0.08),
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(11),
-                                  bottomLeft: Radius.circular(11),
-                                ),
-                              ),
-                              alignment: Alignment.center,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    type == 'flat' ? '₱${val.toStringAsFixed(0)}' : '${val.toStringAsFixed(0)}%',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 14,
-                                      color: isClaimed ? const Color(0xFF64748B) : AppColors.primary,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  Text(
-                                    'OFF',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 9,
-                                      color: isClaimed ? const Color(0xFF64748B) : AppColors.primary,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Dotted line
-                            CustomPaint(
-                              size: const Size(4, 76),
-                              painter: MobileTicketDottedLinePainter(
-                                color: isClaimed
-                                    ? const Color(0xFFE2E8F0)
-                                    : AppColors.primary.withValues(alpha: 0.25),
-                              ),
-                            ),
-                            // Details
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      code,
-                                      style: GoogleFonts.inter(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 12,
-                                        color: AppColors.textHeadline,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Min Spend ₱${minSpend.toStringAsFixed(0)}',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.textSubtle,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const Spacer(),
-                                    Align(
-                                      alignment: Alignment.bottomRight,
-                                      child: isClaimed
-                                          ? Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFE2E8F0),
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                'Claimed',
-                                                style: GoogleFonts.inter(
-                                                  fontSize: 8,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: const Color(0xFF64748B),
-                                                ),
-                                              ),
-                                            )
-                                          : InkWell(
-                                              onTap: () async {
-                                                final ok = await VoucherService().claimVoucher(currentUserId, v['voucher_id']);
-                                                if (ok) {
-                                                  setVoucherState(() {
-                                                    isClaimed = true;
-                                                  });
-                                                }
-                                              },
-                                              borderRadius: BorderRadius.circular(4),
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.primary,
-                                                  borderRadius: BorderRadius.circular(4),
-                                                ),
-                                                child: Text(
-                                                  'Claim',
-                                                  style: GoogleFonts.inter(
-                                                    fontSize: 8,
-                                                    fontWeight: FontWeight.w800,
-                                                    color: Colors.white,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class MobileTicketDottedLinePainter extends CustomPainter {
-  final Color color;
-  MobileTicketDottedLinePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
-
-    double startY = 4;
-    while (startY < size.height - 4) {
-      canvas.drawLine(Offset(size.width / 2, startY), Offset(size.width / 2, startY + 3), paint);
-      startY += 6;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
@@ -1014,7 +816,6 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(covariant _SliverTabBarDelegate oldDelegate) {
     return oldDelegate.child != child;
   }
-
 }
 
 String _titleCase(String text) {
@@ -1025,15 +826,24 @@ String _titleCase(String text) {
   }).join(' ');
 }
 
-// â”€â”€ Products Tab â”€â”€
-class _ProductsTab extends StatelessWidget {
+// ─── Products Tab with Shopee Sub-Filter & E-Commerce Grid ───
+class _ProductsTab extends StatefulWidget {
   final String farmerId;
-  const _ProductsTab({required this.farmerId});
+  final String searchQuery;
+  const _ProductsTab({required this.farmerId, this.searchQuery = ''});
+
+  @override
+  State<_ProductsTab> createState() => _ProductsTabState();
+}
+
+class _ProductsTabState extends State<_ProductsTab> {
+  int _activeSortIndex = 0;
+  bool _priceAscending = true;
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<ProductItem>>(
-      future: SupabaseDataService().getProductsByFarmerId(farmerId),
+      future: SupabaseDataService().getProductsByFarmerId(widget.farmerId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -1044,8 +854,8 @@ class _ProductsTab extends StatelessWidget {
           );
         }
 
-        final products = snapshot.data ?? [];
-        if (products.isEmpty) {
+        final rawProducts = snapshot.data ?? [];
+        if (rawProducts.isEmpty) {
           return (context.findAncestorStateOfType<_FarmerPublicProfileScreenState>()!)
               ._emptyState(
             Icons.storefront_rounded,
@@ -1054,23 +864,118 @@ class _ProductsTab extends StatelessWidget {
           );
         }
 
-        return GridView.builder(
-          padding: const EdgeInsets.all(20),
+        // Apply real-time search filtering
+        final filtered = rawProducts.where((p) {
+          if (widget.searchQuery.isEmpty) return true;
+          final q = widget.searchQuery.toLowerCase();
+          return p.name.toLowerCase().contains(q) ||
+                 p.farm.toLowerCase().contains(q);
+        }).toList();
+
+        if (filtered.isEmpty && widget.searchQuery.isNotEmpty) {
+          return (context.findAncestorStateOfType<_FarmerPublicProfileScreenState>()!)
+              ._emptyState(
+            Icons.search_off_rounded,
+            'No Items Found',
+            'No products matching "${widget.searchQuery}".',
+          );
+        }
+
+        // Apply sorting
+        final products = List<ProductItem>.from(filtered);
+        if (_activeSortIndex == 1) {
+          // Latest
+          products.sort((a, b) => b.name.compareTo(a.name));
+        } else if (_activeSortIndex == 3) {
+          // Price
+          products.sort((a, b) {
+            final pa = double.tryParse(a.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+            final pb = double.tryParse(b.price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+            return _priceAscending ? pa.compareTo(pb) : pb.compareTo(pa);
+          });
+        }
+
+        return CustomScrollView(
           physics: const BouncingScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: 0.65,
-          ),
-          itemCount: products.length,
-          itemBuilder: (_, i) => _buildProductCard(context, products[i]),
+          slivers: [
+            // Sub-filter row (Popular | Latest | Top Sales | Price ↕)
+            SliverToBoxAdapter(
+              child: Container(
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                ),
+                child: Row(
+                  children: [
+                    _buildSortTab(0, 'Popular'),
+                    _buildDivider(),
+                    _buildSortTab(1, 'Latest'),
+                    _buildDivider(),
+                    _buildSortTab(2, 'Top Sales'),
+                    _buildDivider(),
+                    _buildSortTab(3, _activeSortIndex == 3 ? (_priceAscending ? 'Price ↑' : 'Price ↓') : 'Price ↕'),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.all(10),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 0.62,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _buildShopeeProductCard(context, products[index]),
+                  childCount: products.length,
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
   }
 
-  Widget _buildProductCard(BuildContext context, ProductItem product) {
+  Widget _buildDivider() {
+    return Container(
+      width: 1,
+      height: 14,
+      color: const Color(0xFFE2E8F0),
+    );
+  }
+
+  Widget _buildSortTab(int index, String label) {
+    final isActive = _activeSortIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            if (index == 3 && _activeSortIndex == 3) {
+              _priceAscending = !_priceAscending;
+            } else {
+              _activeSortIndex = index;
+            }
+          });
+        },
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+              color: isActive ? const Color(0xFF059669) : const Color(0xFF64748B),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShopeeProductCard(BuildContext context, ProductItem product) {
     final buttonKey = GlobalKey();
     return GestureDetector(
       onTap: () {
@@ -1080,126 +985,179 @@ class _ProductsTab extends StatelessWidget {
         );
       },
       child: Container(
-        decoration: AppDecorations.cardDecoration.copyWith(
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(22)),
-              child: CachedNetworkImage(
-                imageUrl: product.imageUrl,
-                height: 120,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorWidget: (_, _, _) => Container(
-                  height: 120,
-                  color: AppColors.primaryLight,
-                  child: const Center(
-                    child: Icon(Icons.image_outlined,
-                        size: 32, color: AppColors.primary),
-                  ),
-                ),
-              ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFF1F5F9)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Product Image
+              AspectRatio(
+                aspectRatio: 1.0,
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Text(
-                      product.name,
-                      style: AppTextStyles.headline3.copyWith(fontSize: 14),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _titleCase(product.farm),
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textSubtle,
-                        fontSize: 11,
+                    CachedNetworkImage(
+                      imageUrl: product.imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: const Color(0xFFF8FAFC),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              product.price,
-                              style: AppTextStyles.headline3.copyWith(
-                                color: AppColors.primary,
-                                fontSize: 16,
-                              ),
-                            ),
-                            if (product.unit.isNotEmpty)
-                              Text(
-                                product.unit,
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.textSubtle,
-                                  fontSize: 10,
-                                ),
-                              ),
-                          ],
+                      errorWidget: (context, url, error) => Container(
+                        color: const Color(0xFFF0FDF4),
+                        child: const Center(
+                          child: Icon(Icons.eco_outlined,
+                              size: 32, color: Color(0xFF059669)),
                         ),
-                        if (AuthService().userId.isEmpty || product.farmerId != AuthService().userId)
-                          GestureDetector(
-                            key: buttonKey,
-                            onTap: () async {
-                              final parentState = context.findAncestorStateOfType<_FarmerPublicProfileScreenState>();
-                              if (parentState != null) {
-                                parentState._runFlyToCartAnimation(buttonKey, product.imageUrl);
-                              }
-                              final errorMsg = await CartService().addItem(product);
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content:
-                                      Text(errorMsg ?? '${product.name} added to cart'),
-                                  duration: const Duration(seconds: 1),
-                                  backgroundColor: AppColors.primary,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10)),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color:
-                                        AppColors.primary.withValues(alpha: 0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.add_shopping_cart_rounded,
-                                size: 16,
-                                color: Colors.white,
-                              ),
-                            ),
+                      ),
+                    ),
+                    // Direct Grower Tag
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF059669),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Direct Farm',
+                          style: GoogleFonts.inter(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
                           ),
-                      ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Product Title (2 lines max)
+                      Text(
+                        product.name,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF0F172A),
+                          height: 1.25,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Spacer(),
+                      // Price Row
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            product.price,
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFF059669),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          if (product.unit.isNotEmpty) ...[
+                            const SizedBox(width: 2),
+                            Text(
+                              '/${product.unit}',
+                              style: GoogleFonts.inter(
+                                color: const Color(0xFF94A3B8),
+                                fontSize: 9.5,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      // Rating & Action Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.star_rounded, size: 11, color: Color(0xFFFBBF24)),
+                              const SizedBox(width: 2),
+                              Text(
+                                '5.0',
+                                style: GoogleFonts.inter(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                              Text(
+                                '  |  Fresh',
+                                style: GoogleFonts.inter(
+                                  fontSize: 9.5,
+                                  color: const Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (AuthService().userId.isEmpty || product.farmerId != AuthService().userId)
+                            GestureDetector(
+                              key: buttonKey,
+                              onTap: () async {
+                                final parentState = context.findAncestorStateOfType<_FarmerPublicProfileScreenState>();
+                                if (parentState != null) {
+                                  parentState._runFlyToCartAnimation(buttonKey, product.imageUrl);
+                                }
+                                final errorMsg = await CartService().addItem(product);
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(errorMsg ?? '${product.name} added to cart'),
+                                    duration: const Duration(seconds: 1),
+                                    backgroundColor: const Color(0xFF059669),
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFECFDF5),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFD1FAE5)),
+                                ),
+                                child: const Icon(
+                                  Icons.add_shopping_cart_rounded,
+                                  size: 13,
+                                  color: Color(0xFF059669),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

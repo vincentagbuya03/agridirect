@@ -1250,21 +1250,23 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
 
         // ─── ID Type Selector ───
         _buildSectionTitle('Select Government ID', Icons.badge_rounded),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Row(
           children: [
-            _buildIdTypeChip(
-              'national_id',
-              'National ID (PhilSys)',
-              Icons.credit_card_rounded,
+            _buildIdTypeCard(
+              type: 'national_id',
+              title: 'National ID',
+              subtitle: 'PhilSys / ePhilID',
+              tag: 'RECOMMENDED',
+              icon: Icons.credit_card_rounded,
             ),
-            const SizedBox(width: 8),
-            _buildIdTypeChip('other_id', 'Other Gov ID', Icons.badge_rounded),
-            const SizedBox(width: 8),
-            _buildIdTypeChip(
-              'local_id',
-              'Local / Barangay ID',
-              Icons.location_city_rounded,
+            const SizedBox(width: 12),
+            _buildIdTypeCard(
+              type: 'local_id',
+              title: 'Local ID',
+              subtitle: 'Barangay / RSBSA',
+              tag: 'ALTERNATIVE',
+              icon: Icons.location_city_rounded,
             ),
           ],
         ),
@@ -1558,44 +1560,100 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     );
   }
 
-  Widget _buildIdTypeChip(String type, String label, IconData icon) {
+  Widget _buildIdTypeCard({
+    required String type,
+    required String title,
+    required String subtitle,
+    required String tag,
+    required IconData icon,
+  }) {
     final isSelected = _idType == type;
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _idType = type),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
           decoration: BoxDecoration(
-            color: isSelected ? _primary : Colors.white,
-            borderRadius: BorderRadius.circular(14),
+            color: isSelected ? const Color(0xFFF0FDF4) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: isSelected ? _primary : _border,
-              width: isSelected ? 1.5 : 1,
+              width: isSelected ? 2.0 : 1.0,
             ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: _primary.withValues(alpha: 0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
+            boxShadow: [
+              BoxShadow(
+                color: (isSelected ? _primary : Colors.black).withValues(
+                  alpha: isSelected ? 0.08 : 0.03,
+                ),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, size: 18, color: isSelected ? Colors.white : _muted),
-              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? _primary.withValues(alpha: 0.15)
+                          : const Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      size: 20,
+                      color: isSelected ? _primary : _muted,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? _primary
+                          : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      tag,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: isSelected
+                            ? Colors.white
+                            : const Color(0xFF64748B),
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
+                title,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  color: isSelected ? Colors.white : _dark,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? const Color(0xFF065F46) : _dark,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: GoogleFonts.inter(
+                  fontSize: 11.5,
+                  color: isSelected
+                      ? const Color(0xFF047857).withValues(alpha: 0.8)
+                      : _muted,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],

@@ -49,8 +49,10 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
   bool _isSaving = false;
   bool _isEditing = false;
   bool _isUploadingImage = false;
+  bool _isUploadingCover = false;
   bool _isImagePickerActive = false;
   String? _farmerImageUrl;
+  String? _farmerCoverUrl;
   String? _customerImageUrl;
   String? _farmerId;
 
@@ -165,11 +167,26 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
             _imageUrlController.text = rawImagePath;
             _freeDeliveryMinAmountController.text = (farmer['free_delivery_min_amount'] ?? '0').toString();
             _farmerId = farmer['farmer_id']?.toString(); // 🟢 NEW: Save farmer_id
+            // 1. Personal Avatar is loaded from user profile
+            final userProfile = await SupabaseDatabase.getUserProfile(userId);
+            final rawAvatarPath = (userProfile?['avatar_url'] as String?)?.trim() ?? 
+                                  (farmer['face_photo_path'] as String?)?.trim() ?? 
+                                  _auth.userAvatarUrl;
             _farmerImageUrl = await SupabaseDatabase.getSafeUrl(
-              rawImagePath,
+              rawAvatarPath,
               defaultBucket: 'uploads',
             );
             await _precacheProfileImage(_farmerImageUrl);
+
+            // 2. Farm Cover Banner is loaded from farmers.image_url
+            final rawCoverPath = (farmer['image_url'] ?? '').toString().trim();
+            if (rawCoverPath.isNotEmpty) {
+              _farmerCoverUrl = await SupabaseDatabase.getSafeUrl(
+                rawCoverPath,
+                defaultBucket: 'uploads',
+              );
+              await _precacheProfileImage(_farmerCoverUrl);
+            }
 
             if (updates.isNotEmpty) {
               await SupabaseConfig.client
@@ -342,33 +359,18 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
           debugPrint('🔍 Attempting to update farmer image for user_id: $userId, farmer_id: $_farmerId');
           
           if (userId != null && userId.isNotEmpty) {
+            final result = await SupabaseConfig.client
+                .from('users')
+                .update({'avatar_url': dbPath})
+                .eq('user_id', userId)
+                .select('user_id');
+            
+            updateSuccessful = result.isNotEmpty;
             if (isFarmer) {
-              if (_farmerId != null && _farmerId!.isNotEmpty) {
-                final result = await SupabaseConfig.client
-                    .from('farmers')
-                    .update({'image_url': dbPath})
-                    .eq('farmer_id', _farmerId!)
-                    .select('farmer_id');
-                
-                updateSuccessful = result.isNotEmpty;
-                debugPrint('✅ Database update attempted via farmer_id: $_farmerId. Rows affected: ${result.length}');
-              } else {
-                final result = await SupabaseConfig.client
-                    .from('farmers')
-                    .update({'image_url': dbPath})
-                    .eq('user_id', userId)
-                    .select('farmer_id');
-                
-                updateSuccessful = result.isNotEmpty;
-                debugPrint('✅ Database update attempted via user_id: $userId. Rows affected: ${result.length}');
-              }
-            } else {
-              final result = await SupabaseConfig.client
-                  .from('users')
-                  .update({'avatar_url': dbPath})
-                  .eq('user_id', userId)
-                  .select('user_id');
-              updateSuccessful = result.isNotEmpty;
+              await SupabaseConfig.client
+                  .from('farmers')
+                  .update({'face_photo_path': dbPath})
+                  .eq('user_id', userId);
             }
           }
         } catch (dbErr) {
@@ -426,6 +428,80 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
     }
   }
 
+  Future<void> _uploadFarmerCover() async {
+    if (_isUploadingCover) return;
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1920,
+      imageQuality: 85,
+    );
+    if (image == null) return;
+
+    setState(() => _isUploadingCover = true);
+    try {
+      final bytes = await image.readAsBytes();
+      final ext = image.name.split('.').last;
+      final fileName = 'cover_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final path = 'covers/$fileName';
+
+      final resultPath = await SupabaseDatabase.uploadImage(
+        bucket: 'uploads',
+        path: path,
+        bytes: bytes,
+      );
+
+      if (resultPath != null) {
+        final publicUrl = SupabaseConfig.client.storage
+            .from('uploads')
+            .getPublicUrl(path);
+
+        final userId = _auth.userId.isNotEmpty ? _auth.userId : SupabaseConfig.client.auth.currentUser?.id;
+        if (userId != null && userId.isNotEmpty) {
+          if (_farmerId != null && _farmerId!.isNotEmpty) {
+            await SupabaseConfig.client
+                .from('farmers')
+                .update({
+                  'image_url': path,
+                })
+                .eq('farmer_id', _farmerId!);
+          } else {
+            await SupabaseConfig.client
+                .from('farmers')
+                .update({
+                  'image_url': path,
+                })
+                .eq('user_id', userId);
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _farmerCoverUrl = publicUrl;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Farm cover photo updated successfully!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error uploading cover photo: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to upload cover photo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingCover = false);
+    }
+  }
+
   Future<void> _saveDetails() async {
     if (!_infoKey.currentState!.validate()) return;
 
@@ -441,15 +517,19 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
 
       if (_auth.isViewingAsFarmer) {
         // Update farmer details
-        var query = SupabaseConfig.client.from('farmers').update({
+        final Map<String, dynamic> farmerUpdates = {
           'farm_name': _nameController.text.trim(),
           'location': _locationController.text.trim(),
           'residential_address': _addressController.text.trim(),
           'farm_latitude': _parseCoordinate(_latitudeController.text),
           'farm_longitude': _parseCoordinate(_longitudeController.text),
-          'image_url': _imageUrlController.text.trim(),
           'free_delivery_min_amount': double.tryParse(_freeDeliveryMinAmountController.text) ?? 0.0,
-        });
+        };
+        if (_farmerCoverUrl != null && _farmerCoverUrl!.isNotEmpty) {
+          farmerUpdates['image_url'] = _farmerCoverUrl;
+        }
+
+        var query = SupabaseConfig.client.from('farmers').update(farmerUpdates);
 
         if (_farmerId != null && _farmerId!.isNotEmpty) {
           await query.eq('farmer_id', _farmerId!);
@@ -865,6 +945,110 @@ class _MyDetailsScreenState extends State<MyDetailsScreen> {
               ],
             ),
           ),
+          if (isFarmer) ...[
+            const SizedBox(height: 20),
+            const Divider(color: Color(0xFFF1F5F9), height: 1),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Farm Cover Banner',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textHeadline,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Banner photo on your store page',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: AppColors.textSubtle,
+                      ),
+                    ),
+                  ],
+                ),
+                OutlinedButton.icon(
+                  onPressed: _isUploadingCover ? null : _uploadFarmerCover,
+                  icon: _isUploadingCover
+                      ? const SizedBox(
+                          width: 13,
+                          height: 13,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                        )
+                      : const Icon(Icons.camera_alt_rounded, size: 14),
+                  label: Text(
+                    _isUploadingCover ? 'Uploading...' : 'Change Cover',
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary, width: 1.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              height: 110,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(13),
+                child: _farmerCoverUrl != null && _farmerCoverUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: _farmerCoverUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (_, _) => Container(color: Colors.grey[100]),
+                        errorWidget: (_, _, _) => Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF064E3B), Color(0xFF047857)],
+                            ),
+                          ),
+                          child: const Center(
+                            child: Icon(Icons.landscape_rounded, color: Colors.white38, size: 32),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF064E3B), Color(0xFF047857)],
+                          ),
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.add_photo_alternate_rounded, color: Colors.white60, size: 28),
+                              const SizedBox(height: 6),
+                              Text(
+                                'No cover photo uploaded yet\nTap "Change Cover" to add one',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+          ],
         ],
       ),
     );

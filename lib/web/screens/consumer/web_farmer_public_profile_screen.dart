@@ -2,6 +2,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/data/app_data.dart';
 import '../../../shared/router/app_routes.dart';
@@ -61,13 +63,100 @@ class _WebFarmerPublicProfileScreenState
   late final TabController _tabController;
   final _followService = FollowService();
   final TextEditingController _searchCtrl = TextEditingController();
-
   bool _isFollowing = false;
   bool _isFollowBusy = false;
   int _followerCount = 0;
   String _searchQuery = '';
   String _selectedCategory = 'All';
   String _selectedSort = 'Featured';
+
+  bool _isUploadingCover = false;
+  String? _customCoverUrl;
+
+  Future<void> _pickAndUploadCoverPhoto() async {
+    if (_isUploadingCover) return;
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1920,
+      imageQuality: 85,
+    );
+    if (image == null) return;
+
+    setState(() => _isUploadingCover = true);
+    try {
+      final bytes = await image.readAsBytes();
+      final ext = image.name.split('.').last;
+      final fileName = 'cover_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final path = 'covers/$fileName';
+
+      await SupabaseConfig.client.storage
+          .from('uploads')
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(
+              contentType: 'image/${ext == "png" ? "png" : "jpeg"}',
+              upsert: true,
+            ),
+          );
+
+      final publicUrl = SupabaseConfig.client.storage
+          .from('uploads')
+          .getPublicUrl(path);
+
+      // Update farmers table in database
+      final userId = AuthService().userId;
+      if (userId.isNotEmpty) {
+        await SupabaseConfig.client
+            .from('farmers')
+            .update({
+              'image_url': publicUrl,
+            })
+            .eq('user_id', userId);
+      } else if (widget.farmerId.isNotEmpty) {
+        await SupabaseConfig.client
+            .from('farmers')
+            .update({
+              'image_url': publicUrl,
+            })
+            .eq('farmer_id', widget.farmerId);
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _customCoverUrl = publicUrl;
+        _isUploadingCover = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+              SizedBox(width: 10),
+              Expanded(child: Text('Farm cover photo updated successfully!')),
+            ],
+          ),
+          backgroundColor: const Color(0xFF16A34A),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error uploading cover photo: $e');
+      if (!mounted) return;
+      setState(() => _isUploadingCover = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload cover photo: $e'),
+          backgroundColor: Colors.red.shade600,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -503,11 +592,37 @@ class _WebFarmerPublicProfileScreenState
   // 1. STORE HERO BANNER & IDENTITY
   // ---------------------------------------------------------------------------
   Widget _buildStoreHeroBanner(Map<String, dynamic> farmer, bool isMobile) {
-    final coverImageUrl = farmer['cover_image_url']?.toString() ??
-        farmer['image_url']?.toString();
-    final avatarUrl = farmer['avatar_url']?.toString() ??
-        farmer['profile_image_url']?.toString() ??
-        farmer['image_url']?.toString();
+    final rawAvatar = (farmer['avatar_url'] ??
+            farmer['profile_image_url'] ??
+            farmer['face_photo_path'] ??
+            farmer['profile_picture'])
+        ?.toString();
+    final avatarUrl = rawAvatar;
+
+    final rawCover = (_customCoverUrl ??
+            farmer['image_url'] ??
+            farmer['cover_image_url'] ??
+            farmer['cover_url'] ??
+            farmer['farm_photo_path'] ??
+            farmer['farm_image_url'] ??
+            farmer['farm_banner_url'] ??
+            farmer['banner_url'])
+        ?.toString();
+
+    String? coverImageUrl = (rawCover != null && rawCover.trim().isNotEmpty)
+        ? rawCover.trim()
+        : null;
+
+    if (avatarUrl != null &&
+        coverImageUrl != null &&
+        (coverImageUrl == avatarUrl ||
+         coverImageUrl.toLowerCase().contains('face_photo') ||
+         coverImageUrl.toLowerCase().contains('avatar') ||
+         coverImageUrl.toLowerCase().contains('profile_picture') ||
+         coverImageUrl.toLowerCase().contains('selfie'))) {
+      coverImageUrl = null;
+    }
+
     final farmName = _farmName(farmer);
     final specialty = _specialty(farmer);
     final locationText = _location(farmer);
@@ -538,7 +653,7 @@ class _WebFarmerPublicProfileScreenState
                 fit: StackFit.expand,
                 children: [
                   SafeNetworkImage(
-                    imageUrl: coverImageUrl,
+                    imageUrl: _customCoverUrl ?? coverImageUrl,
                     defaultBucket: 'uploads',
                     fit: BoxFit.cover,
                     placeholder: Container(
@@ -575,12 +690,87 @@ class _WebFarmerPublicProfileScreenState
                     ),
                   ),
 
-                  // Top Action Buttons (Share)
+                  // Top Action Buttons (Change Cover Photo + Share)
                   Positioned(
                     top: 16,
                     right: 16,
                     child: Row(
                       children: [
+                        if (ownProfile) ...[
+                          _isUploadingCover
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Uploading...',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: _pickAndUploadCoverPhoto,
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(alpha: 0.55),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: Colors.white.withValues(alpha: 0.3),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.camera_alt_rounded,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Change Cover',
+                                            style: GoogleFonts.inter(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                          const SizedBox(width: 10),
+                        ],
                         _buildGlassIconButton(
                           icon: Icons.ios_share_rounded,
                           tooltip: 'Share Store Link & QR Code',

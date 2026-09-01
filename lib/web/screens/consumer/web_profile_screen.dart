@@ -29,6 +29,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../shared/services/integration/reverse_geocoding_service.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
+
 // Web Profile screen.
 /// Shows user info, "Start Selling" button, and account settings.
 class WebProfileScreen extends StatefulWidget {
@@ -58,7 +59,6 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   // Animations
   late AnimationController _fadeInController;
 
-
   Map<String, dynamic>? _farmerProfile;
   int _totalOrdersCount = 0;
   int _followersCount = 0;
@@ -75,7 +75,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
   bool _isSavingProfile = false;
   bool _isUploadingAvatar = false;
   String _avatarUrl = '';
-  
+  String? _coverImageUrl;
+  bool _isUploadingCover = false;
+
   bool _hasMfaEnabled = false;
 
   Future<void> _checkMfaStatus() async {
@@ -104,9 +106,12 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 profile['farm_name']?.toString() ?? auth.userName;
             _specialtyController.text = profile['specialty']?.toString() ?? '';
             _locationController.text = profile['location']?.toString() ?? '';
-            _latitudeController.text = profile['farm_latitude']?.toString() ?? '';
-            _longitudeController.text = profile['farm_longitude']?.toString() ?? '';
-            _avatarUrl = profile['image_url']?.toString() ?? auth.userAvatarUrl;
+            _latitudeController.text =
+                profile['farm_latitude']?.toString() ?? '';
+            _longitudeController.text =
+                profile['farm_longitude']?.toString() ?? '';
+            _avatarUrl = (profile['avatar_url'] ?? profile['face_photo_path'])?.toString() ?? auth.userAvatarUrl;
+            _coverImageUrl = profile['image_url']?.toString();
           }
         });
       }
@@ -226,6 +231,63 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       if (mounted) setState(() => _isUploadingAvatar = false);
     }
   }
+
+  Future<void> _pickAndUploadInlineCover() async {
+    if (_isUploadingCover || _isSavingProfile) return;
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1920,
+      imageQuality: 85,
+    );
+    if (image == null) return;
+
+    setState(() => _isUploadingCover = true);
+    try {
+      final bytes = await image.readAsBytes();
+      final ext = image.name.split('.').last;
+      final fileName = 'cover_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final path = 'covers/$fileName';
+
+      final resultPath = await SupabaseDatabase.uploadImage(
+        bucket: 'uploads',
+        path: path,
+        bytes: bytes,
+      );
+
+      if (resultPath != null) {
+        final publicUrl = SupabaseConfig.client.storage
+            .from('uploads')
+            .getPublicUrl(path);
+
+        final userId = AuthService().userId;
+        if (userId.isNotEmpty) {
+          await SupabaseConfig.client
+              .from('farmers')
+              .update({'image_url': publicUrl})
+              .eq('user_id', userId);
+        }
+
+        if (mounted) {
+          setState(() {
+            _coverImageUrl = publicUrl;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Farm cover banner uploaded and saved!'),
+              backgroundColor: primary,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error uploading cover photo: $e');
+    } finally {
+      if (mounted) setState(() => _isUploadingCover = false);
+    }
+  }
+
   double? _parseCoordinate(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return null;
@@ -241,7 +303,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         'avatar_url': _avatarUrl,
         'phone': _phoneController.text.trim(),
       };
-      
+
       // Only update user's full name if in consumer mode
       if (!auth.isViewingAsFarmer) {
         userUpdates['name'] = _nameController.text.trim();
@@ -254,16 +316,19 @@ class _WebProfileScreenState extends State<WebProfileScreen>
 
       // 2. If viewing as farmer, update the farmers table
       if (auth.isViewingAsFarmer) {
+        final Map<String, dynamic> farmerUpdates = {
+          'farm_name': _nameController.text.trim(),
+          'specialty': _specialtyController.text.trim(),
+          'location': _locationController.text.trim(),
+          'farm_latitude': _parseCoordinate(_latitudeController.text),
+          'farm_longitude': _parseCoordinate(_longitudeController.text),
+        };
+        if (_coverImageUrl != null && _coverImageUrl!.isNotEmpty) {
+          farmerUpdates['image_url'] = _coverImageUrl;
+        }
         await SupabaseConfig.client
             .from('farmers')
-            .update({
-              'farm_name': _nameController.text.trim(),
-              'specialty': _specialtyController.text.trim(),
-              'location': _locationController.text.trim(),
-              'farm_latitude': _parseCoordinate(_latitudeController.text),
-              'farm_longitude': _parseCoordinate(_longitudeController.text),
-              'image_url': _avatarUrl,
-            })
+            .update(farmerUpdates)
             .eq('user_id', auth.userId);
       }
 
@@ -306,8 +371,6 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     super.dispose();
   }
 
-
-
   Future<void> _confirmLogout() async {
     await showDialog<bool>(
       context: context,
@@ -342,9 +405,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     widget.onModeChanged();
   }
 
-
-  int _selectedTab =
-      0; // 0: Profile, 1: Addresses, 2: Vouchers, 3: Orders, 4: Notifications, 5: Privacy
+  int _selectedTab = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -373,13 +434,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     final displayName = isFarmer && _farmerProfile != null
         ? (_farmerProfile!['farm_name']?.toString() ?? auth.userName)
         : auth.userName;
-    final profileImageUrl =
-        isFarmer &&
-            _farmerProfile != null &&
-            _farmerProfile!['image_url'] != null &&
-            _farmerProfile!['image_url'].toString().isNotEmpty
-        ? _farmerProfile!['image_url'].toString()
-        : auth.userAvatarUrl;
+    final profileImageUrl = _avatarUrl.isNotEmpty
+        ? _avatarUrl
+        : ((isFarmer && _farmerProfile != null)
+            ? (_farmerProfile!['avatar_url'] ?? _farmerProfile!['face_photo_path'] ?? auth.userAvatarUrl)?.toString()
+            : auth.userAvatarUrl);
 
     return Column(
       children: [
@@ -399,7 +458,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       height: 44,
                       fit: BoxFit.cover,
                       placeholder: Container(color: Colors.grey[200]),
-                      errorWidget: const Icon(Icons.person, size: 22, color: _muted),
+                      errorWidget: const Icon(
+                        Icons.person,
+                        size: 22,
+                        color: _muted,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -423,7 +486,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                             const SizedBox(width: 3),
                             Text(
                               'Edit Profile',
-                              style: GoogleFonts.inter(fontSize: 11, color: _muted),
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: _muted,
+                              ),
                             ),
                           ],
                         ),
@@ -432,14 +498,23 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   ),
                   // Mode switch button
                   GestureDetector(
-                    onTap: isFarmer ? _handleSwitchToCustomer : _handleSwitchToFarmer,
+                    onTap: isFarmer
+                        ? _handleSwitchToCustomer
+                        : _handleSwitchToFarmer,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: isFarmer ? Colors.amber.shade50 : const Color(0xFFDCFCE7),
+                        color: isFarmer
+                            ? Colors.amber.shade50
+                            : const Color(0xFFDCFCE7),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isFarmer ? Colors.amber.shade300 : primary.withValues(alpha: 0.4),
+                          color: isFarmer
+                              ? Colors.amber.shade300
+                              : primary.withValues(alpha: 0.4),
                         ),
                       ),
                       child: Row(
@@ -449,8 +524,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                             isFarmer
                                 ? Icons.swap_horiz_rounded
                                 : (auth.isSeller
-                                    ? Icons.storefront_rounded
-                                    : Icons.agriculture_rounded),
+                                      ? Icons.storefront_rounded
+                                      : Icons.agriculture_rounded),
                             size: 13,
                             color: isFarmer ? Colors.amber.shade900 : primary,
                           ),
@@ -459,8 +534,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                             isFarmer
                                 ? 'Farmer Mode'
                                 : (auth.isSeller
-                                    ? 'Switch to Farm'
-                                    : 'Become a Farmer'),
+                                      ? 'Switch to Farm'
+                                      : 'Become a Farmer'),
                             style: GoogleFonts.inter(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
@@ -480,12 +555,34 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 child: Row(
                   children: [
                     _buildMobileTab(0, 'Profile', icon: Icons.person_outline),
-                    if (!isFarmer) _buildMobileTab(1, 'Addresses', icon: Icons.location_on_outlined),
+                    if (!isFarmer)
+                      _buildMobileTab(
+                        1,
+                        'Addresses',
+                        icon: Icons.location_on_outlined,
+                      ),
                     _buildMobileTab(5, 'Privacy', icon: Icons.shield_outlined),
-                    _buildMobileTab(3, 'Orders', icon: Icons.shopping_bag_outlined),
-                    _buildMobileTab(2, 'Vouchers', icon: Icons.confirmation_number_outlined),
-                    _buildMobileTab(4, 'Notifications', icon: Icons.notifications_outlined),
-                    _buildMobileTab(7, 'Help', icon: Icons.help_outline_rounded, onTap: () => context.push(AppRoutes.helpCenter)),
+                    _buildMobileTab(
+                      3,
+                      'Orders',
+                      icon: Icons.shopping_bag_outlined,
+                    ),
+                    _buildMobileTab(
+                      2,
+                      'Vouchers',
+                      icon: Icons.confirmation_number_outlined,
+                    ),
+                    _buildMobileTab(
+                      4,
+                      'Notifications',
+                      icon: Icons.notifications_outlined,
+                    ),
+                    _buildMobileTab(
+                      7,
+                      'Help',
+                      icon: Icons.help_outline_rounded,
+                      onTap: () => context.push(AppRoutes.helpCenter),
+                    ),
                   ],
                 ),
               ),
@@ -504,7 +601,12 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     );
   }
 
-  Widget _buildMobileTab(int index, String label, {required IconData icon, VoidCallback? onTap}) {
+  Widget _buildMobileTab(
+    int index,
+    String label, {
+    required IconData icon,
+    VoidCallback? onTap,
+  }) {
     final isSelected = _selectedTab == index && onTap == null;
     return GestureDetector(
       onTap: onTap ?? () => setState(() => _selectedTab = index),
@@ -580,13 +682,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     final displayName = isFarmer && _farmerProfile != null
         ? (_farmerProfile!['farm_name']?.toString() ?? auth.userName)
         : auth.userName;
-    final profileImageUrl =
-        isFarmer &&
-            _farmerProfile != null &&
-            _farmerProfile!['image_url'] != null &&
-            _farmerProfile!['image_url'].toString().isNotEmpty
-        ? _farmerProfile!['image_url'].toString()
-        : auth.userAvatarUrl;
+    final profileImageUrl = _avatarUrl.isNotEmpty
+        ? _avatarUrl
+        : ((isFarmer && _farmerProfile != null)
+            ? (_farmerProfile!['avatar_url'] ?? _farmerProfile!['face_photo_path'] ?? auth.userAvatarUrl)?.toString()
+            : auth.userAvatarUrl);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -669,7 +769,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             children: [
               _buildSidebarCategory('MY ACCOUNT'),
               _buildSidebarItem(0, Icons.person_outline_rounded, 'My Profile'),
-              if (!isFarmer) _buildSidebarItem(1, Icons.location_on_outlined, 'Addresses'),
+              if (!isFarmer)
+                _buildSidebarItem(1, Icons.location_on_outlined, 'Addresses'),
               _buildSidebarItem(5, Icons.shield_outlined, 'Privacy Settings'),
 
               const Divider(height: 24, color: Color(0xFFF1F5F9)),
@@ -882,8 +983,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // â”€â”€ Header (responsive) â”€â”€
-                if (isMobileLayout) ..._buildMobileHeader(isFarmer)
-                else ..._buildDesktopHeader(isFarmer),
+                if (isMobileLayout)
+                  ..._buildMobileHeader(isFarmer)
+                else
+                  ..._buildDesktopHeader(isFarmer),
 
                 const Divider(height: 32, color: Color(0xFFF1F5F9)),
 
@@ -902,27 +1005,61 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                             spacing: 12,
                             runSpacing: 8,
                             children: [
-                              _buildFarmerMetricItem('Orders', '$_totalOrdersCount', Icons.shopping_bag_outlined),
-                              _buildFarmerMetricItem('Followers', '$_followersCount', Icons.people_outline),
-                              _buildFarmerMetricItem('Status', 'Verified', Icons.verified_outlined),
+                              _buildFarmerMetricItem(
+                                'Orders',
+                                '$_totalOrdersCount',
+                                Icons.shopping_bag_outlined,
+                              ),
+                              _buildFarmerMetricItem(
+                                'Followers',
+                                '$_followersCount',
+                                Icons.people_outline,
+                              ),
+                              _buildFarmerMetricItem(
+                                'Status',
+                                'Verified',
+                                Icons.verified_outlined,
+                              ),
                             ],
                           )
                         : Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              _buildFarmerMetricItem('Total Store Orders', '$_totalOrdersCount', Icons.shopping_bag_outlined),
-                              Container(width: 1, height: 32, color: Colors.amber.shade200),
-                              _buildFarmerMetricItem('Store Followers', '$_followersCount', Icons.people_outline),
-                              Container(width: 1, height: 32, color: Colors.amber.shade200),
-                              _buildFarmerMetricItem('Store Status', 'Active & Verified', Icons.verified_outlined),
+                              _buildFarmerMetricItem(
+                                'Total Store Orders',
+                                '$_totalOrdersCount',
+                                Icons.shopping_bag_outlined,
+                              ),
+                              Container(
+                                width: 1,
+                                height: 32,
+                                color: Colors.amber.shade200,
+                              ),
+                              _buildFarmerMetricItem(
+                                'Store Followers',
+                                '$_followersCount',
+                                Icons.people_outline,
+                              ),
+                              Container(
+                                width: 1,
+                                height: 32,
+                                color: Colors.amber.shade200,
+                              ),
+                              _buildFarmerMetricItem(
+                                'Store Status',
+                                'Active & Verified',
+                                Icons.verified_outlined,
+                              ),
                             ],
                           ),
                   ),
                 ],
 
                 // â”€â”€ Form + Avatar (responsive) â”€â”€
-                if (isMobileLayout) ..._buildMobileFormLayout(isFarmer)
-                else ..._buildDesktopFormLayout(isFarmer),
+                if (isMobileLayout)
+                  ..._buildMobileFormLayout(isFarmer)
+                else
+                  ..._buildDesktopFormLayout(isFarmer),
               ],
             ),
           ),
@@ -967,9 +1104,14 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
-                        color: isFarmer ? Colors.amber.shade100 : const Color(0xFFDCFCE7),
+                        color: isFarmer
+                            ? Colors.amber.shade100
+                            : const Color(0xFFDCFCE7),
                         borderRadius: BorderRadius.circular(100),
                       ),
                       child: Text(
@@ -1001,14 +1143,27 @@ class _WebProfileScreenState extends State<WebProfileScreen>
         child: ElevatedButton.icon(
           onPressed: _isSavingProfile ? null : _saveInlineProfileChanges,
           icon: _isSavingProfile
-              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
               : const Icon(Icons.check_circle_rounded, size: 16),
-          label: Text(_isSavingProfile ? 'Saving...' : (isFarmer ? 'Save Store Details' : 'Save Profile')),
+          label: Text(
+            _isSavingProfile
+                ? 'Saving...'
+                : (isFarmer ? 'Save Store Details' : 'Save Profile'),
+          ),
           style: ElevatedButton.styleFrom(
             backgroundColor: isFarmer ? Colors.amber.shade800 : primary,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         ),
       ),
@@ -1027,7 +1182,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: isFarmer ? Colors.amber.shade100 : const Color(0xFFDCFCE7),
+                    color: isFarmer
+                        ? Colors.amber.shade100
+                        : const Color(0xFFDCFCE7),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -1046,7 +1203,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         spacing: 10,
                         children: [
                           Text(
-                            isFarmer ? 'Farm Store Profile' : 'My Personal Profile',
+                            isFarmer
+                                ? 'Farm Store Profile'
+                                : 'My Personal Profile',
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 20,
                               fontWeight: FontWeight.w800,
@@ -1054,9 +1213,14 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
-                              color: isFarmer ? Colors.amber.shade100 : const Color(0xFFDCFCE7),
+                              color: isFarmer
+                                  ? Colors.amber.shade100
+                                  : const Color(0xFFDCFCE7),
                               borderRadius: BorderRadius.circular(100),
                             ),
                             child: Text(
@@ -1064,7 +1228,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
-                                color: isFarmer ? Colors.amber.shade900 : primary,
+                                color: isFarmer
+                                    ? Colors.amber.shade900
+                                    : primary,
                               ),
                             ),
                           ),
@@ -1087,20 +1253,34 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           ElevatedButton.icon(
             onPressed: _isSavingProfile ? null : _saveInlineProfileChanges,
             icon: _isSavingProfile
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
                 : const Icon(Icons.check_circle_rounded, size: 16),
-            label: Text(_isSavingProfile ? 'Saving...' : (isFarmer ? 'Save Store Details' : 'Save Profile')),
+            label: Text(
+              _isSavingProfile
+                  ? 'Saving...'
+                  : (isFarmer ? 'Save Store Details' : 'Save Profile'),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: isFarmer ? Colors.amber.shade800 : primary,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
         ],
       ),
     ];
   }
+
   LatLng _getInitialPin() {
     final lat = _parseCoordinate(_latitudeController.text);
     final lng = _parseCoordinate(_longitudeController.text);
@@ -1123,26 +1303,37 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             Future<void> useCurrentLocation() async {
               setModalState(() => isLocating = true);
               try {
-                final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-                if (!serviceEnabled) throw Exception('Location services are disabled.');
+                final serviceEnabled =
+                    await Geolocator.isLocationServiceEnabled();
+                if (!serviceEnabled) {
+                  throw Exception('Location services are disabled.');
+                }
 
                 var permission = await Geolocator.checkPermission();
                 if (permission == LocationPermission.denied) {
                   permission = await Geolocator.requestPermission();
                 }
 
-                if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+                if (permission == LocationPermission.denied ||
+                    permission == LocationPermission.deniedForever) {
                   throw Exception('Location permission denied.');
                 }
 
-                final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+                final position = await Geolocator.getCurrentPosition(
+                  desiredAccuracy: LocationAccuracy.high,
+                );
                 selectedPin = LatLng(position.latitude, position.longitude);
                 mapController.move(selectedPin, 15);
                 setModalState(() {});
               } catch (e) {
                 if (!mounted) return;
                 if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text('Unable to get current location: $e'), backgroundColor: Colors.red));
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text('Unable to get current location: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
                 }
               } finally {
                 setModalState(() => isLocating = false);
@@ -1163,16 +1354,26 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                           Expanded(
                             child: Text(
                               'Pin Farm Location',
-                              style: GoogleFonts.plusJakartaSans(fontSize: 20, fontWeight: FontWeight.w800, color: _dark),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: _dark,
+                              ),
                             ),
                           ),
-                          IconButton(onPressed: () => Navigator.of(dialogContext).pop(), icon: const Icon(Icons.close)),
+                          IconButton(
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            icon: const Icon(Icons.close),
+                          ),
                         ],
                       ),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('Tap anywhere on the map to place your farm pin.', style: GoogleFonts.inter(fontSize: 14, color: _muted)),
+                      child: Text(
+                        'Tap anywhere on the map to place your farm pin.',
+                        style: GoogleFonts.inter(fontSize: 14, color: _muted),
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Expanded(
@@ -1187,11 +1388,13 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                               initialZoom: 17,
                               minZoom: 5,
                               maxZoom: 19,
-                              onTap: (_, point) => setModalState(() => selectedPin = point),
+                              onTap: (_, point) =>
+                                  setModalState(() => selectedPin = point),
                             ),
                             children: [
                               TileLayer(
-                                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                                urlTemplate:
+                                    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
                                 subdomains: const ['a', 'b', 'c', 'd'],
                                 userAgentPackageName: 'com.agridirect.app',
                                 retinaMode: RetinaMode.isHighDensity(context),
@@ -1203,7 +1406,11 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                     height: 48,
                                     point: selectedPin,
                                     alignment: Alignment.bottomCenter,
-                                    child: const Icon(Icons.location_on, color: primary, size: 40),
+                                    child: const Icon(
+                                      Icons.location_on,
+                                      color: primary,
+                                      size: 40,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1220,8 +1427,18 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                             children: [
                               Expanded(
                                 child: OutlinedButton.icon(
-                                  onPressed: isLocating ? null : useCurrentLocation,
-                                  icon: isLocating ? const SizedBox(width: 16, height: 16, child: AppShimmerLoader(strokeWidth: 2)) : const Icon(Icons.my_location),
+                                  onPressed: isLocating
+                                      ? null
+                                      : useCurrentLocation,
+                                  icon: isLocating
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: AppShimmerLoader(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(Icons.my_location),
                                   label: const Text('Use Current Location'),
                                 ),
                               ),
@@ -1230,31 +1447,52 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                           const SizedBox(height: 10),
                           Text(
                             'Selected: ${selectedPin.latitude.toStringAsFixed(6)}, ${selectedPin.longitude.toStringAsFixed(6)}',
-                            style: GoogleFonts.inter(fontSize: 12, color: _muted),
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: _muted,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           Row(
                             children: [
                               Expanded(
-                                child: OutlinedButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+                                child: OutlinedButton(
+                                  onPressed: () =>
+                                      Navigator.of(dialogContext).pop(),
+                                  child: const Text('Cancel'),
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: ElevatedButton(
                                   onPressed: () async {
-                                    final resolved = await ReverseGeocodingService.resolveFromCoordinates(
-                                      latitude: selectedPin.latitude,
-                                      longitude: selectedPin.longitude,
-                                    );
-                                    final fallbackLocation = '${selectedPin.latitude.toStringAsFixed(5)}, ${selectedPin.longitude.toStringAsFixed(5)}';
+                                    final resolved =
+                                        await ReverseGeocodingService.resolveFromCoordinates(
+                                          latitude: selectedPin.latitude,
+                                          longitude: selectedPin.longitude,
+                                        );
+                                    final fallbackLocation =
+                                        '${selectedPin.latitude.toStringAsFixed(5)}, ${selectedPin.longitude.toStringAsFixed(5)}';
                                     setState(() {
-                                      _latitudeController.text = selectedPin.latitude.toStringAsFixed(6);
-                                      _longitudeController.text = selectedPin.longitude.toStringAsFixed(6);
-                                      _locationController.text = resolved.hasData ? resolved.fullAddress : fallbackLocation;
+                                      _latitudeController.text = selectedPin
+                                          .latitude
+                                          .toStringAsFixed(6);
+                                      _longitudeController.text = selectedPin
+                                          .longitude
+                                          .toStringAsFixed(6);
+                                      _locationController.text =
+                                          resolved.hasData
+                                          ? resolved.fullAddress
+                                          : fallbackLocation;
                                     });
-                                    if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                                    if (dialogContext.mounted) {
+                                      Navigator.of(dialogContext).pop();
+                                    }
                                   },
-                                  style: ElevatedButton.styleFrom(backgroundColor: primary, foregroundColor: Colors.white),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: primary,
+                                    foregroundColor: Colors.white,
+                                  ),
                                   child: const Text('Use This Pin'),
                                 ),
                               ),
@@ -1273,12 +1511,21 @@ class _WebProfileScreenState extends State<WebProfileScreen>
     );
   }
 
-  // â”€â”€ Mobile form: avatar on top center, fields below â”€â”€
+  // ─── Mobile form: avatar on top center, fields below ───
   List<Widget> _buildMobileFormLayout(bool isFarmer) {
     return [
       Center(
         child: Column(
           children: [
+            Text(
+              isFarmer ? 'Store Avatar / Logo' : 'Profile Picture',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: _dark,
+              ),
+            ),
+            const SizedBox(height: 8),
             Container(
               width: 90,
               height: 90,
@@ -1290,7 +1537,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (isFarmer ? Colors.amber : primary).withValues(alpha: 0.15),
+                    color: (isFarmer ? Colors.amber : primary).withValues(
+                      alpha: 0.15,
+                    ),
                     blurRadius: 16,
                   ),
                 ],
@@ -1323,27 +1572,134 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             OutlinedButton.icon(
               onPressed: _isUploadingAvatar ? null : _pickAndUploadInlineAvatar,
               icon: const Icon(Icons.upload_file_rounded, size: 14),
-              label: Text(isFarmer ? 'Upload Logo' : 'Select Photo', style: const TextStyle(fontSize: 12)),
+              label: Text(
+                isFarmer ? 'Upload Logo' : 'Select Photo',
+                style: const TextStyle(fontSize: 12),
+              ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _dark,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 side: const BorderSide(color: Color(0xFFCBD5E1)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
+            if (isFarmer) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Farm Cover Banner',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _dark,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: 160,
+                height: 90,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.shade700, width: 2),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: _isUploadingCover
+                      ? Container(
+                          color: Colors.grey[200],
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.amber,
+                              strokeWidth: 3,
+                            ),
+                          ),
+                        )
+                      : SafeNetworkImage(
+                          imageUrl: _coverImageUrl,
+                          defaultBucket: 'uploads',
+                          fit: BoxFit.cover,
+                          placeholder: Container(color: Colors.grey[200]),
+                          errorWidget: Container(
+                            color: const Color(0xFF003822),
+                            child: const Center(
+                              child: Icon(
+                                Icons.landscape_rounded,
+                                color: Colors.white38,
+                                size: 28,
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _isUploadingCover ? null : _pickAndUploadInlineCover,
+                icon: const Icon(Icons.camera_alt_rounded, size: 14),
+                label: const Text(
+                  'Change Cover',
+                  style: TextStyle(fontSize: 12),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _dark,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
       const SizedBox(height: 20),
       // Form fields full width
       if (isFarmer) ...[
-        _buildInlineEditRow(label: 'Farm Store Name', controller: _nameController, icon: Icons.storefront_outlined),
-        _buildInlineEditRow(label: 'Farm Specialty', controller: _specialtyController, icon: Icons.grass_outlined),
-        _buildInlineEditRow(label: 'Farm Location', controller: _locationController, icon: Icons.location_on_outlined, suffixWidget: IconButton(onPressed: _openFarmPinPicker, icon: const Icon(Icons.map_outlined, color: primary))),
-        _buildInlineEditRow(label: 'Business Phone', controller: _phoneController, icon: Icons.phone_outlined),
-        _buildInlineEditRow(label: 'Registered Email', controller: _emailController, icon: Icons.mail_outline, readOnly: true, badge: 'Farmer Verified'),
+        _buildInlineEditRow(
+          label: 'Farm Store Name',
+          controller: _nameController,
+          icon: Icons.storefront_outlined,
+        ),
+        _buildInlineEditRow(
+          label: 'Farm Specialty',
+          controller: _specialtyController,
+          icon: Icons.grass_outlined,
+        ),
+        _buildInlineEditRow(
+          label: 'Farm Location',
+          controller: _locationController,
+          icon: Icons.location_on_outlined,
+          suffixWidget: IconButton(
+            onPressed: _openFarmPinPicker,
+            icon: const Icon(Icons.map_outlined, color: primary),
+          ),
+        ),
+        _buildInlineEditRow(
+          label: 'Business Phone',
+          controller: _phoneController,
+          icon: Icons.phone_outlined,
+        ),
+        _buildInlineEditRow(
+          label: 'Registered Email',
+          controller: _emailController,
+          icon: Icons.mail_outline,
+          readOnly: true,
+          badge: 'Farmer Verified',
+        ),
       ] else ...[
-        _buildInlineEditRow(label: 'Full Name', controller: _nameController, icon: Icons.person_outline),
+        _buildInlineEditRow(
+          label: 'Full Name',
+          controller: _nameController,
+          icon: Icons.person_outline,
+        ),
         _buildInlineEditRow(
           label: 'Email Address',
           controller: _emailController,
@@ -1355,7 +1711,14 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               final res = await context.push(AppRoutes.updateEmail);
               if (res == true && mounted) _refreshProfile();
             },
-            child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primary)),
+            child: const Text(
+              'Change',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: primary,
+              ),
+            ),
           ),
         ),
         _buildInlineEditRow(
@@ -1368,10 +1731,22 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               final res = await context.push(AppRoutes.updatePhone);
               if (res == true && mounted) _refreshProfile();
             },
-            child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primary)),
+            child: const Text(
+              'Change',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: primary,
+              ),
+            ),
           ),
         ),
-        _buildInlineEditRow(label: 'Account Type', controller: TextEditingController(text: 'Consumer / Buyer Account'), icon: Icons.badge_outlined, readOnly: true),
+        _buildInlineEditRow(
+          label: 'Account Type',
+          controller: TextEditingController(text: 'Consumer / Buyer Account'),
+          icon: Icons.badge_outlined,
+          readOnly: true,
+        ),
       ],
     ];
   }
@@ -1387,9 +1762,25 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             child: Column(
               children: [
                 if (isFarmer) ...[
-                  _buildInlineEditRow(label: 'Farm Store Name', controller: _nameController, icon: Icons.storefront_outlined),
-                  _buildInlineEditRow(label: 'Farm Specialty', controller: _specialtyController, icon: Icons.grass_outlined),
-                  _buildInlineEditRow(label: 'Farm Location', controller: _locationController, icon: Icons.location_on_outlined, suffixWidget: IconButton(onPressed: _openFarmPinPicker, icon: const Icon(Icons.map_outlined, color: primary))),
+                  _buildInlineEditRow(
+                    label: 'Farm Store Name',
+                    controller: _nameController,
+                    icon: Icons.storefront_outlined,
+                  ),
+                  _buildInlineEditRow(
+                    label: 'Farm Specialty',
+                    controller: _specialtyController,
+                    icon: Icons.grass_outlined,
+                  ),
+                  _buildInlineEditRow(
+                    label: 'Farm Location',
+                    controller: _locationController,
+                    icon: Icons.location_on_outlined,
+                    suffixWidget: IconButton(
+                      onPressed: _openFarmPinPicker,
+                      icon: const Icon(Icons.map_outlined, color: primary),
+                    ),
+                  ),
                   _buildInlineEditRow(
                     label: 'Business Phone',
                     controller: _phoneController,
@@ -1400,7 +1791,14 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         final res = await context.push(AppRoutes.updatePhone);
                         if (res == true && mounted) _refreshProfile();
                       },
-                      child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primary)),
+                      child: const Text(
+                        'Change',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: primary,
+                        ),
+                      ),
                     ),
                   ),
                   _buildInlineEditRow(
@@ -1414,11 +1812,22 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         final res = await context.push(AppRoutes.updateEmail);
                         if (res == true && mounted) _refreshProfile();
                       },
-                      child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primary)),
+                      child: const Text(
+                        'Change',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: primary,
+                        ),
+                      ),
                     ),
                   ),
                 ] else ...[
-                  _buildInlineEditRow(label: 'Full Name', controller: _nameController, icon: Icons.person_outline),
+                  _buildInlineEditRow(
+                    label: 'Full Name',
+                    controller: _nameController,
+                    icon: Icons.person_outline,
+                  ),
                   _buildInlineEditRow(
                     label: 'Email Address',
                     controller: _emailController,
@@ -1430,7 +1839,14 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         final res = await context.push(AppRoutes.updateEmail);
                         if (res == true && mounted) _refreshProfile();
                       },
-                      child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primary)),
+                      child: const Text(
+                        'Change',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: primary,
+                        ),
+                      ),
                     ),
                   ),
                   _buildInlineEditRow(
@@ -1443,10 +1859,24 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                         final res = await context.push(AppRoutes.updatePhone);
                         if (res == true && mounted) _refreshProfile();
                       },
-                      child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primary)),
+                      child: const Text(
+                        'Change',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: primary,
+                        ),
+                      ),
                     ),
                   ),
-                  _buildInlineEditRow(label: 'Account Type', controller: TextEditingController(text: 'Consumer / Buyer Account'), icon: Icons.badge_outlined, readOnly: true),
+                  _buildInlineEditRow(
+                    label: 'Account Type',
+                    controller: TextEditingController(
+                      text: 'Consumer / Buyer Account',
+                    ),
+                    icon: Icons.badge_outlined,
+                    readOnly: true,
+                  ),
                 ],
               ],
             ),
@@ -1456,9 +1886,18 @@ class _WebProfileScreenState extends State<WebProfileScreen>
           const SizedBox(width: 36),
           Column(
             children: [
+              Text(
+                isFarmer ? 'Store Avatar / Logo' : 'Profile Picture',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _dark,
+                ),
+              ),
+              const SizedBox(height: 8),
               Container(
-                width: 110,
-                height: 110,
+                width: 100,
+                height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
@@ -1467,7 +1906,9 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: (isFarmer ? Colors.amber : primary).withValues(alpha: 0.15),
+                      color: (isFarmer ? Colors.amber : primary).withValues(
+                        alpha: 0.15,
+                      ),
                       blurRadius: 16,
                     ),
                   ],
@@ -1490,31 +1931,109 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                           placeholder: Container(color: Colors.grey[200]),
                           errorWidget: Icon(
                             isFarmer ? Icons.storefront : Icons.person,
-                            size: 48,
+                            size: 40,
                             color: _muted,
                           ),
                         ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               OutlinedButton.icon(
-                onPressed: _isUploadingAvatar ? null : _pickAndUploadInlineAvatar,
-                icon: const Icon(Icons.upload_file_rounded, size: 16),
-                label: Text(isFarmer ? 'Upload Store Logo' : 'Select Photo'),
+                onPressed: _isUploadingAvatar
+                    ? null
+                    : _pickAndUploadInlineAvatar,
+                icon: const Icon(Icons.upload_file_rounded, size: 14),
+                label: Text(
+                  isFarmer ? 'Upload Logo' : 'Select Photo',
+                  style: const TextStyle(fontSize: 12),
+                ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: _dark,
                   side: const BorderSide(color: Color(0xFFCBD5E1)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
+              if (isFarmer) ...[
+                const SizedBox(height: 20),
+                Text(
+                  'Farm Cover Banner',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _dark,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: 160,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.shade700, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: _isUploadingCover
+                        ? Container(
+                            color: Colors.grey[200],
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.amber,
+                                strokeWidth: 3,
+                              ),
+                            ),
+                          )
+                        : SafeNetworkImage(
+                            imageUrl: _coverImageUrl,
+                            defaultBucket: 'uploads',
+                            fit: BoxFit.cover,
+                            placeholder: Container(color: Colors.grey[200]),
+                            errorWidget: Container(
+                              color: const Color(0xFF003822),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.landscape_rounded,
+                                  color: Colors.white38,
+                                  size: 28,
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _isUploadingCover
+                      ? null
+                      : _pickAndUploadInlineCover,
+                  icon: const Icon(Icons.camera_alt_rounded, size: 14),
+                  label: const Text(
+                    'Change Cover',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _dark,
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               Text(
-                isFarmer
-                    ? 'Store Logo / Banner\nMax 1 MB (.JPEG, .PNG)'
-                    : 'File size: max 1 MB\nFile extension: .JPEG, .PNG',
+                'Max file size: 5 MB\nFormat: .JPG, .PNG',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
-                  fontSize: 11,
+                  fontSize: 10.5,
                   color: const Color(0xFF94A3B8),
                   height: 1.4,
                 ),
@@ -1581,15 +2100,14 @@ class _WebProfileScreenState extends State<WebProfileScreen>
               fillColor: readOnly
                   ? const Color(0xFFF8FAFC)
                   : const Color(0xFFF9FAFB),
-              prefixIcon: Icon(
-                icon,
-                size: 18,
-                color: const Color(0xFF9CA3AF),
-              ),
+              prefixIcon: Icon(icon, size: 18, color: const Color(0xFF9CA3AF)),
               suffixIcon: badge != null
                   ? Container(
                       margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFDCFCE7),
                         borderRadius: BorderRadius.circular(100),
@@ -1604,7 +2122,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       ),
                     )
                   : suffixWidget,
-              suffixIconConstraints: const BoxConstraints(minHeight: 0, minWidth: 0),
+              suffixIconConstraints: const BoxConstraints(
+                minHeight: 0,
+                minWidth: 0,
+              ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: 10,
@@ -1712,7 +2233,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                       const SizedBox(height: 4),
                       Text(
                         'Manage your shipping addresses for fast farm produce orders',
-                        style: GoogleFonts.inter(fontSize: isMobile ? 12 : 13, color: _muted),
+                        style: GoogleFonts.inter(
+                          fontSize: isMobile ? 12 : 13,
+                          color: _muted,
+                        ),
                       ),
                     ],
                   ),
@@ -1907,7 +2431,10 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                 setState(() {});
                               },
                               style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
@@ -1931,9 +2458,13 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                                   setState(() {});
                                 },
                                 style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   minimumSize: Size.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
                                 ),
                                 child: Text(
                                   'Delete',
@@ -2022,9 +2553,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                 onTap: () async {
                   final result = await showDialog<bool>(
                     context: context,
-                    builder: (context) => WebTwoFactorDialog(
-                      initialIsActive: _hasMfaEnabled,
-                    ),
+                    builder: (context) =>
+                        WebTwoFactorDialog(initialIsActive: _hasMfaEnabled),
                   );
                   if (result == true) {
                     _checkMfaStatus();
@@ -2098,10 +2628,7 @@ class _WebProfileScreenState extends State<WebProfileScreen>
             ),
             if (badge != null)
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 2,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: const Color(0xFFDCFCE7),
                   borderRadius: BorderRadius.circular(4),
@@ -2204,8 +2731,6 @@ class _WebProfileScreenState extends State<WebProfileScreen>
       },
     );
   }
-
-
 
   // â”€â”€â”€ Navigation Bar â”€â”€â”€
   Widget _buildNavBar() {

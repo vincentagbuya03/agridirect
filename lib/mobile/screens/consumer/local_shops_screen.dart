@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
+import '../../../shared/widgets/image_widgets.dart';
 
 class LocalShopsScreen extends StatefulWidget {
   const LocalShopsScreen({super.key});
@@ -205,12 +206,24 @@ class _LocalShopsScreenState extends State<LocalShopsScreen> {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5), // Light mint background
+                  color: const Color(0xFFECFDF5),
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.2), width: 2),
                 ),
-                child: const Center(
-                  child: Icon(Icons.storefront_rounded, color: Color(0xFF059669), size: 28), // Professional icon
+                child: ClipOval(
+                  child: (shop['avatar_url'] ?? shop['avatarUrl']) != null &&
+                          (shop['avatar_url'] ?? shop['avatarUrl']).toString().isNotEmpty
+                      ? SafeNetworkImage(
+                          imageUrl: (shop['avatar_url'] ?? shop['avatarUrl']).toString(),
+                          defaultBucket: 'uploads',
+                          fit: BoxFit.cover,
+                          errorWidget: const Center(
+                            child: Icon(Icons.storefront_rounded, color: Color(0xFF059669), size: 28),
+                          ),
+                        )
+                      : const Center(
+                          child: Icon(Icons.storefront_rounded, color: Color(0xFF059669), size: 28),
+                        ),
                 ),
               ),
               const SizedBox(width: 16),

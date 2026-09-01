@@ -679,12 +679,6 @@ class _WebShopCard extends StatefulWidget {
 class _WebShopCardState extends State<_WebShopCard> {
   bool _isHovered = false;
 
-  static const List<String> _defaultFarmPhotos = [
-    'assets/images/farmer images/Pangasinan-farmers.jpg',
-    'assets/images/farmer images/images (1).jpg',
-    'assets/images/farmer images/images.jpg',
-  ];
-
   double _safeDouble(dynamic val, [double fallback = 0.0]) {
     if (val == null) return fallback;
     if (val is num) return val.toDouble();
@@ -736,29 +730,37 @@ class _WebShopCardState extends State<_WebShopCard> {
       return SupabaseConfig.client.storage.from('uploads').getPublicUrl(cleanPath);
     }
 
-    final rawAvatar = (farmer['image_url'] ??
-            farmer['imageUrl'] ??
-            farmer['avatar_url'] ??
-            farmer['profile_picture'] ??
+    final rawAvatar = (farmer['avatar_url'] ??
             farmer['users']?['avatar_url'] ??
+            farmer['profile_picture'] ??
+            farmer['face_photo_path'] ??
             '')
         .toString()
         .trim();
     final avatarUrl = resolveImg(rawAvatar) ?? '';
 
-    // Check multiple possible image fields for cover banner
-    String rawImg = (farmer['cover_image_url'] ??
+    // Check multiple possible image fields for cover banner (strictly separate from personal avatar)
+    String rawImg = (farmer['image_url'] ??
+            farmer['cover_image_url'] ??
+            farmer['cover_url'] ??
+            farmer['farm_photo_path'] ??
             farmer['farm_image_url'] ??
             farmer['farm_banner_url'] ??
             farmer['banner_url'] ??
-            farmer['image_url'] ??
-            farmer['imageUrl'] ??
             '')
         .toString()
         .trim();
     String? resolvedBanner = resolveImg(rawImg);
-    if (resolvedBanner == null || resolvedBanner.isEmpty) {
-      rawImg = _defaultFarmPhotos[widget.index % _defaultFarmPhotos.length];
+
+    final bool isAvatarDuplicate = resolvedBanner != null &&
+        ((avatarUrl.isNotEmpty && resolvedBanner == avatarUrl) ||
+         resolvedBanner.toLowerCase().contains('face_photo') ||
+         resolvedBanner.toLowerCase().contains('avatar') ||
+         resolvedBanner.toLowerCase().contains('profile_picture') ||
+         resolvedBanner.toLowerCase().contains('selfie'));
+
+    if (resolvedBanner == null || resolvedBanner.isEmpty || isAvatarDuplicate) {
+      rawImg = '';
     } else {
       rawImg = resolvedBanner;
     }
@@ -804,14 +806,8 @@ class _WebShopCardState extends State<_WebShopCard> {
                       child: Stack(
                         children: [
                           Positioned.fill(
-                            child: rawImg.startsWith('assets/')
-                                ? Image.asset(
-                                    rawImg,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                        _buildDefaultBanner(),
-                                  )
-                                : CachedNetworkImage(
+                            child: rawImg.isNotEmpty
+                                ? CachedNetworkImage(
                                     imageUrl: rawImg,
                                     fit: BoxFit.cover,
                                     placeholder: (context, url) => Container(
@@ -819,7 +815,8 @@ class _WebShopCardState extends State<_WebShopCard> {
                                     ),
                                     errorWidget: (context, url, error) =>
                                         _buildDefaultBanner(),
-                                  ),
+                                  )
+                                : _buildDefaultBanner(),
                           ),
                           Positioned.fill(
                             child: Container(
@@ -1042,18 +1039,16 @@ class _WebShopCardState extends State<_WebShopCard> {
   }
 
   Widget _buildDefaultBanner() {
-    return Image.asset(
-      'assets/images/farmer images/Pangasinan-farmers.jpg',
-      fit: BoxFit.cover,
-      errorBuilder: (ctx, err, stack) => Image.asset(
-        'assets/images/san_carlos_farming_1.jpg',
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Container(
-          color: const Color(0xFF005A36),
-          child: const Center(
-            child: Icon(Icons.agriculture_rounded, color: Colors.white38, size: 36),
-          ),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF064E3B), Color(0xFF065F46), Color(0xFF047857)],
         ),
+      ),
+      child: const Center(
+        child: Icon(Icons.agriculture_rounded, color: Colors.white24, size: 32),
       ),
     );
   }

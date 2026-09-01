@@ -2,10 +2,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/supabase_config.dart';
 
 /// Analytics Service - Tracks app usage time only
-/// Only monitors session duration (hours used)
+/// Only monitors session duration (hours used) and active device sessions
 class AnalyticsService {
   // Singleton
   static final AnalyticsService _instance = AnalyticsService._internal();
@@ -19,8 +20,12 @@ class AnalyticsService {
   String? _currentUserId;
   DateTime? _sessionStartTime;
   Timer? _sessionTimer;
+  RealtimeChannel? _sessionChannel;
   String? _cachedAppVersion;
   String? _cachedDeviceInfo;
+
+  /// Optional callback when this device's session is terminated remotely
+  VoidCallback? onRemoteSessionTerminated;
 
   // Getters for monitoring
   String? get currentSessionId => _currentSessionId;
@@ -53,6 +58,16 @@ class AnalyticsService {
       final resolvedAppVersion = appVersion ?? await _resolveAppVersion();
       final resolvedDeviceInfo = deviceInfo ?? await _resolveDeviceInfo();
 
+      // Clean up previous unclosed sessions for this same device to prevent duplicate active entries
+      try {
+        await _client
+            .from('app_sessions')
+            .update({'end_time': _sessionStartTime!.toIso8601String()})
+            .eq('user_id', userId)
+            .eq('device_info', resolvedDeviceInfo)
+            .filter('end_time', 'is', 'null');
+      } catch (_) {}
+
       // Create session record
       final response = await _client
           .from('app_sessions')
@@ -75,9 +90,54 @@ class AnalyticsService {
         (_) => _syncSessionData(userId),
       );
 
+      // Subscribe to Realtime Postgres changes on this session to detect remote logout immediately
+      _subscribeToSessionChanges(_currentSessionId!);
+
       debugPrint('📊 Analytics: Session started - $_currentSessionId');
     } catch (e) {
       debugPrint('Analytics: Error starting session: $e');
+    }
+  }
+
+  void _subscribeToSessionChanges(String sessionId) {
+    try {
+      _sessionChannel?.unsubscribe();
+      _sessionChannel = _client
+          .channel('app_sessions:$sessionId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'app_sessions',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'session_id',
+              value: sessionId,
+            ),
+            callback: (payload) {
+              final newRecord = payload.newRecord;
+              if (newRecord.isNotEmpty && newRecord['end_time'] != null) {
+                debugPrint('🚨 Session terminated remotely via realtime! Triggering logout...');
+                _handleRemoteLogout();
+              }
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('Analytics: Error subscribing to session changes: $e');
+    }
+  }
+
+  void _handleRemoteLogout() {
+    _sessionTimer?.cancel();
+    _sessionChannel?.unsubscribe();
+    _currentSessionId = null;
+    _currentUserId = null;
+    _sessionStartTime = null;
+
+    if (onRemoteSessionTerminated != null) {
+      onRemoteSessionTerminated!();
+    } else {
+      _client.auth.signOut();
     }
   }
 
@@ -87,6 +147,8 @@ class AnalyticsService {
 
     try {
       _sessionTimer?.cancel();
+      _sessionChannel?.unsubscribe();
+      _sessionChannel = null;
 
       final endTime = DateTime.now();
       final duration = endTime.difference(_sessionStartTime!).inSeconds;
@@ -118,6 +180,19 @@ class AnalyticsService {
     try {
       final now = DateTime.now();
       final duration = now.difference(_sessionStartTime!).inSeconds;
+
+      // Check if session was terminated remotely
+      final checkRes = await _client
+          .from('app_sessions')
+          .select('end_time')
+          .eq('session_id', _currentSessionId!)
+          .maybeSingle();
+
+      if (checkRes != null && checkRes['end_time'] != null) {
+        debugPrint('🚨 Session terminated remotely detected in sync! Triggering logout...');
+        _handleRemoteLogout();
+        return;
+      }
 
       // Update session with duration only
       await _client

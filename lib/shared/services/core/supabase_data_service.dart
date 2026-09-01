@@ -938,10 +938,8 @@ class SupabaseDataService {
         final seed = (item['product_id']?.toString().hashCode ?? 0).abs();
         soldCount = 5 + (seed % 30);
       }
-      if (claimPercent == null) {
-        claimPercent =
-            ((soldCount / (soldCount + stock)) * 100).clamp(15.0, 95.0);
-      }
+      claimPercent ??=
+          ((soldCount / (soldCount + stock)) * 100).clamp(15.0, 95.0);
     }
 
     return ProductItem(
@@ -2681,14 +2679,14 @@ class SupabaseDataService {
           response = await _client
               .from('farmers')
               .select(
-                'farmer_id, user_id, farm_name, specialty, location, badge, image_url, is_verified, is_active, years_of_experience, full_name, residential_address, face_photo_path',
+                'farmer_id, user_id, farm_name, specialty, location, badge, image_url, is_verified, is_active, years_of_experience, full_name, residential_address, face_photo_path, users(avatar_url, name)',
               )
               .eq('is_verified', true)
               .eq('is_active', true)
               .order('created_at', ascending: false)
               .limit(20);
         } catch (_) {
-          response = await _client.from('farmers').select().limit(20);
+          response = await _client.from('farmers').select('*, users(avatar_url, name)').limit(20);
         }
       }
 
@@ -2698,17 +2696,39 @@ class SupabaseDataService {
           .toList();
 
       final farmers = rows.map((item) {
-        final rawImagePath = (item['image_url'] ??
-                item['cover_image_url'] ??
-                item['farm_image_url'])
-            ?.toString();
-        final imageUrl = _resolveImageUrl(rawImagePath);
+        final userObj = item['users'] as Map<String, dynamic>?;
 
-        final rawAvatar = (item['avatar_url'] ??
+        // Avatar / Farm Logo (avatar_url from users table, fallback to face_photo_path)
+        final rawAvatar = (userObj?['avatar_url'] ??
+                item['avatar_url'] ??
                 item['face_photo_path'] ??
-                item['profile_picture'])
+                item['profile_picture'] ??
+                item['profile_image_url'])
             ?.toString();
-        final avatarUrl = _resolveImageUrl(rawAvatar) ?? imageUrl;
+        final avatarUrl = _resolveImageUrl(rawAvatar);
+
+        // Farm Cover Photo (strictly image_url on farmers table)
+        final rawCoverPath = (item['image_url'] ??
+                item['cover_image_url'] ??
+                item['cover_url'] ??
+                item['farm_photo_path'] ??
+                item['farm_image_url'] ??
+                item['farm_banner_url'] ??
+                item['banner_url'])
+            ?.toString();
+        String? resolvedCover = _resolveImageUrl(rawCoverPath);
+
+        // If cover is duplicate of avatar/face photo, clear it
+        final isAvatarDuplicate = resolvedCover != null &&
+            ((avatarUrl != null && resolvedCover == avatarUrl) ||
+             resolvedCover.toLowerCase().contains('face_photo') ||
+             resolvedCover.toLowerCase().contains('avatar') ||
+             resolvedCover.toLowerCase().contains('profile_picture') ||
+             resolvedCover.toLowerCase().contains('selfie'));
+
+        if (isAvatarDuplicate) {
+          resolvedCover = null;
+        }
 
         final farmName = item['farm_name']?.toString().trim();
         final fullName = item['full_name']?.toString().trim();
@@ -2744,11 +2764,13 @@ class SupabaseDataService {
           'name': displayName,
           'full_name': ownerName,
           'owner_name': ownerName,
-          'imageUrl': imageUrl,
-          'image_url': imageUrl,
+          'imageUrl': resolvedCover,
+          'image_url': resolvedCover,
+          'cover_image_url': resolvedCover,
+          'cover_url': resolvedCover,
+          'farm_image_url': resolvedCover,
           'avatar_url': avatarUrl,
           'face_photo_path': avatarUrl,
-          'cover_image_url': imageUrl,
           'location': loc,
           'farm_address': loc,
           'address': loc,
