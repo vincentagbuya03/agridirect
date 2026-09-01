@@ -25,10 +25,6 @@
       "destination": "/api/share?type=farmer&id=$1"
     },
     {
-      "source": "/farm/(.*)",
-      "destination": "/api/share?type=farmer&id=$1"
-    },
-    {
       "source": "/((?!.*\\.).*)",
       "destination": "/index"
     }
