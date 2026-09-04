@@ -525,10 +525,10 @@ class _CartScreenState extends State<CartScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7ED),
+        color: AppColors.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: const Color(0xFFEA580C).withValues(alpha: 0.25),
+          color: AppColors.primary.withValues(alpha: 0.2),
         ),
       ),
       child: Row(
@@ -536,13 +536,13 @@ class _CartScreenState extends State<CartScreen> {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: const Color(0xFFEA580C).withValues(alpha: 0.15),
+              color: AppColors.primary.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.confirmation_number_rounded,
               size: 16,
-              color: Color(0xFFEA580C),
+              color: AppColors.primary,
             ),
           ),
           const SizedBox(width: 10),
@@ -556,7 +556,7 @@ class _CartScreenState extends State<CartScreen> {
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
-                    color: const Color(0xFF9A3412),
+                    color: AppColors.primary,
                   ),
                 ),
                 Text(
@@ -564,7 +564,7 @@ class _CartScreenState extends State<CartScreen> {
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w500,
                     fontSize: 10,
-                    color: const Color(0xFFC2410C),
+                    color: AppColors.textSubtle,
                   ),
                 ),
               ],
@@ -573,7 +573,7 @@ class _CartScreenState extends State<CartScreen> {
           const Icon(
             Icons.chevron_right_rounded,
             size: 18,
-            color: Color(0xFFEA580C),
+            color: AppColors.primary,
           ),
         ],
       ),

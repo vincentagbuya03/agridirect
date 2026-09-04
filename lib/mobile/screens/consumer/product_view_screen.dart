@@ -1083,17 +1083,17 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF7ED),
+            color: AppColors.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: const Color(0xFFFFEDD5),
+              color: AppColors.primary.withValues(alpha: 0.2),
             ),
           ),
           child: Row(
             children: [
               const Icon(
                 Icons.confirmation_number_outlined,
-                color: Color(0xFFEA580C),
+                color: AppColors.primary,
                 size: 18,
               ),
               const SizedBox(width: 8),
@@ -1102,14 +1102,14 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFFEA580C),
+                  color: AppColors.primary,
                 ),
               ),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEA580C),
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -1127,12 +1127,12 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFFEA580C),
+                  color: AppColors.primary,
                 ),
               ),
               const Icon(
                 Icons.chevron_right_rounded,
-                color: Color(0xFFEA580C),
+                color: AppColors.primary,
                 size: 18,
               ),
             ],
@@ -1862,7 +1862,7 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isOutOfStock
                         ? Colors.grey.shade400
-                        : const Color(0xFFEA580C),
+                        : AppColors.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
