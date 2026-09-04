@@ -22,7 +22,6 @@ import 'community_stories_screen.dart';
 import 'home/widgets/ecom_sliver_app_bar.dart';
 import 'home/widgets/ecom_hero_banner.dart';
 import 'home/widgets/ecom_quick_channels.dart';
-import 'home/widgets/ecom_category_grid.dart';
 import 'home/widgets/ecom_flash_sale_section.dart';
 import 'home/widgets/ecom_product_card.dart';
 
@@ -48,7 +47,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   late Future<List<ProductItem>> _dailyDiscoveriesFuture;
   late Future<List<ProductItem>> _flashSaleProductsFuture;
-  late Future<List<CategoryItem>> _categoriesFuture;
   Position? _userPosition;
 
   @override
@@ -61,7 +59,6 @@ class _HomeScreenState extends State<HomeScreen>
 
     _dailyDiscoveriesFuture = SupabaseDataService().getNearbyProducts();
     _flashSaleProductsFuture = SupabaseDataService().getFlashSaleProducts();
-    _categoriesFuture = SupabaseDataService().getCategories();
     _loadDefaultAddress();
     _loadUserPosition();
   }
@@ -107,7 +104,6 @@ class _HomeScreenState extends State<HomeScreen>
             _featuredFarmersFuture = SupabaseDataService().getFeaturedFarmers();
             _flashSaleProductsFuture =
                 SupabaseDataService().getFlashSaleProducts();
-            _categoriesFuture = SupabaseDataService().getCategories();
           });
           await Future.wait([
             _loadDefaultAddress(),
@@ -125,9 +121,6 @@ class _HomeScreenState extends State<HomeScreen>
             const SliverToBoxAdapter(child: SizedBox(height: 6)),
             const SliverToBoxAdapter(child: EcomHeroBanner()),
             const SliverToBoxAdapter(child: EcomQuickChannels()),
-            SliverToBoxAdapter(
-              child: EcomCategoryGrid(categoriesFuture: _categoriesFuture),
-            ),
             SliverToBoxAdapter(
               child: FutureBuilder<List<ProductItem>>(
                 future: _flashSaleProductsFuture,
