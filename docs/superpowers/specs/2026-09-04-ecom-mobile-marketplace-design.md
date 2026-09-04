@@ -11,6 +11,15 @@ AgriDirect connects local farmers directly with consumers and institutional buye
 
 This design specification details Phase 1 of the mobile transformation: modularizing and redesigning the Consumer Home Screen and Discovery Feed into a high-density, interactive, and visually captivating agricultural marketplace.
 
+### 1.1 Strict Real-Data Guarantee (Zero Garbage / Mock Data)
+- **Zero Mock / Hardcoded Produce:** No synthetic, hardcoded, or dummy mock data will ever be injected. All displayed crops, prices, stock levels, and farmer profiles must come directly from real Supabase tables and views (`v_products`, `categories`, `farmer_profiles`, `promotions`).
+- **Dynamic Conditional Display:** Badges, counters, and promotional sections only appear when backed by genuine data:
+  - Discount ribbons (`-XX%`) only render if `discountPercent > 0` and `originalPrice` exists.
+  - Sold counters (`X sold`) only render if real orders exist (`soldCount != null && soldCount > 0`).
+  - Flash Sale section automatically hides/collapses if there are no active flash sales in the database.
+  - Distance tags only compute and display if user and farmer coordinates are valid.
+- **Dynamic Categories Catalog:** Categories are fetched dynamically from the `categories` table via `SupabaseDataService().getCategories()`, not hardcoded lists.
+
 ---
 
 ## 2. Visual & Brand Design System
@@ -64,29 +73,31 @@ lib/mobile/screens/consumer/home/
 
 #### C. EcomCategoryGrid (`ecom_category_grid.dart`)
 - **Format:** 2-row horizontal-scroll matrix with circular squircle icons.
-- **Categories:** Fresh Vegetables, Sweet Fruits, Rice & Grains, Poultry & Eggs, Fresh Seafood, Organic Harvest, Pre-Orders, and Wholesale B2B.
-- **Micro-Badges:** Small tag chips ("HOT", "NEW", "50% OFF") overlaid on high-priority categories.
+- **Data Source:** Fetched live from the Supabase `categories` table via `SupabaseDataService().getCategories()`.
+- **Dynamic Icons:** Icon mapping based on actual database category name (e.g. Vegetables, Fruits, Grains, Poultry, Fish) with safe fallback. No dummy categories.
 
 #### D. EcomFlashSaleSection (`ecom_flash_sale_section.dart`)
+- **Visibility:** Only renders if `SupabaseDataService().getFlashSaleProducts()` returns at least 1 active flash deal from the database. If none exist, the section collapses cleanly to 0 height.
 - **Header:** Vibrant orange-to-coral gradient bar featuring:
   - `⚡ FLASH DEALS` title
-  - Real-time digital countdown box: `[ 02 ] : [ 45 ] : [ 18 ]`
+  - Real-time digital countdown box: `[ HH ] : [ MM ] : [ SS ]` based on active product's `flash_sale_end` timestamp.
   - `View All ❯` navigation link to full flash deals screen.
 - **Horizontal Deal Cards:**
-  - Produce preview image with discount ribbon (`-40%`).
-  - Flash price in bold flame color (`₱45/kg`).
-  - Stock claim bar (`🔥 78% Sold`) using custom progress bar with flame icon.
+  - Produce preview image from `product.imageUrl` with discount ribbon computed from `product.discountPercent` (only shown if > 0).
+  - Flash price in bold flame color from `product.price`.
+  - Stock claim bar: Computed from actual database values (`reservedQuantity` / `targetQuantity` or `stockQuantity`), with clean fallback if stock metrics are not configured.
 
 #### E. EcomProductCard (`ecom_product_card.dart`)
 - **Format:** 2-column grid card with 1:1 square image ratio.
-- **Visual Features:**
-  - High-res image with fallback placeholder and rounded top corners.
-  - Farm Verified Pill: `🌱 [Farm Name]`.
-  - Product Title (2-line clamped with ellipsis).
-  - Dual Pricing: Bold discounted price (`₱85`) + crossed-out SRP (`₱110`).
-  - Trust & Social Proof: Star rating `★ 4.9 (42)` and sales volume `1.5k sold`.
-  - Origin & Proximity: `📍 2.8 km away`.
-  - Quick "+ Cart" floating button with micro-tap bounce feedback.
+- **Visual Features (Strict Real-Data Driven):**
+  - High-res image from `product.imageUrl` with fallback asset placeholder and rounded top corners.
+  - Farm Verified Pill: Real farm name from `product.farm` or `product.farmerName`.
+  - Product Title: Real `product.name` (2-line clamped with ellipsis).
+  - Dual Pricing: Real `product.price` in bold green + crossed-out `product.originalPrice` only when original price is provided and greater than price.
+  - Trust & Social Proof: Real `product.rating` and `product.reviews` (only rendered if rating data exists; no fake 5-star ratings).
+  - Sales Count: Real `product.soldCount` (only displayed if > 0; no synthetic sales metrics).
+  - Origin & Proximity: Real distance computed from user coordinates to `product.latitude`/`product.longitude` (omitted if coordinates are missing).
+  - Quick "+ Cart" floating button with micro-tap bounce feedback that triggers actual `CartService().addToCart(...)`.
 
 ---
 
