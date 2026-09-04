@@ -21,6 +21,7 @@ import 'farmer_public_profile_screen.dart';
 import 'community_stories_screen.dart';
 import 'home/widgets/ecom_sliver_app_bar.dart';
 import 'home/widgets/ecom_hero_banner.dart';
+import 'home/widgets/ecom_quick_channels.dart';
 import 'home/widgets/ecom_category_grid.dart';
 import 'home/widgets/ecom_flash_sale_section.dart';
 import 'home/widgets/ecom_product_card.dart';
@@ -118,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 6)),
             const SliverToBoxAdapter(child: EcomHeroBanner()),
+            const SliverToBoxAdapter(child: EcomQuickChannels()),
             SliverToBoxAdapter(
               child: EcomCategoryGrid(categoriesFuture: _categoriesFuture),
             ),

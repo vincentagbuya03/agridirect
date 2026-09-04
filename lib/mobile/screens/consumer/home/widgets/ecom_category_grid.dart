@@ -82,7 +82,7 @@ class EcomCategoryGrid extends StatelessWidget {
               ),
             ),
             SizedBox(
-              height: 176,
+              height: 192,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -109,13 +109,13 @@ class EcomCategoryGrid extends StatelessWidget {
 
   Widget _buildCategoryItem(BuildContext context, CategoryItem cat) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 5),
       child: InkWell(
         onTap: () => _handleCategoryTap(context, cat.name),
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          width: 72,
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          width: 76,
+          padding: const EdgeInsets.symmetric(vertical: 2),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -126,12 +126,12 @@ class EcomCategoryGrid extends StatelessWidget {
                   color: Color(cat.bgColor),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: Color(cat.iconColor).withValues(alpha: 0.15),
+                    color: Color(cat.iconColor).withValues(alpha: 0.2),
                     width: 1,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Color(cat.iconColor).withValues(alpha: 0.08),
+                      color: Color(cat.iconColor).withValues(alpha: 0.12),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -145,18 +145,21 @@ class EcomCategoryGrid extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                cat.name,
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF334155),
-                  height: 1.1,
+              const SizedBox(height: 5),
+              SizedBox(
+                height: 26,
+                child: Text(
+                  cat.name,
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1E293B),
+                    height: 1.15,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
               ),
             ],
           ),

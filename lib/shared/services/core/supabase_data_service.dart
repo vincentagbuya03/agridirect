@@ -643,7 +643,7 @@ class SupabaseDataService {
     // Mapping based on category name keywords
     final name = categoryName.toLowerCase();
 
-    if (name.contains('veggie') || name.contains('vegetable')) {
+    if (name.contains('vegetable') || name.contains('veggie') || name.contains('greens')) {
       return Icons.eco_rounded.codePoint;
     }
     if (name.contains('fruit')) {
@@ -656,47 +656,74 @@ class SupabaseDataService {
     }
     if (name.contains('dairy') ||
         name.contains('milk') ||
-        name.contains('egg') ||
         name.contains('cheese')) {
       return Icons.water_drop_rounded.codePoint;
     }
-    if (name.contains('poultry') || name.contains('chicken')) {
-      return Icons.egg_rounded.codePoint;
+    if (name.contains('poultry') || name.contains('chicken') || name.contains('egg')) {
+      return Icons.egg_alt_rounded.codePoint;
     }
-    if (name.contains('livestock') || name.contains('meat')) {
-      return Icons.bakery_dining_rounded.codePoint; // Placeholder for meat
+    if (name.contains('livestock') || name.contains('meat') || name.contains('pork') || name.contains('beef')) {
+      return Icons.pets_rounded.codePoint;
     }
     if (name.contains('herb') || name.contains('spice')) {
       return Icons.spa_rounded.codePoint;
     }
-    if (name.contains('root')) {
+    if (name.contains('root') || name.contains('tuber') || name.contains('cassava') || name.contains('camote')) {
       return Icons.agriculture_rounded.codePoint;
     }
+    if (name.contains('fish') || name.contains('seafood') || name.contains('marine')) {
+      return Icons.set_meal_rounded.codePoint;
+    }
 
-    return Icons.category_rounded.codePoint;
+    return Icons.storefront_rounded.codePoint;
   }
 
   int _getCategoryColor(String categoryName, {required bool isBackground}) {
     final name = categoryName.toLowerCase();
 
-    if (name.contains('veggie')) {
+    if (name.contains('vegetable') || name.contains('veggie') || name.contains('greens')) {
       return isBackground ? 0xFFDCFCE7 : 0xFF10B981; // Green
     }
     if (name.contains('fruit')) {
-      return isBackground ? 0xFFFFEDD5 : 0xFFEA580C; // Orange
+      return isBackground ? 0xFFFFEDD5 : 0xFFEA580C; // Coral Orange
     }
-    if (name.contains('grain')) {
-      return isBackground ? 0xFFFEF3C7 : 0xFFD97706; // Amber
+    if (name.contains('grain') || name.contains('rice') || name.contains('corn')) {
+      return isBackground ? 0xFFFEF9C3 : 0xFFCA8A04; // Harvest Gold
     }
-    if (name.contains('dairy')) {
-      return isBackground ? 0xFFDBEAFE : 0xFF2563EB; // Blue
+    if (name.contains('root') || name.contains('tuber')) {
+      return isBackground ? 0xFFFFEDD5 : 0xFFC2410C; // Terracotta / Earthy
+    }
+    if (name.contains('poultry') || name.contains('chicken') || name.contains('egg')) {
+      return isBackground ? 0xFFFEF3C7 : 0xFFD97706; // Sunny Amber
+    }
+    if (name.contains('livestock') || name.contains('meat') || name.contains('pork') || name.contains('beef')) {
+      return isBackground ? 0xFFFFE4E6 : 0xFFBE123C; // Rose Ruby
+    }
+    if (name.contains('herb') || name.contains('spice')) {
+      return isBackground ? 0xFFCCFBF1 : 0xFF0D9488; // Fresh Mint Teal
+    }
+    if (name.contains('fish') || name.contains('seafood')) {
+      return isBackground ? 0xFFE0F2FE : 0xFF0284C7; // Ocean Cyan
+    }
+    if (name.contains('dairy') || name.contains('milk') || name.contains('cheese')) {
+      return isBackground ? 0xFFDBEAFE : 0xFF2563EB; // Sky Blue
     }
     if (name.contains('organic')) {
-      return isBackground ? 0xFFD1FAE5 : 0xFF059669; // Emerald
+      return isBackground ? 0xFFD1FAE5 : 0xFF059669; // Forest Emerald
     }
 
-    // Default neutral colors
-    return isBackground ? 0xFFF1F5F9 : 0xFF64748B;
+    // Dynamic saturated palette fallback for any custom database category
+    final palettes = [
+      [0xFFDCFCE7, 0xFF10B981],
+      [0xFFFFEDD5, 0xFFEA580C],
+      [0xFFFEF3C7, 0xFFD97706],
+      [0xFFDBEAFE, 0xFF2563EB],
+      [0xFFCCFBF1, 0xFF0D9488],
+      [0xFFFFE4E6, 0xFFBE123C],
+      [0xFFF3E8FF, 0xFF9333EA],
+    ];
+    final idx = (name.hashCode.abs()) % palettes.length;
+    return isBackground ? palettes[idx][0] : palettes[idx][1];
   }
 
   String? _resolveImageUrl(String? rawUrl) {
