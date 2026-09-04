@@ -17,12 +17,64 @@
       "destination": "/api/$1"
     },
     {
+      "source": "/farmer/(.*)",
+      "destination": "/api/share?type=farmer&id=$1"
+    },
+    {
+      "source": "/farm/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|TelegramBot|WhatsApp|Slackbot|Discordbot|LinkedInBot|Pinterest|Googlebot|bingbot|Applebot|crawler|spider|bot|meta-externalagent|facebookcatalog).*"
+        }
+      ],
+      "destination": "/api/share?type=farmer&id=$1"
+    },
+    {
+      "source": "/farmer-profile/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|TelegramBot|WhatsApp|Slackbot|Discordbot|LinkedInBot|Pinterest|Googlebot|bingbot|Applebot|crawler|spider|bot|meta-externalagent|facebookcatalog).*"
+        }
+      ],
+      "destination": "/api/share?type=farmer&id=$1"
+    },
+    {
+      "source": "/product-details",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|TelegramBot|WhatsApp|Slackbot|Discordbot|LinkedInBot|Pinterest|Googlebot|bingbot|Applebot|crawler|spider|bot|meta-externalagent|facebookcatalog).*"
+        }
+      ],
+      "destination": "/api/share?type=product"
+    },
+    {
+      "source": "/preorder-details",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|TelegramBot|WhatsApp|Slackbot|Discordbot|LinkedInBot|Pinterest|Googlebot|bingbot|Applebot|crawler|spider|bot|meta-externalagent|facebookcatalog).*"
+        }
+      ],
+      "destination": "/api/share?type=product"
+    },
+    {
       "source": "/product/(.*)",
       "destination": "/api/share?type=product&id=$1"
     },
     {
-      "source": "/farmer/(.*)",
-      "destination": "/api/share?type=farmer&id=$1"
+      "source": "/preorder/(.*)",
+      "destination": "/api/share?type=product&id=$1"
+    },
+    {
+      "source": "/.well-known/(.*)",
+      "destination": "/.well-known/$1"
     },
     {
       "source": "/((?!.*\\.).*)",
@@ -70,6 +122,19 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/.well-known/assetlinks.json",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
         }
       ]
     }

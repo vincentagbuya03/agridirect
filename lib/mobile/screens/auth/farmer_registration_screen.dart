@@ -18,8 +18,11 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import '../../../shared/router/app_routes.dart';
 import '../../widgets/auth/verification_guide_widget.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 import 'package:agridirect/mobile/screens/common/id_back_scanner.dart';
 import 'package:agridirect/mobile/screens/common/id_capture_screen.dart';
+import '../../../shared/services/ai/farmer_ai_verification_service.dart';
+import '../../../shared/services/ai/biometric_face_matching_service.dart';
 
 class FarmerRegistrationScreen extends StatefulWidget {
   final VoidCallback onRegistrationComplete;
@@ -81,7 +84,16 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
   Uint8List? _idImageBytes;
   bool _idBackUploaded = false; // ID Back Captured
   String? _idBackImagePath;
+  Uint8List? _idBackImageBytes;
   final ImagePicker _imagePicker = ImagePicker();
+
+  // AI Verification Metadata
+  String? _frontExtractedName;
+  String? _frontExtractedDob;
+  String? _frontExtractedPcn;
+  String? _frontOcrFullText;
+  String? _backQrRawPayload;
+  Map<String, dynamic>? _backQrSubject;
 
   // Signature
   bool _guideShown = false;
@@ -239,11 +251,16 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 GestureDetector(
                   onTap: _showVerificationGuide,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFDCFCE7),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _primary.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: _primary.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -276,7 +293,11 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
   // ─── Step Indicator ───
   Widget _buildStepIndicator() {
     final labels = ['Verification', 'Profile & Farm', 'Review'];
-    final icons = [Icons.shield_outlined, Icons.person_outline_rounded, Icons.rate_review_outlined];
+    final icons = [
+      Icons.shield_outlined,
+      Icons.person_outline_rounded,
+      Icons.rate_review_outlined,
+    ];
 
     return Container(
       color: Colors.white,
@@ -298,7 +319,9 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                         duration: const Duration(milliseconds: 300),
                         height: 4,
                         decoration: BoxDecoration(
-                          color: isCurrent || isCompleted ? _primary : const Color(0xFFE2E8F0),
+                          color: isCurrent || isCompleted
+                              ? _primary
+                              : const Color(0xFFE2E8F0),
                           borderRadius: BorderRadius.circular(4),
                           boxShadow: isCurrent
                               ? [
@@ -317,7 +340,11 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                           Icon(
                             isCompleted ? Icons.check_circle_rounded : icons[i],
                             size: 12,
-                            color: isCurrent ? _primary : (isCompleted ? const Color(0xFF16A34A) : _muted),
+                            color: isCurrent
+                                ? _primary
+                                : (isCompleted
+                                      ? const Color(0xFF16A34A)
+                                      : _muted),
                           ),
                           const SizedBox(width: 4),
                           Expanded(
@@ -325,7 +352,9 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                               labels[i],
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 10.5,
-                                fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
+                                fontWeight: isCurrent
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
                                 color: isCurrent ? _dark : _muted,
                               ),
                               maxLines: 1,
@@ -510,7 +539,10 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 if (_fullNameController.text.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFDCFCE7),
                       borderRadius: BorderRadius.circular(10),
@@ -546,18 +578,49 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
 
         _buildModuleHeader(
           'Identity Profile',
-          'Personal data from your government ID',
+          'Personal data from your government ID (Locked)',
         ),
         _buildGlassCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.lock_rounded,
+                      size: 15,
+                      color: Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Extracted from verified government ID. Cannot be modified.',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               _buildLabel('Full Legal Name'),
               const SizedBox(height: 8),
               _buildTextField(
                 _fullNameController,
                 'e.g. Juan Dela Cruz',
                 prefixIcon: Icons.badge_rounded,
+                suffixIcon: Icons.lock_outline_rounded,
+                readOnly: true,
               ),
               const SizedBox(height: 18),
               Row(
@@ -572,6 +635,8 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                           _sexController,
                           'Male / Female',
                           prefixIcon: Icons.wc_rounded,
+                          suffixIcon: Icons.lock_outline_rounded,
+                          readOnly: true,
                         ),
                       ],
                     ),
@@ -583,15 +648,12 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                       children: [
                         _buildLabel('Birth Date'),
                         const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: _pickBirthDate,
-                          child: AbsorbPointer(
-                            child: _buildTextField(
-                              _birthDateController,
-                              'MM/DD/YYYY',
-                              prefixIcon: Icons.calendar_today_rounded,
-                            ),
-                          ),
+                        _buildTextField(
+                          _birthDateController,
+                          'MM/DD/YYYY',
+                          prefixIcon: Icons.calendar_today_rounded,
+                          suffixIcon: Icons.lock_outline_rounded,
+                          readOnly: true,
                         ),
                       ],
                     ),
@@ -605,6 +667,8 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 _placeOfBirthController,
                 'City/Municipality, Province',
                 prefixIcon: Icons.location_city_rounded,
+                suffixIcon: Icons.lock_outline_rounded,
+                readOnly: true,
               ),
               const SizedBox(height: 18),
               _buildLabel(
@@ -617,6 +681,8 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                     ? 'e.g., 2729-20'
                     : '16-digit PCN or ID Number',
                 prefixIcon: Icons.numbers_rounded,
+                suffixIcon: Icons.lock_outline_rounded,
+                readOnly: true,
                 keyboardType: _idType == 'local_id'
                     ? TextInputType.text
                     : TextInputType.number,
@@ -1542,7 +1608,8 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
           // ID BACK CARD
           _buildDocumentCaptureCard(
             title: 'ID Back Side',
-            subtitle: 'Barcode, card serial numbers, and signatures must be sharp.',
+            subtitle:
+                'Barcode, card serial numbers, and signatures must be sharp.',
             icon: Icons.flip_to_back_rounded,
             isUploaded: _idBackUploaded,
             imagePath: _idBackImagePath,
@@ -1617,9 +1684,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? _primary
-                          : const Color(0xFFF1F5F9),
+                      color: isSelected ? _primary : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -1820,10 +1885,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                       flex: 2,
                       child: ElevatedButton.icon(
                         onPressed: onCamera,
-                        icon: const Icon(
-                          Icons.camera_alt_rounded,
-                          size: 16,
-                        ),
+                        icon: const Icon(Icons.camera_alt_rounded, size: 16),
                         label: const Text('Take Photo'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _primary,
@@ -1929,14 +1991,18 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Application Summary',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: _dark,
+                  Flexible(
+                    child: Text(
+                      'Application Summary',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: _dark,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -2261,38 +2327,6 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
   }
 
   // ─── Actions ───
-  Future<void> _pickBirthDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: DateTime(2000, 1, 1),
-      firstDate: DateTime(1940),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: _primary,
-              onPrimary: Colors.white,
-              onSurface: _dark,
-            ),
-            dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (date != null) {
-      // Store in RPC friendly format YYYY-MM-DD behind the scenes
-      // But display as MM/DD/YYYY for user comfort
-      setState(() {
-        _birthDateController.text =
-            '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}/${date.year}';
-        // We can use the controller text for display and a hidden value for DB
-        _registration.birthDate =
-            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-      });
-    }
-  }
 
   Future<void> _handleFaceScan() async {
     final path = await context.push<String>(AppRoutes.faceCapture);
@@ -2327,31 +2361,72 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
       String? qrPayload;
 
       if (source == 'camera') {
-        if (!isFront && _idType == 'national_id') {
-          // Automatic in-app stream scanner for PhilSys National ID Back
-          final result = await Navigator.of(context).push<IdBackCaptureResult>(
-            MaterialPageRoute(
-              builder: (context) =>
-                  const IdBackCaptureScreen(label: 'PhilSys ID Back'),
-            ),
-          );
-          if (result != null) {
-            imagePath = result.imagePath;
-            qrPayload = result.qrData;
-          } else {
-            return; // Cancelled
+        if (!kIsWeb) {
+          try {
+            final pictures = await CunningDocumentScanner.getPictures(
+              noOfPages: 1,
+            );
+            if (pictures != null && pictures.isNotEmpty) {
+              imagePath = pictures.first;
+
+              // If scanning ID back, extract PhilSys QR from the scanned document
+              if (!isFront && _idType == 'national_id') {
+                try {
+                  final barcodeScanner = BarcodeScanner(
+                    formats: [BarcodeFormat.qrCode],
+                  );
+                  final barcodes = await barcodeScanner.processImage(
+                    InputImage.fromFilePath(imagePath),
+                  );
+                  await barcodeScanner.close();
+                  if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
+                    qrPayload = barcodes.first.rawValue;
+                  }
+                } catch (e) {
+                  debugPrint('Document scanner QR extract error: $e');
+                }
+              }
+            } else {
+              return; // User cancelled scanning
+            }
+          } catch (e) {
+            debugPrint('CunningDocumentScanner error, falling back to camera: $e');
+            if (!mounted) return;
+            // Fallback to in-app camera if native scanner fails
+            if (!isFront && _idType == 'national_id') {
+              final result =
+                  await Navigator.of(context).push<IdBackCaptureResult>(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const IdBackCaptureScreen(label: 'PhilSys ID Back'),
+                ),
+              );
+              if (result != null) {
+                imagePath = result.imagePath;
+                qrPayload = result.qrData;
+              } else {
+                return;
+              }
+            } else {
+              imagePath = await Navigator.of(context).push<String>(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      IdCaptureScreen(label: isFront ? 'ID Front' : 'ID Back'),
+                ),
+              );
+              if (imagePath == null) return;
+            }
           }
         } else {
-          // Front ID direct in-app camera capture
+          // Web fallback
+          if (!mounted) return;
           imagePath = await Navigator.of(context).push<String>(
             MaterialPageRoute(
               builder: (context) =>
                   IdCaptureScreen(label: isFront ? 'ID Front' : 'ID Back'),
             ),
           );
-          if (imagePath == null) {
-            return; // Cancelled
-          }
+          if (imagePath == null) return;
         }
       } else {
         final image = await _imagePicker.pickImage(
@@ -2363,7 +2438,9 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         // If National ID Back is uploaded from gallery, extract QR
         if (imagePath != null && !isFront && _idType == 'national_id') {
           try {
-            final barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.qrCode]);
+            final barcodeScanner = BarcodeScanner(
+              formats: [BarcodeFormat.qrCode],
+            );
             final barcodes = await barcodeScanner.processImage(
               InputImage.fromFilePath(imagePath),
             );
@@ -2391,7 +2468,11 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
               SnackBar(
                 content: const Row(
                   children: [
-                    Icon(Icons.credit_card_off_rounded, color: Colors.white, size: 20),
+                    Icon(
+                      Icons.credit_card_off_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -2413,13 +2494,19 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         }
 
         // ── Validation: If National ID Back, require valid back document verification ──
-        if (!isFront && _idType == 'national_id' && (qrPayload == null || qrPayload.isEmpty)) {
+        if (!isFront &&
+            _idType == 'national_id' &&
+            (qrPayload == null || qrPayload.isEmpty)) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Row(
                 children: [
-                  Icon(Icons.flip_to_back_rounded, color: Colors.white, size: 20),
+                  Icon(
+                    Icons.flip_to_back_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -2449,6 +2536,7 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
           } else {
             _idBackUploaded = true;
             _idBackImagePath = imagePath;
+            _idBackImageBytes = bytes;
           }
         });
 
@@ -2561,8 +2649,9 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     }
 
     // Also check for 16-digit PCN format (e.g. 5978-8912-6371-5068)
-    final hasPcn =
-        RegExp(r'\b\d{4}[-\s]\d{4}[-\s]\d{4}[-\s]\d{4}\b').hasMatch(upper);
+    final hasPcn = RegExp(
+      r'\b\d{4}[-\s]\d{4}[-\s]\d{4}[-\s]\d{4}\b',
+    ).hasMatch(upper);
 
     // Require at least 2 National ID keywords OR (1 keyword + valid PCN)
     return matchCount >= 2 || (matchCount >= 1 && hasPcn);
@@ -2593,9 +2682,15 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
       }
 
       // 2. Check Sex / Gender
-      if (RegExp(r'\b(MALE|LALAKI)\b', caseSensitive: false).hasMatch(fullText)) {
+      if (RegExp(
+        r'\b(MALE|LALAKI)\b',
+        caseSensitive: false,
+      ).hasMatch(fullText)) {
         foundSex = 'Male';
-      } else if (RegExp(r'\b(FEMALE|BABAE)\b', caseSensitive: false).hasMatch(fullText)) {
+      } else if (RegExp(
+        r'\b(FEMALE|BABAE)\b',
+        caseSensitive: false,
+      ).hasMatch(fullText)) {
         foundSex = 'Female';
       }
 
@@ -2618,27 +2713,47 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
       for (int i = 0; i < lines.length; i++) {
         final line = lines[i].toUpperCase();
 
-        if ((line.contains('LAST NAME') || line.contains('APELYIDO')) && i + 1 < lines.length) {
+        if ((line.contains('LAST NAME') || line.contains('APELYIDO')) &&
+            i + 1 < lines.length) {
           final nextLine = lines[i + 1].trim();
-          if (!nextLine.contains('/') && !nextLine.toUpperCase().contains('NAME') && nextLine.length >= 2) {
+          if (!nextLine.contains('/') &&
+              !nextLine.toUpperCase().contains('NAME') &&
+              nextLine.length >= 2) {
             foundLastName = nextLine;
           }
-        } else if ((line.contains('GIVEN') || line.contains('PANGALAN') || line.contains('FIRST NAME')) && i + 1 < lines.length) {
+        } else if ((line.contains('GIVEN') ||
+                line.contains('PANGALAN') ||
+                line.contains('FIRST NAME')) &&
+            i + 1 < lines.length) {
           final nextLine = lines[i + 1].trim();
-          if (!nextLine.contains('/') && !nextLine.toUpperCase().contains('NAME') && nextLine.length >= 2) {
+          if (!nextLine.contains('/') &&
+              !nextLine.toUpperCase().contains('NAME') &&
+              nextLine.length >= 2) {
             foundFirstName = nextLine;
           }
-        } else if ((line.contains('MIDDLE') || line.contains('GITNANG')) && i + 1 < lines.length) {
+        } else if ((line.contains('MIDDLE') || line.contains('GITNANG')) &&
+            i + 1 < lines.length) {
           final nextLine = lines[i + 1].trim();
-          if (!nextLine.contains('/') && !nextLine.toUpperCase().contains('NAME') && nextLine.length >= 2) {
+          if (!nextLine.contains('/') &&
+              !nextLine.toUpperCase().contains('NAME') &&
+              nextLine.length >= 2) {
             foundMiddleName = nextLine;
           }
         }
       }
 
-      final nameParts = [foundFirstName, foundMiddleName, foundLastName]
-          .where((s) => s != null && s.isNotEmpty)
-          .toList();
+      final nameParts = [
+        foundFirstName,
+        foundMiddleName,
+        foundLastName,
+      ].where((s) => s != null && s.isNotEmpty).toList();
+
+      _frontOcrFullText = fullText;
+      if (nameParts.isNotEmpty) {
+        _frontExtractedName = nameParts.join(' ');
+      }
+      if (foundDob != null) _frontExtractedDob = foundDob;
+      if (foundPcn != null) _frontExtractedPcn = foundPcn;
 
       bool didFillAny = false;
 
@@ -2674,7 +2789,9 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
             ),
             backgroundColor: _primary,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -2689,12 +2806,15 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
       Map<String, dynamic> subject = {};
 
       String cleanQr = qrRaw.trim();
+      _backQrRawPayload = cleanQr;
 
       // Case 1: Direct JSON
       if (cleanQr.startsWith('{') && cleanQr.endsWith('}')) {
         final data = jsonDecode(cleanQr);
         if (data is Map<String, dynamic>) {
-          subject = data.containsKey('subject') && data['subject'] is Map<String, dynamic>
+          subject =
+              data.containsKey('subject') &&
+                  data['subject'] is Map<String, dynamic>
               ? (data['subject'] as Map<String, dynamic>)
               : data;
         }
@@ -2712,7 +2832,9 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
             final decodedStr = utf8.decode(decodedBytes);
             final data = jsonDecode(decodedStr);
             if (data is Map<String, dynamic>) {
-              subject = data.containsKey('subject') && data['subject'] is Map<String, dynamic>
+              subject =
+                  data.containsKey('subject') &&
+                      data['subject'] is Map<String, dynamic>
                   ? (data['subject'] as Map<String, dynamic>)
                   : data;
             }
@@ -2722,40 +2844,74 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
         }
       }
 
+      _backQrSubject = subject;
+
       // Name resolution (fName, mName, lName, Suffix)
-      final fName = subject['fName'] ?? subject['firstName'] ?? subject['First_Name'] ?? '';
-      final mName = subject['mName'] ?? subject['middleName'] ?? subject['Middle_Name'] ?? '';
-      final lName = subject['lName'] ?? subject['lastName'] ?? subject['Last_Name'] ?? '';
+      final fName =
+          subject['fName'] ??
+          subject['firstName'] ??
+          subject['First_Name'] ??
+          '';
+      final mName =
+          subject['mName'] ??
+          subject['middleName'] ??
+          subject['Middle_Name'] ??
+          '';
+      final lName =
+          subject['lName'] ?? subject['lastName'] ?? subject['Last_Name'] ?? '';
       final suffix = subject['Suffix'] ?? subject['suffix'] ?? '';
 
-      final constructedName = [fName, mName, lName, suffix]
-          .where((e) => e.toString().trim().isNotEmpty)
-          .join(' ');
+      final constructedName = [
+        fName,
+        mName,
+        lName,
+        suffix,
+      ].where((e) => e.toString().trim().isNotEmpty).join(' ');
 
       if (constructedName.isNotEmpty) {
         _fullNameController.text = constructedName;
       }
 
       // Sex / Gender
-      final sex = subject['sex'] ?? subject['Sex'] ?? subject['Gender'] ?? subject['gender'] ?? '';
+      final sex =
+          subject['sex'] ??
+          subject['Sex'] ??
+          subject['Gender'] ??
+          subject['gender'] ??
+          '';
       if (sex.toString().isNotEmpty) {
         _sexController.text = sex.toString();
       }
 
       // Place of Birth
-      final pob = subject['POB'] ?? subject['pob'] ?? subject['BirthPlace'] ?? subject['placeOfBirth'] ?? '';
+      final pob =
+          subject['POB'] ??
+          subject['pob'] ??
+          subject['BirthPlace'] ??
+          subject['placeOfBirth'] ??
+          '';
       if (pob.toString().isNotEmpty) {
         _placeOfBirthController.text = pob.toString();
       }
 
       // PCN (PhilSys Card Number)
-      final pcn = subject['PCN'] ?? subject['pcn'] ?? subject['CardNumber'] ?? subject['idNumber'] ?? '';
+      final pcn =
+          subject['PCN'] ??
+          subject['pcn'] ??
+          subject['CardNumber'] ??
+          subject['idNumber'] ??
+          '';
       if (pcn.toString().isNotEmpty) {
         _pcnController.text = pcn.toString();
       }
 
       // Birth Date
-      final dob = subject['DOB'] ?? subject['dob'] ?? subject['BirthDate'] ?? subject['birthDate'] ?? '';
+      final dob =
+          subject['DOB'] ??
+          subject['dob'] ??
+          subject['BirthDate'] ??
+          subject['birthDate'] ??
+          '';
       if (dob.toString().isNotEmpty) {
         final dobStr = dob.toString();
         if (dobStr.contains('-')) {
@@ -2785,7 +2941,9 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
             ),
             backgroundColor: _primary,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -2911,23 +3069,77 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
     try {
       final auth = AuthService();
 
-      // Submit registration to Supabase
+      // ── Step 1: Run 1-to-1 Biometric Facial Comparison ──
+      BiometricFaceMatchResult? faceMatchResult;
+      if ((_idImagePath != null || _idImageBytes != null) &&
+          (_faceImagePath != null || _faceImageBytes != null)) {
+        try {
+          faceMatchResult = await BiometricFaceMatchingService.compareFaces(
+            idFrontImagePath: _idImagePath ?? '',
+            selfieImagePath: _faceImagePath ?? '',
+            idFrontBytes: _idImageBytes,
+            selfieBytes: _faceImageBytes,
+          );
+          debugPrint(
+            '[Biometric Face Match] Matched: ${faceMatchResult.isMatched}, Score: ${(faceMatchResult.similarityScore * 100).toStringAsFixed(1)}%, Status: ${faceMatchResult.status}',
+          );
+        } catch (e) {
+          debugPrint('[Biometric Face Match] Comparison error: $e');
+        }
+      }
+
+      // ── Step 2: Run On-Device AI Auto-Verification ──
+      final aiResult = FarmerAiVerificationService.evaluate(
+        registeredFullName: _registration.fullName,
+        registeredDob: _registration.birthDate,
+        frontOcrText: _frontOcrFullText,
+        frontExtractedName: _frontExtractedName,
+        frontExtractedDob: _frontExtractedDob,
+        frontExtractedPcn: _frontExtractedPcn,
+        backQrRawPayload: _backQrRawPayload,
+        backQrSubject: _backQrSubject,
+        faceSelfieCaptured:
+            _faceScanned && (_faceImagePath != null || _faceImageBytes != null),
+        idType: _idType,
+        faceMatchSimilarity: faceMatchResult?.similarityScore,
+        faceFoundOnId: faceMatchResult?.faceFoundOnId,
+      );
+
+      debugPrint(
+        '[AI Verification] Decision: ${aiResult.isAutoApproved}, Score: ${(aiResult.confidenceScore * 100).toStringAsFixed(1)}%, Method: ${aiResult.verificationMethod}',
+      );
+
+      // ── Step 2: Submit registration to Supabase with AI Auto-Verification result ──
       await SupabaseDatabase.submitFarmerRegistration(
         userId: auth.userId,
         registration: _registration,
         faceImageBytes: _faceImageBytes,
         idImageBytes: _idImageBytes,
+        idBackImageBytes: _idBackImageBytes,
         resolvedFarmLocation: _resolvedFarmLocation,
+        isAutoVerified: aiResult.isAutoApproved,
+        verificationMethod: aiResult.verificationMethod,
+        confidenceScore: aiResult.confidenceScore,
+        reviewNotes: aiResult.summaryNotes,
       );
 
-      // Refresh registration status in AuthService so profile UI updates immediately
+      // If AI auto-approved the farmer, immediately activate seller mode!
+      if (aiResult.isAutoApproved) {
+        try {
+          await auth.startSelling();
+        } catch (e) {
+          debugPrint('Non-critical startSelling error: $e');
+        }
+      }
+
+      // Sync verified ID legal name and registration status in AuthService
+      if (_registration.fullName.trim().isNotEmpty) {
+        await auth.updateUserName(_registration.fullName.trim());
+      }
       await auth.refreshRegistrationStatus();
 
-      // DON'T activate seller mode yet - wait for admin approval
-      // await auth.startSelling();
-
       if (mounted) {
-        // Show success dialog
+        // Show success dialog tailored for AI auto-approval or admin review
         await showDialog(
           context: context,
           barrierDismissible: false,
@@ -2941,23 +3153,53 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: _primary.withValues(alpha: 0.1),
+                    color: (aiResult.isAutoApproved ? _primary : const Color(0xFF3B82F6))
+                        .withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.check_circle, size: 56, color: _primary),
+                  child: Icon(
+                    aiResult.isAutoApproved
+                        ? Icons.verified_rounded
+                        : Icons.hourglass_top_rounded,
+                    size: 56,
+                    color: aiResult.isAutoApproved ? _primary : const Color(0xFF3B82F6),
+                  ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 Text(
-                  'Registration Submitted!',
+                  aiResult.isAutoApproved
+                      ? 'AI Auto-Verified!'
+                      : 'Submitted for Review',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: _dark,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (aiResult.isAutoApproved ? _primary : const Color(0xFF3B82F6))
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    aiResult.isAutoApproved
+                        ? '🤖 AgriDirect AI • ${(aiResult.confidenceScore * 100).toStringAsFixed(0)}% Confidence'
+                        : '📋 In Queue • Admin Review',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: aiResult.isAutoApproved ? _primary : const Color(0xFF3B82F6),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Text(
-                  'Your farmer registration has been submitted for admin review. You will be notified once approved.',
+                  aiResult.isAutoApproved
+                      ? 'Congratulations! AgriDirect AI has verified your Philippine National ID credentials. Your farm store is officially unlocked and ready to sell!'
+                      : 'Your farmer registration has been received. Our admin team will review your credentials within 24 hours.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
@@ -2993,7 +3235,9 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                       ),
                       child: Center(
                         child: Text(
-                          'Go to Dashboard',
+                          aiResult.isAutoApproved
+                              ? 'Start Selling Produce'
+                              : 'Go to Dashboard',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
@@ -3119,12 +3363,8 @@ class _FarmerRegistrationScreenState extends State<FarmerRegistrationScreen> {
                                 children: [
                                   TileLayer(
                                     urlTemplate:
-                                        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                                    subdomains: const ['a', 'b', 'c', 'd'],
+                                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                                     userAgentPackageName: 'com.agridirect.app',
-                                    retinaMode: RetinaMode.isHighDensity(
-                                      context,
-                                    ),
                                   ),
                                   MarkerLayer(
                                     markers: [

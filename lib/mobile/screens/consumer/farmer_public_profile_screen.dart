@@ -330,7 +330,13 @@ class _FarmerPublicProfileScreenState extends State<FarmerPublicProfileScreen>
       backgroundColor: const Color(0xFF0F172A),
       elevation: 0,
       leading: IconButton(
-        onPressed: () => Navigator.pop(context),
+        onPressed: () {
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          } else {
+            GoRouter.of(context).go(AppRoutes.home);
+          }
+        },
         icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
       ),
       title: Container(

@@ -104,17 +104,25 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
       final farmers = await SupabaseConfig.client
           .from('farmers')
           .select(
-            'farm_name, image_url, location, specialty, farming_history, years_of_experience',
+            'farm_name, image_url, face_photo_path, location, specialty, farming_history, years_of_experience',
           )
           .eq('user_id', userId)
           .limit(1);
 
       if (farmers.isNotEmpty && mounted) {
         final rawCover = farmers[0]['image_url'] as String?;
-        final safeCoverUrl = await SupabaseDatabase.getSafeUrl(
-          rawCover,
-          defaultBucket: 'uploads',
-        );
+        final facePhoto = farmers[0]['face_photo_path'] as String?;
+        final isFacePhoto = rawCover != null &&
+            (rawCover == facePhoto ||
+             rawCover.contains('face_photo') ||
+             rawCover.contains('selfie'));
+
+        final safeCoverUrl = (rawCover != null && !isFacePhoto)
+            ? await SupabaseDatabase.getSafeUrl(
+                rawCover,
+                defaultBucket: 'uploads',
+              )
+            : '';
         setState(() {
           _farmerName = farmers[0]['farm_name'] as String?;
           _farmerLocation = farmers[0]['location'] as String?;

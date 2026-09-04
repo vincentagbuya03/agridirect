@@ -1394,10 +1394,8 @@ class _WebProfileScreenState extends State<WebProfileScreen>
                             children: [
                               TileLayer(
                                 urlTemplate:
-                                    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                                subdomains: const ['a', 'b', 'c', 'd'],
+                                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                                 userAgentPackageName: 'com.agridirect.app',
-                                retinaMode: RetinaMode.isHighDensity(context),
                               ),
                               MarkerLayer(
                                 markers: [

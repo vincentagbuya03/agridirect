@@ -3,6 +3,7 @@ export default async function handler(req, res) {
 
   const APP_URL = 'https://agridirect-app.vercel.app';
   const DEFAULT_IMAGE = `${APP_URL}/icons/Icon-512.png`;
+
   const DEFAULT_TITLE = 'AgriDirect - Farm Direct E-commerce';
   const DEFAULT_DESC = 'Buy fresh, affordable, and high-quality produce directly from local farmers on AgriDirect!';
 
@@ -24,12 +25,22 @@ export default async function handler(req, res) {
     return `${supabaseUrl}/storage/v1/object/public/uploads/${encodeURIComponent(clean)}`;
   }
 
+  function getMimeType(url) {
+    if (!url || typeof url !== 'string') return 'image/jpeg';
+    const clean = url.toLowerCase().split('?')[0];
+    if (clean.endsWith('.png')) return 'image/png';
+    if (clean.endsWith('.webp')) return 'image/webp';
+    if (clean.endsWith('.gif')) return 'image/gif';
+    return 'image/jpeg';
+  }
+
   // Always serve HTML so crawlers (Facebook, Messenger, Twitter, etc.) read the OpenGraph tags.
   function sendHtml(res, { title, description, image, redirectUrl, canonicalUrl }) {
     const safeTitle = (title || DEFAULT_TITLE).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&(?!amp;|lt;|gt;)/g, '&amp;');
     const safeDesc = (description || DEFAULT_DESC).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&(?!amp;|lt;|gt;)/g, '&amp;');
     const safeImage = resolveImageUrl(image);
     const safeCanonical = canonicalUrl || redirectUrl;
+    const safeMime = getMimeType(safeImage);
 
     const html = `<!DOCTYPE html>
 <html lang="en" prefix="og: https://ogp.me/ns#">
@@ -45,6 +56,7 @@ export default async function handler(req, res) {
     <meta property="og:description" content="${safeDesc}">
     <meta property="og:image" content="${safeImage}">
     <meta property="og:image:secure_url" content="${safeImage}">
+    <meta property="og:image:type" content="${safeMime}">
     <meta property="og:image:alt" content="${safeTitle}">
     <meta property="og:site_name" content="AgriDirect Philippines">
     <meta property="og:locale" content="en_PH">
@@ -56,13 +68,10 @@ export default async function handler(req, res) {
     <meta name="twitter:description" content="${safeDesc}">
     <meta name="twitter:image" content="${safeImage}">
 
-    <!-- Real users get JS redirect; crawlers/bots stay to read metadata -->
+    <!-- Crawlers only reach this HTML; real browsers are redirected server-side -->
     <script>
-      var ua = navigator.userAgent || '';
-      var isCrawler = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|TelegramBot|Discordbot|Applebot|Googlebot|bingbot|SkypeUriPreview/i.test(ua);
-      if (!isCrawler) {
-        window.location.replace("${redirectUrl}");
-      }
+      // Fallback for any browser that slips through server-side detection
+      window.location.replace("${redirectUrl}");
     </script>
     <noscript>
       <meta http-equiv="refresh" content="0; url=${redirectUrl}">
@@ -77,8 +86,7 @@ export default async function handler(req, res) {
 </html>`;
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('X-Robots-Tag', 'noindex');
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=600, stale-while-revalidate=86400');
     res.status(200).send(html);
   }
 
@@ -178,21 +186,21 @@ export default async function handler(req, res) {
   try {
     let product = null;
 
-    // Query v_products VIEW
+    // Query v_products VIEW — also select image_url as a fallback
     try {
       const r1 = await fetch(
-        `${supabaseUrl}/rest/v1/v_products?product_id=eq.${encodeURIComponent(id)}&select=name,description,price&limit=1`,
+        `${supabaseUrl}/rest/v1/v_products?product_id=eq.${encodeURIComponent(id)}&select=name,description,price,image_url&limit=1`,
         { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
       );
       const data1 = await r1.json();
       if (Array.isArray(data1) && data1.length > 0) product = data1[0];
     } catch (_) {}
 
-    // Fallback: try products table
+    // Fallback: try products table — also select image_url
     if (!product) {
       try {
         const r2 = await fetch(
-          `${supabaseUrl}/rest/v1/products?product_id=eq.${encodeURIComponent(id)}&select=name,description,price&limit=1`,
+          `${supabaseUrl}/rest/v1/products?product_id=eq.${encodeURIComponent(id)}&select=name,description,price,image_url&limit=1`,
           { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
         );
         const data2 = await r2.json();
@@ -209,8 +217,16 @@ export default async function handler(req, res) {
       const imgData = await imgRes.json();
       if (Array.isArray(imgData) && imgData.length > 0 && imgData[0].image_url) {
         imageUrl = imgData[0].image_url;
+      } else {
+        // Fallback: try image_url column directly on the product row
+        const imgFallback = product?.image_url || product?.thumbnail_url;
+        if (imgFallback) imageUrl = imgFallback;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Last resort: use product's own image_url if set
+      const imgFallback = product?.image_url || product?.thumbnail_url;
+      if (imgFallback) imageUrl = imgFallback;
+    }
 
     if (!product) {
       sendHtml(res, {

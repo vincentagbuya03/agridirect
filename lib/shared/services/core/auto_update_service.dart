@@ -4,19 +4,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ota_update/ota_update.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../router/app_router.dart';
 import '../../styles/app_theme.dart';
 
-enum UpdateType {
-  none,
-  optional,
-  force,
-}
+enum UpdateType { none, optional, force }
 
 class AppVersionInfo {
   final String platform;
@@ -39,7 +35,10 @@ class AppVersionInfo {
     required this.isCritical,
   });
 
-  factory AppVersionInfo.fromSupabase(Map<String, dynamic> map) {
+  factory AppVersionInfo.fromSupabase(
+    Map<String, dynamic> map, {
+    List<String> deviceAbis = const [],
+  }) {
     List<String> notes = [];
     if (map['release_notes'] is List) {
       notes = (map['release_notes'] as List)
@@ -48,27 +47,67 @@ class AppVersionInfo {
           .toList();
     }
 
+    String resolvedApkUrl = map['apk_url']?.toString() ?? '';
+    if (map['apk_urls'] is Map) {
+      final urlsMap = map['apk_urls'] as Map<String, dynamic>;
+      for (final abi in deviceAbis) {
+        if (urlsMap.containsKey(abi) && urlsMap[abi].toString().isNotEmpty) {
+          resolvedApkUrl = urlsMap[abi].toString();
+          break;
+        }
+      }
+    } else if (resolvedApkUrl.contains('{abi}') && deviceAbis.isNotEmpty) {
+      resolvedApkUrl = resolvedApkUrl.replaceAll('{abi}', deviceAbis.first);
+    }
+
     return AppVersionInfo(
       platform: map['platform']?.toString() ?? 'android',
-      latestVersion: (map['latest_version']?.toString() ?? '1.0.0').replaceAll(RegExp(r'^[vV]'), ''),
+      latestVersion: (map['latest_version']?.toString() ?? '1.0.0').replaceAll(
+        RegExp(r'^[vV]'),
+        '',
+      ),
       latestBuildNumber: (map['latest_build_number'] as num?)?.toInt() ?? 1,
-      minSupportedVersion: (map['min_supported_version']?.toString() ?? '1.0.0').replaceAll(RegExp(r'^[vV]'), ''),
-      minSupportedBuildNumber: (map['min_supported_build_number'] as num?)?.toInt() ?? 1,
-      apkUrl: map['apk_url']?.toString() ?? '',
+      minSupportedVersion: (map['min_supported_version']?.toString() ?? '1.0.0')
+          .replaceAll(RegExp(r'^[vV]'), ''),
+      minSupportedBuildNumber:
+          (map['min_supported_build_number'] as num?)?.toInt() ?? 1,
+      apkUrl: resolvedApkUrl,
       releaseNotes: notes,
       isCritical: map['is_critical'] == true,
     );
   }
 
-  factory AppVersionInfo.fromGitHub(Map<String, dynamic> data) {
-    final String tagName = (data['tag_name'] as String? ?? '1.0.0').replaceAll(RegExp(r'^[vV]'), '');
+  factory AppVersionInfo.fromGitHub(
+    Map<String, dynamic> data, {
+    List<String> deviceAbis = const [],
+  }) {
+    final String tagName = (data['tag_name'] as String? ?? '1.0.0').replaceAll(
+      RegExp(r'^[vV]'),
+      '',
+    );
     final assets = data['assets'] as List<dynamic>? ?? [];
     String apk = '';
-    for (final asset in assets) {
-      final name = asset['name'] as String? ?? '';
-      if (name.endsWith('.apk')) {
-        apk = asset['browser_download_url'] as String? ?? '';
-        break;
+
+    // 1. Try to find the exact matching split APK for the device's ABI
+    for (final abi in deviceAbis) {
+      for (final asset in assets) {
+        final name = (asset['name'] as String? ?? '').toLowerCase();
+        if (name.endsWith('.apk') && name.contains(abi.toLowerCase())) {
+          apk = asset['browser_download_url'] as String? ?? '';
+          break;
+        }
+      }
+      if (apk.isNotEmpty) break;
+    }
+
+    // 2. If no split APK matches the device ABI, fall back to universal or first APK
+    if (apk.isEmpty) {
+      for (final asset in assets) {
+        final name = asset['name'] as String? ?? '';
+        if (name.endsWith('.apk')) {
+          apk = asset['browser_download_url'] as String? ?? '';
+          break;
+        }
       }
     }
 
@@ -99,12 +138,24 @@ class AppVersionInfo {
 class AutoUpdateService {
   static const String _githubReleasesUrl =
       'https://api.github.com/repos/vincentagbuya03/agridirect/releases/latest';
-  static const String _prefDismissedVersionKey = 'agridirect_update_dismissed_version';
-  static const String _prefDismissedTimeKey = 'agridirect_update_dismissed_time';
+
+  /// Detects device supported CPU ABIs for split-per-abi matching
+  static Future<List<String>> _getDeviceSupportedAbis() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return [];
+    try {
+      final info = await DeviceInfoPlugin().androidInfo;
+      return info.supportedAbis;
+    } catch (_) {
+      return [];
+    }
+  }
 
   /// Main entry point to check for updates.
   /// [showFeedback] set to true when manually invoked (e.g. from Settings screen).
-  Future<void> checkForUpdates(BuildContext context, {bool showFeedback = false}) async {
+  Future<void> checkForUpdates(
+    BuildContext context, {
+    bool showFeedback = false,
+  }) async {
     // Web Update Handling
     if (kIsWeb) {
       await _handleWebUpdateCheck(context, showFeedback: showFeedback);
@@ -115,7 +166,11 @@ class AutoUpdateService {
     if (defaultTargetPlatform != TargetPlatform.android) {
       if (showFeedback && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Auto-updates are only supported on Android and Web.')),
+          const SnackBar(
+            content: Text(
+              'Auto-updates are only supported on Android and Web.',
+            ),
+          ),
         );
       }
       return;
@@ -129,7 +184,10 @@ class AutoUpdateService {
               SizedBox(
                 width: 16,
                 height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
               ),
               SizedBox(width: 12),
               Text('Checking for updates...'),
@@ -156,7 +214,10 @@ class AutoUpdateService {
       }
 
       final packageInfo = await PackageInfo.fromPlatform();
-      final String currentVersion = packageInfo.version.replaceAll(RegExp(r'^[vV]'), '');
+      final String currentVersion = packageInfo.version.replaceAll(
+        RegExp(r'^[vV]'),
+        '',
+      );
       final int currentBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
 
       final updateType = _determineUpdateType(
@@ -177,21 +238,14 @@ class AutoUpdateService {
         if (showFeedback && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Your app is up to date (v$currentVersion+$currentBuild)'),
+              content: Text(
+                'Your app is up to date (v$currentVersion+$currentBuild)',
+              ),
               backgroundColor: AppColors.success,
             ),
           );
         }
         return;
-      }
-
-      // Check snooze for optional updates when in background mode
-      if (updateType == UpdateType.optional && !showFeedback) {
-        final isSnoozed = await _isUpdateSnoozed(versionInfo.latestVersion);
-        if (isSnoozed) {
-          debugPrint('AutoUpdateService: Update v${versionInfo.latestVersion} is snoozed.');
-          return;
-        }
       }
 
       if (!context.mounted) return;
@@ -217,11 +271,17 @@ class AutoUpdateService {
   }
 
   /// Web platform version checker
-  Future<void> _handleWebUpdateCheck(BuildContext context, {required bool showFeedback}) async {
+  Future<void> _handleWebUpdateCheck(
+    BuildContext context, {
+    required bool showFeedback,
+  }) async {
     try {
       final info = await _fetchRemoteVersionInfo(platform: 'web');
       final packageInfo = await PackageInfo.fromPlatform();
-      final String currentVersion = packageInfo.version.replaceAll(RegExp(r'^[vV]'), '');
+      final String currentVersion = packageInfo.version.replaceAll(
+        RegExp(r'^[vV]'),
+        '',
+      );
       final int currentBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
 
       if (info != null) {
@@ -237,7 +297,11 @@ class AutoUpdateService {
             SnackBar(
               content: Row(
                 children: [
-                  const Icon(Icons.cloud_download_outlined, color: Colors.white, size: 20),
+                  const Icon(
+                    Icons.cloud_download_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -274,14 +338,21 @@ class AutoUpdateService {
       debugPrint('Web Update Check Error: $e');
       if (showFeedback && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error checking web updates: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text('Error checking web updates: $e'),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     }
   }
 
   /// Fetches remote version config from Supabase, with GitHub Releases fallback.
-  Future<AppVersionInfo?> _fetchRemoteVersionInfo({required String platform}) async {
+  Future<AppVersionInfo?> _fetchRemoteVersionInfo({
+    required String platform,
+  }) async {
+    final deviceAbis = await _getDeviceSupportedAbis();
+
     // 1. Try Supabase app_versions table
     try {
       final response = await Supabase.instance.client
@@ -291,26 +362,33 @@ class AutoUpdateService {
           .maybeSingle();
 
       if (response is Map<String, dynamic>) {
-        final info = AppVersionInfo.fromSupabase(response);
+        final info = AppVersionInfo.fromSupabase(
+          response,
+          deviceAbis: deviceAbis,
+        );
         if (info.latestVersion.isNotEmpty) {
           return info;
         }
       }
     } catch (e) {
-      debugPrint('AutoUpdateService: Supabase version query failed ($e), trying fallback...');
+      debugPrint(
+        'AutoUpdateService: Supabase version query failed ($e), trying fallback...',
+      );
     }
 
     // 2. Fallback to GitHub Releases (Android only)
     if (platform == 'android') {
       try {
-        final res = await http.get(
-          Uri.parse(_githubReleasesUrl),
-          headers: {'Accept': 'application/vnd.github.v3+json'},
-        ).timeout(const Duration(seconds: 8));
+        final res = await http
+            .get(
+              Uri.parse(_githubReleasesUrl),
+              headers: {'Accept': 'application/vnd.github.v3+json'},
+            )
+            .timeout(const Duration(seconds: 8));
 
         if (res.statusCode == 200) {
           final data = json.decode(res.body) as Map<String, dynamic>;
-          return AppVersionInfo.fromGitHub(data);
+          return AppVersionInfo.fromGitHub(data, deviceAbis: deviceAbis);
         }
       } catch (e) {
         debugPrint('AutoUpdateService: GitHub fallback failed: $e');
@@ -329,19 +407,22 @@ class AutoUpdateService {
     // 1. Check if below minimum supported version (Force Update)
     if (info.isCritical) {
       final cmpLatest = _compareSemVer(currentVersion, info.latestVersion);
-      if (cmpLatest < 0 || (cmpLatest == 0 && currentBuild < info.latestBuildNumber)) {
+      if (cmpLatest < 0 ||
+          (cmpLatest == 0 && currentBuild < info.latestBuildNumber)) {
         return UpdateType.force;
       }
     }
 
     final cmpMin = _compareSemVer(currentVersion, info.minSupportedVersion);
-    if (cmpMin < 0 || (cmpMin == 0 && currentBuild < info.minSupportedBuildNumber)) {
+    if (cmpMin < 0 ||
+        (cmpMin == 0 && currentBuild < info.minSupportedBuildNumber)) {
       return UpdateType.force;
     }
 
     // 2. Check if newer version is available (Optional Update)
     final cmpLatest = _compareSemVer(currentVersion, info.latestVersion);
-    if (cmpLatest < 0 || (cmpLatest == 0 && currentBuild < info.latestBuildNumber)) {
+    if (cmpLatest < 0 ||
+        (cmpLatest == 0 && currentBuild < info.latestBuildNumber)) {
       return UpdateType.optional;
     }
 
@@ -356,7 +437,9 @@ class AutoUpdateService {
     final parts1 = clean1.split('.').map((e) => int.tryParse(e) ?? 0).toList();
     final parts2 = clean2.split('.').map((e) => int.tryParse(e) ?? 0).toList();
 
-    final maxLen = parts1.length > parts2.length ? parts1.length : parts2.length;
+    final maxLen = parts1.length > parts2.length
+        ? parts1.length
+        : parts2.length;
     while (parts1.length < maxLen) {
       parts1.add(0);
     }
@@ -369,35 +452,6 @@ class AutoUpdateService {
       if (parts1[i] > parts2[i]) return 1;
     }
     return 0;
-  }
-
-  /// Checks if the user dismissed this update version within the last 24 hours
-  Future<bool> _isUpdateSnoozed(String remoteVersion) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final dismissedVersion = prefs.getString(_prefDismissedVersionKey);
-      final dismissedTimeStr = prefs.getString(_prefDismissedTimeKey);
-
-      if (dismissedVersion == remoteVersion && dismissedTimeStr != null) {
-        final dismissedTime = DateTime.tryParse(dismissedTimeStr);
-        if (dismissedTime != null) {
-          final difference = DateTime.now().difference(dismissedTime);
-          if (difference.inHours < 24) {
-            return true;
-          }
-        }
-      }
-    } catch (_) {}
-    return false;
-  }
-
-  /// Snoozes this version for 24 hours
-  static Future<void> snoozeUpdate(String version) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_prefDismissedVersionKey, version);
-      await prefs.setString(_prefDismissedTimeKey, DateTime.now().toIso8601String());
-    } catch (_) {}
   }
 
   void _showUpdatePrompt({
@@ -483,85 +537,88 @@ class _UpdateDialogState extends State<_UpdateDialog> {
     });
 
     try {
-      OtaUpdate().execute(
-        apkUrl,
-        destinationFilename: 'agridirect_update.apk',
-        usePackageInstaller: true,
-      ).listen(
-        (OtaEvent event) {
-          if (!mounted) return;
-          switch (event.status) {
-            case OtaStatus.DOWNLOADING:
+      OtaUpdate()
+          .execute(
+            apkUrl,
+            destinationFilename: 'agridirect_update.apk',
+            usePackageInstaller: false,
+          )
+          .listen(
+            (OtaEvent event) {
+              if (!mounted) return;
+              switch (event.status) {
+                case OtaStatus.DOWNLOADING:
+                  setState(() {
+                    final progressStr = event.value;
+                    if (progressStr != null) {
+                      _downloadProgress = double.tryParse(progressStr) != null
+                          ? double.parse(progressStr) / 100.0
+                          : null;
+                    }
+                  });
+                  break;
+                case OtaStatus.INSTALLING:
+                  setState(() {
+                    _statusMessage = 'Installing update...';
+                    final progressStr = event.value;
+                    _downloadProgress = progressStr == null
+                        ? null
+                        : (double.tryParse(progressStr) ?? 0) / 100.0;
+                  });
+                  break;
+                case OtaStatus.INSTALLATION_DONE:
+                  setState(() {
+                    _statusMessage =
+                        'Update installed. Restarting AgriDirect...';
+                    _isDownloading = false;
+                    _downloadProgress = null;
+                  });
+                  break;
+                case OtaStatus.PERMISSION_NOT_GRANTED_ERROR:
+                  setState(() {
+                    _statusMessage =
+                        'Install permission was not granted. Please allow AgriDirect to install unknown apps or download via browser.';
+                    _isDownloading = false;
+                    _hasError = true;
+                    _downloadProgress = null;
+                  });
+                  break;
+                case OtaStatus.INSTALLATION_ERROR:
+                  setState(() {
+                    _statusMessage =
+                        'Installation failed. Please verify the APK package or try downloading directly in browser.';
+                    _isDownloading = false;
+                    _hasError = true;
+                    _downloadProgress = null;
+                  });
+                  break;
+                case OtaStatus.DOWNLOAD_ERROR:
+                case OtaStatus.CHECKSUM_ERROR:
+                case OtaStatus.INTERNAL_ERROR:
+                case OtaStatus.ALREADY_RUNNING_ERROR:
+                case OtaStatus.CANCELED:
+                  setState(() {
+                    final details = event.value?.trim();
+                    _statusMessage = details == null || details.isEmpty
+                        ? 'Download failed (${event.status.name})'
+                        : 'Download failed: $details';
+                    _isDownloading = false;
+                    _hasError = true;
+                    _downloadProgress = null;
+                  });
+                  break;
+              }
+            },
+            onError: (err) {
+              if (!mounted) return;
               setState(() {
-                final progressStr = event.value;
-                if (progressStr != null) {
-                  _downloadProgress = double.tryParse(progressStr) != null
-                      ? double.parse(progressStr) / 100.0
-                      : null;
-                }
-              });
-              break;
-            case OtaStatus.INSTALLING:
-              setState(() {
-                _statusMessage = 'Installing update...';
-                final progressStr = event.value;
-                _downloadProgress = progressStr == null
-                    ? null
-                    : (double.tryParse(progressStr) ?? 0) / 100.0;
-              });
-              break;
-            case OtaStatus.INSTALLATION_DONE:
-              setState(() {
-                _statusMessage = 'Update installed. Restarting AgriDirect...';
-                _isDownloading = false;
-                _downloadProgress = null;
-              });
-              break;
-            case OtaStatus.PERMISSION_NOT_GRANTED_ERROR:
-              setState(() {
-                _statusMessage =
-                    'Install permission was not granted. Please allow AgriDirect to install unknown apps or download via browser.';
+                _statusMessage = 'Update encountered an error: $err';
                 _isDownloading = false;
                 _hasError = true;
                 _downloadProgress = null;
               });
-              break;
-            case OtaStatus.INSTALLATION_ERROR:
-              setState(() {
-                _statusMessage =
-                    'Installation failed. Please verify the APK package or try downloading directly in browser.';
-                _isDownloading = false;
-                _hasError = true;
-                _downloadProgress = null;
-              });
-              break;
-            case OtaStatus.DOWNLOAD_ERROR:
-            case OtaStatus.CHECKSUM_ERROR:
-            case OtaStatus.INTERNAL_ERROR:
-            case OtaStatus.ALREADY_RUNNING_ERROR:
-            case OtaStatus.CANCELED:
-              setState(() {
-                final details = event.value?.trim();
-                _statusMessage = details == null || details.isEmpty
-                    ? 'Download failed (${event.status.name})'
-                    : 'Download failed: $details';
-                _isDownloading = false;
-                _hasError = true;
-                _downloadProgress = null;
-              });
-              break;
-          }
-        },
-        onError: (err) {
-          if (!mounted) return;
-          setState(() {
-            _statusMessage = 'Update encountered an error: $err';
-            _isDownloading = false;
-            _hasError = true;
-            _downloadProgress = null;
-          });
-        },
-      );
+            },
+          );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -597,7 +654,9 @@ class _UpdateDialogState extends State<_UpdateDialog> {
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
-              widget.isForced ? Icons.warning_amber_rounded : Icons.system_update_rounded,
+              widget.isForced
+                  ? Icons.warning_amber_rounded
+                  : Icons.system_update_rounded,
               color: widget.isForced ? AppColors.error : AppColors.primary,
               size: 26,
             ),
@@ -617,7 +676,10 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                 ),
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
@@ -713,7 +775,9 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                     value: _downloadProgress,
                     minHeight: 8,
                     backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -738,7 +802,6 @@ class _UpdateDialogState extends State<_UpdateDialog> {
           if (!widget.isForced)
             TextButton(
               onPressed: () {
-                AutoUpdateService.snoozeUpdate(widget.versionInfo.latestVersion);
                 Navigator.of(context, rootNavigator: true).pop();
               },
               child: Text(
@@ -755,24 +818,34 @@ class _UpdateDialogState extends State<_UpdateDialog> {
               icon: const Icon(Icons.open_in_browser_rounded, size: 18),
               label: Text(
                 'Browser Download',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ElevatedButton(
             onPressed: _startUpdate,
             style: ElevatedButton.styleFrom(
-              backgroundColor: widget.isForced ? AppColors.error : AppColors.primary,
+              backgroundColor: widget.isForced
+                  ? AppColors.error
+                  : AppColors.primary,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 12,
+              ),
             ),
             child: Text(
               _hasError ? 'Retry' : 'Update Now',

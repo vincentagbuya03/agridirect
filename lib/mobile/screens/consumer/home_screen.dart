@@ -9,6 +9,7 @@ import '../../../shared/data/app_data.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/services/commerce/cart_service.dart';
 import '../../../shared/services/user/user_service.dart';
+import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/models/auth/user_address_model.dart';
 import '../../../shared/widgets/image_widgets.dart';
 import 'cart_screen.dart';
@@ -107,15 +108,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadUserFirstName() async {
     try {
+      final auth = AuthService();
+      if (auth.userName.isNotEmpty) {
+        if (mounted) {
+          setState(() => _firstName = auth.userName.trim().split(' ').first);
+        }
+        return;
+      }
       final user = SupabaseConfig.currentUser;
       if (user == null) return;
-      final profile = await SupabaseDataService().getFarmerProfile(user.id);
-      final name =
-          profile?['full_name']?.toString() ??
+      final userProfile = await SupabaseDatabase.getUserProfile(user.id);
+      final farmerProfile =
+          await SupabaseDataService().getFarmerProfile(user.id);
+      final name = userProfile?['name']?.toString() ??
+          farmerProfile?['full_name']?.toString() ??
           user.userMetadata?['full_name']?.toString() ??
           user.email?.split('@').first ??
           '';
-      final first = name.split(' ').first;
+      final first = name.trim().split(' ').first;
       if (mounted) setState(() => _firstName = first);
     } catch (_) {}
   }

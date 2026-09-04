@@ -705,8 +705,16 @@ class _AdminHowItWorksTabState extends State<AdminHowItWorksTab> {
   Widget _buildAdminFaq() {
     final faqs = [
       {
-        'q': 'How do I approve a new farmer account?',
-        'a': 'Go to the "Farmers" tab (Tab 1), select the "Pending Verification" filter pill, click on the farmer row to view their ID and farm details, then click the green "Verify Farmer" button.',
+        'q': 'How does Farmer AI Auto-Verification work?',
+        'a': 'AgriDirect uses on-device Computer Vision AI (Google ML Kit). When a farmer captures their PhilSys National ID (Front & Back) and live selfie, the AI cross-checks PSA cryptographic QR data, OCR legal name, birthdate, and facial liveness in real time. If confidence is ≥ 85%, the farmer is instantly auto-verified with zero waiting time.',
+      },
+      {
+        'q': 'What happens if a farmer fails AI Auto-Verification?',
+        'a': 'They are not rejected. Submissions below 85% confidence (due to camera blur, nickname mismatch, or lighting) are safely routed to the "Pending Verification" queue in the Farmers tab (Tab 1). The AI attaches diagnostic notes (e.g. "Name similarity 76%") so you can inspect the ID and verify them with 1 click.',
+      },
+      {
+        'q': 'How do I approve a pending farmer account?',
+        'a': 'Go to the "Farmers" tab (Tab 1), select the "Pending Verification" filter pill, click on the farmer row to view their uploaded ID, selfie, and AI diagnostic breakdown, then click the green "Confirm Verification" button.',
       },
       {
         'q': 'How do I send a weather storm alert to all farmers?',

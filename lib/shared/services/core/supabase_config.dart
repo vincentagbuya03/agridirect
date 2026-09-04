@@ -467,13 +467,17 @@ class SupabaseDatabase {
     }
   }
 
-  static Future<void> submitFarmerRegistration({
+  static Future<Map<String, dynamic>> submitFarmerRegistration({
     required String userId,
     required FarmerRegistration registration,
     Uint8List? faceImageBytes,
     Uint8List? idImageBytes,
     Uint8List? idBackImageBytes,
     String? resolvedFarmLocation,
+    bool isAutoVerified = false,
+    String verificationMethod = 'manual_admin',
+    double? confidenceScore,
+    String? reviewNotes,
   }) async {
     try {
       final yearsOfExp = int.tryParse(registration.yearsOfExperience) ?? 0;
@@ -542,6 +546,10 @@ class SupabaseDatabase {
         'p_education_rows': educationJsonb,
         'p_crop_rows': cropJsonb,
         'p_livestock_rows': livestockJsonb,
+        'p_is_verified': isAutoVerified,
+        'p_verification_method': verificationMethod,
+        'p_confidence_score': confidenceScore,
+        'p_review_notes': reviewNotes,
       };
 
       final response = await _client.rpc(
@@ -559,9 +567,6 @@ class SupabaseDatabase {
       final trimmedResolvedLocation = resolvedFarmLocation?.trim() ?? '';
       if (trimmedResolvedLocation.isNotEmpty) {
         farmerProfileUpdates['location'] = trimmedResolvedLocation;
-      }
-      if (faceUrl != null && faceUrl.trim().isNotEmpty) {
-        farmerProfileUpdates['image_url'] = faceUrl.trim();
       }
       if (farmerProfileUpdates.isNotEmpty) {
         await _client
@@ -582,6 +587,8 @@ class SupabaseDatabase {
           debugPrint('User name sync warning: $e');
         }
       }
+
+      return result is Map ? Map<String, dynamic>.from(result) : <String, dynamic>{};
     } catch (e) {
       rethrow;
     }

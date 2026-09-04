@@ -1109,10 +1109,19 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Manually refresh the farmer registration status
+  /// Manually refresh the farmer registration status and sync verified name
   Future<void> refreshRegistrationStatus() async {
     if (_userId.isEmpty) return;
     try {
+      // Sync user profile name (e.g. verified legal name from ID)
+      final userProfile = await SupabaseDatabase.getUserProfile(_userId);
+      if (userProfile != null) {
+        final profileName = (userProfile['name'] as String?)?.trim() ?? '';
+        if (profileName.isNotEmpty) {
+          _userName = profileName;
+        }
+      }
+
       final reg = await SupabaseDatabase.getFarmerRegistration(_userId);
       if (reg != null) {
         final regStatus = reg['status'] as String?;
@@ -1129,6 +1138,20 @@ class AuthService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error refreshing registration status: $e');
+    }
+  }
+
+  /// Explicitly updates user display name locally and in database
+  Future<void> updateUserName(String newName) async {
+    final cleanName = newName.trim();
+    if (cleanName.isEmpty || _userId.isEmpty) return;
+    _userName = cleanName;
+    try {
+      await SupabaseDatabase.updateUserName(userId: _userId, name: cleanName);
+      await _persistCachedUserState();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating user name: $e');
     }
   }
 

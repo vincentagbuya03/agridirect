@@ -506,10 +506,11 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
         : 'N/A';
     final avatarUrl = farmer['avatar_url'] ?? farmer['users']?['avatar_url'];
 
+    final isAiVerified = farmer['verification_method'] == 'ai_auto_verified';
     String statusLabel;
     Color statusColor;
     if (isVerified) {
-      statusLabel = 'VERIFIED';
+      statusLabel = isAiVerified ? 'AI VERIFIED' : 'VERIFIED';
       statusColor = AdminUi.success;
     } else if (isPending) {
       statusLabel = 'PENDING';
@@ -615,14 +616,24 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                 flex: 2,
                 child: Row(
                   children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: statusColor,
-                        shape: BoxShape.circle,
+                    if (isAiVerified)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Icon(
+                          Icons.auto_awesome_rounded,
+                          size: 14,
+                          color: statusColor,
+                        ),
+                      )
+                    else
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
                     const SizedBox(width: 8),
                     Text(
                       statusLabel,
@@ -1444,7 +1455,12 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
                   },
                 ),
                 _detailSection('VERIFICATION STATUS', [
-                  _detailStatusItem(status),
+                  _detailStatusItem(
+                    status,
+                    verificationMethod: farmer['verification_method']?.toString(),
+                    confidenceScore: (farmer['ai_confidence_score'] as num?)?.toDouble(),
+                    reviewNotes: farmer['ai_verification_notes']?.toString() ?? farmer['review_notes']?.toString(),
+                  ),
                 ]),
                 const SizedBox(height: 32),
                 _detailSection('SUBMITTED DOCUMENTS', [
@@ -1590,11 +1606,17 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
     );
   }
 
-  Widget _detailStatusItem(String status) {
+  Widget _detailStatusItem(
+    String status, {
+    String? verificationMethod,
+    double? confidenceScore,
+    String? reviewNotes,
+  }) {
     final isVerified =
         status.toLowerCase() == 'verified' ||
         status.toLowerCase() == 'approved';
     final isPending = status.toLowerCase() == 'pending';
+    final isAiVerified = verificationMethod == 'ai_auto_verified';
     final color = isVerified
         ? AdminUi.success
         : (isPending ? AdminUi.warning : AdminUi.danger);
@@ -1602,36 +1624,108 @@ class _AdminFarmersTabState extends State<AdminFarmersTab> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withValues(alpha: 0.08),
         borderRadius: AdminUi.radiusMd,
         border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            isVerified ? Icons.verified_rounded : Icons.pending_actions_rounded,
-            color: color,
-          ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text(
-                status.toUpperCase(),
-                style: AdminUi.label(
-                  size: 13,
-                  color: color,
-                  weight: FontWeight.w800,
-                ),
+              Icon(
+                isAiVerified
+                    ? Icons.auto_awesome_rounded
+                    : (isVerified
+                        ? Icons.verified_rounded
+                        : Icons.pending_actions_rounded),
+                color: color,
+                size: 24,
               ),
-              Text(
-                isVerified
-                    ? 'All credentials verified'
-                    : 'Awaiting admin review',
-                style: AdminUi.body(size: 12, color: AdminUi.textSecondary),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          status.toUpperCase(),
+                          style: AdminUi.label(
+                            size: 13,
+                            color: color,
+                            weight: FontWeight.w800,
+                          ),
+                        ),
+                        if (isAiVerified) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AdminUi.brand.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '🤖 AI VERIFIED ${confidenceScore != null ? "(${(confidenceScore * 100).toStringAsFixed(0)}%)" : ""}',
+                              style: AdminUi.label(
+                                size: 10,
+                                color: AdminUi.brand,
+                                weight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isAiVerified
+                          ? 'Automated on-device computer vision & PhilSys QR validation passed'
+                          : (isVerified
+                              ? 'All credentials verified by administrator'
+                              : 'Awaiting administrator verification'),
+                      style: AdminUi.body(size: 12, color: AdminUi.textSecondary),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
+          if (reviewNotes != null && reviewNotes.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AdminUi.border),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 16,
+                    color: color,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      reviewNotes,
+                      style: AdminUi.body(
+                        size: 12,
+                        color: AdminUi.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
