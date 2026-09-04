@@ -1,48 +1,74 @@
-# Android Release and OTA Update Guide
+# Android Release and In-App Update Guide
 
-This guide explains how AgriDirect checks for Android app updates and how to release a new APK version safely.
+This guide explains how AgriDirect checks for app updates and how to release a new APK version safely.
+
+---
 
 ## How the Update Flow Works
 
-AgriDirect uses the Flutter package `ota_update` for Android OTA installation.
+AgriDirect uses **Supabase Remote Config** backed by `public.app_versions` with an automatic fallback to GitHub Releases. In-app downloads and installations are handled by `ota_update` with browser fallback support.
 
-The update check starts from:
-
+The update check runs automatically on app launch from:
+- `lib/main.dart`
 - `lib/shared/services/core/auto_update_service.dart`
-- `lib/mobile/screens/profile/app_settings_screen.dart`
+- `lib/mobile/screens/profile/app_settings_screen.dart` (Manual check)
 
-When the user taps **Check for Updates**, the app:
+### Update Decision Matrix
 
-1. Calls the latest GitHub release API:
+```
+Installed App Version vs Remote Config
+  │
+  ├─> Installed >= Remote Latest  ──> "Your app is up to date"
+  │
+  ├─> Installed < Min Supported OR is_critical = true ──> Force Update
+  │   - Non-dismissible modal
+  │   - "Later" button is hidden
+  │   - Must update to continue
+  │
+  └─> Installed < Remote Latest (and >= Min Supported) ──> Optional Update
+      - Shows "What's New" release notes
+      - "Update Now" or "Later"
+      - Tapping "Later" snoozes optional prompt for 24 hours
+```
 
-   ```text
-   https://api.github.com/repos/vincentagbuya03/agridirect/releases/latest
-   ```
+---
 
-2. Reads the release tag name, for example `v1.0.3`.
-3. Finds the first release asset ending in `.apk`.
-4. Reads the installed app version using `package_info_plus`.
-5. Compares the installed version with the GitHub release tag.
-6. If the GitHub release is newer, it shows the update dialog.
-7. Downloads the APK using `OtaUpdate().execute(...)`.
-8. Hands the downloaded APK to Android Package Installer.
-9. Android installs the APK only if the APK is valid, signed correctly, and has a higher `versionCode`.
+## Supabase Remote Config (`app_versions`)
+
+Version parameters can be updated instantly in the `app_versions` table:
+
+```sql
+UPDATE public.app_versions
+SET
+    latest_version = '1.0.4',
+    latest_build_number = 4,
+    min_supported_version = '1.0.0',
+    min_supported_build_number = 1,
+    apk_url = 'https://github.com/vincentagbuya03/agridirect/releases/download/v1.0.4/AgriDirect-Installer.apk',
+    release_notes = ARRAY[
+        'Added real-time chat audio calls',
+        'Direct shop order tracking improvements',
+        'Bug fixes and performance upgrades'
+    ],
+    is_critical = false,
+    updated_at = now()
+WHERE platform = 'android';
+```
+
+---
 
 ## Android OTA Requirements
 
 The OTA installer needs these Android files configured:
-
 - `android/app/src/main/AndroidManifest.xml`
 - `android/app/src/main/res/xml/filepaths.xml`
 
 The manifest must include:
-
 ```xml
 <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 ```
 
 Inside `<application>`, it must include the OTA provider and install receiver:
-
 ```xml
 <provider
     android:name="sk.fourq.otaupdate.OtaUpdateFileProvider"
@@ -64,7 +90,6 @@ Inside `<application>`, it must include the OTA provider and install receiver:
 ```
 
 `filepaths.xml` must contain:
-
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
@@ -72,204 +97,54 @@ Inside `<application>`, it must include the OTA provider and install receiver:
 </paths>
 ```
 
+---
+
 ## Version Rules
 
 Android uses two version values from `pubspec.yaml`:
 
 ```yaml
-version: 1.0.3+3
+version: 1.0.4+4
 ```
 
-The part before `+` is the user-visible version:
+- Before `+`: user-visible version (`1.0.4`)
+- After `+`: Android `versionCode` (`4`)
 
-```text
-1.0.3
-```
+> [!IMPORTANT]
+> Every new APK update must increment the build number after `+`. Android will reject installs if `versionCode` did not increase.
 
-The part after `+` is Android `versionCode`:
+---
 
-```text
-3
-```
-
-Every APK update must increase the build number after `+`. If the installed app is `1.0.2+2`, the next update should be something like:
-
-```yaml
-version: 1.0.3+3
-```
-
-Do not release `1.0.3+2` over `1.0.2+2`. Android will reject it because the `versionCode` did not increase.
-
-## Release Checklist
+## Step-by-Step Release Checklist
 
 ### 1. Update the Version
-
 Edit `pubspec.yaml`:
-
 ```yaml
-version: 1.0.3+3
+version: 1.0.4+4
 ```
 
-Use this pattern:
-
-- Patch release: `1.0.2+2` to `1.0.3+3`
-- Minor release: `1.0.2+2` to `1.1.0+3`
-- Hotfix after `1.0.3+3`: `1.0.4+4`
-
-### 2. Verify the App
-
-Run analysis before building:
-
+### 2. Verify Code
 ```powershell
 & 'C:\flutter\bin\cache\dart-sdk\bin\dart.exe' analyze
 ```
 
-If you changed Android config, also run an Android build check:
-
-```powershell
-cd android
-$env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'
-$env:GRADLE_USER_HOME='c:\Users\Nick Vincent Agbuya\Documents\Flutter Project\agridirect\.gradle-user-home'
-.\gradlew.bat :app:assembleDebug
-cd ..
-```
-
-### 3. Build the Release APK
-
-For the normal GitHub release APK, run:
-
+### 3. Build the Universal Release APK
+Run the release build script:
 ```powershell
 .\scripts\build-android-universal-release.ps1
 ```
-
-This runs:
-
-```powershell
-flutter build apk --release
-```
-
-Then it copies the newest universal APK to:
-
+This generates:
 ```text
 web/AgriDirect-Installer.apk
 ```
 
-You can upload that APK to GitHub Releases.
+### 4. Publish to GitHub Releases
+1. Go to `https://github.com/vincentagbuya03/agridirect/releases/new`
+2. Set Tag: `v1.0.4`
+3. Title: `AgriDirect v1.0.4`
+4. Attach: `web/AgriDirect-Installer.apk`
+5. Publish release.
 
-There is also a split-per-ABI script:
-
-```powershell
-.\scripts\build-android-split-release.ps1
-```
-
-Only use the split build if you intentionally want architecture-specific APKs. For the simplest OTA flow, prefer the universal APK.
-
-### 4. Create or Update the GitHub Release
-
-Go to:
-
-```text
-https://github.com/vincentagbuya03/agridirect/releases/new
-```
-
-Set the tag to match the visible version:
-
-```text
-v1.0.3
-```
-
-Attach the APK asset:
-
-```text
-AgriDirect-Installer.apk
-```
-
-Publish the release.
-
-The app checks the latest GitHub release tag, so the latest release must be the version you want users to install.
-
-### 5. Test the OTA Update
-
-Install the previous version on a real Android device.
-
-Example:
-
-```text
-Installed app: 1.0.2+2
-GitHub release: v1.0.3
-Uploaded APK: 1.0.3+3
-```
-
-Then open:
-
-```text
-Account & Security > Check for Updates
-```
-
-Expected result:
-
-1. The app shows **Update Available**.
-2. The APK downloads.
-3. Android asks permission to install or opens the installer.
-4. The app installs successfully.
-5. After reopening, the installed app version is the new version.
-
-## Common Problems
-
-### Download Finishes but App Does Not Update
-
-Most likely causes:
-
-- The APK has the same or lower `versionCode`.
-- The APK was signed with a different signing key.
-- Android install permission was denied.
-- The GitHub release asset is old and was not replaced after rebuilding.
-
-Fix:
-
-1. Confirm `pubspec.yaml` has a higher build number after `+`.
-2. Rebuild the APK.
-3. Re-upload the new APK to GitHub Releases.
-4. Try the update again.
-
-### App Keeps Showing the Same Update
-
-Most likely causes:
-
-- The installed app version did not actually change.
-- The GitHub release tag is higher than the app version inside the APK.
-- The uploaded APK was built before updating `pubspec.yaml`.
-
-Fix:
-
-1. Confirm `pubspec.yaml` version.
-2. Rebuild the APK after changing the version.
-3. Upload the rebuilt APK.
-4. Install and check again.
-
-### Android Says App Not Installed
-
-Most likely causes:
-
-- The new APK has a lower or equal `versionCode`.
-- The package name changed.
-- The signing key changed.
-
-The package name currently comes from:
-
-```text
-android/app/build.gradle.kts
-applicationId = "com.example.agridirect"
-```
-
-Do not change `applicationId` unless you intentionally want Android to treat it as a different app.
-
-## Quick Release Summary
-
-1. Update `pubspec.yaml`, for example `version: 1.0.3+3`.
-2. Run `dart analyze`.
-3. Build with `.\scripts\build-android-universal-release.ps1`.
-4. Create GitHub release tag `v1.0.3`.
-5. Upload `web/AgriDirect-Installer.apk`.
-6. Test from an older installed Android version.
-
+### 5. Update Supabase `app_versions`
+Update the row in Supabase SQL editor or Table Editor to `latest_version = '1.0.4'`, `latest_build_number = 4`, `apk_url`, and `release_notes`.
+Users currently on older builds will immediately receive the in-app update prompt!

@@ -179,6 +179,7 @@ void main() async {
       initialRoute = '$routePath$query';
       // Mark as deep link if we landed on a product or other content page
       isDeepLink = routePath.contains('product-details') ||
+          routePath.contains('farmer') ||
           routePath.contains('farmer-profile') ||
           routePath.contains('article');
       debugPrint('🔗 AppLinks getInitialLink captured: $initialRoute (isDeepLink=$isDeepLink)');
@@ -601,7 +602,12 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      AutoUpdateService().checkForUpdates(context);
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        final navContext = appNavigatorKey.currentContext ?? context;
+        if (mounted && navContext.mounted) {
+          AutoUpdateService().checkForUpdates(navContext);
+        }
+      });
     });
     _lifecycleObserver = _AppLifecycleObserver(this);
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
@@ -612,7 +618,10 @@ class _AgriDirectAppState extends State<AgriDirectApp> {
     _initializeAppSession();
     
     // If app started with a deep link, force navigate to it after first frame to ensure GoRouter initializes fully
-    if (widget.initialRoute != null && widget.initialRoute != '/' && widget.initialRoute!.contains('product-details')) {
+    if (widget.initialRoute != null &&
+        widget.initialRoute != '/' &&
+        (widget.initialRoute!.contains('product-details') ||
+         widget.initialRoute!.contains('/farmer/'))) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         debugPrint('🚀 PostFrameCallback: Navigating to initial deep link ${widget.initialRoute}');
         _router.go(widget.initialRoute!);
