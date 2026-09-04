@@ -1,36 +1,29 @@
 import 'package:flutter/material.dart';
-import 'search_screen.dart';
-import '../auth/qr_scanner_screen.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:geolocator/geolocator.dart';
+import 'dart:async';
+
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/router/app_router.dart';
-import '../../../shared/services/commerce/cart_service.dart';
 import '../../../shared/services/user/user_service.dart';
-import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/models/auth/user_address_model.dart';
 import '../../../shared/widgets/image_widgets.dart';
-import 'cart_screen.dart';
-import 'farmer_public_profile_screen.dart';
-import 'community_stories_screen.dart';
 import '../../../shared/styles/app_theme.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/screens/post_detail_screen.dart';
-import 'product_view_screen.dart';
-import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/services/community/message_service.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'promo_action_screen.dart';
-import 'free_shipping_screen.dart';
-import 'vouchers_screen.dart';
-import 'wholesale_screen.dart';
-import 'fresh_produce_screen.dart';
-import 'flash_sale_screen.dart';
-import 'local_shops_screen.dart';
-import 'more_actions_bottom_sheet.dart';
-import 'dart:async';
+
+import 'farmer_public_profile_screen.dart';
+import 'community_stories_screen.dart';
+import 'home/widgets/ecom_sliver_app_bar.dart';
+import 'home/widgets/ecom_hero_banner.dart';
+import 'home/widgets/ecom_category_grid.dart';
+import 'home/widgets/ecom_flash_sale_section.dart';
+import 'home/widgets/ecom_product_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -49,12 +42,9 @@ class _HomeScreenState extends State<HomeScreen> {
   late Stream<int> _unreadCountStream;
 
   late Future<List<ProductItem>> _dailyDiscoveriesFuture;
-
   late Future<List<ProductItem>> _flashSaleProductsFuture;
-  String _firstName = '';
-  int _currentBannerPage = 0;
-  final PageController _bannerController = PageController();
-  Timer? _bannerTimer;
+  late Future<List<CategoryItem>> _categoriesFuture;
+  Position? _userPosition;
 
   @override
   void initState() {
@@ -65,18 +55,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     _dailyDiscoveriesFuture = SupabaseDataService().getNearbyProducts();
-
     _flashSaleProductsFuture = SupabaseDataService().getFlashSaleProducts();
+    _categoriesFuture = SupabaseDataService().getCategories();
     _loadDefaultAddress();
-    _loadUserFirstName();
-    _startBannerAutoPlay();
+    _loadUserPosition();
   }
 
-  @override
-  void dispose() {
-    _bannerTimer?.cancel();
-    _bannerController.dispose();
-    super.dispose();
+  Future<void> _loadUserPosition() async {
+    try {
+      final pos = await Geolocator.getLastKnownPosition();
+      if (mounted && pos != null) {
+        setState(() => _userPosition = pos);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadDefaultAddress() async {
@@ -91,43 +82,6 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {
       if (mounted) setState(() => _addressLoaded = true);
     }
-  }
-
-  void _startBannerAutoPlay() {
-    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (_bannerController.hasClients) {
-        final next = (_currentBannerPage + 1) % 3;
-        _bannerController.animateToPage(
-          next,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
-      }
-    });
-  }
-
-  Future<void> _loadUserFirstName() async {
-    try {
-      final auth = AuthService();
-      if (auth.userName.isNotEmpty) {
-        if (mounted) {
-          setState(() => _firstName = auth.userName.trim().split(' ').first);
-        }
-        return;
-      }
-      final user = SupabaseConfig.currentUser;
-      if (user == null) return;
-      final userProfile = await SupabaseDatabase.getUserProfile(user.id);
-      final farmerProfile =
-          await SupabaseDataService().getFarmerProfile(user.id);
-      final name = userProfile?['name']?.toString() ??
-          farmerProfile?['full_name']?.toString() ??
-          user.userMetadata?['full_name']?.toString() ??
-          user.email?.split('@').first ??
-          '';
-      final first = name.trim().split(' ').first;
-      if (mounted) setState(() => _firstName = first);
-    } catch (_) {}
   }
 
   String get _displayCity {
@@ -145,371 +99,112 @@ class _HomeScreenState extends State<HomeScreen> {
           setState(() {
             _dailyDiscoveriesFuture = SupabaseDataService().getNearbyProducts();
             _featuredFarmersFuture = SupabaseDataService().getFeaturedFarmers();
-
-            _flashSaleProductsFuture = SupabaseDataService()
-                .getFlashSaleProducts();
+            _flashSaleProductsFuture =
+                SupabaseDataService().getFlashSaleProducts();
+            _categoriesFuture = SupabaseDataService().getCategories();
           });
+          await Future.wait([
+            _loadDefaultAddress(),
+            _loadUserPosition(),
+          ]);
         },
-        child: Column(
-          children: [
-            _buildPremiumHeader(context),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(top: 14, bottom: 40),
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            EcomSliverAppBar(
+              displayCity: _displayCity,
+              onLocationTap: () => _showAddressPicker(context),
+              unreadMessagesStream: _unreadCountStream,
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 6)),
+            const SliverToBoxAdapter(child: EcomHeroBanner()),
+            SliverToBoxAdapter(
+              child: EcomCategoryGrid(categoriesFuture: _categoriesFuture),
+            ),
+            SliverToBoxAdapter(
+              child: FutureBuilder<List<ProductItem>>(
+                future: _flashSaleProductsFuture,
+                builder: (context, snapshot) {
+                  final products = snapshot.data ?? [];
+                  return EcomFlashSaleSection(flashProducts: products);
+                },
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  _buildSectionHeader(
+                    'Featured Farmers',
+                    'Map View',
+                    () => context.push(AppRoutes.farmersMap),
+                  ),
+                  _buildFeaturedFarmersList(context),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                child: Row(
                   children: [
-                    _buildGreetingStrip(),
-                    _buildFlashSaleCountdownBanner(),
-                    _buildPromoBannerCarousel(),
-                    _buildQuickActionMenu(),
-                    const SizedBox(height: 24),
-                    _buildCategoryChipBar(),
-                    const SizedBox(height: 24),
-                    _buildDailyDiscoveries(),
-                    const SizedBox(height: 32),
-                    _buildSectionHeader(
-                      'Featured Farmers',
-                      'Map View',
-                      () => context.push(AppRoutes.farmersMap),
+                    Container(
+                      width: 4,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
-                    _buildFeaturedFarmersList(context),
-                    const SizedBox(height: 32),
-                    _buildSectionHeader('Community Feed', 'See All', () {
-                      Navigator.of(context)
-                          .push(
-                            MaterialPageRoute(
-                              builder: (_) => const CommunityStoriesScreen(),
-                            ),
-                          )
-                          .then((_) {
-                            if (mounted) setState(() {});
-                          });
-                    }),
-                    _buildCommunityFeed(context),
+                    const SizedBox(width: 8),
+                    Text(
+                      'DAILY DISCOVERIES',
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () {
+                        SupabaseDataService.navigationTabNotifier.value = 1;
+                      },
+                      child: Text(
+                        'See All',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ——————————————————————————————————————————————————————————————————————
-  Widget _buildGreetingStrip() {
-    final hour = DateTime.now().hour;
-    final String greeting = hour < 12
-        ? 'Good morning'
-        : hour < 17
-        ? 'Good afternoon'
-        : 'Good evening';
-    final String emoji = hour < 12
-        ? '☀️'
-        : hour < 17
-        ? '🌤️'
-        : '🌙';
-    if (_firstName.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$greeting, $_firstName! $emoji',
-            style: GoogleFonts.poppins(
-              fontSize: 19,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF111827),
-              letterSpacing: -0.4,
-            ),
-          ),
-          Text(
-            "What's fresh today?",
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: const Color(0xFF6B7280),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // â”€â”€ FLASH SALE LIVE BANNER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  Widget _buildFlashSaleCountdownBanner() {
-    return FutureBuilder<List<ProductItem>>(
-      future: _flashSaleProductsFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting ||
-            (snapshot.data ?? []).isEmpty) {
-          return const SizedBox.shrink();
-        }
-        return GestureDetector(
-          onTap: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const FlashSaleScreen())),
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7C2D12), Color(0xFFEA580C)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.bolt_rounded, color: Colors.white, size: 22),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Flash Sale is LIVE — Deals ending soon!',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'Shop Now →',
-                    style: GoogleFonts.inter(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // ── PROMO BANNER CAROUSEL ──────────────────────────────────────────────────
-  Widget _buildPromoBannerCarousel() {
-    final banners = [
-      {
-        'title': 'Fresh Produce Sale',
-        'subtitle': 'Up to 30% off — limited time!',
-        'tag': '🌿 SEASONAL',
-        'start': const Color(0xFF047857),
-        'end': const Color(0xFF10B981),
-        'icon': Icons.eco_rounded,
-      },
-      {
-        'title': 'Free Delivery',
-        'subtitle': 'On orders over 500',
-        'tag': 'ðŸšš FREE SHIP',
-        'start': const Color(0xFFB45309),
-        'end': const Color(0xFFF59E0B),
-        'icon': Icons.local_shipping_rounded,
-      },
-      {
-        'title': 'Support Local',
-        'subtitle': 'Buy directly from farmers',
-        'tag': ' FARM FRESH',
-        'start': const Color(0xFF1E40AF),
-        'end': const Color(0xFF3B82F6),
-        'icon': Icons.storefront_rounded,
-      },
-    ];
-    return Column(
-      children: [
-        SizedBox(
-          height: 175,
-          child: PageView.builder(
-            controller: _bannerController,
-            onPageChanged: (i) => setState(() => _currentBannerPage = i),
-            itemCount: banners.length,
-            itemBuilder: (ctx, index) {
-              final b = banners[index];
-              return _buildPromoBanner(
-                b['title'] as String,
-                b['subtitle'] as String,
-                b['tag'] as String,
-                b['start'] as Color,
-                b['end'] as Color,
-                b['icon'] as IconData,
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            banners.length,
-            (i) => AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: _currentBannerPage == i ? 20 : 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: _currentBannerPage == i
-                    ? AppColors.primary
-                    : const Color(0xFFD1D5DB),
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  Widget _buildPromoBanner(
-    String title,
-    String subtitle,
-    String tag,
-    Color colorStart,
-    Color colorEnd,
-    IconData icon,
-  ) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [colorStart, colorEnd],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: colorStart.withValues(alpha: 0.35),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            Positioned(
-              right: -30,
-              top: -30,
-              child: Container(
-                width: 160,
-                height: 160,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.07),
-                ),
-              ),
-            ),
-            Positioned(
-              right: 16,
-              bottom: -15,
-              child: Icon(
-                icon,
-                size: 100,
-                color: Colors.white.withValues(alpha: 0.1),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 16, 22, 16),
+            _buildDailyDiscoveriesSliver(),
+            SliverToBoxAdapter(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.35),
-                      ),
-                    ),
-                    child: Text(
-                      tag,
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          height: 1.1,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: GoogleFonts.inter(
-                          color: Colors.white.withValues(alpha: 0.85),
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  GestureDetector(
-                    onTap: () =>
-                        SupabaseDataService.navigationTabNotifier.value = 1,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Shop Now',
-                            style: GoogleFonts.inter(
-                              color: colorStart,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
+                  const SizedBox(height: 24),
+                  _buildSectionHeader('Community Feed', 'See All', () {
+                    Navigator.of(context)
+                        .push(
+                          MaterialPageRoute(
+                            builder: (_) => const CommunityStoriesScreen(),
                           ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 13,
-                            color: colorStart,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                        )
+                        .then((_) {
+                          if (mounted) setState(() {});
+                        });
+                  }),
+                  _buildCommunityFeed(context),
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
@@ -519,351 +214,58 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── CATEGORY CHIP BAR ──────────────────────────────────────────────
-  Widget _buildCategoryChipBar() {
-    final chips = [
-      {'label': 'Vegetables', 'cat': 'Vegetables'},
-      {'label': 'Fruits', 'cat': 'Fruits'},
-      {'label': 'Grains', 'cat': 'Grains'},
-      {'label': 'Livestock', 'cat': 'Livestock'},
-      {'label': 'Herbs', 'cat': 'Herbs'},
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-          child: Text(
-            'Shop by Type',
-            style: GoogleFonts.poppins(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF111827),
-              letterSpacing: -0.3,
-            ),
-          ),
-        ),
-        SizedBox(
-          height: 40,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: chips.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 8),
-            itemBuilder: (context, index) {
-              final chip = chips[index];
-              return GestureDetector(
-                onTap: () {
-                  SupabaseDataService.marketplaceCategoryNotifier.value =
-                      chip['cat'];
-                  SupabaseDataService.navigationTabNotifier.value = 1;
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: const Color(0xFFD1FAE5),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    chip['label']!,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF065F46),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickActionMenu() {
-    final actions = [
-      {
-        'icon': Icons.local_shipping_rounded,
-        'label': 'Free\nShipping',
-        'shortLabel': 'Free Shipping',
-        'gradientStart': const Color(0xFF059669),
-        'gradientEnd': const Color(0xFF10B981),
-      },
-      {
-        'icon': Icons.card_giftcard_rounded,
-        'label': 'My\nVouchers',
-        'shortLabel': 'Vouchers',
-        'gradientStart': const Color(0xFFD97706),
-        'gradientEnd': const Color(0xFFF59E0B),
-      },
-      {
-        'icon': Icons.inventory_2_rounded,
-        'label': 'Whole\nsale',
-        'shortLabel': 'Wholesale',
-        'gradientStart': const Color(0xFF1D4ED8),
-        'gradientEnd': const Color(0xFF3B82F6),
-      },
-      {
-        'icon': Icons.eco_rounded,
-        'label': 'Fresh\nProduce',
-        'shortLabel': 'Fresh Produce',
-        'gradientStart': const Color(0xFF0F766E),
-        'gradientEnd': const Color(0xFF14B8A6),
-      },
-      {
-        'icon': Icons.flash_on_rounded,
-        'label': 'Flash\nSale',
-        'shortLabel': 'Flash Sale',
-        'gradientStart': const Color(0xFFB45309),
-        'gradientEnd': const Color(0xFFF59E0B),
-      },
-      {
-        'icon': Icons.storefront_rounded,
-        'label': 'Local\nShops',
-        'shortLabel': 'Local Shops',
-        'gradientStart': const Color(0xFF6D28D9),
-        'gradientEnd': const Color(0xFF8B5CF6),
-      },
-      {
-        'icon': Icons.apps_rounded,
-        'label': 'More\nServices',
-        'shortLabel': 'More',
-        'gradientStart': const Color(0xFF475569),
-        'gradientEnd': const Color(0xFF64748B),
-      },
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 14),
-            child: Row(
-              children: [
-                Text(
-                  'Shop by Category',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => context.push(AppRoutes.marketplace),
-                  child: Text(
-                    'View All',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              mainAxisSpacing: 14,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.78,
-            ),
-            itemCount: actions.length,
-            itemBuilder: (context, index) {
-              final action = actions[index];
-              final gradientStart = action['gradientStart'] as Color;
-              final gradientEnd = action['gradientEnd'] as Color;
-              return _QuickActionButton(
-                icon: action['icon'] as IconData,
-                label: action['label'] as String,
-                gradientStart: gradientStart,
-                gradientEnd: gradientEnd,
-                onTap: () {
-                  final shortLabel = action['shortLabel'] as String;
-                  if (shortLabel == 'More') {
-                    showMoreActionsBottomSheet(context);
-                    return;
-                  }
-                  Widget? screen;
-                  switch (shortLabel) {
-                    case 'Free Shipping':
-                      screen = const FreeShippingScreen();
-                      break;
-                    case 'Vouchers':
-                      screen = const VouchersScreen();
-                      break;
-                    case 'Wholesale':
-                      screen = const WholesaleScreen();
-                      break;
-                    case 'Fresh Produce':
-                      screen = const FreshProduceScreen();
-                      break;
-                    case 'Flash Sale':
-                      screen = const FlashSaleScreen();
-                      break;
-                    case 'Local Shops':
-                      screen = const LocalShopsScreen();
-                      break;
-                    default:
-                      screen = PromoActionScreen(
-                        title: shortLabel,
-                        icon: action['icon'] as IconData,
-                        color: gradientStart,
-                      );
-                  }
-                  Navigator.of(
-                    context,
-                  ).push(MaterialPageRoute(builder: (context) => screen!));
-                },
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDailyDiscoveries() {
+  Widget _buildDailyDiscoveriesSliver() {
     return FutureBuilder<List<ProductItem>>(
       future: _dailyDiscoveriesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final products = snapshot.data ?? [];
-        if (products.isEmpty) return const SizedBox.shrink();
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Daily Discoveries',
-                    style: AppTextStyles.headline2.copyWith(fontSize: 22),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      SupabaseDataService.navigationTabNotifier.value = 1;
-                    },
-                    child: Text(
-                      'See All',
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                ],
+          return SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.65,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
               ),
-              const SizedBox(height: 20),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.75,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Center(child: AppShimmerLoader()),
                 ),
-                itemCount: products.length > 6 ? 6 : products.length,
-                itemBuilder: (context, index) {
-                  final product = products[index];
-                  return GestureDetector(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ProductViewScreen(product: product),
-                      ),
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(12),
-                              ),
-                              child: CachedNetworkImage(
-                                imageUrl: product.imageUrl,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                placeholder: (context, url) =>
-                                    const AppShimmerLoader(),
-                                errorWidget: (context, url, error) =>
-                                    const Icon(Icons.error),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  product.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  product.price,
-                                  style: const TextStyle(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+                childCount: 4,
               ),
-            ],
+            ),
+          );
+        }
+
+        final products = snapshot.data ?? [];
+        if (products.isEmpty) {
+          return const SliverToBoxAdapter(child: SizedBox.shrink());
+        }
+
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.65,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final product = products[index];
+                return EcomProductCard(
+                  product: product,
+                  userPosition: _userPosition,
+                );
+              },
+              childCount: products.length,
+            ),
           ),
         );
       },
@@ -894,301 +296,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPremiumHeader(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF047857), Color(0xFF059669), Color(0xFF10B981)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF064E3B).withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Row 1: Location selector pill + Quick Actions (Messages, Alerts, Cart)
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _showAddressPicker(context),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.25),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.location_on_rounded,
-                              color: Color(0xFFFDE047),
-                              size: 16,
-                            ),
-                            const SizedBox(width: 5),
-                            Flexible(
-                              child: RichText(
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                text: TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: 'Deliver to: ',
-                                      style: GoogleFonts.inter(
-                                        color: Colors.white.withValues(alpha: 0.85),
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    TextSpan(
-                                      text: _displayCity,
-                                      style: GoogleFonts.inter(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 2),
-                            const Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  StreamBuilder<int>(
-                    stream: _unreadCountStream,
-                    builder: (context, snapshot) {
-                      return _buildCompactHeaderAction(
-                        Icons.chat_bubble_outline_rounded,
-                        (snapshot.data ?? 0) > 0,
-                        () => context.push(AppRoutes.customerMessages),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 12),
-                  _buildCompactHeaderNotification(context),
-                  const SizedBox(width: 12),
-                  _buildCompactHeaderCart(context),
-                ],
-              ),
-              const SizedBox(height: 10),
-              // Row 2: Full-width Hero Search Button
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SearchScreen()),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.95),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFECFDF5),
-                            borderRadius: BorderRadius.circular(9),
-                          ),
-                          child: const Icon(
-                            Icons.search_rounded,
-                            color: Color(0xFF059669),
-                            size: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Search fresh vegetables, fruits, crops...',
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFF94A3B8),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Container(
-                          height: 20,
-                          width: 1,
-                          color: const Color(0xFFE2E8F0),
-                          margin: const EdgeInsets.symmetric(horizontal: 6),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const QRScannerScreen(
-                                  title: 'Scan QR / Product',
-                                  instruction: 'Scan QR code to locate produce',
-                                ),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.qr_code_scanner_rounded,
-                              color: Color(0xFF059669),
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCompactHeaderAction(
-    IconData icon,
-    bool hasNotification,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Icon(icon, color: Colors.white, size: 23),
-          if (hasNotification)
-            Positioned(
-              right: -3,
-              top: -3,
-              child: Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFF10B981),
-                    width: 1.5,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactHeaderNotification(BuildContext context) {
-    return ValueListenableBuilder<int>(
-      valueListenable: NotificationService().unreadCountNotifier,
-      builder: (context, count, _) {
-        return _buildCompactHeaderAction(
-          Icons.notifications_none_rounded,
-          count > 0,
-          () => context.push(AppRoutes.notifications),
-        );
-      },
-    );
-  }
-
-  Widget _buildCompactHeaderCart(BuildContext context) {
-    return ListenableBuilder(
-      listenable: CartService(),
-      builder: (context, _) {
-        final count = CartService().itemCount;
-        return GestureDetector(
-          onTap: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const CartScreen())),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              const Icon(
-                Icons.shopping_cart_outlined,
-                color: Colors.white,
-                size: 23,
-              ),
-              if (count > 0)
-                Positioned(
-                  right: -7,
-                  top: -7,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    child: Text(
-                      '$count',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
     );
   }
 
