@@ -33,7 +33,11 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   late Future<List<Map<String, dynamic>>> _featuredFarmersFuture =
       SupabaseDataService().getFeaturedFarmers();
   UserAddress? _defaultAddress;
@@ -92,6 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: RefreshIndicator(
@@ -262,6 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
               (context, index) {
                 final product = products[index];
                 return EcomProductCard(
+                  key: ValueKey('home_prod_${product.productId ?? index}'),
                   product: product,
                   userPosition: _userPosition,
                 );

@@ -122,8 +122,15 @@ class EcomProductCard extends StatelessWidget {
                 children: [
                   product.imageUrl.isNotEmpty
                       ? CachedNetworkImage(
+                          key: ValueKey('img_${product.productId}_${product.imageUrl}'),
                           imageUrl: product.imageUrl,
                           fit: BoxFit.cover,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                          placeholderFadeInDuration: Duration.zero,
+                          useOldImageOnUrlChange: true,
+                          memCacheWidth: 400,
+                          memCacheHeight: 400,
                           placeholder: (context, url) =>
                               const AppShimmerLoader(),
                           errorWidget: (context, url, error) => Container(

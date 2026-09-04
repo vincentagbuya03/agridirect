@@ -40,7 +40,11 @@ class MarketplaceScreen extends StatefulWidget {
   State<MarketplaceScreen> createState() => _MarketplaceScreenState();
 }
 
-class _MarketplaceScreenState extends State<MarketplaceScreen> {
+class _MarketplaceScreenState extends State<MarketplaceScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   int _selectedFilter = 0;
   List<String> _filters = ['All Products'];
   MarketplaceSort _selectedSort = MarketplaceSort.popular;
@@ -394,6 +398,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -903,6 +908,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                           itemCount: cachedProducts.length,
                           itemBuilder: (_, i) =>
                               EcomProductCard(
+                                key: ValueKey('cached_${cachedProducts[i].productId ?? i}'),
                                 product: cachedProducts[i],
                                 userPosition: _userPosition,
                               ),
@@ -1003,6 +1009,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 ),
                 itemCount: filteredProducts.length,
                 itemBuilder: (_, i) => EcomProductCard(
+                  key: ValueKey('prod_${filteredProducts[i].productId ?? i}'),
                   product: filteredProducts[i],
                   userPosition: _userPosition,
                 ),
