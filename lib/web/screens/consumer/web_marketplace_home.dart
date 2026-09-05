@@ -176,6 +176,9 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
 
   // ─── Visual Categories Slider ───
   Widget _buildVisualCategoriesSection(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final isWideDesktop = sw >= 1024;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -216,86 +219,107 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
           ],
         ),
         const SizedBox(height: 16),
-        SizedBox(
-          height: 110,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: _visualCategories.length,
-            separatorBuilder: (_, index) => const SizedBox(width: 14),
-            itemBuilder: (context, index) {
-              final cat = _visualCategories[index];
-              final isDeal = cat['category'] == 'Deals';
-
-              return InkWell(
-                onTap: () {
-                  if (isDeal) {
-                    widget.onNavigate(1, AppRoutes.flashSale);
-                  } else {
-                    context.go(AppRoutes.shop,
-                        extra: {'category': cat['category']});
-                  }
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  width: 140,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isDeal
-                        ? WebDesignTokens.dealAmber.withValues(alpha: 0.08)
-                        : WebDesignTokens.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isDeal
-                          ? WebDesignTokens.dealAmber.withValues(alpha: 0.3)
-                          : WebDesignTokens.border,
-                    ),
-                    boxShadow: WebDesignTokens.cardRest,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: isDeal
-                              ? WebDesignTokens.dealAmber.withValues(alpha: 0.15)
-                              : WebDesignTokens.primaryLight,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          cat['icon'] as IconData,
-                          color: isDeal
-                              ? WebDesignTokens.dealAmber
-                              : WebDesignTokens.primary,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        cat['title'] as String,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.rubik(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: WebDesignTokens.dark,
-                        ),
-                      ),
-                      Text(
-                        cat['items'] as String,
-                        style: GoogleFonts.nunitoSans(
-                          fontSize: 11,
-                          color: WebDesignTokens.slate500,
-                        ),
-                      ),
-                    ],
-                  ),
+        if (isWideDesktop)
+          Row(
+            children: _visualCategories.map((cat) {
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                  child: _buildCategoryCard(cat),
                 ),
               );
-            },
+            }).toList(),
+          )
+        else
+          SizedBox(
+            height: 110,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _visualCategories.length,
+              separatorBuilder: (_, index) => const SizedBox(width: 14),
+              itemBuilder: (context, index) {
+                return SizedBox(
+                  width: 140,
+                  child: _buildCategoryCard(_visualCategories[index]),
+                );
+              },
+            ),
           ),
-        ),
       ],
+    );
+  }
+
+  Widget _buildCategoryCard(Map<String, dynamic> cat) {
+    final isDeal = cat['category'] == 'Deals';
+
+    return InkWell(
+      onTap: () {
+        if (isDeal) {
+          widget.onNavigate(1, AppRoutes.flashSale);
+        } else {
+          context.go(AppRoutes.shop, extra: {'category': cat['category']});
+        }
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 106,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDeal
+              ? WebDesignTokens.dealAmber.withValues(alpha: 0.08)
+              : WebDesignTokens.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDeal
+                ? WebDesignTokens.dealAmber.withValues(alpha: 0.3)
+                : WebDesignTokens.border,
+          ),
+          boxShadow: WebDesignTokens.cardRest,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isDeal
+                    ? WebDesignTokens.dealAmber.withValues(alpha: 0.15)
+                    : WebDesignTokens.primaryLight,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                cat['icon'] as IconData,
+                color: isDeal
+                    ? WebDesignTokens.dealAmber
+                    : WebDesignTokens.primary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              cat['title'] as String,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.rubik(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: WebDesignTokens.dark,
+              ),
+            ),
+            Text(
+              cat['items'] as String,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunitoSans(
+                fontSize: 11,
+                color: WebDesignTokens.slate500,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

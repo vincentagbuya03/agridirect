@@ -25,6 +25,12 @@ class WebFarmerSpotlightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ratingNum = double.tryParse(rating) ?? 0.0;
+    final hasValidReviews = totalReviews > 0 && ratingNum > 0.0;
+    final displayCrops = cropsSummary.trim().isNotEmpty
+        ? cropsSummary
+        : 'San Carlos Fresh Harvest';
+
     return Container(
       decoration: BoxDecoration(
         color: WebDesignTokens.surface,
@@ -93,20 +99,34 @@ class WebFarmerSpotlightCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.15),
+                  color: hasValidReviews
+                      ? Colors.amber.withValues(alpha: 0.15)
+                      : WebDesignTokens.primaryLight,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.star_rounded,
-                        size: 14, color: Colors.amber),
-                    const SizedBox(width: 3),
+                    Icon(
+                      hasValidReviews
+                          ? Icons.star_rounded
+                          : Icons.verified_rounded,
+                      size: 14,
+                      color: hasValidReviews
+                          ? Colors.amber
+                          : WebDesignTokens.primaryDark,
+                    ),
+                    const SizedBox(width: 4),
                     Text(
-                      '$rating ($totalReviews)',
+                      hasValidReviews
+                          ? '$rating ($totalReviews)'
+                          : 'Verified Grower',
                       style: GoogleFonts.rubik(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: WebDesignTokens.dark,
+                        color: hasValidReviews
+                            ? WebDesignTokens.dark
+                            : WebDesignTokens.primaryDark,
                       ),
                     ),
                   ],
@@ -115,7 +135,7 @@ class WebFarmerSpotlightCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  cropsSummary,
+                  displayCrops,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.nunitoSans(
