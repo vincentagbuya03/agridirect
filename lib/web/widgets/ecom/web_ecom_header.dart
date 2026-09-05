@@ -305,31 +305,52 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
           // Right: Links
           Row(
             children: [
+              _buildUtilityLink('Community', () {
+                context.go(AppRoutes.community);
+              }),
+              _buildUtilityDivider(),
+              _buildUtilityLink('Find Farmer', () {
+                context.go(AppRoutes.farmersMap);
+              }),
+              _buildUtilityDivider(),
+              _buildUtilityLink('Weather', () {
+                context.go(AppRoutes.weatherRadar);
+              }),
+              _buildUtilityDivider(),
+              _buildUtilityLink('DA Articles', () {
+                context.go(AppRoutes.articles);
+              }),
+              _buildUtilityDivider(),
+              _buildUtilityLink('About Us', () {
+                context.go(AppRoutes.aboutUs);
+              }),
+              _buildUtilityDivider(),
+              _buildUtilityLink('Our Story', () {
+                context.go(AppRoutes.webWelcome);
+              }),
+              _buildUtilityDivider(),
               _buildUtilityLink('Farmer Portal', () {
                 final auth = AuthService();
                 if (auth.isLoggedIn) {
                   if (auth.isViewingAsFarmer) {
                     auth.switchToCustomerMode();
-                    widget.onNavigate(0, AppRoutes.marketplace);
+                    context.go(AppRoutes.marketplace);
                   } else {
                     auth.switchToFarmerMode();
-                    widget.onNavigate(0, AppRoutes.farmerDashboard);
+                    context.go(AppRoutes.farmerDashboard);
                   }
                 } else {
                   context.push(AppRoutes.login);
                 }
               }),
+              _buildUtilityDivider(),
               _buildUtilityLink('Track Harvest', () {
                 final auth = AuthService();
                 if (auth.isLoggedIn) {
-                  widget.onNavigate(0, AppRoutes.customerOrders);
+                  context.go(AppRoutes.customerOrders);
                 } else {
                   context.push(AppRoutes.login);
                 }
-              }),
-              _buildUtilityDivider(),
-              _buildUtilityLink('DA Articles', () {
-                widget.onNavigate(0, AppRoutes.articles);
               }),
               _buildUtilityDivider(),
               _buildUtilityLink('Help & FAQs', () {
@@ -756,15 +777,21 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
   }
 
   Widget _buildDepartmentMegaMenu() {
-    final categories = [
-      {'label': '🥬 Fresh Vegetables', 'route': '${AppRoutes.shop}?category=Vegetables'},
-      {'label': '🍎 Fruits & Orchards', 'route': '${AppRoutes.shop}?category=Fruits'},
+    final produceLinks = [
+      {'label': '🥬 Vegetables', 'route': '${AppRoutes.shop}?category=Vegetables'},
+      {'label': '🍎 Fruits', 'route': '${AppRoutes.shop}?category=Fruits'},
       {'label': '🌾 Rice & Grains', 'route': '${AppRoutes.shop}?category=Grains'},
-      {'label': '🌱 Organic & GAP', 'route': '${AppRoutes.shop}?category=Organic'},
       {'label': '⚡ Flash Deals', 'route': AppRoutes.flashSale},
       {'label': '📦 Pre-Orders', 'route': AppRoutes.preorders},
-      {'label': '🚜 Direct Farmers', 'route': AppRoutes.localShops},
-      {'label': '🏷️ AgriVouchers', 'route': AppRoutes.vouchers},
+      {'label': '🚜 Farm Shops', 'route': AppRoutes.localShops},
+    ];
+
+    final serviceLinks = [
+      {'label': '🌾 Find Farmer', 'route': AppRoutes.farmersMap},
+      {'label': '💬 Community', 'route': AppRoutes.community},
+      {'label': '🌦️ Weather Radar', 'route': AppRoutes.weatherRadar},
+      {'label': 'ℹ️ About Us', 'route': AppRoutes.aboutUs},
+      {'label': '📖 Our Story', 'route': AppRoutes.webWelcome},
     ];
 
     return Container(
@@ -776,27 +803,82 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Row(
-        children: categories.map((cat) {
-          final isFlash = cat['label']!.contains('⚡');
-          return InkWell(
-            onTap: () {
-              context.go(cat['route']!);
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-              child: Text(
-                cat['label']!,
-                style: GoogleFonts.nunitoSans(
-                  fontSize: 13,
-                  fontWeight: isFlash ? FontWeight.w700 : FontWeight.w600,
-                  color: isFlash
-                      ? WebDesignTokens.dealAmber
-                      : WebDesignTokens.slate700,
-                ),
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Left: Produce & Harvest Departments
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: produceLinks.map((cat) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: WebDesignTokens.dark,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () => context.go(cat['route']!),
+                      child: Text(
+                        cat['label']!,
+                        style: GoogleFonts.nunitoSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
             ),
-          );
-        }).toList(),
+          ),
+
+          // Right: Community & Agricultural Services
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: serviceLinks.map((svc) {
+                final isSpecial = svc['label']!.contains('Community') ||
+                    svc['label']!.contains('Find Farmer');
+                return Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: isSpecial
+                          ? WebDesignTokens.primaryDark
+                          : WebDesignTokens.slate600,
+                      backgroundColor: isSpecial
+                          ? WebDesignTokens.primaryLight.withValues(alpha: 0.5)
+                          : Colors.transparent,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () => context.go(svc['route']!),
+                    child: Text(
+                      svc['label']!,
+                      style: GoogleFonts.nunitoSans(
+                        fontSize: 12.5,
+                        fontWeight:
+                            isSpecial ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }

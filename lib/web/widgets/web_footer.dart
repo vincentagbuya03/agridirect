@@ -353,24 +353,14 @@ class AgriDirectWebFooter extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: _buildFooterSection('MORE', [
-                            _FooterAction('Home', () => context.go('/')),
-                            _FooterAction(
-                              'About Us',
-                              () => context.go('/about-us'),
-                            ),
-                            _FooterAction(
-                              'Blog & DA Articles',
-                              () => context.go('/articles'),
-                            ),
-                            _FooterAction(
-                              'Start Selling',
-                              () => context.go('/register'),
-                            ),
-                            _FooterAction(
-                              'Farmer Assistance',
-                              () => _showFarmerAssistanceModal(context),
-                            ),
+                          child: _buildFooterSection('EXPLORE & MORE', [
+                            _FooterAction('Storefront Home', () => context.go(AppRoutes.marketplace)),
+                            _FooterAction('Our Story & Welcome', () => context.go(AppRoutes.webWelcome)),
+                            _FooterAction('About Us', () => context.go(AppRoutes.aboutUs)),
+                            _FooterAction('Find Farmer Map', () => context.go(AppRoutes.farmersMap)),
+                            _FooterAction('Weather Radar', () => context.go(AppRoutes.weatherRadar)),
+                            _FooterAction('Community Hub', () => context.go(AppRoutes.community)),
+                            _FooterAction('DA Articles', () => context.go(AppRoutes.articles)),
                           ]),
                         ),
                         Expanded(
@@ -436,28 +426,15 @@ class AgriDirectWebFooter extends StatelessWidget {
                     // MORE
                     Expanded(
                       flex: 2,
-                      child: _buildFooterSection('MORE', [
-                        _FooterAction('Home', () => context.go('/')),
-                        _FooterAction(
-                          'About Us',
-                          () => context.go('/about-us'),
-                        ),
-                        _FooterAction(
-                          'Blog & DA Articles',
-                          () => context.go('/articles'),
-                        ),
-                        _FooterAction(
-                          'Start Selling',
-                          () => context.go('/register'),
-                        ),
-                        _FooterAction(
-                          'Farmer Assistance',
-                          () => _showFarmerAssistanceModal(context),
-                        ),
-                        _FooterAction(
-                          'Reviews & Stories',
-                          () => context.go('/community'),
-                        ),
+                      child: _buildFooterSection('EXPLORE & SERVICES', [
+                        _FooterAction('Storefront Home', () => context.go(AppRoutes.marketplace)),
+                        _FooterAction('Our Story & Welcome', () => context.go(AppRoutes.webWelcome)),
+                        _FooterAction('About Us', () => context.go(AppRoutes.aboutUs)),
+                        _FooterAction('Find Farmer Map', () => context.go(AppRoutes.farmersMap)),
+                        _FooterAction('Weather Radar', () => context.go(AppRoutes.weatherRadar)),
+                        _FooterAction('Community Hub', () => context.go(AppRoutes.community)),
+                        _FooterAction('Blog & DA Articles', () => context.go(AppRoutes.articles)),
+                        _FooterAction('Farmer Assistance', () => _showFarmerAssistanceModal(context)),
                       ]),
                     ),
                     // SHOP

@@ -154,7 +154,11 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                             _buildCuratedProduceGrid(sw),
                             const SizedBox(height: 48),
 
-                            // 7. Community & Economic Impact Counter
+                            // 7. AgriDirect Ecosystem & Community Hub
+                            _buildAgriServicesHub(context, sw),
+                            const SizedBox(height: 48),
+
+                            // 8. Community & Economic Impact Counter
                             _buildImpactMetricsSection(),
                             const SizedBox(height: 40),
                           ],
@@ -795,6 +799,219 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
           ),
         ],
       ),
+    );
+  }
+
+  // ─── AgriDirect Ecosystem & Community Hub ───
+  Widget _buildAgriServicesHub(BuildContext context, double screenWidth) {
+    final services = [
+      {
+        'title': 'Find Local Growers',
+        'tag': 'INTERACTIVE MAP',
+        'desc':
+            'Locate 200+ verified growers across 86 San Carlos barangays. View farm locations and shop directly.',
+        'icon': Icons.explore_rounded,
+        'color': WebDesignTokens.primary,
+        'action': 'Explore Map →',
+        'route': AppRoutes.farmersMap,
+      },
+      {
+        'title': 'Agricultural Weather',
+        'tag': 'RADAR & FORECAST',
+        'desc':
+            'Hyper-local precipitation radar, typhoon advisories, and seasonal harvest forecasting for Pangasinan.',
+        'icon': Icons.cloud_sync_rounded,
+        'color': const Color(0xFF0284C7),
+        'action': 'Check Weather →',
+        'route': AppRoutes.weatherRadar,
+      },
+      {
+        'title': 'Farmer Community',
+        'tag': 'GROWER FORUM',
+        'desc':
+            'Engage with local farmers, share recipes, read harvest dispatches, and ask agricultural questions.',
+        'icon': Icons.forum_rounded,
+        'color': const Color(0xFFD97706),
+        'action': 'Join Forum →',
+        'route': AppRoutes.community,
+      },
+      {
+        'title': 'Our Mission & Story',
+        'tag': 'FARM-TO-TABLE',
+        'desc':
+            'Learn why AgriDirect exists: 100% fair payouts to growers, zero middleman markups, and fresh harvest.',
+        'icon': Icons.local_florist_rounded,
+        'color': const Color(0xFF059669),
+        'action': 'Read Our Story →',
+        'route': AppRoutes.webWelcome,
+      },
+    ];
+
+    Widget buildCard(Map<String, dynamic> svc) {
+      final color = svc['color'] as Color;
+      return Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: WebDesignTokens.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: WebDesignTokens.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(svc['icon'] as IconData, color: color, size: 22),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    svc['tag'] as String,
+                    style: GoogleFonts.rubik(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              svc['title'] as String,
+              style: GoogleFonts.rubik(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: WebDesignTokens.dark,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              svc['desc'] as String,
+              style: GoogleFonts.nunitoSans(
+                fontSize: 12.5,
+                color: WebDesignTokens.slate500,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: () => context.go(svc['route'] as String),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      svc['action'] as String,
+                      style: GoogleFonts.rubik(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AgriDirect Ecosystem & Community Hub',
+                  style: GoogleFonts.rubik(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: WebDesignTokens.dark,
+                  ),
+                ),
+                Text(
+                  'Connecting San Carlos consumers with accredited growers, weather intelligence, and community resources',
+                  style: GoogleFonts.nunitoSans(
+                    fontSize: 13,
+                    color: WebDesignTokens.slate500,
+                  ),
+                ),
+              ],
+            ),
+            TextButton(
+              onPressed: () => context.go(AppRoutes.aboutUs),
+              child: Text(
+                'About AgriDirect >',
+                style: GoogleFonts.rubik(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: WebDesignTokens.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        if (screenWidth >= 1024)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: services.map((s) {
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: buildCard(s),
+                ),
+              );
+            }).toList(),
+          )
+        else if (screenWidth >= 650)
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: services.map((s) {
+              return SizedBox(
+                width: (screenWidth - 72) / 2,
+                child: buildCard(s),
+              );
+            }).toList(),
+          )
+        else
+          Column(
+            children: services.map((s) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: buildCard(s),
+              );
+            }).toList(),
+          ),
+      ],
     );
   }
 }

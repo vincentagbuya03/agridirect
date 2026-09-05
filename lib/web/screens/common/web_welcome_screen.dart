@@ -406,13 +406,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     child: GestureDetector(
                       onTap: () {
                         if (i == 0) {
-                          if (_scrollController.hasClients) {
-                            _scrollController.animateTo(
-                              0,
-                              duration: const Duration(milliseconds: 500),
-                              curve: Curves.easeOutCubic,
-                            );
-                          }
+                          context.go(AppRoutes.marketplace);
                         } else {
                           context.go(navRoutes[i]);
                         }
@@ -1121,7 +1115,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        '200+ Farmers',
+                        'Verified Growers',
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -1129,7 +1123,7 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                         ),
                       ),
                       Text(
-                        'Across the region',
+                        'San Carlos Network',
                         style: GoogleFonts.inter(
                           fontSize: 10,
                           color: AgriColors.muted,
