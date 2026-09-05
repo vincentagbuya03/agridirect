@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../constants/web_design_tokens.dart';
 
@@ -39,7 +40,7 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
         const Color(0xFF059669)
       ],
       'cta': 'SHOP TODAY\'S HARVEST',
-      'route': AppRoutes.freshProduce,
+      'route': AppRoutes.shop,
     },
     {
       'tag': 'SEASONAL HARVEST RADAR',
@@ -269,7 +270,7 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
                               horizontal: 24, vertical: 14),
                         ),
                         onPressed: () {
-                          widget.onNavigate(1, slide['route']);
+                          context.go(slide['route']);
                         },
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -407,7 +408,7 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
           ),
           const SizedBox(height: 8),
           InkWell(
-            onTap: () => widget.onNavigate(1, AppRoutes.flashSale),
+            onTap: () => context.go(AppRoutes.flashSale),
             child: Row(
               children: [
                 Text(
@@ -510,7 +511,7 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
           ),
           const SizedBox(height: 8),
           InkWell(
-            onTap: () => widget.onNavigate(1, AppRoutes.localShops),
+            onTap: () => context.go(AppRoutes.localShops),
             child: Row(
               children: [
                 Text(

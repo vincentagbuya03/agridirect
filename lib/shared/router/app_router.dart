@@ -513,12 +513,19 @@ GoRouter createAppRouter({String? initialRoute}) {
         builder: (context, state) {
           final showPreOrders =
               state.uri.queryParameters['mode'] == 'preorders';
+          final category = state.uri.queryParameters['category'] ??
+              (state.extra is Map ? (state.extra as Map)['category'] as String? : null);
+          final search = state.uri.queryParameters['search'] ??
+              (state.extra is Map ? (state.extra as Map)['search'] as String? : null);
+
           return LayoutBuilder(
             builder: (context, constraints) {
               if (kIsWeb || constraints.maxWidth > 800) {
                 return WebNavigation(
                   initialIndex: 1,
                   showPreOrdersInShop: showPreOrders,
+                  initialCategory: category,
+                  initialSearchQuery: search,
                   onLogout: () async {
                     await AuthService().logout();
                     if (context.mounted) context.go(AppRoutes.login);

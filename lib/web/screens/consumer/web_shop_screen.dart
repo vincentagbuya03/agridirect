@@ -70,6 +70,25 @@ class _WebShopScreenState extends State<WebShopScreen> {
     _loadProducts();
   }
 
+  @override
+  void didUpdateWidget(covariant WebShopScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    bool shouldReapply = false;
+    if (widget.initialCategory != null &&
+        widget.initialCategory != _selectedCategory) {
+      _selectedCategory = widget.initialCategory!;
+      shouldReapply = true;
+    }
+    if (widget.initialSearchQuery != null &&
+        widget.initialSearchQuery != _searchQuery) {
+      _searchQuery = widget.initialSearchQuery!;
+      shouldReapply = true;
+    }
+    if (shouldReapply) {
+      _applyFilters();
+    }
+  }
+
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
     try {

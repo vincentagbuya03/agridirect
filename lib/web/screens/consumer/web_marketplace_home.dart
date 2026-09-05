@@ -206,7 +206,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
               ],
             ),
             TextButton(
-              onPressed: () => widget.onNavigate(1, AppRoutes.shop),
+              onPressed: () => context.go(AppRoutes.shop),
               child: Text(
                 'All Categories >',
                 style: GoogleFonts.rubik(
@@ -255,9 +255,10 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
     return InkWell(
       onTap: () {
         if (isDeal) {
-          widget.onNavigate(1, AppRoutes.flashSale);
+          context.go(AppRoutes.flashSale);
         } else {
-          context.go(AppRoutes.shop, extra: {'category': cat['category']});
+          final catName = Uri.encodeComponent(cat['category'] as String);
+          context.go('${AppRoutes.shop}?category=$catName');
         }
       },
       borderRadius: BorderRadius.circular(16),
@@ -344,14 +345,14 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
           // Fallback: take first 4 items as showcase deals
           return WebFlashSaleStrip(
             flashProducts: all.take(4).toList(),
-            onViewAll: () => widget.onNavigate(1, AppRoutes.flashSale),
+            onViewAll: () => context.go(AppRoutes.flashSale),
             onProductTap: _navigateToProduct,
           );
         }
 
         return WebFlashSaleStrip(
           flashProducts: flashDeals,
-          onViewAll: () => widget.onNavigate(1, AppRoutes.flashSale),
+          onViewAll: () => context.go(AppRoutes.flashSale),
           onProductTap: _navigateToProduct,
         );
       },
@@ -390,7 +391,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
               ],
             ),
             TextButton(
-              onPressed: () => widget.onNavigate(1, AppRoutes.localShops),
+              onPressed: () => context.go(AppRoutes.localShops),
               child: Text(
                 'View All Growers >',
                 style: GoogleFonts.rubik(
@@ -464,7 +465,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                         ),
                       ),
                       onPressed: () =>
-                          widget.onNavigate(1, AppRoutes.localShops),
+                          context.go(AppRoutes.localShops),
                       child: Text(
                         'Explore Farm Directory >',
                         style: GoogleFonts.rubik(
@@ -502,7 +503,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                         if (fid != null && fid.toString().isNotEmpty) {
                           context.push('${AppRoutes.farmerProfileBase}/$fid');
                         } else {
-                          widget.onNavigate(1, AppRoutes.localShops);
+                          context.go(AppRoutes.localShops);
                         }
                       },
                     ),
@@ -535,7 +536,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                         if (fid != null && fid.toString().isNotEmpty) {
                           context.push('${AppRoutes.farmerProfileBase}/$fid');
                         } else {
-                          widget.onNavigate(1, AppRoutes.localShops);
+                          context.go(AppRoutes.localShops);
                         }
                       },
                     ),
@@ -718,7 +719,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                onPressed: () => widget.onNavigate(1, AppRoutes.shop),
+                onPressed: () => context.go(AppRoutes.shop),
               ),
             ),
           ],

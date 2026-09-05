@@ -757,10 +757,10 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
 
   Widget _buildDepartmentMegaMenu() {
     final categories = [
-      {'label': '🥬 Fresh Vegetables', 'route': AppRoutes.freshProduce},
-      {'label': '🍎 Fruits & Orchards', 'route': AppRoutes.shop},
-      {'label': '🌾 Rice & Grains', 'route': AppRoutes.shop},
-      {'label': '🌱 Organic & GAP', 'route': AppRoutes.shop},
+      {'label': '🥬 Fresh Vegetables', 'route': '${AppRoutes.shop}?category=Vegetables'},
+      {'label': '🍎 Fruits & Orchards', 'route': '${AppRoutes.shop}?category=Fruits'},
+      {'label': '🌾 Rice & Grains', 'route': '${AppRoutes.shop}?category=Grains'},
+      {'label': '🌱 Organic & GAP', 'route': '${AppRoutes.shop}?category=Organic'},
       {'label': '⚡ Flash Deals', 'route': AppRoutes.flashSale},
       {'label': '📦 Pre-Orders', 'route': AppRoutes.preorders},
       {'label': '🚜 Direct Farmers', 'route': AppRoutes.localShops},
@@ -780,7 +780,7 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
           final isFlash = cat['label']!.contains('⚡');
           return InkWell(
             onTap: () {
-              widget.onNavigate(1, cat['route']);
+              context.go(cat['route']!);
             },
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),

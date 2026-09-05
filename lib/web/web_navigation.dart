@@ -18,6 +18,8 @@ class WebNavigation extends StatefulWidget {
   final int initialIndex;
   final bool showPreOrdersInShop;
   final String? initialPostId;
+  final String? initialCategory;
+  final String? initialSearchQuery;
 
   const WebNavigation({
     super.key,
@@ -25,6 +27,8 @@ class WebNavigation extends StatefulWidget {
     this.initialIndex = 0,
     this.showPreOrdersInShop = false,
     this.initialPostId,
+    this.initialCategory,
+    this.initialSearchQuery,
   });
 
   @override
@@ -40,6 +44,7 @@ class _WebNavigationState extends State<WebNavigation> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _selectedCategoryFilter = widget.initialCategory;
     _auth.addListener(_onAuthChanged);
   }
 
@@ -121,6 +126,7 @@ class _WebNavigationState extends State<WebNavigation> {
         currentIndex: _currentIndex,
         initialShowPreOrders: widget.showPreOrdersInShop,
         initialCategory: _selectedCategoryFilter,
+        initialSearchQuery: widget.initialSearchQuery,
       ),
       WebCommunityHub(onNavigate: _navigateTo, currentIndex: _currentIndex, initialPostId: widget.initialPostId),
       WebProfileScreen(
