@@ -14,7 +14,7 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/services/commerce/voucher_service.dart';
 import '../../../shared/services/auth/auth_service.dart';
-import '../../widgets/web_consumer_nav_bar.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
 
 /// Dedicated full-page checkout for cart items (web).
 class WebCartCheckoutScreen extends StatefulWidget {
@@ -300,17 +300,15 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
         children: [
           Column(
             children: [
-              WebConsumerNavBar(
-                currentIndex: -1,
-                onNavigate: (i) => context.go(AppRoutes.webTabRoute(i)),
-                onCartTap: () => context.go(AppRoutes.cart),
-                isCartActive: true,
-                margin: EdgeInsets.fromLTRB(
-                  isCompact ? 16 : 32,
-                  20,
-                  isCompact ? 16 : 32,
-                  12,
-                ),
+              WebEcomHeader(
+                currentIndex: 4,
+                onNavigate: (i, [route]) {
+                  if (route != null) {
+                    context.go(route);
+                  } else {
+                    context.go(AppRoutes.webTabRoute(i));
+                  }
+                },
               ),
               Expanded(
                 child: SingleChildScrollView(
