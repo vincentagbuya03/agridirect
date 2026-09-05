@@ -3,10 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../shared/router/app_routes.dart';
-import '../../../shared/widgets/brand_logo.dart';
 import '../../constants/developer_assets.dart';
 import '../../widgets/animated_components.dart';
 import '../../widgets/web_footer.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
 
 /// WebAboutUsScreen
 /// Comprehensive About Us page highlighting the AgriDirect mission,
@@ -28,163 +28,36 @@ class WebAboutUsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildNav(context, isMobile),
-            _buildHero(isMobile),
-            _buildMissionStory(isMobile),
-            _buildPartnershipSignatories(isMobile),
-            _buildDevelopmentTeamSection(isMobile),
-            _buildPillarsGrid(isMobile),
-            _buildImpactStats(isMobile),
-            _buildCta(context, isMobile),
-            const AgriDirectWebFooter(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // NAVIGATION BAR
-  // ---------------------------------------------------------------------------
-  Widget _buildNav(BuildContext context, bool isMobile) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 48,
-        vertical: 16,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+      body: Column(
+        children: [
+          WebEcomHeader(
+            currentIndex: 4,
+            onNavigate: (index, [route]) {
+              if (route != null) {
+                context.go(route);
+              }
+            },
+            onSearch: (query) {
+              context.go(AppRoutes.shop, extra: {'search': query});
+            },
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildHero(isMobile),
+                  _buildMissionStory(isMobile),
+                  _buildPartnershipSignatories(isMobile),
+                  _buildDevelopmentTeamSection(isMobile),
+                  _buildPillarsGrid(isMobile),
+                  _buildImpactStats(isMobile),
+                  _buildCta(context, isMobile),
+                  const AgriDirectWebFooter(),
+                ],
+              ),
+            ),
           ),
         ],
-      ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1300),
-          child: Row(
-            children: [
-              MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(
-                  onTap: () => context.go('/'),
-                  child: BrandLogo(
-                    size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              if (!isMobile) ...[
-                TextButton(
-                  onPressed: () => context.go('/'),
-                  child: Text(
-                    'Home',
-                    style: GoogleFonts.inter(
-                      color: AgriColors.dark,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () => context.go(AppRoutes.shop),
-                  child: Text(
-                    'Shop',
-                    style: GoogleFonts.inter(
-                      color: AgriColors.dark,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () => context.go(AppRoutes.community),
-                  child: Text(
-                    'Community',
-                    style: GoogleFonts.inter(
-                      color: AgriColors.dark,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () => context.go(AppRoutes.articles),
-                  child: Text(
-                    'DA Articles',
-                    style: GoogleFonts.inter(
-                      color: AgriColors.dark,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () {},
-                  child: Text(
-                    'About Us',
-                    style: GoogleFonts.inter(
-                      color: _primary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () => context.go(AppRoutes.farmersMap),
-                  child: Text(
-                    'Find Farmer',
-                    style: GoogleFonts.inter(
-                      color: AgriColors.dark,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () => context.go(AppRoutes.weatherRadar),
-                  child: Text(
-                    'Weather',
-                    style: GoogleFonts.inter(
-                      color: AgriColors.dark,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-              ],
-              ElevatedButton.icon(
-                onPressed: () => context.go(AppRoutes.marketplace),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 12,
-                  ),
-                ),
-                icon: const Icon(Icons.storefront_rounded, size: 16),
-                label: Text(
-                  'Marketplace',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

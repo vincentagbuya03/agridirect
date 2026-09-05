@@ -95,10 +95,14 @@ class _WebFlashSaleStripState extends State<WebFlashSaleStrip> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ─── Header Bar with Countdown & View All ───
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+          Builder(
+            builder: (context) {
+              final sw = MediaQuery.of(context).size.width;
+              final isCompact = sw < 900;
+              final isMobile = sw < 600;
+
+              final titleSection = Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -116,48 +120,50 @@ class _WebFlashSaleStripState extends State<WebFlashSaleStrip> {
                       Text(
                         'FLASH HARVEST DEALS',
                         style: GoogleFonts.rubik(
-                          fontSize: 18,
+                          fontSize: isMobile ? 15 : 18,
                           fontWeight: FontWeight.w800,
                           color: WebDesignTokens.dark,
                           letterSpacing: 0.5,
                         ),
                       ),
                       Text(
-                        'Limited batch discounts direct from morning pickings',
+                        isMobile
+                            ? 'Limited batch fresh discounts'
+                            : 'Limited batch discounts direct from morning pickings',
                         style: GoogleFonts.nunitoSans(
-                          fontSize: 13,
+                          fontSize: isMobile ? 11.5 : 13,
                           color: WebDesignTokens.slate500,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(width: 20),
-                  // Live Countdown Timer
-                  Row(
-                    children: [
-                      Text(
-                        'ENDS IN: ',
-                        style: GoogleFonts.rubik(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: WebDesignTokens.dealAmber,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      _buildTimeBox('$hours', 'H'),
-                      const Text(' : ',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      _buildTimeBox('$minutes', 'M'),
-                      const Text(' : ',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      _buildTimeBox('$seconds', 'S'),
-                    ],
-                  ),
                 ],
-              ),
+              );
 
-              // Right: Navigation Arrows & View All Link
-              Row(
+              final timerSection = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'ENDS IN: ',
+                    style: GoogleFonts.rubik(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: WebDesignTokens.dealAmber,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _buildTimeBox('$hours', 'H'),
+                  const Text(' : ',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  _buildTimeBox('$minutes', 'M'),
+                  const Text(' : ',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  _buildTimeBox('$seconds', 'S'),
+                ],
+              );
+
+              final actionsSection = Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back_ios_rounded, size: 16),
@@ -184,8 +190,45 @@ class _WebFlashSaleStripState extends State<WebFlashSaleStrip> {
                     ),
                   ),
                 ],
-              ),
-            ],
+              );
+
+              if (isCompact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 10,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      alignment: WrapAlignment.spaceBetween,
+                      children: [
+                        titleSection,
+                        timerSection,
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [actionsSection],
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      titleSection,
+                      const SizedBox(width: 20),
+                      timerSection,
+                    ],
+                  ),
+                  actionsSection,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 20),
 

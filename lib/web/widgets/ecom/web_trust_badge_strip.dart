@@ -9,7 +9,8 @@ class WebTrustBadgeStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
-    final isCompact = sw < 900;
+    final isCompact = sw < 1024;
+    final isMobile = sw < 600;
 
     final pillars = [
       {
@@ -38,13 +39,24 @@ class WebTrustBadgeStrip extends StatelessWidget {
       },
     ];
 
+    if (isMobile) {
+      return Column(
+        children: pillars.map((p) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _buildCard(p),
+          );
+        }).toList(),
+      );
+    }
+
     if (isCompact) {
       return GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 2.4,
+          childAspectRatio: 2.8,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
         ),

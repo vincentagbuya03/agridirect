@@ -8,7 +8,7 @@ import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/widgets/image_widgets.dart';
-import '../../widgets/web_consumer_nav_bar.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
 
 /// Web-only Find Farmer Screen — Desktop-optimized 2-column layout with interactive map & farmer directory
 class WebFindFarmerScreen extends StatefulWidget {
@@ -151,11 +151,18 @@ class _WebFindFarmerScreenState extends State<WebFindFarmerScreen> {
       backgroundColor: background,
       body: Column(
         children: [
-          WebConsumerNavBar(
-            currentIndex: widget.currentIndex,
-            onNavigate: _handleNavClick,
-            onCartTap: () => context.go(AppRoutes.cart),
-            margin: EdgeInsets.symmetric(horizontal: sw < 600 ? 12 : 32, vertical: 16),
+          WebEcomHeader(
+            currentIndex: -1,
+            onNavigate: (index, [route]) {
+              if (route != null) {
+                context.go(route);
+              } else {
+                _handleNavClick(index);
+              }
+            },
+            onSearch: (query) {
+              context.go(AppRoutes.shop, extra: {'search': query});
+            },
           ),
           Expanded(
             child: SingleChildScrollView(

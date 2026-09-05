@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_routes.dart';
-import '../../widgets/web_consumer_nav_bar.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
 import 'radar/consumer_radar_view.dart';
 
 class WebConsumerWeatherRadarScreen extends StatelessWidget {
@@ -16,25 +16,24 @@ class WebConsumerWeatherRadarScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFF8FAFC),
       body: Column(
         children: [
-          WebConsumerNavBar(
+          WebEcomHeader(
             currentIndex: -1,
-            onNavigate: (index) => context.go(AppRoutes.webTabRoute(index)),
-            onCartTap: () => context.go(AppRoutes.cart),
-            margin: EdgeInsets.fromLTRB(
-              isCompact ? 16 : 32,
-              20,
-              isCompact ? 16 : 32,
-              12,
-            ),
+            onNavigate: (index, [route]) {
+              if (route != null) {
+                context.go(route);
+              } else {
+                context.go(AppRoutes.webTabRoute(index));
+              }
+            },
+            onSearch: (query) {
+              context.go(AppRoutes.shop, extra: {'search': query});
+            },
           ),
           Expanded(
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: isCompact ? 16 : 32),
+              padding: EdgeInsets.all(isCompact ? 12 : 24),
               child: ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  topRight: Radius.circular(24),
-                ),
+                borderRadius: BorderRadius.circular(24),
                 child: const ConsumerRadarView(
                   lat: 15.9281,
                   lon: 120.3489,

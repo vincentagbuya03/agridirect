@@ -367,46 +367,61 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
   Widget _buildFarmerCooperativesSection() {
     final sw = MediaQuery.of(context).size.width;
     final isCompact = sw < 1024;
+    final isMobile = sw < 650;
+
+    final headerText = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Featured Local Cooperatives',
+          style: GoogleFonts.rubik(
+            fontSize: isMobile ? 18 : 20,
+            fontWeight: FontWeight.w700,
+            color: WebDesignTokens.dark,
+          ),
+        ),
+        Text(
+          'Accredited farmer associations committed to transparent, fair trade produce',
+          style: GoogleFonts.nunitoSans(
+            fontSize: isMobile ? 12 : 13,
+            color: WebDesignTokens.slate500,
+          ),
+        ),
+      ],
+    );
+
+    final viewAllBtn = TextButton(
+      onPressed: () => context.go(AppRoutes.localShops),
+      child: Text(
+        'View All Growers >',
+        style: GoogleFonts.rubik(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: WebDesignTokens.primary,
+        ),
+      ),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Featured Local Cooperatives',
-                  style: GoogleFonts.rubik(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: WebDesignTokens.dark,
-                  ),
-                ),
-                Text(
-                  'Accredited farmer associations committed to transparent, fair trade produce',
-                  style: GoogleFonts.nunitoSans(
-                    fontSize: 13,
-                    color: WebDesignTokens.slate500,
-                  ),
-                ),
-              ],
-            ),
-            TextButton(
-              onPressed: () => context.go(AppRoutes.localShops),
-              child: Text(
-                'View All Growers >',
-                style: GoogleFonts.rubik(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: WebDesignTokens.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
+        if (isMobile)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              headerText,
+              const SizedBox(height: 6),
+              Align(alignment: Alignment.centerLeft, child: viewAllBtn),
+            ],
+          )
+        else
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              headerText,
+              viewAllBtn,
+            ],
+          ),
         const SizedBox(height: 16),
         FutureBuilder<List<Map<String, dynamic>>>(
           future: _farmersFuture,
@@ -686,7 +701,9 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: columns,
-                  childAspectRatio: 0.68,
+                  childAspectRatio: screenWidth < 500
+                      ? 0.62
+                      : (screenWidth < 650 ? 0.65 : 0.68),
                   crossAxisSpacing: 14,
                   mainAxisSpacing: 14,
                 ),
@@ -734,6 +751,9 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
 
   // ─── Community & Economic Impact Counter ───
   Widget _buildImpactMetricsSection() {
+    final sw = MediaQuery.of(context).size.width;
+    final isMobile = sw < 700;
+
     final metrics = [
       {'val': '100%', 'label': 'Direct Farmer Payouts (0% Markup)'},
       {'val': '86', 'label': 'San Carlos Barangays Covered'},
@@ -742,7 +762,10 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
     ];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 24,
+        vertical: isMobile ? 20 : 28,
+      ),
       decoration: BoxDecoration(
         color: WebDesignTokens.primaryLight,
         borderRadius: BorderRadius.circular(20),
@@ -758,26 +781,40 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
               const Icon(Icons.volunteer_activism_rounded,
                   color: WebDesignTokens.primaryDark, size: 22),
               const SizedBox(width: 8),
-              Text(
-                'AgriDirect Community & Transparency Impact',
-                style: GoogleFonts.rubik(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: WebDesignTokens.primaryDark,
+              Flexible(
+                child: Text(
+                  'AgriDirect Community & Transparency Impact',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.rubik(
+                    fontSize: isMobile ? 14 : 16,
+                    fontWeight: FontWeight.w700,
+                    color: WebDesignTokens.primaryDark,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          Row(
-            children: metrics.map((m) {
-              return Expanded(
-                child: Column(
+          if (isMobile)
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 1.8,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 16,
+              ),
+              itemCount: metrics.length,
+              itemBuilder: (context, i) {
+                final m = metrics[i];
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       m['val']!,
                       style: GoogleFonts.rubik(
-                        fontSize: 26,
+                        fontSize: 22,
                         fontWeight: FontWeight.w800,
                         color: WebDesignTokens.primaryDark,
                       ),
@@ -787,16 +824,44 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
                       m['label']!,
                       textAlign: TextAlign.center,
                       style: GoogleFonts.nunitoSans(
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: WebDesignTokens.slate600,
                       ),
                     ),
                   ],
-                ),
-              );
-            }).toList(),
-          ),
+                );
+              },
+            )
+          else
+            Row(
+              children: metrics.map((m) {
+                return Expanded(
+                  child: Column(
+                    children: [
+                      Text(
+                        m['val']!,
+                        style: GoogleFonts.rubik(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: WebDesignTokens.primaryDark,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        m['label']!,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.nunitoSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: WebDesignTokens.slate600,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
         ],
       ),
     );

@@ -119,19 +119,26 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
   Widget build(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
     final isStacked = sw < 1024;
+    final isMobile = sw < 650;
 
     if (isStacked) {
       return Column(
         children: [
-          _buildMainSlider(height: 380),
+          _buildMainSlider(height: isMobile ? 320 : 380, sw: sw),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: _buildFlashDealMiniCard(context)),
-              const SizedBox(width: 16),
-              Expanded(child: _buildFarmerSpotlightMiniCard(context)),
-            ],
-          ),
+          if (isMobile) ...[
+            _buildFlashDealMiniCard(context),
+            const SizedBox(height: 16),
+            _buildFarmerSpotlightMiniCard(context),
+          ] else ...[
+            Row(
+              children: [
+                Expanded(child: _buildFlashDealMiniCard(context)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildFarmerSpotlightMiniCard(context)),
+              ],
+            ),
+          ],
         ],
       );
     }
@@ -144,7 +151,7 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
           // 8 Columns: Main Hero Slider
           Expanded(
             flex: 8,
-            child: _buildMainSlider(),
+            child: _buildMainSlider(sw: sw),
           ),
           const SizedBox(width: 20),
           // 4 Columns: Side Promotional Bento Cards
@@ -163,7 +170,11 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
     );
   }
 
-  Widget _buildMainSlider({double? height}) {
+  Widget _buildMainSlider({double? height, required double sw}) {
+    final titleFontSize = sw < 450 ? 18.0 : (sw < 650 ? 22.0 : (sw < 1024 ? 26.0 : 30.0));
+    final subtitleFontSize = sw < 450 ? 12.0 : 14.0;
+    final isMobile = sw < 650;
+
     return Container(
       height: height,
       decoration: BoxDecoration(
@@ -190,8 +201,10 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
                       end: Alignment.bottomRight,
                     ),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 40, vertical: 36),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 20 : 40,
+                    vertical: isMobile ? 20 : 36,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -210,40 +223,42 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
                         child: Text(
                           slide['tag'],
                           style: GoogleFonts.rubik(
-                            fontSize: 11,
+                            fontSize: isMobile ? 10 : 11,
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
                             letterSpacing: 0.8,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      SizedBox(height: isMobile ? 8 : 14),
 
                       // Headline
                       Text(
                         slide['title'],
                         style: GoogleFonts.rubik(
-                          fontSize: 30,
+                          fontSize: titleFontSize,
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
                           height: 1.15,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: isMobile ? 6 : 12),
 
                       // Subtitle
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 480),
                         child: Text(
                           slide['subtitle'],
+                          maxLines: isMobile ? 2 : 3,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.nunitoSans(
-                            fontSize: 14,
+                            fontSize: subtitleFontSize,
                             color: Colors.white.withValues(alpha: 0.9),
-                            height: 1.4,
+                            height: 1.35,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      SizedBox(height: isMobile ? 12 : 20),
 
                       // Badges
                       Wrap(

@@ -16,9 +16,9 @@ import '../../../shared/router/app_routes.dart';
 import '../../../shared/utils/share_util.dart';
 import '../../../shared/services/integration/weather_service.dart';
 import '../../../shared/models/weather_model.dart';
-import '../../widgets/web_consumer_nav_bar.dart';
 import '../../widgets/web_hamburger_menu_button.dart';
 import '../../widgets/web_footer.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
 import '../../../shared/widgets/image_widgets.dart';
 
 import '../../../shared/screens/article_detail_screen.dart';
@@ -331,13 +331,18 @@ class _WebCommunityHubState extends State<WebCommunityHub>
     final isCompact = sw < 1100;
 
     if (!AuthService().isViewingAsFarmer) {
-      return WebConsumerNavBar(
-        currentIndex: widget.currentIndex,
-        onNavigate: widget.onNavigate,
-        onCartTap: () => context.go(AppRoutes.cart),
-        margin: isMobile
-            ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-            : const EdgeInsets.fromLTRB(32, 24, 32, 12),
+      return WebEcomHeader(
+        currentIndex: 2,
+        onNavigate: (index, [route]) {
+          if (route != null) {
+            context.go(route);
+          } else {
+            widget.onNavigate(index);
+          }
+        },
+        onSearch: (query) {
+          context.go(AppRoutes.shop, extra: {'search': query});
+        },
       );
     }
 
