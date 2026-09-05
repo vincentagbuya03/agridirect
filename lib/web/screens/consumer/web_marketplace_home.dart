@@ -32,6 +32,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
   final SupabaseDataService _dataService = SupabaseDataService();
 
   late Future<List<ProductItem>> _productsFuture;
+  late Future<List<Map<String, dynamic>>> _farmersFuture;
 
   String _activeTab = 'All';
 
@@ -39,37 +40,37 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
     {
       'title': 'Fresh Veggies',
       'icon': Icons.eco_rounded,
-      'items': '42 items',
+      'items': 'Direct Farm Harvest',
       'category': 'Vegetables',
     },
     {
       'title': 'Root Crops',
       'icon': Icons.grass_rounded,
-      'items': '18 items',
+      'items': 'Cassava, Ube & Taro',
       'category': 'Root Crops',
     },
     {
       'title': 'Sweet Fruits',
       'icon': Icons.apple_rounded,
-      'items': '24 items',
+      'items': 'Seasonal Orchards',
       'category': 'Fruits',
     },
     {
       'title': 'Rice & Grains',
       'icon': Icons.grain_rounded,
-      'items': '15 items',
+      'items': 'Pangasinan Grains',
       'category': 'Grains',
     },
     {
       'title': 'Organic & GAP',
       'icon': Icons.spa_rounded,
-      'items': '30 items',
+      'items': 'Certified Eco-Farms',
       'category': 'Organic',
     },
     {
       'title': 'Flash Deals',
       'icon': Icons.bolt_rounded,
-      'items': 'Up to 35% Off',
+      'items': 'Limited Discounts',
       'category': 'Deals',
     },
   ];
@@ -82,6 +83,7 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
 
   void _loadData() {
     _productsFuture = _dataService.getNearbyProducts();
+    _farmersFuture = _dataService.getFeaturedFarmers();
   }
 
   void _navigateToProduct(ProductItem product) {
@@ -337,33 +339,6 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
     final sw = MediaQuery.of(context).size.width;
     final isCompact = sw < 1024;
 
-    final cooperatives = [
-      {
-        'farmName': 'San Carlos Organic Producers Cooperative',
-        'farmerName': 'Mang Juan Dizon',
-        'barangay': 'Brgy. Roxas Hub',
-        'rating': '4.9',
-        'totalReviews': 340,
-        'crops': 'Native Tomatoes, Eggplant, Bittergourd',
-      },
-      {
-        'farmName': 'Pangasinan Grain & Rice Growers Federation',
-        'farmerName': 'Tatay Ernesto Reyes',
-        'barangay': 'Brgy. Pagal Fields',
-        'rating': '5.0',
-        'totalReviews': 512,
-        'crops': 'Dinorado, Sinandomeng, Glutinous Rice',
-      },
-      {
-        'farmName': 'Baleyadaan Highland Vegetable Association',
-        'farmerName': 'Nanay Corazon Santos',
-        'barangay': 'Brgy. Baleyadaan',
-        'rating': '4.8',
-        'totalReviews': 218,
-        'crops': 'Baguio Beans, Squash, Sweet Corn',
-      },
-    ];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -404,43 +379,148 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
           ],
         ),
         const SizedBox(height: 16),
-        if (isCompact)
-          Column(
-            children: cooperatives
-                .map((c) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: WebFarmerSpotlightCard(
-                        farmName: c['farmName'] as String,
-                        farmerName: c['farmerName'] as String,
-                        barangay: c['barangay'] as String,
-                        rating: c['rating'] as String,
-                        totalReviews: c['totalReviews'] as int,
-                        cropsSummary: c['crops'] as String,
-                        onVisit: () =>
-                            widget.onNavigate(1, AppRoutes.localShops),
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: _farmersFuture,
+          builder: (context, snapshot) {
+            final farmers = snapshot.data ?? [];
+            final topFarmers = farmers.take(3).toList();
+
+            if (topFarmers.isEmpty) {
+              // Verified Regional Cooperatives Overview
+              return Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: WebDesignTokens.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: WebDesignTokens.border),
+                  boxShadow: WebDesignTokens.cardRest,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: const BoxDecoration(
+                        color: WebDesignTokens.primaryLight,
+                        shape: BoxShape.circle,
                       ),
-                    ))
-                .toList(),
-          )
-        else
-          Row(
-            children: cooperatives.map((c) {
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: WebFarmerSpotlightCard(
-                    farmName: c['farmName'] as String,
-                    farmerName: c['farmerName'] as String,
-                    barangay: c['barangay'] as String,
-                    rating: c['rating'] as String,
-                    totalReviews: c['totalReviews'] as int,
-                    cropsSummary: c['crops'] as String,
-                    onVisit: () => widget.onNavigate(1, AppRoutes.localShops),
-                  ),
+                      child: const Icon(Icons.verified_user_rounded,
+                          color: WebDesignTokens.primary, size: 28),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'San Carlos Agricultural Cooperatives & Registered Farms',
+                            style: GoogleFonts.rubik(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: WebDesignTokens.dark,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'All local growers on AgriDirect are verified in partnership with the City Agriculture Office. Browse certified organic and standard producers across all 86 barangays.',
+                            style: GoogleFonts.nunitoSans(
+                              fontSize: 13,
+                              color: WebDesignTokens.slate600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: WebDesignTokens.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () =>
+                          widget.onNavigate(1, AppRoutes.localShops),
+                      child: Text(
+                        'Explore Farm Directory >',
+                        style: GoogleFonts.rubik(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               );
-            }).toList(),
-          ),
+            }
+
+            if (isCompact) {
+              return Column(
+                children: topFarmers.map((f) {
+                  final farmName = (f['farm_name'] ?? f['shop_name'] ?? 'Local Farm').toString();
+                  final farmerName = (f['full_name'] ?? f['farmer_name'] ?? 'Local Farmer').toString();
+                  final barangay = (f['location'] ?? f['farm_address'] ?? 'San Carlos City').toString();
+                  final rating = (f['average_rating'] ?? f['rating'] ?? '5.0').toString();
+                  final reviews = int.tryParse(f['review_count']?.toString() ?? '') ?? 0;
+                  final crops = (f['specialty'] ?? 'Fresh Crops').toString();
+                  final fid = f['farmer_id'] ?? f['id'];
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: WebFarmerSpotlightCard(
+                      farmName: farmName,
+                      farmerName: farmerName,
+                      barangay: barangay,
+                      rating: rating,
+                      totalReviews: reviews,
+                      cropsSummary: crops,
+                      onVisit: () {
+                        if (fid != null && fid.toString().isNotEmpty) {
+                          context.push('${AppRoutes.farmerProfileBase}/$fid');
+                        } else {
+                          widget.onNavigate(1, AppRoutes.localShops);
+                        }
+                      },
+                    ),
+                  );
+                }).toList(),
+              );
+            }
+
+            return Row(
+              children: topFarmers.map((f) {
+                final farmName = (f['farm_name'] ?? f['shop_name'] ?? 'Local Farm').toString();
+                final farmerName = (f['full_name'] ?? f['farmer_name'] ?? 'Local Farmer').toString();
+                final barangay = (f['location'] ?? f['farm_address'] ?? 'San Carlos City').toString();
+                final rating = (f['average_rating'] ?? f['rating'] ?? '5.0').toString();
+                final reviews = int.tryParse(f['review_count']?.toString() ?? '') ?? 0;
+                final crops = (f['specialty'] ?? 'Fresh Crops').toString();
+                final fid = f['farmer_id'] ?? f['id'];
+
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: WebFarmerSpotlightCard(
+                      farmName: farmName,
+                      farmerName: farmerName,
+                      barangay: barangay,
+                      rating: rating,
+                      totalReviews: reviews,
+                      cropsSummary: crops,
+                      onVisit: () {
+                        if (fid != null && fid.toString().isNotEmpty) {
+                          context.push('${AppRoutes.farmerProfileBase}/$fid');
+                        } else {
+                          widget.onNavigate(1, AppRoutes.localShops);
+                        }
+                      },
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
       ],
     );
   }
@@ -626,10 +706,10 @@ class _WebMarketplaceHomeState extends State<WebMarketplaceHome> {
   // ─── Community & Economic Impact Counter ───
   Widget _buildImpactMetricsSection() {
     final metrics = [
-      {'val': '₱1.4M+', 'label': 'Direct Farmer Payouts'},
-      {'val': '45+', 'label': 'Accredited Cooperatives'},
-      {'val': '12,500+ kg', 'label': 'Fresh Produce Delivered'},
-      {'val': '86', 'label': 'San Carlos Barangays Served'},
+      {'val': '100%', 'label': 'Direct Farmer Payouts (0% Markup)'},
+      {'val': '86', 'label': 'San Carlos Barangays Covered'},
+      {'val': '24h', 'label': 'Harvest-to-Door Freshness'},
+      {'val': 'DA Verified', 'label': 'Accredited Grower Network'},
     ];
 
     return Container(

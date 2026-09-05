@@ -55,6 +55,12 @@ class _WebNavigationState extends State<WebNavigation> {
   }
 
   void _navigateTo(int index, [String? category]) {
+    // If target is a direct route path, navigate immediately
+    if (category != null && category.startsWith('/')) {
+      context.go(category);
+      return;
+    }
+
     // If trying to access Profile (index 3) and not logged in, show login instead
     if (index == 3 && !_auth.isLoggedIn) {
       _showLoginDialog();

@@ -940,10 +940,19 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   children: [
                     // Background image of fresh produce
                     Positioned.fill(
-                      child: Image.asset(
-                        'assets/images/fresh_organic_hero.png',
+                      child: CachedNetworkImage(
+                        imageUrl:
+                            'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80',
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
+                        placeholder: (context, url) => Container(
+                          decoration: const BoxDecoration(
+                            gradient: AgriColors.primaryGradient,
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(color: Colors.white),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) {
                           return Container(
                             decoration: const BoxDecoration(
                               gradient: AgriColors.primaryGradient,
@@ -1158,19 +1167,19 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                         children: [
                           Expanded(
                             child: _statItem(
-                              200,
-                              '+',
-                              'Farmers',
-                              Icons.agriculture_rounded,
+                              86,
+                              ' Brgys',
+                              'San Carlos Hub',
+                              Icons.location_city_rounded,
                               isMobile: true,
                             ),
                           ),
                           Expanded(
                             child: _statItem(
-                              5000,
-                              '+',
-                              'Products',
-                              Icons.inventory_2_rounded,
+                              100,
+                              '%',
+                              'Farm Direct',
+                              Icons.agriculture_rounded,
                               isMobile: true,
                             ),
                           ),
@@ -1183,17 +1192,17 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                             child: _statItem(
                               24,
                               'hrs',
-                              'Delivery',
+                              'Fresh Delivery',
                               Icons.local_shipping_rounded,
                               isMobile: true,
                             ),
                           ),
                           Expanded(
                             child: _statItem(
-                              98,
+                              0,
                               '%',
-                              'Happy',
-                              Icons.thumb_up_rounded,
+                              'Middleman Fee',
+                              Icons.verified_rounded,
                               isMobile: true,
                             ),
                           ),
@@ -1206,22 +1215,22 @@ class _WebWelcomeScreenState extends State<WebWelcomeScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _statItem(
-                      200,
-                      '+',
-                      'Local Farmers',
-                      Icons.agriculture_rounded,
+                      86,
+                      ' Brgys',
+                      'San Carlos Covered',
+                      Icons.location_city_rounded,
                     ),
                     _statDivider(),
-                    _statItem(5000, '+', 'Products', Icons.inventory_2_rounded),
+                    _statItem(100, '%', 'Direct Farm Payout', Icons.agriculture_rounded),
                     _statDivider(),
                     _statItem(
                       24,
                       'hrs',
-                      'Fast Delivery',
+                      'Fresh Harvest Delivery',
                       Icons.local_shipping_rounded,
                     ),
                     _statDivider(),
-                    _statItem(98, '%', 'Satisfaction', Icons.thumb_up_rounded),
+                    _statItem(0, '%', 'Middleman Markup', Icons.verified_rounded),
                   ],
                 ),
         ),

@@ -319,9 +319,13 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                   context.push(AppRoutes.login);
                 }
               }),
-              _buildUtilityDivider(),
               _buildUtilityLink('Track Harvest', () {
-                widget.onNavigate(4, AppRoutes.cart);
+                final auth = AuthService();
+                if (auth.isLoggedIn) {
+                  widget.onNavigate(0, AppRoutes.customerOrders);
+                } else {
+                  context.push(AppRoutes.login);
+                }
               }),
               _buildUtilityDivider(),
               _buildUtilityLink('DA Articles', () {
@@ -654,7 +658,7 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                         widget.onNavigate(3, AppRoutes.profile);
                         break;
                       case 'orders':
-                        widget.onNavigate(4, AppRoutes.cart);
+                        widget.onNavigate(0, AppRoutes.customerOrders);
                         break;
                       case 'toggle':
                         if (auth.isViewingAsFarmer) {
