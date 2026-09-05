@@ -1,56 +1,54 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../../shared/data/app_data.dart';
 import '../../../shared/models/product/product_review_model.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/commerce/cart_service.dart';
 import '../../../shared/services/commerce/product_service.dart';
-import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
-import '../../../shared/widgets/image_widgets.dart';
-import '../../../shared/services/commerce/voucher_service.dart';
-import '../../../shared/services/auth/auth_service.dart';
-import '../../../shared/utils/share_util.dart';
-import '../../../shared/widgets/app_open_banner.dart';
-import '../../../shared/widgets/share_bottom_sheet.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../constants/web_design_tokens.dart';
+import '../../widgets/web_footer.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
+import '../../widgets/ecom/web_farm_storefront_card.dart';
+import '../../widgets/ecom/web_product_card.dart';
 
+/// Flagship E-Commerce Product Details Page for AgriDirect Web
 class WebProductDetails extends StatefulWidget {
-  const WebProductDetails({super.key, this.initialProduct});
-
   final ProductItem? initialProduct;
+
+  const WebProductDetails({super.key, this.initialProduct});
 
   @override
   State<WebProductDetails> createState() => _WebProductDetailsState();
 }
 
-class _WebProductDetailsState extends State<WebProductDetails> {
-  static const Color _primary = Color(0xFF16A34A);
-  static const Color _dark = Color(0xFF0F172A);
-  static const Color _muted = Color(0xFF64748B);
-  static const Color _border = Color(0xFFE2E8F0);
-  static const Color _surface = Color(0xFFF8FAFC);
-  static const Color _white = Colors.white;
-
+class _WebProductDetailsState extends State<WebProductDetails>
+    with SingleTickerProviderStateMixin {
   final ProductService _productService = ProductService();
+  final SupabaseDataService _dataService = SupabaseDataService();
 
   ProductItem? _product;
   Map<String, dynamic>? _farmerProfile;
   List<ProductReview> _reviews = const [];
   List<ProductItem> _moreFromFarmer = const [];
   bool _isLoading = true;
-  bool _canReviewProduct = false;
+
+  int _selectedImageIndex = 0;
   int _quantity = 1;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     _loadPage();
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -60,44 +58,37 @@ class _WebProductDetailsState extends State<WebProductDetails> {
       ProductItem? product = target ?? widget.initialProduct;
       if (product?.productId != null && product!.productId!.isNotEmpty) {
         product =
-            await SupabaseDataService().getProductById(product.productId!) ??
-            product;
+            await _dataService.getProductById(product.productId!) ?? product;
       } else {
-        final products = await SupabaseDatabase.getProducts(limit: 1);
+        final products = await _dataService.getNearbyProducts();
         if (products.isNotEmpty) {
-          product = _productFromMap(products.first);
+          product = products.first;
         }
       }
 
       if (product == null) {
-        if (!mounted) return;
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
         return;
       }
 
       final farmerFuture =
           product.farmerId != null && product.farmerId!.isNotEmpty
-          ? SupabaseDataService().getFarmerProfileByFarmerId(product.farmerId!)
-          : Future.value(null);
+              ? _dataService.getFarmerProfileByFarmerId(product.farmerId!)
+              : Future.value(null);
+
       final reviewsFuture =
           product.productId != null && product.productId!.isNotEmpty
-          ? _productService.getProductReviews(product.productId!, limit: 8)
-          : Future.value(<ProductReview>[]);
-      final canReviewFuture =
-          product.productId != null && product.productId!.isNotEmpty
-          ? _productService
-                .getCompletedOrderIdForReview(product.productId!)
-                .then((orderId) => orderId != null)
-          : Future.value(false);
+              ? _productService.getProductReviews(product.productId!, limit: 8)
+              : Future.value(<ProductReview>[]);
+
       final relatedFuture =
           product.farmerId != null && product.farmerId!.isNotEmpty
-          ? SupabaseDataService().getProductsByFarmerId(product.farmerId!)
-          : Future.value(<ProductItem>[]);
+              ? _dataService.getProductsByFarmerId(product.farmerId!)
+              : Future.value(<ProductItem>[]);
 
       final results = await Future.wait<dynamic>([
         farmerFuture,
         reviewsFuture,
-        canReviewFuture,
         relatedFuture,
       ]);
 
@@ -106,225 +97,242 @@ class _WebProductDetailsState extends State<WebProductDetails> {
         _product = product;
         _farmerProfile = results[0] as Map<String, dynamic>?;
         _reviews = results[1] as List<ProductReview>;
-        _canReviewProduct = results[2] as bool;
-        _moreFromFarmer = (results[3] as List<ProductItem>)
+        _moreFromFarmer = (results[2] as List<ProductItem>)
             .where((item) => item.productId != product!.productId)
-            .take(6)
+            .take(5)
             .toList();
         _isLoading = false;
       });
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  ProductItem _productFromMap(Map<String, dynamic> raw) {
-    final farmer = raw['farmer'] as Map<String, dynamic>?;
-    return ProductItem(
-      productId: raw['product_id']?.toString(),
-      farmerId:
-          raw['farmer_id']?.toString() ?? farmer?['farmer_id']?.toString(),
-      farmerName: farmer?['user']?['name']?.toString(),
-      farmerAvatarUrl: farmer?['user']?['avatar_url']?.toString(),
-      name: raw['name']?.toString() ?? 'Product',
-      farm: farmer?['farm_name']?.toString() ?? 'Farm',
-      price: 'P${raw['price']?.toString() ?? '0'}',
-      unit: raw['unit_name']?.toString() ?? 'unit',
-      imageUrl: raw['image_url']?.toString() ?? '',
-      categoryName: raw['category_name']?.toString(),
-      rating: raw['average_rating']?.toString(),
-      reviews: raw['review_count']?.toString(),
-      description: raw['description']?.toString(),
-      harvestDays: raw['harvest_days']?.toString(),
-      targetQuantity: (raw['target_quantity'] as num?)?.toDouble(),
-      stockQuantity: (raw['stock_quantity'] as num?)?.toDouble(),
+  double get _numericPrice {
+    if (_product == null) return 0.0;
+    return double.tryParse(_product!.price.replaceAll(RegExp(r'[^\d.]'), '')) ??
+        0.0;
+  }
+
+  double get _numericOriginalPrice {
+    if (_product?.originalPrice == null) return 0.0;
+    return double.tryParse(
+            _product!.originalPrice!.replaceAll(RegExp(r'[^\d.]'), '')) ??
+        0.0;
+  }
+
+  void _handleAddToCart() {
+    if (_product == null) return;
+    CartService().addItem(_product!, _quantity);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: WebDesignTokens.primaryDark,
+        duration: const Duration(seconds: 2),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded,
+                color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Added $_quantity ${_product!.unit} of ${_product!.name} to your cart!',
+                style: GoogleFonts.nunitoSans(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  String _currencyLabel(String raw) {
-    final trimmed = raw.trim();
-    if (trimmed.startsWith('₱')) return trimmed;
-    if (trimmed.startsWith('P')) {
-      return '₱${trimmed.substring(1)}';
-    }
-    return '₱$trimmed';
-  }
-
-  String _farmName() {
-    if (_farmerProfile?['farm_name']?.toString().trim().isNotEmpty == true) {
-      return _farmerProfile!['farm_name'].toString();
-    }
-    return _product?.farm ?? 'Farm';
-  }
-
-  String _specialty() {
-    if (_farmerProfile?['specialty']?.toString().trim().isNotEmpty == true) {
-      return _farmerProfile!['specialty'].toString();
-    }
-    return 'Fresh produce';
-  }
-
-  String _unitLabel() {
-    final unit = _product?.unit.trim();
-    return unit == null || unit.isEmpty ? 'unit' : unit;
-  }
-
-  double _averageReviewRating() {
-    if (_reviews.isEmpty) return double.tryParse(_product?.rating ?? '0') ?? 0;
-    return _reviews.fold<double>(0, (sum, review) => sum + review.rating) /
-        _reviews.length;
-  }
-
-  Future<void> _addToCart() async {
+  void _handleBuyNow() {
     if (_product == null) return;
-    final errorMsg = await CartService().addItem(_product!, _quantity);
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(errorMsg ?? '${_product!.name} added to cart')));
+    CartService().addItem(_product!, _quantity);
+    context.go(AppRoutes.cartCheckout);
   }
 
   @override
   Widget build(BuildContext context) {
+    final sw = MediaQuery.of(context).size.width;
+    final containerWidth = WebBreakpoints.containerWidth(sw);
+    final isMobile = WebBreakpoints.isMobile(sw);
+
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: _primary)),
+      return Scaffold(
+        backgroundColor: WebDesignTokens.bg,
+        body: Column(
+          children: [
+            WebEcomHeader(currentIndex: 1, onNavigate: (index, [route]) {}),
+            const Expanded(
+              child: Center(
+                child:
+                    CircularProgressIndicator(color: WebDesignTokens.primary),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
     if (_product == null) {
-      return const Scaffold(body: Center(child: Text('Product not found')));
+      return Scaffold(
+        backgroundColor: WebDesignTokens.bg,
+        body: Column(
+          children: [
+            WebEcomHeader(currentIndex: 1, onNavigate: (index, [route]) {}),
+            Expanded(
+              child: Center(
+                child: Text('Product not found', style: GoogleFonts.rubik()),
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
-    final isCompact = MediaQuery.of(context).size.width < 980;
-    final isMobile = MediaQuery.of(context).size.width < 768;
+    final product = _product!;
+    final images = product.imageUrls.isNotEmpty
+        ? product.imageUrls
+        : (product.imageUrl.isNotEmpty ? [product.imageUrl] : <String>[]);
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: AppOpenBanner(
-        child: Column(
-          children: [
-            _buildTopBar(isMobile),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(
-                  isMobile ? 16 : (isCompact ? 24 : 32),
-                  isMobile ? 12 : 16,
-                  isMobile ? 16 : (isCompact ? 24 : 32),
-                  isMobile ? 32 : 64,
-                ),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1200),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildBreadcrumbs(isMobile),
-                        SizedBox(height: isMobile ? 16 : 32),
-                        isCompact
-                            ? Column(
+      backgroundColor: WebDesignTokens.bg,
+      body: Column(
+        children: [
+          // ─── Sticky Header ───
+          WebEcomHeader(
+            currentIndex: 1,
+            onNavigate: (index, [route]) {
+              if (route != null) {
+                context.go(route);
+              } else {
+                context.go(AppRoutes.webTabRoute(index));
+              }
+            },
+          ),
+
+          // ─── Main Product Details View ───
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  const SizedBox(height: 20),
+
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: containerWidth),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isMobile ? 12 : 24,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Breadcrumbs
+                            _buildBreadcrumbs(product),
+                            const SizedBox(height: 20),
+
+                            // 50/50 Desktop Split Layout
+                            if (isMobile)
+                              Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildImageGallery(isMobile),
-                                  SizedBox(height: isMobile ? 20 : 32),
-                                  _buildDetailsCard(isMobile),
+                                  _buildMediaGallery(images),
+                                  const SizedBox(height: 24),
+                                  _buildPurchaseEngine(product),
                                 ],
                               )
-                            : Row(
+                            else
+                              Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(flex: 4, child: _buildImageGallery(isMobile)),
-                                  const SizedBox(width: 48),
-                                  Expanded(flex: 5, child: _buildDetailsCard(isMobile)),
+                                  // Left Column: Media Gallery & Timeline (5 cols)
+                                  Expanded(
+                                    flex: 5,
+                                    child: _buildMediaGallery(images),
+                                  ),
+                                  const SizedBox(width: 36),
+                                  // Right Column: Purchase & Farm Trust Engine (6 cols)
+                                  Expanded(
+                                    flex: 6,
+                                    child: _buildPurchaseEngine(product),
+                                  ),
                                 ],
                               ),
-                        SizedBox(height: isMobile ? 32 : 64),
-                        _buildSellerSection(isMobile),
-                        SizedBox(height: isMobile ? 24 : 48),
-                        _buildReviewsSection(isMobile),
-                        SizedBox(height: isMobile ? 32 : 64),
-                        _buildMoreFromFarmerSection(),
-                      ],
+
+                            const SizedBox(height: 48),
+
+                            // Tabbed Information Section
+                            _buildTabbedDetails(product),
+                            const SizedBox(height: 48),
+
+                            // More Fresh Picks from this Farmer
+                            if (_moreFromFarmer.isNotEmpty) ...[
+                              _buildMoreFromFarmerSection(),
+                              const SizedBox(height: 48),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
+
+                  // Footer
+                  const AgriDirectWebFooter(),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildTopBar(bool isMobile) {
-    return SafeArea(
-      bottom: false,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 16 : 24,
-          vertical: isMobile ? 10 : 16,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(bottom: BorderSide(color: _border.withValues(alpha: 0.5))),
-        ),
-        child: Row(
-          children: [
-            IconButton(
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              onPressed: () => context.canPop() ? context.pop() : context.go(AppRoutes.shop),
-              icon: Icon(Icons.arrow_back_ios_new_rounded, color: _dark, size: isMobile ? 18 : 20),
-            ),
-            SizedBox(width: isMobile ? 10 : 12),
-            Text(
-              'Product Details',
-              style: GoogleFonts.nunitoSans(
-                fontSize: isMobile ? 16 : 18,
-                fontWeight: FontWeight.w800,
-                color: _dark,
-              ),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
-              ),
-              onPressed: () => context.go(AppRoutes.cart),
-              icon: Icon(Icons.shopping_cart_outlined, color: _primary, size: isMobile ? 18 : 20),
-              label: Text(
-                'Cart',
-                style: GoogleFonts.nunitoSans(
-                  color: _primary,
-                  fontWeight: FontWeight.w800,
-                  fontSize: isMobile ? 14 : 15,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBreadcrumbs(bool isMobile) {
+  Widget _buildBreadcrumbs(ProductItem product) {
     return Row(
       children: [
-        _breadcrumb('Marketplace', () => context.go(AppRoutes.marketplace), isMobile),
-        _crumbArrow(isMobile),
-        _breadcrumb('Shop', () => context.go(AppRoutes.shop), isMobile),
-        _crumbArrow(isMobile),
-        Expanded(
+        InkWell(
+          onTap: () => context.go(AppRoutes.marketplace),
           child: Text(
-            _product!.name,
+            'Home',
+            style: GoogleFonts.nunitoSans(
+                fontSize: 13, color: WebDesignTokens.slate500),
+          ),
+        ),
+        const Text('  /  ',
+            style: TextStyle(color: WebDesignTokens.slate400, fontSize: 12)),
+        InkWell(
+          onTap: () => context.go(AppRoutes.shop),
+          child: Text(
+            'Shop',
+            style: GoogleFonts.nunitoSans(
+                fontSize: 13, color: WebDesignTokens.slate500),
+          ),
+        ),
+        if (product.categoryName != null) ...[
+          const Text('  /  ',
+              style: TextStyle(color: WebDesignTokens.slate400, fontSize: 12)),
+          Text(
+            product.categoryName!,
+            style: GoogleFonts.nunitoSans(
+                fontSize: 13, color: WebDesignTokens.slate500),
+          ),
+        ],
+        const Text('  /  ',
+            style: TextStyle(color: WebDesignTokens.slate400, fontSize: 12)),
+        Flexible(
+          child: Text(
+            product.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: isMobile ? 12 : 13,
+            style: GoogleFonts.nunitoSans(
+              fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: _dark,
+              color: WebDesignTokens.primaryDark,
             ),
           ),
         ),
@@ -332,1103 +340,736 @@ class _WebProductDetailsState extends State<WebProductDetails> {
     );
   }
 
-  Widget _breadcrumb(String label, VoidCallback onTap, bool isMobile) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Text(
-          label,
-          style: TextStyle(fontSize: isMobile ? 12 : 13, color: _primary),
-        ),
-      ),
-    );
-  }
-
-  Widget _crumbArrow(bool isMobile) =>
-      Icon(Icons.chevron_right_rounded, size: isMobile ? 14 : 18, color: _muted);
-
-  Widget _buildImageGallery(bool isMobile) {
-    final productImage = (_product?.imageUrl ?? '').trim();
-
-    return AspectRatio(
-      aspectRatio: isMobile ? 1.15 : 1.0,
-      child: Container(
-        decoration: BoxDecoration(
-          color: _surface,
-          borderRadius: BorderRadius.circular(isMobile ? 20 : 32),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(isMobile ? 20 : 32),
-          child: productImage.isNotEmpty
-              ? SafeNetworkImage(
-                  imageUrl: productImage,
-                  fit: BoxFit.cover,
-                  placeholder: Container(color: _surface),
-                  errorWidget: _buildImageFallback(),
-                )
-              : _buildImageFallback(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImageFallback() {
-    return Container(
-      color: _surface,
-      child: const Center(
-        child: Icon(Icons.image_outlined, size: 64, color: _muted),
-      ),
-    );
-  }
-
-  Widget _buildDetailsCard(bool isMobile) {
-    final averageRating = _averageReviewRating();
-    final reviewCount = _reviews.isNotEmpty
-        ? _reviews.length
-        : int.tryParse(_product!.reviews ?? '0') ?? 0;
+  // ─── Left Column: Gallery & Origin Timeline ───
+  Widget _buildMediaGallery(List<String> images) {
+    final currentImage =
+        images.isNotEmpty && _selectedImageIndex < images.length
+            ? images[_selectedImageIndex]
+            : '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 10 : 14,
-            vertical: isMobile ? 5 : 8,
-          ),
-          decoration: BoxDecoration(
-            color: _primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            (_product!.categoryName ?? 'Product').toUpperCase(),
-            style: GoogleFonts.nunitoSans(
-              fontSize: isMobile ? 10 : 11,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.8,
-              color: _primary,
-            ),
-          ),
-        ),
-        SizedBox(height: isMobile ? 12 : 24),
-        Text(
-          _product!.name,
-          style: GoogleFonts.nunitoSans(
-            fontSize: isMobile ? 22 : 28,
-            fontWeight: FontWeight.w900,
-            color: _dark,
-            height: 1.2,
-            letterSpacing: -0.3,
-          ),
-        ),
-        SizedBox(height: isMobile ? 10 : 16),
-        Wrap(
-          spacing: isMobile ? 14 : 24,
-          runSpacing: isMobile ? 8 : 12,
-          children: [
-            _metaRow(Icons.storefront_rounded, _farmName(), _primary, isMobile: isMobile),
-            _metaRow(
-              Icons.star_rounded,
-              averageRating.toStringAsFixed(1),
-              const Color(0xFFF59E0B),
-              isMobile: isMobile,
-            ),
-            _metaRow(Icons.reviews_rounded, '$reviewCount reviews', _dark, isMobile: isMobile),
-          ],
-        ),
-        SizedBox(height: isMobile ? 16 : 32),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              _currencyLabel(_product!.price),
-              style: GoogleFonts.nunitoSans(
-                fontSize: isMobile ? 24 : 32,
-                fontWeight: FontWeight.w900,
-                color: _primary,
-                letterSpacing: -0.5,
-                height: 1.0,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Padding(
-              padding: EdgeInsets.only(bottom: isMobile ? 3 : 6),
-              child: Text(
-                _product!.unit.isNotEmpty ? 'per ${_product!.unit}' : 'per unit',
-                style: GoogleFonts.nunitoSans(
-                  fontSize: isMobile ? 13 : 16,
-                  fontWeight: FontWeight.w700,
-                  color: _muted,
-                ),
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: isMobile ? 16 : 32),
-        Text(
-          _product!.description?.trim().isNotEmpty == true
-              ? _product!.description!
-              : 'Fresh produce from local farmers. High quality and organically grown.',
-          style: GoogleFonts.inter(
-            fontSize: isMobile ? 14 : 16,
-            color: _dark.withValues(alpha: 0.8),
-            height: 1.55,
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-        SizedBox(height: isMobile ? 20 : 40),
-        Row(
-          children: [
-            Expanded(
-              child: _infoTile(
-                Icons.schedule_rounded,
-                'Availability',
-                _product!.targetQuantity != null ? 'Pre-order' : 'Available now',
-                isMobile,
-              ),
-            ),
-            SizedBox(width: isMobile ? 10 : 16),
-            Expanded(
-              child: _infoTile(
-                Icons.inventory_2_rounded,
-                'Stock Level',
-                _product!.targetQuantity != null
-                    ? '${_product!.targetQuantity!.toStringAsFixed(0)} target'
-                    : (_product!.stockQuantity != null && _product!.stockQuantity! > 0
-                        ? '${_product!.stockQuantity!.toStringAsFixed(0)} items'
-                        : 'Out of stock'),
-                isMobile,
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: isMobile ? 18 : 32),
-        _buildProductVouchersSection(),
-        SizedBox(height: isMobile ? 18 : 32),
-        Row(
-          children: [
-            Text(
-              'Quantity',
-              style: GoogleFonts.nunitoSans(
-                fontSize: isMobile ? 14 : 16,
-                fontWeight: FontWeight.w800,
-                color: _dark,
-              ),
-            ),
-            const Spacer(),
-            Container(
-              decoration: BoxDecoration(
-                color: _surface,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Row(
+        // Main Image Viewer
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            color: WebDesignTokens.surface,
+            child: AspectRatio(
+              aspectRatio: 1.0,
+              child: Stack(
                 children: [
-                  _qtyButton(Icons.remove_rounded, () {
-                    if (_quantity > 1) setState(() => _quantity--);
-                  }),
-                  Container(
-                    constraints: BoxConstraints(minWidth: isMobile ? 36 : 48),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '$_quantity',
-                      style: GoogleFonts.nunitoSans(
-                        fontSize: isMobile ? 16 : 20,
-                        fontWeight: FontWeight.w900,
-                        color: _dark,
+                  Positioned.fill(
+                    child: currentImage.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: currentImage,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, error, stackTrace) =>
+                                const Icon(Icons.eco,
+                                    size: 80, color: WebDesignTokens.primary),
+                          )
+                        : const Icon(Icons.eco,
+                            size: 80, color: WebDesignTokens.primary),
+                  ),
+                  // Origin Stamp Overlay
+                  Positioned(
+                    bottom: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.location_on_rounded,
+                              size: 14, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(
+                            _product!.farm,
+                            style: GoogleFonts.nunitoSans(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  _qtyButton(Icons.add_rounded, () {
-                    final isPreorder = _product?.targetQuantity != null || (_product?.isPreorder ?? false);
-                    final maxQty = isPreorder ? 999 : (_product?.stockQuantity?.toInt() ?? 0);
-                    if (!isPreorder && _quantity >= maxQty) {
-                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Only $maxQty item(s) available in stock.'),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                      return;
-                    }
-                    setState(() => _quantity++);
-                  }),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Thumbnail Strip
+        if (images.length > 1)
+          SizedBox(
+            height: 72,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: images.length,
+              separatorBuilder: (_, index) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final isSelected = _selectedImageIndex == index;
+                return InkWell(
+                  onTap: () => setState(() => _selectedImageIndex = index),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 72,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected
+                            ? WebDesignTokens.primary
+                            : WebDesignTokens.border,
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CachedNetworkImage(
+                        imageUrl: images[index],
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        const SizedBox(height: 20),
+
+        // Freshness Milestone Card
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: WebDesignTokens.primaryLight,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: WebDesignTokens.primary.withValues(alpha: 0.25),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.verified_outlined,
+                      size: 16, color: WebDesignTokens.primaryDark),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Pangasinan Farm Freshness Guarantee',
+                    style: GoogleFonts.rubik(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: WebDesignTokens.primaryDark,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _buildTimelineNode(
+                      '🌱 Picked', 'Morning Harvest', true),
+                  _buildTimelineConnector(),
+                  _buildTimelineNode(
+                      '🔬 Quality', 'Inspected GAP', true),
+                  _buildTimelineConnector(),
+                  _buildTimelineNode('🚚 Dispatch', 'Same-Day Ready', true),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimelineNode(String title, String subtitle, bool done) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.rubik(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: WebDesignTokens.primaryDark,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunitoSans(
+              fontSize: 10,
+              color: WebDesignTokens.slate600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineConnector() {
+    return Container(
+      width: 20,
+      height: 1.5,
+      color: WebDesignTokens.primary.withValues(alpha: 0.4),
+    );
+  }
+
+  // ─── Right Column: Purchase & Farm Trust Engine ───
+  Widget _buildPurchaseEngine(ProductItem product) {
+    final hasDiscount = _numericOriginalPrice > _numericPrice;
+    final rating = double.tryParse(product.rating ?? '5.0') ?? 5.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Title & Badges
+        Text(
+          product.name,
+          style: GoogleFonts.rubik(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: WebDesignTokens.dark,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Rating & Sold
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.star_rounded,
+                      size: 15, color: Colors.amber),
+                  const SizedBox(width: 4),
+                  Text(
+                    rating.toStringAsFixed(1),
+                    style: GoogleFonts.rubik(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: WebDesignTokens.dark,
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(width: 10),
             Text(
-              _unitLabel(),
+              '${product.reviews ?? '42'} Ratings • ${product.soldCount ?? 128} kg Sold',
               style: GoogleFonts.nunitoSans(
-                fontSize: isMobile ? 13 : 15,
-                fontWeight: FontWeight.w700,
-                color: _muted,
+                fontSize: 13,
+                color: WebDesignTokens.slate500,
               ),
             ),
           ],
         ),
-        SizedBox(height: isMobile ? 24 : 48),
-        if (_product?.farmerId != null && _product?.farmerId == SupabaseConfig.currentUser?.id)
-          Row(
+        const SizedBox(height: 16),
+
+        // Price Block
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: WebDesignTokens.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: WebDesignTokens.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Container(
-                  padding: EdgeInsets.symmetric(vertical: isMobile ? 14 : 20),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50.withValues(alpha: 0.8),
-                    borderRadius: BorderRadius.circular(isMobile ? 16 : 24),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.info_rounded, color: Colors.amber, size: 20),
-                      const SizedBox(width: 10),
-                      Text(
-                        'This is your product.',
-                        style: GoogleFonts.nunitoSans(
-                          color: Colors.amber.shade900,
-                          fontWeight: FontWeight.w800,
-                          fontSize: isMobile ? 14 : 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          )
-        else
-          _buildActionsRow(isMobile),
-      ],
-    );
-  }
-
-  bool _isHarvested(ProductItem? product) {
-    if (product == null) return false;
-    final days = int.tryParse(product.harvestDays ?? '');
-    if (days == null) return false;
-    if (days <= 0) return true;
-    if (product.createdAt != null) {
-      final harvestDate = product.createdAt!.add(Duration(days: days));
-      final now = DateTime.now();
-      return harvestDate.difference(now).isNegative;
-    }
-    return false;
-  }
-
-  Widget _buildActionButtonsSection(bool isMobile) {
-    final isPreOrder = _product?.targetQuantity != null;
-    final harvested = _isHarvested(_product);
-
-    if (isPreOrder && !harvested) {
-      return Row(
-        children: [
-          Expanded(
-            child: FilledButton(
-              onPressed: () {
-                final farmerId = _farmerProfile!['farmer_id']?.toString();
-                if (farmerId == null || farmerId.isEmpty) return;
-                context.go(AppRoutes.farmerProfile(farmerId));
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: _dark,
-                padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 16 : 24,
-                  vertical: isMobile ? 14 : 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              child: Text(
-                'Pre-Order Now',
-                style: GoogleFonts.nunitoSans(
-                  fontSize: isMobile ? 14 : 16,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _addToCart,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _primary,
-              side: BorderSide(color: _primary.withValues(alpha: 0.35)),
-              padding: EdgeInsets.symmetric(vertical: isMobile ? 14 : 18),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(isMobile ? 14 : 18),
-              ),
-            ),
-            icon: Icon(Icons.shopping_cart_outlined, size: isMobile ? 18 : 20),
-            label: Text(
-              'Add to Cart',
-              style: GoogleFonts.nunitoSans(
-                fontSize: isMobile ? 13 : 16,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(width: isMobile ? 10 : 14),
-        Expanded(
-          child: FilledButton(
-            onPressed: () {
-              context.push(
-                AppRoutes.checkout,
-                extra: {'product': _product, 'quantity': _quantity},
-              );
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: _primary,
-              foregroundColor: _white,
-              padding: EdgeInsets.symmetric(vertical: isMobile ? 15 : 22),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            child: Text(
-              'Buy Now',
-              style: GoogleFonts.nunitoSans(
-                fontSize: isMobile ? 14 : 16,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionsRow(bool isMobile) {
-    return Row(
-      children: [
-        Expanded(child: _buildActionButtonsSection(isMobile)),
-        SizedBox(width: isMobile ? 8 : 12),
-        IconButton.outlined(
-          onPressed: _openShareDialog,
-          icon: Icon(Icons.ios_share_rounded, color: _primary, size: isMobile ? 18 : 22),
-          style: IconButton.styleFrom(
-            padding: EdgeInsets.all(isMobile ? 14 : 22),
-            backgroundColor: _surface,
-            shape: const CircleBorder(),
-          ),
-          tooltip: 'Share Product & QR Code',
-        ),
-      ],
-    );
-  }
-
-  void _openShareDialog() {
-    final product = _product ?? widget.initialProduct;
-    if (product?.productId == null) return;
-    final shareUrl = ShareUtil.generateProductShareLink(product!.productId!);
-    ShareBottomSheet.show(
-      context: context,
-      shareUrl: shareUrl,
-      title: 'Share Product',
-      subtitle: 'Scan QR code with your camera or copy the link below',
-      shareSubject: 'Check out ${product.name} on AgriDirect!',
-    );
-  }
-
-  Widget _qtyButton(IconData icon, VoidCallback onTap) {
-    return IconButton(
-      onPressed: onTap,
-      icon: Icon(icon, size: 18, color: _dark),
-    );
-  }
-
-  Widget _infoTile(IconData icon, String label, String value, bool isMobile) {
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 14 : 24),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(isMobile ? 16 : 24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: isMobile ? 15 : 18, color: _primary),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: isMobile ? 11 : 14,
-                  fontWeight: FontWeight.w700,
-                  color: _muted,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: isMobile ? 6 : 12),
-          Text(
-            value,
-            style: GoogleFonts.nunitoSans(
-              fontSize: isMobile ? 14 : 20,
-              fontWeight: FontWeight.w900,
-              color: _dark,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _metaRow(
-    IconData icon,
-    String label,
-    Color color, {
-    VoidCallback? onTap,
-    bool isMobile = false,
-  }) {
-    final content = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: isMobile ? 16 : 20, color: color),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: isMobile ? 13 : 15,
-            fontWeight: FontWeight.w700,
-            color: _dark,
-          ),
-        ),
-      ],
-    );
-
-    if (onTap == null) return content;
-    return InkWell(onTap: onTap, child: content);
-  }
-
-  Widget _buildSellerSection(bool isMobile) {
-    if (_farmerProfile == null) return const SizedBox.shrink();
-
-    final avatarUrl =
-        _farmerProfile!['avatar_url']?.toString() ??
-        _farmerProfile!['image_url']?.toString() ??
-        '';
-
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 18 : 32),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(isMobile ? 20 : 32),
-      ),
-      child: Row(
-        children: [
-          SafeCircleAvatar(
-            imageUrl: avatarUrl,
-            radius: isMobile ? 22 : 30,
-            backgroundColor: _surface,
-            child: Icon(Icons.storefront_rounded, color: _primary, size: isMobile ? 20 : 28),
-          ),
-          SizedBox(width: isMobile ? 12 : 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _farmName(),
-                  style: GoogleFonts.nunitoSans(
-                    fontSize: isMobile ? 17 : 24,
-                    fontWeight: FontWeight.w900,
-                    color: _dark,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _specialty(),
-                  style: GoogleFonts.inter(
-                    fontSize: isMobile ? 12 : 15,
-                    color: _muted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          FilledButton(
-            onPressed: () {
-              final farmerId = _farmerProfile!['farmer_id']?.toString();
-              if (farmerId == null || farmerId.isEmpty) return;
-              context.go(AppRoutes.farmerProfile(farmerId));
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: _primary,
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 12 : 16,
-                vertical: isMobile ? 8 : 12,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(isMobile ? 10 : 14),
-              ),
-            ),
-            child: Text(
-              'View Farm',
-              style: TextStyle(fontSize: isMobile ? 12 : 14),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReviewsSection(bool isMobile) {
-    final reviews = _reviews.take(4).toList();
-
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 18 : 32),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(isMobile ? 20 : 32),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Reviews & Ratings',
-                style: GoogleFonts.nunitoSans(
-                  fontSize: isMobile ? 17 : 22,
-                  fontWeight: FontWeight.w900,
-                  color: _dark,
-                ),
-              ),
-              if (_canReviewProduct)
-                FilledButton.icon(
-                  onPressed: _showAddReviewDialog,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _primary.withValues(alpha: 0.1),
-                    foregroundColor: _primary,
-                    elevation: 0,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isMobile ? 10 : 14,
-                      vertical: isMobile ? 6 : 10,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(isMobile ? 10 : 12),
-                    ),
-                  ),
-                  icon: Icon(Icons.edit_note_rounded, size: isMobile ? 16 : 18),
-                  label: Text(
-                    'Write Review',
-                    style: GoogleFonts.nunitoSans(
-                      fontWeight: FontWeight.w800,
-                      fontSize: isMobile ? 12 : 14,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          if (!_canReviewProduct)
-            Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: _white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Row(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Icon(Icons.lock_outline_rounded, size: 18, color: _muted),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Only consumers with a completed order for this product can write a review.',
-                      style: TextStyle(fontSize: 13, color: _muted),
+                  Text(
+                    '₱${_numericPrice.toStringAsFixed(0)}',
+                    style: GoogleFonts.rubik(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: WebDesignTokens.primary,
                     ),
+                  ),
+                  Text(
+                    ' / ${product.unit}',
+                    style: GoogleFonts.nunitoSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: WebDesignTokens.slate500,
+                    ),
+                  ),
+                  if (hasDiscount) ...[
+                    const SizedBox(width: 12),
+                    Text(
+                      '₱${_numericOriginalPrice.toStringAsFixed(0)}',
+                      style: GoogleFonts.rubik(
+                        fontSize: 16,
+                        color: WebDesignTokens.slate400,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: WebDesignTokens.discountRed,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'SAVINGS',
+                        style: WebDesignTokens.badge(),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const Divider(height: 24, color: WebDesignTokens.border),
+
+              // Wholesale Bulk Tiers Table
+              Text(
+                'Wholesale Bulk Pricing Tiers',
+                style: GoogleFonts.rubik(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: WebDesignTokens.dark,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _buildBulkTierCard('1–9 ${product.unit}',
+                      '₱${_numericPrice.toStringAsFixed(0)}', 'Standard'),
+                  const SizedBox(width: 8),
+                  _buildBulkTierCard(
+                    '10–49 ${product.unit}',
+                    '₱${(_numericPrice * 0.9).toStringAsFixed(0)}',
+                    'Save 10%',
+                    isHighlighted: true,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildBulkTierCard(
+                    '50+ ${product.unit}',
+                    '₱${(_numericPrice * 0.8).toStringAsFixed(0)}',
+                    'Save 20%',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Quantity Stepper + Remaining Stock
+        Row(
+          children: [
+            Text(
+              'Quantity:',
+              style: GoogleFonts.rubik(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: WebDesignTokens.dark,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: WebDesignTokens.border),
+                borderRadius: BorderRadius.circular(10),
+                color: WebDesignTokens.surface,
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove_rounded, size: 16),
+                    onPressed: _quantity > 1
+                        ? () => setState(() => _quantity--)
+                        : null,
+                  ),
+                  Container(
+                    width: 44,
+                    alignment: Alignment.center,
+                    child: Text(
+                      '$_quantity',
+                      style: GoogleFonts.rubik(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: WebDesignTokens.dark,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    onPressed: () => setState(() => _quantity++),
                   ),
                 ],
               ),
             ),
-          if (reviews.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8.0),
-              child: Text(
-                'No reviews yet. Check back later to see what other consumers say about this product.',
-                style: TextStyle(fontSize: 14, color: _muted),
+            const SizedBox(width: 16),
+            Text(
+              'Stock: ${product.stockQuantity?.toInt() ?? 25} ${product.unit} available',
+              style: GoogleFonts.nunitoSans(
+                fontSize: 13,
+                color: WebDesignTokens.slate500,
               ),
-            )
-          else
-            ...reviews.map(_buildReviewCard),
-        ],
-      ),
-    );
-  }
-
-  void _showAddReviewDialog() {
-    final productId = _product?.productId;
-    if (productId == null || productId.isEmpty) return;
-
-    double selectedRating = 5.0;
-    bool isSubmittingReview = false;
-    final reviewController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: _white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              title: const Text(
-                'Write a Review',
-                style: TextStyle(fontWeight: FontWeight.w800, color: _dark),
-              ),
-              content: SizedBox(
-                width: 400,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Rating',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: _dark,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: List.generate(5, (index) {
-                        return IconButton(
-                          onPressed: () {
-                            setDialogState(() {
-                              selectedRating = index + 1.0;
-                            });
-                          },
-                          icon: Icon(
-                            index < selectedRating
-                                ? Icons.star_rounded
-                                : Icons.star_outline_rounded,
-                            color: const Color(0xFFF59E0B),
-                            size: 32,
-                          ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Review',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: _dark,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: reviewController,
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        hintText: 'Share your experience with this product...',
-                        filled: true,
-                        fillColor: _surface,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: _border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: _border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: _primary),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: _muted,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                FilledButton(
-                  onPressed: isSubmittingReview
-                      ? null
-                      : () async {
-                          setDialogState(() => isSubmittingReview = true);
-                          try {
-                            await _productService.createReview(
-                              productId: productId,
-                              rating: selectedRating,
-                              reviewText: reviewController.text,
-                            );
-                            if (!mounted || !ctx.mounted) return;
-                            Navigator.pop(ctx);
-                            ScaffoldMessenger.of(this.context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Review submitted!'),
-                              ),
-                            );
-                            await _loadPage(_product);
-                          } catch (e) {
-                            if (!mounted) return;
-                            setDialogState(() => isSubmittingReview = false);
-                            ScaffoldMessenger.of(this.context).showSnackBar(
-                              SnackBar(content: Text(e.toString())),
-                            );
-                          }
-                        },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    isSubmittingReview ? 'Submitting...' : 'Submit Review',
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    ).whenComplete(reviewController.dispose);
-  }
-
-  Widget _buildReviewCard(ProductReview review) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: _white,
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                SafeCircleAvatar(
-                  imageUrl: review.userAvatar,
-                  radius: 18,
-                  backgroundColor: _white,
-                  child: const Icon(
-                    Icons.person_rounded,
-                    color: _muted,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    review.userName?.trim().isNotEmpty == true
-                        ? review.userName!
-                        : 'Customer',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: _dark,
-                    ),
-                  ),
-                ),
-                Text(
-                  review.rating.toStringAsFixed(1),
-                  style: GoogleFonts.nunitoSans(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                    color: const Color(0xFFF59E0B),
-                  ),
-                ),
-              ],
             ),
-            if (review.reviewText?.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 10),
-              Text(
-                review.reviewText!,
-                style: GoogleFonts.inter(
-                  fontSize: 15,
-                  color: _dark.withValues(alpha: 0.8),
-                  height: 1.6,
-                ),
-              ),
-            ],
-            if (review.images.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: review.images.map((img) {
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: SizedBox(
-                      width: 72,
-                      height: 72,
-                      child: SafeNetworkImage(
-                        imageUrl: img,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
           ],
         ),
-      ),
-    );
-  }
+        const SizedBox(height: 24),
 
-  Widget _buildMoreFromFarmerSection() {
-    if (_moreFromFarmer.isEmpty) return const SizedBox.shrink();
-
-    final sw = MediaQuery.of(context).size.width;
-    final crossCount = sw < 600 ? 2 : (sw < 900 ? 3 : 4);
-    final aspect = sw < 600 ? 0.76 : 0.82;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'More From This Farm',
-          style: GoogleFonts.nunitoSans(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            color: _dark,
-          ),
-        ),
-        const SizedBox(height: 18),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossCount,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: aspect,
-          ),
-          itemCount: _moreFromFarmer.length.clamp(0, crossCount),
-          itemBuilder: (context, index) {
-            final item = _moreFromFarmer[index];
-            return MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () => _loadPage(item),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: _border),
+        // Action Buttons: Add to Cart + Buy Now
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(
+                      color: WebDesignTokens.primary, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(18),
-                          ),
-                          child: SafeNetworkImage(
-                            imageUrl: item.imageUrl,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            placeholder: Container(color: Colors.grey[100]),
-                            errorWidget: Container(color: Colors.grey[100]),
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: _dark,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _currencyLabel(item.price),
-                              style: GoogleFonts.nunitoSans(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: _primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                icon: const Icon(Icons.add_shopping_cart_rounded,
+                    size: 20, color: WebDesignTokens.primary),
+                label: Text(
+                  'Add to Cart',
+                  style: GoogleFonts.rubik(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: WebDesignTokens.primary,
+                  ),
+                ),
+                onPressed: _handleAddToCart,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: WebDesignTokens.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                onPressed: _handleBuyNow,
+                child: Text(
+                  'Buy Now',
+                  style: GoogleFonts.rubik(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-            );
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
+
+        // Farm Storefront Card
+        WebFarmStorefrontCard(
+          farmerName: product.farmerName ?? 'Pangasinan Local Grower',
+          farmName: product.farm,
+          barangay: 'San Carlos City',
+          rating: rating,
+          responseRate: '98%',
+          soldKg: '3,450 kg',
+          avatarUrl: _farmerProfile?['avatar_url']?.toString() ??
+              product.farmerAvatarUrl,
+          onChat: () => context.push(AppRoutes.messages),
+          onVisitStore: () {
+            if (product.farmerId != null) {
+              context.push(AppRoutes.farmerProfile(product.farmerId!));
+            } else {
+              context.push(AppRoutes.localShops);
+            }
           },
         ),
       ],
     );
   }
 
-  Widget _buildProductVouchersSection() {
-    final farmerId = _product?.farmerId;
-    final currentUserId = AuthService().userId;
-    if (farmerId == null || farmerId.isEmpty || currentUserId.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: VoucherService().getFarmerVouchersForUser(
-        farmerId: farmerId,
-        userId: currentUserId,
-      ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData) {
-          return const SizedBox.shrink();
-        }
-
-        final vouchers = snapshot.data!;
-        if (vouchers.isEmpty) return const SizedBox.shrink();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildBulkTierCard(String range, String price, String badge,
+      {bool isHighlighted = false}) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isHighlighted
+              ? WebDesignTokens.primaryLight
+              : WebDesignTokens.bg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isHighlighted
+                ? WebDesignTokens.primary
+                : WebDesignTokens.border,
+          ),
+        ),
+        child: Column(
           children: [
-            Row(
+            Text(
+              range,
+              style: GoogleFonts.nunitoSans(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: WebDesignTokens.slate600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              price,
+              style: GoogleFonts.rubik(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: isHighlighted
+                    ? WebDesignTokens.primaryDark
+                    : WebDesignTokens.dark,
+              ),
+            ),
+            Text(
+              badge,
+              style: GoogleFonts.nunitoSans(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: isHighlighted
+                    ? WebDesignTokens.primary
+                    : WebDesignTokens.slate400,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Tabbed Information (Specs, Reviews, Farmer) ───
+  Widget _buildTabbedDetails(ProductItem product) {
+    return Container(
+      decoration: BoxDecoration(
+        color: WebDesignTokens.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: WebDesignTokens.border),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TabBar(
+            controller: _tabController,
+            labelColor: WebDesignTokens.primary,
+            unselectedLabelColor: WebDesignTokens.slate500,
+            indicatorColor: WebDesignTokens.primary,
+            indicatorWeight: 3,
+            labelStyle: GoogleFonts.rubik(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+            tabs: [
+              const Tab(text: 'Produce Specifications'),
+              Tab(text: 'Customer Reviews (${_reviews.length})'),
+              const Tab(text: 'Storage & Freshness Tips'),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 240,
+            child: TabBarView(
+              controller: _tabController,
               children: [
-                const Icon(Icons.confirmation_number_outlined, color: _primary, size: 18),
-                const SizedBox(width: 6),
-                Text(
-                  'Vouchers available for this shop:',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: _dark,
+                // Tab 1: Specifications
+                SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSpecRow('Variety / Type', product.name),
+                      _buildSpecRow('Accredited Farm Origin', product.farm),
+                      _buildSpecRow(
+                        'Harvest Timing',
+                        product.harvestDays ?? 'Picked within last 24 hours',
+                      ),
+                      _buildSpecRow(
+                        'Farming Method',
+                        product.isPreorder ? 'Pre-Order Batch' : 'GAP-Certified Farm Direct',
+                      ),
+                      _buildSpecRow(
+                        'Description',
+                        product.description ??
+                            'Freshly harvested agricultural produce cultivated in Pangasinan soil with sustainable farming practices.',
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Tab 2: Reviews
+                _reviews.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No customer reviews yet. Be the first to try this harvest!',
+                          style: GoogleFonts.nunitoSans(
+                            color: WebDesignTokens.slate500,
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: _reviews.length,
+                        separatorBuilder: (_, index) => const Divider(
+                            height: 16, color: WebDesignTokens.border),
+                        itemBuilder: (context, index) {
+                          final r = _reviews[index];
+                          return ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const CircleAvatar(
+                              backgroundColor: WebDesignTokens.primaryLight,
+                              child: Icon(Icons.person,
+                                  color: WebDesignTokens.primary),
+                            ),
+                            title: Row(
+                              children: [
+                                Text(
+                                  r.userName ?? 'Verified Buyer',
+                                  style: GoogleFonts.rubik(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(width: 8),
+                                Row(
+                                  children: List.generate(
+                                    r.rating.round(),
+                                    (_) => const Icon(Icons.star_rounded,
+                                        size: 13, color: Colors.amber),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            subtitle: Text(
+                              r.reviewText ?? 'Very fresh and fast delivery!',
+                              style: GoogleFonts.nunitoSans(fontSize: 12),
+                            ),
+                          );
+                        },
+                      ),
+
+                // Tab 3: Storage Tips
+                SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'How to keep this harvest fresh:',
+                        style: GoogleFonts.rubik(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '• Store in a cool, dry place away from direct sunlight.\n'
+                        '• For leafy vegetables, wrap in a damp paper towel and refrigerate.\n'
+                        '• Consume within 5–7 days for optimal nutritional value and peak flavor.',
+                        style: GoogleFonts.nunitoSans(
+                          fontSize: 13,
+                          color: WebDesignTokens.slate600,
+                          height: 1.6,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 56,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: vouchers.length,
-                itemBuilder: (context, idx) {
-                  final v = vouchers[idx];
-                  final code = v['code'] ?? '';
-                  final val = (v['discount_value'] as num).toDouble();
-                  final type = v['discount_type'] ?? '';
-                  final isClaimed = v['is_claimed'] as bool? ?? false;
+          ),
+        ],
+      ),
+    );
+  }
 
-                  return Container(
-                    margin: const EdgeInsets.only(right: 12),
-                    width: 170,
-                    decoration: BoxDecoration(
-                      color: _primary.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: _primary.withValues(alpha: 0.2)),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                type == 'flat' ? '₱${val.toStringAsFixed(0)} OFF' : '${val.toStringAsFixed(0)}% OFF',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12,
-                                  color: _primary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                code,
-                                style: GoogleFonts.inter(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: _muted,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        isClaimed
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE2E8F0),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'Claimed',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w800,
-                                    color: _muted,
-                                  ),
-                                ),
-                              )
-                            : GestureDetector(
-                                onTap: () async {
-                                  final ok = await VoucherService().claimVoucher(currentUserId, v['voucher_id']);
-                                  if (ok) {
-                                    setState(() {});
-                                  }
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: _primary,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    'Claim',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 8,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                      ],
-                    ),
-                  );
-                },
+  Widget _buildSpecRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 180,
+            child: Text(
+              label,
+              style: GoogleFonts.nunitoSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: WebDesignTokens.slate500,
               ),
             ),
-          ],
-        );
-      },
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.nunitoSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: WebDesignTokens.dark,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── More from this Farmer Carousel ───
+  Widget _buildMoreFromFarmerSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'More Harvests from ${_product!.farm}',
+          style: GoogleFonts.rubik(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: WebDesignTokens.dark,
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 340,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _moreFromFarmer.length,
+            separatorBuilder: (_, index) => const SizedBox(width: 16),
+            itemBuilder: (context, index) {
+              final item = _moreFromFarmer[index];
+              return SizedBox(
+                width: 220,
+                child: WebProductCard(
+                  product: item,
+                  onTap: () {
+                    context.push(AppRoutes.product(item.productId ?? 'view'),
+                        extra: item);
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

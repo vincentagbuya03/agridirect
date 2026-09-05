@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/address_management_sheets.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
@@ -849,6 +850,8 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
               ],
             ),
           ),
+          _buildVoucherStrip(),
+          _buildWholesaleTierSection(),
           const SizedBox(height: 8),
           _buildShippingRow(),
           const SizedBox(height: 8),
@@ -968,45 +971,47 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
   }
 
   Widget _buildImageGallery() {
+    final allImages = widget.product.imageUrls.isNotEmpty
+        ? widget.product.imageUrls
+        : (widget.product.imageUrl.isNotEmpty
+            ? [widget.product.imageUrl]
+            : <String>[]);
+
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return Stack(
       children: [
         SizedBox(
-          height: MediaQuery.of(context).size.width, // Square image
+          height: screenWidth,
           width: double.infinity,
-          child: widget.product.imageUrls.isNotEmpty
+          child: allImages.isNotEmpty
               ? PageView.builder(
-                  itemCount: widget.product.imageUrls.length,
+                  itemCount: allImages.length,
                   onPageChanged: (i) => setState(() => _currentPage = i),
-                  itemBuilder: (context, i) =>
-                      widget.product.imageUrls[i].isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: widget.product.imageUrls[i],
-                          fit: BoxFit.cover,
-                        )
-                      : Container(
-                          color: AppColors.background,
-                          child: const Center(
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              color: AppColors.textSubtle,
-                              size: 48,
-                            ),
+                  itemBuilder: (context, i) {
+                    final imgUrl = allImages[i];
+                    if (imgUrl.isEmpty) {
+                      return Container(
+                        color: AppColors.background,
+                        child: const Center(
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            color: AppColors.textSubtle,
+                            size: 48,
                           ),
                         ),
-                )
-              : widget.product.imageUrl.isNotEmpty
-              ? (widget.heroTag != null 
-                  ? Hero(
-                      tag: widget.heroTag!,
-                      child: CachedNetworkImage(
-                        imageUrl: widget.product.imageUrl,
-                        fit: BoxFit.cover,
-                      ),
-                    )
-                  : CachedNetworkImage(
-                      imageUrl: widget.product.imageUrl,
+                      );
+                    }
+                    final cachedImg = CachedNetworkImage(
+                      imageUrl: imgUrl,
                       fit: BoxFit.cover,
-                    ))
+                    );
+                    if (i == 0 && widget.heroTag != null) {
+                      return Hero(tag: widget.heroTag!, child: cachedImg);
+                    }
+                    return cachedImg;
+                  },
+                )
               : Container(
                   color: AppColors.background,
                   child: const Center(
@@ -1018,27 +1023,172 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
                   ),
                 ),
         ),
-        if (widget.product.imageUrls.length > 1)
+        if (allImages.length > 1) ...[
+          // Dots indicator
           Positioned(
             bottom: 16,
-            right: 16,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                allImages.length,
+                (index) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: _currentPage == index ? 16 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _currentPage == index
+                        ? AppColors.primary
+                        : Colors.white.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Page pill
+          Positioned(
+            bottom: 14,
+            right: 14,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(16),
+                color: Colors.black.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                '${_currentPage + 1}/${widget.product.imageUrls.length}',
-                style: const TextStyle(
+                '${_currentPage + 1}/${allImages.length}',
+                style: GoogleFonts.inter(
                   color: Colors.white,
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
           ),
+        ],
       ],
+    );
+  }
+
+  Widget _buildVoucherStrip() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: InkWell(
+        onTap: () => context.push(AppRoutes.claimedVouchers),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.confirmation_number_outlined,
+                color: AppColors.primary,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Vouchers',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '₱20 OFF',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'Claim',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.primary,
+                size: 18,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWholesaleTierSection() {
+    if (!widget.product.isWholesale) return const SizedBox.shrink();
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F9FF),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFBAE6FD)),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.inventory_2_outlined,
+              size: 20,
+              color: Color(0xFF0284C7),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Wholesale & Bulk Orders Available',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0369A1),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Contact farm for wholesale crate and pallet rates.',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: const Color(0xFF0284C7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1296,62 +1446,169 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
 
   Widget _buildFarmerCard(String avatarUrl) {
     return Container(
+      color: Colors.white,
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-      ),
-      child: Row(
+      child: Column(
         children: [
-          SafeCircleAvatar(
-            imageUrl: avatarUrl,
-            radius: 32,
-            child: const Icon(
-              Icons.storefront_rounded,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.product.farm.isNotEmpty ? widget.product.farm : 'Farm / Store',
-                  style: AppTextStyles.headline3.copyWith(fontSize: 16),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Tap to view shop profile',
-                  style: AppTextStyles.bodySmall.copyWith(color: Colors.grey.shade600),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton(
-            onPressed: () {
-              if (widget.product.farmerId != null) {
-                context.push('${AppRoutes.farmerProfileBase}/${widget.product.farmerId}');
-              }
-            },
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.primary),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
+          Row(
+            children: [
+              Stack(
+                children: [
+                  SafeCircleAvatar(
+                    imageUrl: avatarUrl,
+                    radius: 28,
+                    child: const Icon(
+                      Icons.storefront_rounded,
+                      color: AppColors.primary,
+                      size: 26,
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppColors.primary,
+                        size: 14,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: const Text(
-              'Visit',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontSize: 12,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            widget.product.farm.isNotEmpty
+                                ? widget.product.farm
+                                : (widget.product.farmerName ?? 'AgriDirect Farm'),
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textHeadline,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Verified Farm',
+                            style: GoogleFonts.inter(
+                              color: AppColors.primary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 14,
+                          color: AppColors.warning,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          widget.product.rating ?? '5.0',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textHeadline,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '•  Local Producer',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AppColors.textSubtle,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push(
+                    AppRoutes.customerMessages,
+                    extra: {
+                      'farmerId': widget.product.farmerId,
+                      'product': widget.product,
+                    },
+                  ),
+                  icon: const Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    size: 16,
+                  ),
+                  label: const Text('Chat Farmer'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    if (widget.product.farmerId != null) {
+                      context.push(
+                        '${AppRoutes.farmerProfileBase}/${widget.product.farmerId}',
+                      );
+                    }
+                  },
+                  icon: const Icon(
+                    Icons.storefront_rounded,
+                    size: 16,
+                  ),
+                  label: const Text('Visit Farm'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1476,116 +1733,169 @@ class _ProductViewScreenState extends State<ProductViewScreen> {
         !widget.product.isPreorder && (widget.product.stockQuantity ?? 0) <= 0;
 
     return Container(
-      height: 60,
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            offset: const Offset(0, -2),
-            blurRadius: 4,
+            color: Colors.black.withValues(alpha: 0.08),
+            offset: const Offset(0, -3),
+            blurRadius: 10,
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => context.push(
-                      AppRoutes.customerMessages,
-                      extra: {'farmerId': widget.product.farmerId, 'product': widget.product},
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.chat_bubble_outline, color: AppColors.primary, size: 20),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'Chat',
-                          style: TextStyle(fontSize: 10, color: Colors.black87),
-                        ),
-                      ],
-                    ),
-                  ),
+      child: SafeArea(
+        top: false,
+        child: Container(
+          height: 64,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              // Chat with Farmer
+              InkWell(
+                onTap: () => context.push(
+                  AppRoutes.customerMessages,
+                  extra: {
+                    'farmerId': widget.product.farmerId,
+                    'product': widget.product,
+                  },
                 ),
-                Container(width: 1, height: 30, color: Colors.grey.shade300),
-                Expanded(
-                  child: InkWell(
-                    key: _addToCartBtnKey,
-                    onTap: isOutOfStock
-                        ? null
-                        : () async {
-                            _runFlyToCartAnimation(_addToCartBtnKey, widget.product.imageUrl);
-                            final errorMsg = await CartService().addItem(
-                              widget.product,
-                              _quantity,
-                            );
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(errorMsg ?? 'Added to cart'),
-                                duration: const Duration(seconds: 1),
-                              ),
-                            );
-                          },
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.add_shopping_cart,
-                          color: isOutOfStock ? Colors.grey : AppColors.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          isOutOfStock ? 'No Stock' : 'Add to Cart',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isOutOfStock ? Colors.grey : Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: InkWell(
-              onTap: (isOutOfStock || _isOrdering) ? null : _showCheckoutSheet,
-              child: Container(
-                color: isOutOfStock ? Colors.grey.shade400 : AppColors.primary,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      isPreOrder ? 'Pre-Order Now' : 'Order Now',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: 52,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        color: AppColors.primary,
+                        size: 20,
                       ),
-                    ),
-                    if (!isOutOfStock)
+                      const SizedBox(height: 2),
                       Text(
-                        widget.product.price,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
+                        'Chat',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textHeadline,
                         ),
                       ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
+
+              Container(
+                width: 1,
+                height: 28,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                color: Colors.grey.shade200,
+              ),
+
+              // Add to Cart
+              InkWell(
+                key: _addToCartBtnKey,
+                onTap: isOutOfStock
+                    ? null
+                    : () async {
+                        _runFlyToCartAnimation(
+                          _addToCartBtnKey,
+                          widget.product.imageUrl,
+                        );
+                        final errorMsg = await CartService().addItem(
+                          widget.product,
+                          _quantity,
+                        );
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              errorMsg ?? 'Added to cart',
+                            ),
+                            duration: const Duration(seconds: 1),
+                            backgroundColor: AppColors.primary,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        );
+                      },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: 62,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.add_shopping_cart_rounded,
+                        color: isOutOfStock ? Colors.grey : AppColors.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isOutOfStock ? 'No Stock' : 'Add to Cart',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: isOutOfStock
+                              ? Colors.grey
+                              : AppColors.textHeadline,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              // Buy Now / Order Now
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: (isOutOfStock || _isOrdering)
+                      ? null
+                      : _showCheckoutSheet,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isOutOfStock
+                        ? Colors.grey.shade400
+                        : AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isPreOrder
+                            ? Icons.calendar_today_rounded
+                            : Icons.flash_on_rounded,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isPreOrder ? 'Pre-Order Now' : 'Buy Now',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

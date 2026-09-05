@@ -195,6 +195,21 @@ class CartService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void toggleFarmSelection(String farmerId, bool selected) {
+    for (var item in _items) {
+      if (item.farmerId == farmerId) {
+        item.isSelected = selected;
+      }
+    }
+    notifyListeners();
+  }
+
+  bool isFarmSelected(String farmerId) {
+    final farmItems = _items.where((item) => item.farmerId == farmerId).toList();
+    if (farmItems.isEmpty) return false;
+    return farmItems.every((item) => item.isSelected);
+  }
+
   void toggleSelection(String productId) {
     final index = _items.indexWhere((item) => item.productId == productId);
     if (index != -1) {

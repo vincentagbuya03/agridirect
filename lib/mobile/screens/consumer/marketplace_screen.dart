@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'product_view_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/widgets/brand_logo.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
@@ -16,7 +15,6 @@ import '../../../shared/services/offline/network_status_service.dart';
 import '../../widgets/offline_browse_widget.dart';
 import '../../widgets/skeleton_loaders.dart';
 import '../../../shared/services/commerce/cart_service.dart';
-import '../../../shared/widgets/flying_icon_animation.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_router.dart';
 import '../../../shared/services/auth/auth_service.dart';
@@ -24,6 +22,15 @@ import '../auth/qr_scanner_screen.dart';
 import 'search_screen.dart';
 
 import '../../../shared/services/community/notification_service.dart';
+import 'home/widgets/ecom_product_card.dart';
+
+enum MarketplaceSort {
+  popular,
+  latest,
+  topSales,
+  priceAsc,
+  priceDesc,
+}
 
 /// Marketplace Screen - Professional Digital Marketplace
 class MarketplaceScreen extends StatefulWidget {
@@ -33,16 +40,23 @@ class MarketplaceScreen extends StatefulWidget {
   State<MarketplaceScreen> createState() => _MarketplaceScreenState();
 }
 
-class _MarketplaceScreenState extends State<MarketplaceScreen> {
+class _MarketplaceScreenState extends State<MarketplaceScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   int _selectedFilter = 0;
   List<String> _filters = ['All Products'];
+  MarketplaceSort _selectedSort = MarketplaceSort.popular;
+  bool _inStockOnly = false;
+  bool _freeShippingOnly = false;
+  bool _wholesaleOnly = false;
   bool _isOnline = true;
   late OfflineCacheService _cacheService;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   final GlobalKey _cartKey = GlobalKey();
   final TextEditingController _searchController = TextEditingController();
   late Stream<List<ProductItem>> _productsStream;
-  final List<OverlayEntry> _flyingOverlayEntries = [];
 
   double _minPrice = 0.0;
   double _maxPrice = 1000.0;
@@ -315,31 +329,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     );
   }
 
-  Future<void> _toggleFavorite(ProductItem product) async {
-    final productId = product.productId ?? 'unknown_${product.name}';
-    await _ensureCacheServiceReady();
-
-    final isSaved = _cacheService.isProductManuallySaved(productId);
-    if (isSaved) {
-      await _cacheService.removeCachedProduct(productId);
-    } else {
-      await _cacheService.manualSaveProduct(_toCachedProduct(product));
-    }
-
-    if (!mounted) return;
-    setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isSaved
-              ? '${product.name} removed from favorites.'
-              : '${product.name} saved to favorites.',
-        ),
-        backgroundColor: isSaved ? AppColors.textHeadline : AppColors.success,
-      ),
-    );
-  }
-
   void _setupConnectivityListener() {
     _refreshConnectivityStatus();
 
@@ -368,7 +357,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   Future<void> _refreshMarketplaceCacheFromServer() async {
     try {
-      debugPrint('[Marketplace] ðŸ”„ Refreshing cache after reconnect...');
+      debugPrint('[Marketplace] 🔄 Refreshing cache after reconnect...');
       final liveProducts = await SupabaseDataService().getNearbyProducts();
       final liveIds = liveProducts
           .map((p) => p.productId)
@@ -388,23 +377,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
       if (removed > 0) {
         debugPrint(
-          '[Marketplace] ðŸ§¹ Purged $removed stale products from cache',
+          '[Marketplace] 🧹 Purged $removed stale products from cache',
         );
       }
-      debugPrint('[Marketplace] âœ… Cache refresh complete');
+      debugPrint('[Marketplace] ✅ Cache refresh complete');
     } catch (e) {
-      debugPrint('[Marketplace] âš ï¸ Cache refresh failed: $e');
+      debugPrint('[Marketplace] ⚠️ Cache refresh failed: $e');
     }
   }
 
   @override
   void dispose() {
-    for (final entry in _flyingOverlayEntries) {
-      if (entry.mounted) {
-        entry.remove();
-      }
-    }
-    _flyingOverlayEntries.clear();
     _connectivitySubscription?.cancel();
     SupabaseDataService.marketplaceCategoryNotifier.removeListener(
       _onExternalCategoryFilter,
@@ -413,82 +396,163 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     super.dispose();
   }
 
-  void _openProductView(ProductItem product, {String? heroTag}) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ProductViewScreen(product: product, heroTag: heroTag)),
-    );
-  }
-
-  void _runFlyToCartAnimation(GlobalKey startKey, String imageUrl) {
-    final startCtx = startKey.currentContext;
-    final cartCtx = _cartKey.currentContext;
-    if (startCtx == null || cartCtx == null) return;
-
-    final RenderBox? buttonBox = startCtx.findRenderObject() as RenderBox?;
-    final RenderBox? cartBox = cartCtx.findRenderObject() as RenderBox?;
-
-    if (buttonBox == null || cartBox == null) return;
-    if (!buttonBox.attached || !cartBox.attached) return;
-    if (!buttonBox.hasSize || !cartBox.hasSize) return;
-
-    final startPosition = buttonBox.localToGlobal(Offset.zero);
-    final endPosition = cartBox.localToGlobal(Offset.zero);
-
-    if (!startPosition.dx.isFinite ||
-        !startPosition.dy.isFinite ||
-        !endPosition.dx.isFinite ||
-        !endPosition.dy.isFinite) {
-      return;
-    }
-
-    final screenSize = MediaQuery.of(context).size;
-    if (startPosition.dx < 0 ||
-        startPosition.dx > screenSize.width ||
-        startPosition.dy < 0 ||
-        startPosition.dy > screenSize.height) {
-      return;
-    }
-    if (endPosition.dx < 0 ||
-        endPosition.dx > screenSize.width ||
-        endPosition.dy < 0 ||
-        endPosition.dy > screenSize.height) {
-      return;
-    }
-
-    late OverlayEntry overlayEntry;
-    overlayEntry = OverlayEntry(
-      builder: (context) => FlyingIconAnimation(
-        startPosition: startPosition,
-        endPosition: endPosition,
-        imageUrl: imageUrl,
-        onComplete: () {
-          _flyingOverlayEntries.remove(overlayEntry);
-          if (overlayEntry.mounted) {
-            overlayEntry.remove();
-          }
-        },
-      ),
-    );
-
-    _flyingOverlayEntries.add(overlayEntry);
-    final overlay = Overlay.maybeOf(context);
-    if (overlay != null) {
-      overlay.insert(overlayEntry);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
           _buildPremiumHeader(),
           _buildSleekFilterChips(),
+          _buildShopeeSortBar(),
           Expanded(child: _buildProductContent()),
         ],
       ),
     );
+  }
+
+  Widget _buildShopeeSortBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.textHeadline.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          _buildSortTabItem(
+            title: 'Popular',
+            isSelected: _selectedSort == MarketplaceSort.popular,
+            onTap: () => setState(() => _selectedSort = MarketplaceSort.popular),
+          ),
+          _buildSortDivider(),
+          _buildSortTabItem(
+            title: 'Latest',
+            isSelected: _selectedSort == MarketplaceSort.latest,
+            onTap: () => setState(() => _selectedSort = MarketplaceSort.latest),
+          ),
+          _buildSortDivider(),
+          _buildSortTabItem(
+            title: 'Top Sales',
+            isSelected: _selectedSort == MarketplaceSort.topSales,
+            onTap: () => setState(() => _selectedSort = MarketplaceSort.topSales),
+          ),
+          _buildSortDivider(),
+          _buildSortTabItem(
+            title: 'Price',
+            isSelected: _selectedSort == MarketplaceSort.priceAsc ||
+                _selectedSort == MarketplaceSort.priceDesc,
+            icon: _selectedSort == MarketplaceSort.priceAsc
+                ? Icons.arrow_upward_rounded
+                : _selectedSort == MarketplaceSort.priceDesc
+                    ? Icons.arrow_downward_rounded
+                    : Icons.unfold_more_rounded,
+            onTap: () {
+              setState(() {
+                if (_selectedSort == MarketplaceSort.priceAsc) {
+                  _selectedSort = MarketplaceSort.priceDesc;
+                } else {
+                  _selectedSort = MarketplaceSort.priceAsc;
+                }
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSortTabItem({
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+    IconData? icon,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppColors.primary.withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? AppColors.primary : AppColors.textSubtle,
+                ),
+              ),
+              if (icon != null) ...[
+                const SizedBox(width: 2),
+                Icon(
+                  icon,
+                  size: 14,
+                  color: isSelected ? AppColors.primary : AppColors.textSubtle,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSortDivider() {
+    return Container(
+      width: 1,
+      height: 16,
+      color: AppColors.textHeadline.withValues(alpha: 0.08),
+    );
+  }
+
+  void _applySorting(List<ProductItem> list) {
+    switch (_selectedSort) {
+      case MarketplaceSort.popular:
+        list.sort((a, b) {
+          final rA = double.tryParse(a.rating ?? '0') ?? 0;
+          final rB = double.tryParse(b.rating ?? '0') ?? 0;
+          return rB.compareTo(rA);
+        });
+        break;
+      case MarketplaceSort.latest:
+        list.sort((a, b) {
+          if (a.createdAt == null && b.createdAt == null) return 0;
+          if (a.createdAt == null) return 1;
+          if (b.createdAt == null) return -1;
+          return b.createdAt!.compareTo(a.createdAt!);
+        });
+        break;
+      case MarketplaceSort.topSales:
+        list.sort((a, b) => (b.soldCount ?? 0).compareTo(a.soldCount ?? 0));
+        break;
+      case MarketplaceSort.priceAsc:
+        list.sort((a, b) => _parsePrice(a.price).compareTo(_parsePrice(b.price)));
+        break;
+      case MarketplaceSort.priceDesc:
+        list.sort((a, b) => _parsePrice(b.price).compareTo(_parsePrice(a.price)));
+        break;
+    }
   }
 
   Widget _buildPremiumHeader() {
@@ -798,6 +862,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               matchesDistance = distInKm <= _maxDistance;
             }
 
+            if (_inStockOnly && p.stockQuantity != null && p.stockQuantity! <= 0) {
+              return false;
+            }
+            if (_freeShippingOnly && !p.isFreeShipping) {
+              return false;
+            }
+            if (_wholesaleOnly && !p.isWholesale) {
+              return false;
+            }
+
             return matchesCategory &&
                 isNotMine &&
                 matchesQuery &&
@@ -805,6 +879,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 matchesDistance;
           })
           .toList();
+
+      _applySorting(cachedProducts);
 
       return Column(
         children: [
@@ -821,17 +897,21 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       _buildActiveFiltersRow(),
                       Expanded(
                         child: GridView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                           physics: const BouncingScrollPhysics(),
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            mainAxisExtent: 250,
+                            childAspectRatio: 0.65,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
                           ),
                           itemCount: cachedProducts.length,
                           itemBuilder: (_, i) =>
-                              _buildProductCard(cachedProducts[i]),
+                              EcomProductCard(
+                                key: ValueKey('cached_${cachedProducts[i].productId ?? i}'),
+                                product: cachedProducts[i],
+                                userPosition: _userPosition,
+                              ),
                         ),
                       ),
                     ],
@@ -883,12 +963,24 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             matchesDistance = distInKm <= _maxDistance;
           }
 
+          if (_inStockOnly && p.stockQuantity != null && p.stockQuantity! <= 0) {
+            return false;
+          }
+          if (_freeShippingOnly && !p.isFreeShipping) {
+            return false;
+          }
+          if (_wholesaleOnly && !p.isWholesale) {
+            return false;
+          }
+
           return matchesCategory &&
               isNotMine &&
               matchesQuery &&
               matchesPrice &&
               matchesDistance;
         }).toList();
+
+        _applySorting(filteredProducts);
 
         if (filteredProducts.isEmpty) {
           return _buildNoCategoryMatchState();
@@ -907,16 +999,20 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             _buildActiveFiltersRow(),
             Expanded(
               child: GridView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 physics: const BouncingScrollPhysics(),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  mainAxisExtent: 250,
+                  childAspectRatio: 0.65,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
                 ),
                 itemCount: filteredProducts.length,
-                itemBuilder: (_, i) => _buildProductCard(filteredProducts[i]),
+                itemBuilder: (_, i) => EcomProductCard(
+                  key: ValueKey('prod_${filteredProducts[i].productId ?? i}'),
+                  product: filteredProducts[i],
+                  userPosition: _userPosition,
+                ),
               ),
             ),
           ],
@@ -1096,10 +1192,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   Widget _buildActiveFiltersRow() {
-    if (!_priceFilterEnabled && !_distanceFilterEnabled) return const SizedBox.shrink();
+    final hasActive = _priceFilterEnabled ||
+        _distanceFilterEnabled ||
+        _inStockOnly ||
+        _freeShippingOnly ||
+        _wholesaleOnly;
+    if (!hasActive) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -1116,7 +1217,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               ),
               const SizedBox(width: 8),
             ],
-            if (_distanceFilterEnabled)
+            if (_distanceFilterEnabled) ...[
               _buildInlineFilterChip(
                 Icons.near_me_rounded,
                 '< ${_maxDistance.toInt()} km',
@@ -1125,6 +1226,32 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   _maxDistance = 50.0;
                 }),
               ),
+              const SizedBox(width: 8),
+            ],
+            if (_inStockOnly) ...[
+              _buildInlineFilterChip(
+                Icons.inventory_2_outlined,
+                'In Stock',
+                () => setState(() => _inStockOnly = false),
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (_freeShippingOnly) ...[
+              _buildInlineFilterChip(
+                Icons.local_shipping_outlined,
+                'Free Shipping',
+                () => setState(() => _freeShippingOnly = false),
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (_wholesaleOnly) ...[
+              _buildInlineFilterChip(
+                Icons.storefront_outlined,
+                'Wholesale',
+                () => setState(() => _wholesaleOnly = false),
+              ),
+              const SizedBox(width: 8),
+            ],
           ],
         ),
       ),
@@ -1134,261 +1261,405 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   void _showFilterDialog() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.textSubtle.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Filter Marketplace',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textHeadline,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Filter Marketplace',
-                    style: GoogleFonts.poppins(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textHeadline,
+        builder: (ctx, setSheetState) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            24,
+            16,
+            24,
+            MediaQuery.of(ctx).padding.bottom + 24,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.textSubtle.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  TextButton(
-                    onPressed: () {
-                      setSheetState(() {
-                        _minPrice = 0.0;
-                        _maxPrice = 1000.0;
-                        _maxDistance = 50.0;
-                      });
-                      setState(() {
-                        _priceFilterEnabled = false;
-                        _distanceFilterEnabled = false;
-                      });
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Filter Marketplace',
+                      style: GoogleFonts.poppins(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textHeadline,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setSheetState(() {
+                          _minPrice = 0.0;
+                          _maxPrice = 1000.0;
+                          _maxDistance = 50.0;
+                          _inStockOnly = false;
+                          _freeShippingOnly = false;
+                          _wholesaleOnly = false;
+                        });
+                        setState(() {
+                          _priceFilterEnabled = false;
+                          _distanceFilterEnabled = false;
+                          _inStockOnly = false;
+                          _freeShippingOnly = false;
+                          _wholesaleOnly = false;
+                        });
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'Reset',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.payments_outlined,
+                            size: 20,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Price Range',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textHeadline,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              '₱${_minPrice.toInt()} - ₱${_maxPrice.toInt()}',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 5,
+                          activeTrackColor: AppColors.primary,
+                          inactiveTrackColor:
+                              AppColors.primary.withValues(alpha: 0.15),
+                          thumbColor: AppColors.primary,
+                          overlayColor:
+                              AppColors.primary.withValues(alpha: 0.2),
+                          valueIndicatorTextStyle:
+                              const TextStyle(color: Colors.white),
+                        ),
+                        child: RangeSlider(
+                          values: RangeValues(_minPrice, _maxPrice),
+                          min: 0.0,
+                          max: 1000.0,
+                          divisions: 50,
+                          labels: RangeLabels(
+                            '₱${_minPrice.toInt()}',
+                            '₱${_maxPrice.toInt()}',
+                          ),
+                          onChanged: (values) {
+                            setSheetState(() {
+                              _minPrice = values.start;
+                              _maxPrice = values.end;
+                            });
+                            setState(() {
+                              _priceFilterEnabled = true;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.place_outlined,
+                            size: 20,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Max Radius',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textHeadline,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              '${_maxDistance.toInt()} km',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 5,
+                          activeTrackColor: AppColors.primary,
+                          inactiveTrackColor:
+                              AppColors.primary.withValues(alpha: 0.15),
+                          thumbColor: AppColors.primary,
+                          overlayColor:
+                              AppColors.primary.withValues(alpha: 0.2),
+                          valueIndicatorTextStyle:
+                              const TextStyle(color: Colors.white),
+                        ),
+                        child: Slider(
+                          value: _maxDistance,
+                          min: 1.0,
+                          max: 50.0,
+                          divisions: 49,
+                          label: '${_maxDistance.toInt()} km',
+                          onChanged: (val) {
+                            setSheetState(() {
+                              _maxDistance = val;
+                            });
+                            setState(() {
+                              _distanceFilterEnabled = true;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.textHeadline.withValues(alpha: 0.08),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        activeTrackColor: AppColors.primary,
+                        title: Text(
+                          'In Stock Only',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textHeadline,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Hide out-of-stock items',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AppColors.textSubtle,
+                          ),
+                        ),
+                        value: _inStockOnly,
+                        onChanged: (val) {
+                          setSheetState(() => _inStockOnly = val);
+                          setState(() => _inStockOnly = val);
+                        },
+                      ),
+                      Divider(
+                        height: 1,
+                        color: AppColors.textHeadline.withValues(alpha: 0.06),
+                      ),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        activeTrackColor: AppColors.primary,
+                        title: Text(
+                          'Free Shipping Available',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textHeadline,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Items eligible for zero-fee delivery',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AppColors.textSubtle,
+                          ),
+                        ),
+                        value: _freeShippingOnly,
+                        onChanged: (val) {
+                          setSheetState(() => _freeShippingOnly = val);
+                          setState(() => _freeShippingOnly = val);
+                        },
+                      ),
+                      Divider(
+                        height: 1,
+                        color: AppColors.textHeadline.withValues(alpha: 0.06),
+                      ),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        activeTrackColor: AppColors.primary,
+                        title: Text(
+                          'Wholesale / Bulk Only',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textHeadline,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Direct crate or bulk farmer pricing',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: AppColors.textSubtle,
+                          ),
+                        ),
+                        value: _wholesaleOnly,
+                        onChanged: (val) {
+                          setSheetState(() => _wholesaleOnly = val);
+                          setState(() => _wholesaleOnly = val);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
                     ),
                     child: Text(
-                      'Reset',
+                      'Apply Filters',
                       style: GoogleFonts.inter(
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        fontSize: 16,
+                        color: Colors.white,
                       ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
                 ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.payments_outlined, size: 20, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Price Range',
-                          style: GoogleFonts.poppins(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textHeadline,
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            '\u20B1${_minPrice.toInt()} - \u20B1${_maxPrice.toInt()}',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 6,
-                        activeTrackColor: AppColors.primary,
-                        inactiveTrackColor: AppColors.primary.withValues(alpha: 0.15),
-                        thumbColor: AppColors.primary,
-                        overlayColor: AppColors.primary.withValues(alpha: 0.2),
-                        valueIndicatorTextStyle: const TextStyle(color: Colors.white),
-                      ),
-                      child: RangeSlider(
-                        values: RangeValues(_minPrice, _maxPrice),
-                        min: 0.0,
-                        max: 1000.0,
-                        divisions: 50,
-                        labels: RangeLabels(
-                          '\u20B1${_minPrice.toInt()}',
-                          '\u20B1${_maxPrice.toInt()}',
-                        ),
-                        onChanged: (values) {
-                          setSheetState(() {
-                            _minPrice = values.start;
-                            _maxPrice = values.end;
-                          });
-                          setState(() {
-                            _priceFilterEnabled = true;
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.place_outlined, size: 20, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Maximum Distance',
-                          style: GoogleFonts.poppins(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textHeadline,
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            '${_maxDistance.toInt()} km',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 6,
-                        activeTrackColor: AppColors.primary,
-                        inactiveTrackColor: AppColors.primary.withValues(alpha: 0.15),
-                        thumbColor: AppColors.primary,
-                        overlayColor: AppColors.primary.withValues(alpha: 0.2),
-                        valueIndicatorTextStyle: const TextStyle(color: Colors.white),
-                      ),
-                      child: Slider(
-                        value: _maxDistance,
-                        min: 1.0,
-                        max: 50.0,
-                        divisions: 49,
-                        label: '${_maxDistance.toInt()} km',
-                        onChanged: (val) {
-                          setSheetState(() {
-                            _maxDistance = val;
-                          });
-                          setState(() {
-                            _distanceFilterEnabled = true;
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Text(
-                    'Apply Filters',
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildInlineFilterChip(IconData icon, String label, VoidCallback onClear) {
+  Widget _buildInlineFilterChip(
+    IconData icon,
+    String label,
+    VoidCallback onClear,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -1412,244 +1683,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           const SizedBox(width: 4),
           GestureDetector(
             onTap: onClear,
-            child: const Icon(Icons.close_rounded, size: 14, color: AppColors.primary),
+            child: const Icon(
+              Icons.close_rounded,
+              size: 14,
+              color: AppColors.primary,
+            ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildProductCard(ProductItem product) {
-    final productId = product.productId ?? 'unknown_${product.name}';
-    final isSaved = _cacheService.isProductManuallySaved(productId);
-
-    final String heroTag = 'marketplace_product_$productId';
-    return GestureDetector(
-      onTap: () => _openProductView(product, heroTag: heroTag),
-      child: Container(
-        decoration: AppDecorations.cardDecoration.copyWith(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(20),
-                  ),
-                  child: Hero(
-                    tag: heroTag,
-                    child: CachedNetworkImage(
-                      imageUrl: product.imageUrl,
-                      height: 120,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                if (product.categoryName != null && product.categoryName!.isNotEmpty)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        product.categoryName!,
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: AppColors.primary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () => _toggleFavorite(product),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        isSaved
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        size: 18,
-                        color: isSaved
-                            ? Colors.redAccent
-                            : AppColors.textSubtle,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.name,
-                      style: AppTextStyles.headline3.copyWith(fontSize: 14),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      product.farm,
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textSubtle,
-                        fontSize: 11,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.star_rounded, size: 12, color: AppColors.warning),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    product.rating ?? '0.0',
-                                    style: AppTextStyles.labelSmall.copyWith(
-                                      color: AppColors.textBody,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${product.price} / ${product.unit}',
-                                style: AppTextStyles.headline3.copyWith(
-                                  color: AppColors.primary,
-                                  fontSize: 14,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        _AddToCartButton(
-                          onTap: (GlobalKey buttonKey) async {
-                            _runFlyToCartAnimation(buttonKey, product.imageUrl);
-                            final errorMsg = await CartService().addItem(
-                              product,
-                            );
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  errorMsg ?? '${product.name} added to cart',
-                                ),
-                                duration: const Duration(seconds: 1),
-                                backgroundColor: AppColors.primary,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AddToCartButton extends StatefulWidget {
-  final Function(GlobalKey) onTap;
-  const _AddToCartButton({required this.onTap});
-
-  @override
-  State<_AddToCartButton> createState() => _AddToCartButtonState();
-}
-
-class _AddToCartButtonState extends State<_AddToCartButton>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-    );
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.9,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-  }
-
-  final GlobalKey _buttonKey = GlobalKey();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) => _controller.reverse(),
-      onTapCancel: () => _controller.reverse(),
-      onTap: () => widget.onTap(_buttonKey),
-      child: ScaleTransition(
-        key: _buttonKey,
-        scale: _scaleAnimation,
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.add_shopping_cart_rounded,
-            size: 18,
-            color: Colors.white,
-          ),
-        ),
       ),
     );
   }

@@ -117,21 +117,34 @@ class _CartScreenState extends State<CartScreen> {
             return _buildEmptyCart(context);
           }
 
+          final Map<String, List<CartItem>> groupedItems = {};
+          for (final item in items) {
+            final key = item.farmerId.isNotEmpty
+                ? item.farmerId
+                : (item.farm.isNotEmpty ? item.farm : 'general');
+            groupedItems.putIfAbsent(key, () => []).add(item);
+          }
+          final groupKeys = groupedItems.keys.toList();
+
           return Column(
             children: [
               _buildSelectAllHeader(),
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
+                    horizontal: 16,
                     vertical: 8,
                   ),
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) =>
-                      _buildCartItem(context, items[index]),
+                  itemCount: groupKeys.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 14),
+                  itemBuilder: (context, index) {
+                    final farmerKey = groupKeys[index];
+                    final farmItems = groupedItems[farmerKey]!;
+                    return _buildFarmerCartGroup(context, farmerKey, farmItems);
+                  },
                 ),
               ),
+              _buildCartVoucherStrip(),
               _buildCheckoutSection(context),
             ],
           );
@@ -195,37 +208,41 @@ class _CartScreenState extends State<CartScreen> {
   Widget _buildSelectAllHeader() {
     final cart = CartService();
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
       color: AppColors.background,
       child: Row(
         children: [
           Transform.scale(
-            scale: 1.1,
+            scale: 1.05,
             child: Checkbox(
               value: cart.isAllSelected,
               onChanged: (v) => cart.toggleAll(v ?? false),
               activeColor: AppColors.primary,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(5),
               ),
               side: BorderSide(
-                color: AppColors.textHeadline.withValues(alpha: 0.2),
+                color: AppColors.textHeadline.withValues(alpha: 0.25),
                 width: 1.5,
               ),
             ),
           ),
+          const SizedBox(width: 4),
           Text(
             'Select All',
-            style: AppTextStyles.bodyMedium.copyWith(
+            style: GoogleFonts.inter(
               fontWeight: FontWeight.w700,
+              fontSize: 14,
               color: AppColors.textHeadline,
             ),
           ),
           const Spacer(),
           Text(
             '${cart.items.length} items',
-            style: AppTextStyles.bodySmall.copyWith(
+            style: GoogleFonts.inter(
+              fontSize: 12,
               color: AppColors.textSubtle,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -233,64 +250,190 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildCartItem(BuildContext context, CartItem item) {
-    return GestureDetector(
-      onTap: () => CartService().toggleSelection(item.productId),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: item.isSelected
-                ? AppColors.primary.withValues(alpha: 0.3)
-                : Colors.transparent,
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.textHeadline.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+  Widget _buildFarmerCartGroup(
+    BuildContext context,
+    String farmerKey,
+    List<CartItem> farmItems,
+  ) {
+    final cart = CartService();
+    final isGroupSelected =
+        farmItems.isNotEmpty && farmItems.every((item) => item.isSelected);
+    final firstItem = farmItems.first;
+    final farmName = firstItem.farm.isNotEmpty ? firstItem.farm : 'Direct Farm Shop';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.textHeadline.withValues(alpha: 0.07),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Store Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              children: [
+                Transform.scale(
+                  scale: 1.0,
+                  child: Checkbox(
+                    value: isGroupSelected,
+                    onChanged: (v) {
+                      final selected = v ?? false;
+                      if (firstItem.farmerId.isNotEmpty) {
+                        cart.toggleFarmSelection(firstItem.farmerId, selected);
+                      } else {
+                        for (final item in farmItems) {
+                          if (item.isSelected != selected) {
+                            cart.toggleSelection(item.productId);
+                          }
+                        }
+                      }
+                    },
+                    activeColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    side: BorderSide(
+                      color: AppColors.textHeadline.withValues(alpha: 0.25),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.storefront_rounded,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: firstItem.farmerId.isNotEmpty
+                        ? () => context.push(
+                              '${AppRoutes.farmerProfileBase}/${firstItem.farmerId}',
+                            )
+                        : null,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            farmName,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textHeadline,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (firstItem.farmerId.isNotEmpty) ...[
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 16,
+                            color: AppColors.textSubtle,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(
+            height: 1,
+            color: AppColors.textHeadline.withValues(alpha: 0.05),
+          ),
+          // Product Items inside this farm group
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: farmItems.length,
+            separatorBuilder: (_, _) => Divider(
+              height: 1,
+              indent: 48,
+              endIndent: 12,
+              color: AppColors.textHeadline.withValues(alpha: 0.04),
+            ),
+            itemBuilder: (context, i) => _buildCartItem(context, farmItems[i]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCartItem(BuildContext context, CartItem item) {
+    return InkWell(
+      onTap: () => CartService().toggleSelection(item.productId),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Transform.scale(
-              scale: 1.1,
+              scale: 1.0,
               child: Checkbox(
                 value: item.isSelected,
                 onChanged: (_) => CartService().toggleSelection(item.productId),
                 activeColor: AppColors.primary,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(5),
                 ),
                 side: BorderSide(
-                  color: AppColors.textHeadline.withValues(alpha: 0.15),
+                  color: AppColors.textHeadline.withValues(alpha: 0.25),
                   width: 1.5,
                 ),
               ),
             ),
-            const SizedBox(width: 2),
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+            const SizedBox(width: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: CachedNetworkImage(
+                imageUrl: item.imageUrl,
+                width: 76,
+                height: 76,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  width: 76,
+                  height: 76,
+                  color: Colors.grey.shade100,
+                  child: const Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                   ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: CachedNetworkImage(
-                  imageUrl: item.imageUrl,
-                  width: 72,
-                  height: 72,
-                  fit: BoxFit.cover,
+                ),
+                errorWidget: (context, url, error) => Container(
+                  width: 76,
+                  height: 76,
+                  color: Colors.grey.shade100,
+                  child: const Icon(
+                    Icons.eco_rounded,
+                    color: AppColors.primary,
+                    size: 28,
+                  ),
                 ),
               ),
             ),
@@ -300,31 +443,26 @@ class _CartScreenState extends State<CartScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: Text(
                           item.name,
-                          style: AppTextStyles.headline3.copyWith(
-                            fontSize: 16,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                             color: AppColors.textHeadline,
+                            height: 1.25,
                           ),
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       IconButton(
-                        icon: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: AppColors.error.withValues(alpha: 0.05),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.delete_rounded,
-                            color: AppColors.error,
-                            size: 16,
-                          ),
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: AppColors.textSubtle,
+                          size: 18,
                         ),
                         onPressed: () =>
                             CartService().removeItem(item.productId),
@@ -333,29 +471,39 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                     ],
                   ),
-                  Text(
-                    item.farm,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSubtle,
-                      fontSize: 12,
+                  if (item.unit.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        item.unit,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSubtle,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
+                  ],
+                  const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Text(
-                          '₱${item.priceValue.toStringAsFixed(2)}',
-                          style: AppTextStyles.headline3.copyWith(
-                            color: AppColors.primary,
-                            fontSize: 15,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      Text(
+                        '₱${item.priceValue.toStringAsFixed(2)}',
+                        style: GoogleFonts.inter(
+                          color: AppColors.primary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(width: 8),
                       _buildQuantitySelector(item),
                     ],
                   ),
@@ -364,6 +512,70 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCartVoucherStrip() {
+    final cart = CartService();
+    final selectedCount = cart.selectedItems.length;
+    if (selectedCount == 0) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.confirmation_number_rounded,
+              size: 16,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Platform & Farm Vouchers',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    color: AppColors.primary,
+                  ),
+                ),
+                Text(
+                  'Vouchers applied automatically during checkout',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 10,
+                    color: AppColors.textSubtle,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            size: 18,
+            color: AppColors.primary,
+          ),
+        ],
       ),
     );
   }
@@ -972,13 +1184,17 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Payment Method
+                  // Fulfillment & Payment Method
                   Row(
                     children: [
-                      const Icon(Icons.payment_rounded, size: 18, color: AppColors.textHeadline),
+                      const Icon(
+                        Icons.local_shipping_outlined,
+                        size: 18,
+                        color: AppColors.textHeadline,
+                      ),
                       const SizedBox(width: 8),
                       Text(
-                        'Payment Method',
+                        'Fulfillment & Payment Option',
                         style: AppTextStyles.headline3.copyWith(
                           fontSize: 14,
                           color: AppColors.textHeadline,
@@ -991,8 +1207,12 @@ class _CartScreenState extends State<CartScreen> {
                     children: [
                       Expanded(
                         child: _buildPaymentOption(
-                          title: 'COD',
-                          subtitle: 'Cash on Delivery',
+                          title: 'Direct Delivery',
+                          subtitle: 'Cash on Delivery (COD)',
+                          badge: totalDeliveryFee > 0
+                              ? '₱${totalDeliveryFee.toStringAsFixed(0)}'
+                              : 'FREE',
+                          icon: Icons.local_shipping_rounded,
                           isSelected: _paymentMethod == 'COD',
                           onTap: () {
                             setSheetState(() => _paymentMethod = 'COD');
@@ -1003,8 +1223,10 @@ class _CartScreenState extends State<CartScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildPaymentOption(
-                          title: 'COP',
-                          subtitle: 'Cash on Pickup',
+                          title: 'Farm Hub Pickup',
+                          subtitle: 'Cash on Pickup (COP)',
+                          badge: 'FREE',
+                          icon: Icons.storefront_rounded,
                           isSelected: _paymentMethod == 'COP',
                           onTap: () {
                             setSheetState(() => _paymentMethod = 'COP');
@@ -1166,6 +1388,8 @@ class _CartScreenState extends State<CartScreen> {
     required String subtitle,
     required bool isSelected,
     required VoidCallback onTap,
+    IconData? icon,
+    String? badge,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -1173,31 +1397,78 @@ class _CartScreenState extends State<CartScreen> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.1)
+              ? AppColors.primary.withValues(alpha: 0.08)
               : AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
                 ? AppColors.primary
-                : AppColors.textHeadline.withValues(alpha: 0.1),
-            width: 2,
+                : AppColors.textHeadline.withValues(alpha: 0.12),
+            width: isSelected ? 2 : 1,
           ),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(
+                  icon ?? Icons.payment_rounded,
+                  size: 20,
+                  color:
+                      isSelected ? AppColors.primary : AppColors.textHeadline,
+                ),
+                if (badge != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primary
+                          : (badge == 'FREE'
+                              ? Colors.green.shade50
+                              : AppColors.background),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      badge,
+                      style: GoogleFonts.inter(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: isSelected
+                            ? Colors.white
+                            : (badge == 'FREE'
+                                ? Colors.green.shade700
+                                : AppColors.textSubtle),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
             Text(
               title,
-              style: AppTextStyles.headline3.copyWith(
-                fontSize: 16,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
                 color: isSelected ? AppColors.primary : AppColors.textHeadline,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
+            const SizedBox(height: 2),
             Text(
               subtitle,
-              style: AppTextStyles.bodySmall.copyWith(
-                fontSize: 9,
+              style: GoogleFonts.inter(
+                fontSize: 10,
                 color: AppColors.textSubtle,
+                fontWeight: FontWeight.w500,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
