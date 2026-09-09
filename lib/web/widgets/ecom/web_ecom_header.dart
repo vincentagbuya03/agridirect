@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import '../../../shared/models/auth/user_address_model.dart';
+import '../../../shared/services/user/user_service.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/commerce/cart_service.dart';
@@ -8,6 +10,8 @@ import '../../../shared/widgets/brand_logo.dart';
 import '../../constants/web_design_tokens.dart';
 import 'web_location_modal.dart';
 import 'web_cart_flyout.dart';
+import '../web_mobile_farmer_dialog.dart';
+import '../../../shared/widgets/farmer/farmer_mode_switcher_capsule.dart';
 
 /// 3-Tier Enterprise E-Commerce & Marketplace Header for AgriDirect Web
 class WebEcomHeader extends StatefulWidget {
@@ -37,6 +41,7 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
   OverlayEntry? _searchOverlayEntry;
 
   String _currentBarangay = 'Brgy. Roxas';
+  UserAddress? _currentAddress;
   String _selectedCategoryScope = 'All';
   bool _isSearchFocused = false;
 
@@ -55,6 +60,51 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
     if (widget.initialSearchQuery != null) {
       _searchCtrl.text = widget.initialSearchQuery!;
     }
+    _loadUserAddress();
+  }
+
+  Future<void> _loadUserAddress() async {
+    final auth = AuthService();
+    if (!auth.isLoggedIn) {
+      if (mounted) {
+        setState(() {
+          _currentAddress = null;
+        });
+      }
+      return;
+    }
+
+    try {
+      final address = await UserService().getUserAddress();
+      if (mounted) {
+        setState(() {
+          _currentAddress = address;
+          if (address != null && address.barangay.isNotEmpty) {
+            _currentBarangay = address.barangay;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user address in header: $e');
+    }
+  }
+
+  String get _displayLocationText {
+    if (_currentAddress != null) {
+      final b = _currentAddress!.barangay.trim();
+      final c = _currentAddress!.city.trim();
+      if (b.isNotEmpty && c.isNotEmpty) {
+        return '$b, $c ▾';
+      } else if (b.isNotEmpty) {
+        return '$b ▾';
+      } else if (c.isNotEmpty) {
+        return '$c ▾';
+      }
+    }
+    if (AuthService().isLoggedIn) {
+      return 'Set Delivery Address ▾';
+    }
+    return '$_currentBarangay, San Carlos ▾';
   }
 
   @override
@@ -129,11 +179,16 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 4),
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
                       child: Row(
                         children: [
-                          const Icon(Icons.trending_up_rounded,
-                              size: 16, color: WebDesignTokens.primary),
+                          const Icon(
+                            Icons.trending_up_rounded,
+                            size: 16,
+                            color: WebDesignTokens.primary,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Popular Harvest Searches',
@@ -150,8 +205,11 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                     ..._popularSuggestions.map(
                       (item) => ListTile(
                         dense: true,
-                        leading: const Icon(Icons.search_rounded,
-                            size: 18, color: WebDesignTokens.slate400),
+                        leading: const Icon(
+                          Icons.search_rounded,
+                          size: 18,
+                          color: WebDesignTokens.slate400,
+                        ),
                         title: Text(
                           item,
                           style: GoogleFonts.nunitoSans(
@@ -160,8 +218,11 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                             color: WebDesignTokens.dark,
                           ),
                         ),
-                        trailing: const Icon(Icons.north_west_rounded,
-                            size: 14, color: WebDesignTokens.slate400),
+                        trailing: const Icon(
+                          Icons.north_west_rounded,
+                          size: 14,
+                          color: WebDesignTokens.slate400,
+                        ),
                         onTap: () {
                           _searchCtrl.text = item;
                           _removeSearchOverlay();
@@ -224,13 +285,16 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ─── TIER 1: Utility Strip ───
+              // ─── TIER 1: Utility Strip (Desktop) ───
               if (!isMobile) _buildUtilityStrip(context),
 
               // ─── TIER 2: Main Omnibar Header ───
               _buildMainOmnibar(context, auth, cart, isCompact, isMobile),
 
-              // ─── TIER 3: Department Mega-Menu Bar ───
+              // ─── TIER 3: Mobile Quick Navigation Strip (Mobile) ───
+              if (isMobile) _buildMobileQuickNavStrip(context),
+
+              // ─── TIER 4: Department Mega-Menu Bar (Desktop) ───
               if (!isMobile) _buildDepartmentMegaMenu(),
             ],
           ),
@@ -251,7 +315,16 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
             onTap: () {
               WebLocationModal.show(
                 context,
-                currentLocation: _currentBarangay,
+                currentAddress: _currentAddress,
+                currentLocation: _currentAddress?.barangay ?? _currentBarangay,
+                onAddressUpdated: (addr) {
+                  setState(() {
+                    _currentAddress = addr;
+                    if (addr != null && addr.barangay.isNotEmpty) {
+                      _currentBarangay = addr.barangay;
+                    }
+                  });
+                },
                 onLocationSelected: (loc) {
                   setState(() => _currentBarangay = loc);
                 },
@@ -262,8 +335,11 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               child: Row(
                 children: [
-                  const Icon(Icons.location_on_rounded,
-                      size: 15, color: WebDesignTokens.primary),
+                  const Icon(
+                    Icons.location_on_rounded,
+                    size: 15,
+                    color: WebDesignTokens.primary,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     'Deliver to: ',
@@ -273,7 +349,7 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                     ),
                   ),
                   Text(
-                    '$_currentBarangay, San Carlos ▾',
+                    _displayLocationText,
                     style: GoogleFonts.nunitoSans(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -288,8 +364,11 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
           // Center: Ticker
           Row(
             children: [
-              const Icon(Icons.eco_rounded,
-                  size: 14, color: WebDesignTokens.primary),
+              const Icon(
+                Icons.eco_rounded,
+                size: 14,
+                color: WebDesignTokens.primary,
+              ),
               const SizedBox(width: 6),
               Text(
                 '100% Farm-Direct from Pangasinan Growers • Free Delivery on orders ₱500+',
@@ -302,7 +381,6 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
             ],
           ),
 
-          // Right: Links
           Row(
             children: [
               _buildUtilityLink('Community', () {
@@ -325,22 +403,20 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                 context.go(AppRoutes.aboutUs);
               }),
               _buildUtilityDivider(),
-              _buildUtilityLink('Our Story', () {
-                context.go(AppRoutes.webWelcome);
-              }),
-              _buildUtilityDivider(),
               _buildUtilityLink('Farmer Portal', () {
                 final auth = AuthService();
                 if (auth.isLoggedIn) {
                   if (auth.isViewingAsFarmer) {
                     auth.switchToCustomerMode();
                     context.go(AppRoutes.marketplace);
-                  } else {
+                  } else if (auth.isSeller) {
                     auth.switchToFarmerMode();
                     context.go(AppRoutes.farmerDashboard);
+                  } else {
+                    WebMobileFarmerDialog.show(context);
                   }
                 } else {
-                  context.push(AppRoutes.login);
+                  context.go(AppRoutes.login);
                 }
               }),
               _buildUtilityDivider(),
@@ -349,12 +425,12 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                 if (auth.isLoggedIn) {
                   context.go(AppRoutes.customerOrders);
                 } else {
-                  context.push(AppRoutes.login);
+                  context.go(AppRoutes.login);
                 }
               }),
               _buildUtilityDivider(),
               _buildUtilityLink('Help & FAQs', () {
-                context.push(AppRoutes.faqs);
+                context.go(AppRoutes.faqs);
               }),
             ],
           ),
@@ -404,16 +480,16 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
       ),
       child: Row(
         children: [
-          // Logo
+          // Logo (taps to Home / Welcome)
           InkWell(
-            onTap: () => widget.onNavigate(0, AppRoutes.marketplace),
+            onTap: () => context.go(AppRoutes.webWelcome),
             borderRadius: BorderRadius.circular(8),
-            child: const BrandLogo(
-              size: BrandLogoSize.medium,
+            child: BrandLogo(
+              size: isMobile ? BrandLogoSize.small : BrandLogoSize.medium,
               showText: true,
             ),
           ),
-          const SizedBox(width: 24),
+          SizedBox(width: isMobile ? 8 : 24),
 
           // Omnibar Search Area
           if (!isMobile)
@@ -440,15 +516,19 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                         decoration: BoxDecoration(
                           border: Border(
                             right: BorderSide(
-                              color: WebDesignTokens.border.withValues(alpha: 0.8),
+                              color: WebDesignTokens.border.withValues(
+                                alpha: 0.8,
+                              ),
                             ),
                           ),
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
                             value: _selectedCategoryScope,
-                            icon: const Icon(Icons.arrow_drop_down_rounded,
-                                color: WebDesignTokens.slate500),
+                            icon: const Icon(
+                              Icons.arrow_drop_down_rounded,
+                              color: WebDesignTokens.slate500,
+                            ),
                             style: GoogleFonts.nunitoSans(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -456,15 +536,25 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                             ),
                             items: const [
                               DropdownMenuItem(
-                                  value: 'All', child: Text('All Harvests')),
+                                value: 'All',
+                                child: Text('All Harvests'),
+                              ),
                               DropdownMenuItem(
-                                  value: 'Vegetables', child: Text('Vegetables')),
+                                value: 'Vegetables',
+                                child: Text('Vegetables'),
+                              ),
                               DropdownMenuItem(
-                                  value: 'Fruits', child: Text('Fruits')),
+                                value: 'Fruits',
+                                child: Text('Fruits'),
+                              ),
                               DropdownMenuItem(
-                                  value: 'Grains', child: Text('Grains & Rice')),
+                                value: 'Grains',
+                                child: Text('Grains & Rice'),
+                              ),
                               DropdownMenuItem(
-                                  value: 'Organic', child: Text('Organic')),
+                                value: 'Organic',
+                                child: Text('Organic'),
+                              ),
                             ],
                             onChanged: (val) {
                               if (val != null) {
@@ -500,9 +590,11 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                               ),
                               suffixIcon: _searchCtrl.text.isNotEmpty
                                   ? IconButton(
-                                      icon: const Icon(Icons.clear_rounded,
-                                          size: 16,
-                                          color: WebDesignTokens.slate400),
+                                      icon: const Icon(
+                                        Icons.clear_rounded,
+                                        size: 16,
+                                        color: WebDesignTokens.slate400,
+                                      ),
                                       onPressed: () {
                                         _searchCtrl.clear();
                                         _triggerSearch('');
@@ -524,7 +616,9 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                             foregroundColor: Colors.white,
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 18, vertical: 10),
+                              horizontal: 18,
+                              vertical: 10,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -547,82 +641,129 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Chat / Messages
-              IconButton(
-                tooltip: 'Farmer Chat',
-                icon: const Icon(Icons.chat_bubble_outline_rounded,
-                    color: WebDesignTokens.slate700),
-                onPressed: () => widget.onNavigate(0, AppRoutes.messages),
-              ),
+              // Chat & Notifications (hidden on narrow screens to prevent overflow)
+              if (!isMobile) ...[
+                IconButton(
+                  tooltip: 'Farmer Chat',
+                  icon: const Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    color: WebDesignTokens.slate700,
+                  ),
+                  onPressed: () => widget.onNavigate(0, AppRoutes.messages),
+                ),
+                IconButton(
+                  tooltip: 'Notifications',
+                  icon: const Icon(
+                    Icons.notifications_none_rounded,
+                    color: WebDesignTokens.slate700,
+                  ),
+                  onPressed: () =>
+                      widget.onNavigate(0, AppRoutes.notifications),
+                ),
+              ],
 
-              // Notifications
-              IconButton(
-                tooltip: 'Notifications',
-                icon: const Icon(Icons.notifications_none_rounded,
-                    color: WebDesignTokens.slate700),
-                onPressed: () => widget.onNavigate(0, AppRoutes.notifications),
-              ),
-
-              // Cart Button with Hover Flyout
-              CompositedTransformTarget(
-                link: _cartLayerLink,
-                child: MouseRegion(
-                  onEnter: (_) => _showCartOverlay(),
-                  child: InkWell(
-                    onTap: () => widget.onNavigate(4, AppRoutes.cart),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: WebDesignTokens.primaryLight,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: WebDesignTokens.primary.withValues(alpha: 0.3),
+              // Cart Button
+              if (isMobile)
+                IconButton(
+                  tooltip: 'Shopping Cart',
+                  icon: Badge(
+                    label: Text('${cart.itemCount}'),
+                    isLabelVisible: cart.itemCount > 0,
+                    backgroundColor: WebDesignTokens.primary,
+                    textColor: Colors.white,
+                    child: const Icon(
+                      Icons.shopping_bag_outlined,
+                      size: 24,
+                      color: WebDesignTokens.primaryDark,
+                    ),
+                  ),
+                  onPressed: () => widget.onNavigate(4, AppRoutes.cart),
+                )
+              else
+                CompositedTransformTarget(
+                  link: _cartLayerLink,
+                  child: MouseRegion(
+                    onEnter: (_) => _showCartOverlay(),
+                    child: InkWell(
+                      onTap: () => widget.onNavigate(4, AppRoutes.cart),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          Badge(
-                            label: Text('${cart.itemCount}'),
-                            isLabelVisible: cart.itemCount > 0,
-                            backgroundColor: WebDesignTokens.primary,
-                            textColor: Colors.white,
-                            child: const Icon(Icons.shopping_bag_outlined,
-                                size: 22, color: WebDesignTokens.primaryDark),
-                          ),
-                          if (!isCompact) ...[
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'My Cart',
-                                  style: GoogleFonts.nunitoSans(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: WebDesignTokens.slate500,
-                                  ),
-                                ),
-                                Text(
-                                  '₱${cart.totalAmount.toStringAsFixed(0)}',
-                                  style: GoogleFonts.rubik(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: WebDesignTokens.primaryDark,
-                                  ),
-                                ),
-                              ],
+                        decoration: BoxDecoration(
+                          color: WebDesignTokens.primaryLight,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: WebDesignTokens.primary.withValues(
+                              alpha: 0.3,
                             ),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Badge(
+                              label: Text('${cart.itemCount}'),
+                              isLabelVisible: cart.itemCount > 0,
+                              backgroundColor: WebDesignTokens.primary,
+                              textColor: Colors.white,
+                              child: const Icon(
+                                Icons.shopping_bag_outlined,
+                                size: 22,
+                                color: WebDesignTokens.primaryDark,
+                              ),
+                            ),
+                            if (!isCompact) ...[
+                              const SizedBox(width: 10),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'My Cart',
+                                    style: GoogleFonts.nunitoSans(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: WebDesignTokens.slate500,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₱${cart.totalAmount.toStringAsFixed(0)}',
+                                    style: GoogleFonts.rubik(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: WebDesignTokens.primaryDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
 
-              const SizedBox(width: 14),
+              SizedBox(width: isMobile ? 6 : 14),
+
+              // Quick Farmer Mode Switcher Pill
+              if (auth.isSeller || auth.isViewingAsFarmer) ...[
+                FarmerModeSwitcherCapsule(
+                  compact: true,
+                  isFarmerMode: auth.isViewingAsFarmer,
+                  onSwitch: () {
+                    if (auth.isViewingAsFarmer) {
+                      auth.switchToCustomerMode();
+                      widget.onNavigate(0, AppRoutes.marketplace);
+                    } else {
+                      auth.switchToFarmerMode();
+                      widget.onNavigate(0, AppRoutes.farmerDashboard);
+                    }
+                  },
+                ),
+                SizedBox(width: isMobile ? 6 : 12),
+              ],
 
               // User Profile or Login
               if (auth.isLoggedIn)
@@ -634,42 +775,42 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                   child: Row(
                     children: [
                       CircleAvatar(
-                        radius: 18,
+                        radius: isMobile ? 15 : 18,
                         backgroundColor: WebDesignTokens.primary,
-                        child: Text(
-                          auth.userName.isNotEmpty
-                              ? auth.userName[0].toUpperCase()
-                              : 'U',
-                          style: GoogleFonts.rubik(
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
+                        backgroundImage: auth.userAvatarUrl.trim().isNotEmpty
+                            ? NetworkImage(auth.userAvatarUrl.trim())
+                            : null,
+                        child: auth.userAvatarUrl.trim().isEmpty
+                            ? Text(
+                                auth.userName.isNotEmpty
+                                    ? auth.userName[0].toUpperCase()
+                                    : 'U',
+                                style: GoogleFonts.rubik(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  fontSize: isMobile ? 11 : 14,
+                                ),
+                              )
+                            : null,
                       ),
                       if (!isCompact) ...[
                         const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              auth.userName.isNotEmpty ? auth.userName : 'My Account',
-                              style: GoogleFonts.nunitoSans(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: WebDesignTokens.dark,
-                              ),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 130),
+                          child: Text(
+                            auth.userName.isNotEmpty
+                                ? _formatShortName(auth.userName)
+                                : 'My Account',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.nunitoSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: WebDesignTokens.dark,
                             ),
-                            Text(
-                              auth.isSeller ? 'Verified Farmer' : 'Consumer',
-                              style: GoogleFonts.nunitoSans(
-                                fontSize: 11,
-                                color: WebDesignTokens.slate500,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                        const Icon(Icons.keyboard_arrow_down_rounded,
-                            size: 18, color: WebDesignTokens.slate500),
+                        const Icon(Icons.keyboard_arrow_down_rounded, size: 16),
                       ],
                     ],
                   ),
@@ -679,15 +820,17 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                         widget.onNavigate(3, AppRoutes.profile);
                         break;
                       case 'orders':
-                        widget.onNavigate(0, AppRoutes.customerOrders);
+                        context.go(AppRoutes.customerOrders);
                         break;
                       case 'toggle':
                         if (auth.isViewingAsFarmer) {
                           auth.switchToCustomerMode();
                           widget.onNavigate(0, AppRoutes.marketplace);
-                        } else {
+                        } else if (auth.isSeller) {
                           auth.switchToFarmerMode();
                           widget.onNavigate(0, AppRoutes.farmerDashboard);
+                        } else {
+                          WebMobileFarmerDialog.show(context);
                         }
                         break;
                       case 'logout':
@@ -696,6 +839,37 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                     }
                   },
                   itemBuilder: (ctx) => [
+                    PopupMenuItem(
+                      enabled: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            auth.userName.isNotEmpty
+                                ? auth.userName
+                                : 'My Account',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.rubik(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: WebDesignTokens.dark,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            auth.isViewingAsFarmer
+                                ? 'Farmer Mode'
+                                : 'Consumer Mode',
+                            style: GoogleFonts.nunitoSans(
+                              fontSize: 11,
+                              color: WebDesignTokens.slate500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
                     PopupMenuItem(
                       value: 'profile',
                       child: Row(
@@ -712,8 +886,10 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                         children: [
                           const Icon(Icons.receipt_long_outlined, size: 18),
                           const SizedBox(width: 10),
-                          Text('My Orders & Deliveries',
-                              style: GoogleFonts.nunitoSans()),
+                          Text(
+                            'My Orders & Deliveries',
+                            style: GoogleFonts.nunitoSans(),
+                          ),
                         ],
                       ),
                     ),
@@ -721,13 +897,33 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                       value: 'toggle',
                       child: Row(
                         children: [
-                          const Icon(Icons.swap_horiz_rounded, size: 18),
+                          Icon(
+                            auth.isViewingAsFarmer
+                                ? Icons.swap_horiz_rounded
+                                : (auth.isSeller
+                                      ? Icons.storefront_rounded
+                                      : Icons.agriculture_rounded),
+                            size: 18,
+                            color: auth.isSeller || auth.isViewingAsFarmer
+                                ? null
+                                : WebDesignTokens.primary,
+                          ),
                           const SizedBox(width: 10),
                           Text(
                             auth.isViewingAsFarmer
                                 ? 'Switch to Buyer Mode'
-                                : 'Switch to Farmer Mode',
-                            style: GoogleFonts.nunitoSans(),
+                                : (auth.isSeller
+                                      ? 'Switch to Farmer Mode'
+                                      : 'Become a Farmer'),
+                            style: GoogleFonts.nunitoSans(
+                              fontWeight:
+                                  !auth.isSeller && !auth.isViewingAsFarmer
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                              color: !auth.isSeller && !auth.isViewingAsFarmer
+                                  ? WebDesignTokens.primary
+                                  : WebDesignTokens.dark,
+                            ),
                           ),
                         ],
                       ),
@@ -737,12 +933,18 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                       value: 'logout',
                       child: Row(
                         children: [
-                          const Icon(Icons.logout_rounded,
-                              size: 18, color: WebDesignTokens.discountRed),
+                          const Icon(
+                            Icons.logout_rounded,
+                            size: 18,
+                            color: WebDesignTokens.discountRed,
+                          ),
                           const SizedBox(width: 10),
-                          Text('Log Out',
-                              style: GoogleFonts.nunitoSans(
-                                  color: WebDesignTokens.discountRed)),
+                          Text(
+                            'Log Out',
+                            style: GoogleFonts.nunitoSans(
+                              color: WebDesignTokens.discountRed,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -757,14 +959,16 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 12 : 18,
+                      vertical: isMobile ? 8 : 12,
+                    ),
                   ),
-                  onPressed: () => context.push(AppRoutes.login),
+                  onPressed: () => context.go(AppRoutes.login),
                   child: Text(
                     'Sign In',
                     style: GoogleFonts.rubik(
-                      fontSize: 13,
+                      fontSize: isMobile ? 12 : 13,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -777,10 +981,34 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
   }
 
   Widget _buildDepartmentMegaMenu() {
+    final isHomeActive = widget.currentIndex == -1;
+    final isMarketplaceActive = widget.currentIndex == 0;
+
+    final mainNavButtons = [
+      {
+        'label': 'Home',
+        'icon': Icons.home_rounded,
+        'route': AppRoutes.webWelcome,
+        'isActive': isHomeActive,
+      },
+      {
+        'label': 'Marketplace',
+        'icon': Icons.storefront_rounded,
+        'route': AppRoutes.marketplace,
+        'isActive': isMarketplaceActive,
+      },
+    ];
+
     final produceLinks = [
-      {'label': '🥬 Vegetables', 'route': '${AppRoutes.shop}?category=Vegetables'},
+      {
+        'label': '🥬 Vegetables',
+        'route': '${AppRoutes.shop}?category=Vegetables',
+      },
       {'label': '🍎 Fruits', 'route': '${AppRoutes.shop}?category=Fruits'},
-      {'label': '🌾 Rice & Grains', 'route': '${AppRoutes.shop}?category=Grains'},
+      {
+        'label': '🌾 Rice & Grains',
+        'route': '${AppRoutes.shop}?category=Grains',
+      },
       {'label': '⚡ Flash Deals', 'route': AppRoutes.flashSale},
       {'label': '📦 Pre-Orders', 'route': AppRoutes.preorders},
       {'label': '🚜 Farm Shops', 'route': AppRoutes.localShops},
@@ -791,7 +1019,7 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
       {'label': '💬 Community', 'route': AppRoutes.community},
       {'label': '🌦️ Weather Radar', 'route': AppRoutes.weatherRadar},
       {'label': 'ℹ️ About Us', 'route': AppRoutes.aboutUs},
-      {'label': '📖 Our Story', 'route': AppRoutes.webWelcome},
+      {'label': '✨ Welcome Tour', 'route': AppRoutes.webWelcome},
     ];
 
     return Container(
@@ -805,36 +1033,105 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Left: Produce & Harvest Departments
+          // Left: Main Nav + Produce & Harvest Departments
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: produceLinks.map((cat) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        foregroundColor: WebDesignTokens.dark,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 10,
-                        ),
-                        shape: RoundedRectangleBorder(
+                children: [
+                  // 1. Primary Site Navigation: Home & Marketplace
+                  ...mainNavButtons.map((btn) {
+                    final isActive = btn['isActive'] as bool;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => context.go(btn['route'] as String),
                           borderRadius: BorderRadius.circular(8),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 11,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isActive
+                                  ? WebDesignTokens.primary.withValues(alpha: 0.12)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isActive
+                                    ? WebDesignTokens.primary.withValues(alpha: 0.4)
+                                    : Colors.transparent,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  btn['icon'] as IconData,
+                                  size: 15,
+                                  color: isActive
+                                      ? WebDesignTokens.primaryDark
+                                      : WebDesignTokens.slate600,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  btn['label'] as String,
+                                  style: GoogleFonts.nunitoSans(
+                                    fontSize: 13,
+                                    fontWeight: isActive
+                                        ? FontWeight.w800
+                                        : FontWeight.w700,
+                                    color: isActive
+                                        ? WebDesignTokens.primaryDark
+                                        : WebDesignTokens.dark,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                      onPressed: () => context.go(cat['route']!),
-                      child: Text(
-                        cat['label']!,
-                        style: GoogleFonts.nunitoSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                    );
+                  }),
+
+                  // Subtle divider between Site Navigation and Categories
+                  Container(
+                    height: 18,
+                    width: 1.2,
+                    margin: const EdgeInsets.only(left: 4, right: 8),
+                    color: WebDesignTokens.border,
+                  ),
+
+                  // 2. Department & Category Links
+                  ...produceLinks.map((cat) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: WebDesignTokens.dark,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onPressed: () => context.go(cat['route']!),
+                        child: Text(
+                          cat['label']!,
+                          style: GoogleFonts.nunitoSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }).toList(),
+                    );
+                  }),
+                ],
               ),
             ),
           ),
@@ -844,7 +1141,8 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: serviceLinks.map((svc) {
-                final isSpecial = svc['label']!.contains('Community') ||
+                final isSpecial =
+                    svc['label']!.contains('Community') ||
                     svc['label']!.contains('Find Farmer');
                 return Padding(
                   padding: const EdgeInsets.only(left: 4),
@@ -869,8 +1167,9 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
                       svc['label']!,
                       style: GoogleFonts.nunitoSans(
                         fontSize: 12.5,
-                        fontWeight:
-                            isSpecial ? FontWeight.w700 : FontWeight.w600,
+                        fontWeight: isSpecial
+                            ? FontWeight.w700
+                            : FontWeight.w600,
                       ),
                     ),
                   ),
@@ -881,5 +1180,144 @@ class _WebEcomHeaderState extends State<WebEcomHeader> {
         ],
       ),
     );
+  }
+
+  Widget _buildMobileQuickNavStrip(BuildContext context) {
+    final navLinks = [
+      {
+        'label': 'Home',
+        'icon': Icons.home_rounded,
+        'action': () => context.go(AppRoutes.webWelcome),
+      },
+      {
+        'label': 'Marketplace',
+        'icon': Icons.storefront_rounded,
+        'action': () => context.go(AppRoutes.marketplace),
+      },
+      {
+        'label': 'Community',
+        'icon': Icons.forum_outlined,
+        'action': () => context.go(AppRoutes.community),
+      },
+      {
+        'label': 'Find Farmer',
+        'icon': Icons.map_outlined,
+        'action': () => context.go(AppRoutes.farmersMap),
+      },
+      {
+        'label': 'Weather',
+        'icon': Icons.cloud_outlined,
+        'action': () => context.go(AppRoutes.weatherRadar),
+      },
+      {
+        'label': 'DA Articles',
+        'icon': Icons.article_outlined,
+        'action': () => context.go(AppRoutes.articles),
+      },
+      {
+        'label': 'About Us',
+        'icon': Icons.info_outline_rounded,
+        'action': () => context.go(AppRoutes.aboutUs),
+      },
+      {
+        'label': 'Track Harvest',
+        'icon': Icons.local_shipping_outlined,
+        'action': () {
+          final auth = AuthService();
+          if (auth.isLoggedIn) {
+            context.go(AppRoutes.customerOrders);
+          } else {
+            context.go(AppRoutes.login);
+          }
+        },
+      },
+      {
+        'label': 'Help & FAQs',
+        'icon': Icons.help_outline_rounded,
+        'action': () => context.go(AppRoutes.faqs),
+      },
+    ];
+
+    return Container(
+      height: 42,
+      decoration: BoxDecoration(
+        color: WebDesignTokens.bg,
+        border: Border(
+          top: BorderSide(color: WebDesignTokens.border.withValues(alpha: 0.7)),
+          bottom: BorderSide(
+            color: WebDesignTokens.border.withValues(alpha: 0.7),
+          ),
+        ),
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        itemCount: navLinks.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final link = navLinks[i];
+          final label = link['label'] as String;
+          final icon = link['icon'] as IconData;
+          final action = link['action'] as VoidCallback;
+
+          return InkWell(
+            onTap: action,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: WebDesignTokens.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: WebDesignTokens.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 13, color: WebDesignTokens.primary),
+                  const SizedBox(width: 5),
+                  Text(
+                    label,
+                    style: GoogleFonts.nunitoSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: WebDesignTokens.dark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _formatShortName(String fullName) {
+    final trimmed = fullName.trim();
+    if (trimmed.isEmpty) return 'My Account';
+    final parts = trimmed
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return 'My Account';
+
+    String cap(String s) =>
+        s.isEmpty ? '' : '${s[0].toUpperCase()}${s.substring(1).toLowerCase()}';
+
+    if (parts.length == 1) {
+      final single = cap(parts[0]);
+      return single.length > 14 ? '${single.substring(0, 12)}...' : single;
+    }
+
+    final first = cap(parts.first);
+    final lastInitial = parts.last[0].toUpperCase();
+    return '$first $lastInitial.';
   }
 }

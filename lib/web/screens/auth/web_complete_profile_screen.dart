@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/auth/auth_service.dart';
-import '../../../shared/styles/app_theme.dart';
-import '../../../shared/widgets/phone_verification_input_widget.dart';
-
+import '../../../shared/styles/farmer_theme.dart';
+import '../../../shared/widgets/distinctive_phone_input.dart';
+import '../../../shared/widgets/farmer/farmer_button.dart';
+import '../../../shared/widgets/farmer/farmer_language_toggle.dart';
+import '../../../shared/widgets/farmer/farmer_step_card.dart';
 import '../../../shared/widgets/premium_confirm_dialog.dart';
 
-/// Web profile completion screen with professional phone verification and password setup.
+/// Farmer-First Web Profile Completion Screen.
+/// Features instant bilingual switching (English ⇄ Filipino),
+/// 56px+ tactile buttons, high sunlight contrast, and 2-step visual cards.
 class WebCompleteProfileScreen extends StatefulWidget {
   final String userId;
   final String email;
@@ -47,15 +51,15 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
   }
 
   Future<void> _handleLogout() async {
+    final locale = FarmerLocaleService.instance;
     await showDialog<bool>(
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) => PremiumConfirmDialog(
-        title: 'Log Out',
-        content:
-            'Are you sure you want to log out? You can sign in again later to complete your profile.',
-        confirmText: 'Log Out',
-        loadingText: 'Logging out...',
+        title: locale.t('logout_confirm_title'),
+        content: locale.t('logout_confirm_body'),
+        confirmText: locale.t('logout_sign_in_later'),
+        loadingText: '...',
         onConfirm: () async {
           await AuthService().logout();
           if (mounted) {
@@ -67,8 +71,10 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
   }
 
   Future<void> _handleComplete() async {
+    final locale = FarmerLocaleService.instance;
+
     if (!_isPhoneVerified || _verifiedPhone.isEmpty) {
-      _showSnackBar('Please verify your Philippine mobile number via SMS first');
+      _showSnackBar(locale.t('phone_required'));
       return;
     }
 
@@ -76,12 +82,12 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
     final confirmPassword = _confirmPasswordController.text.trim();
 
     if (password.isEmpty || confirmPassword.isEmpty) {
-      _showSnackBar('Please create and confirm your password');
+      _showSnackBar(locale.t('password_required'));
       return;
     }
 
     if (password != confirmPassword) {
-      _showSnackBar('Passwords do not match');
+      _showSnackBar(locale.t('passwords_mismatch'));
       return;
     }
 
@@ -119,10 +125,13 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(
+          message,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF111827),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -131,269 +140,367 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final isCompact = MediaQuery.of(context).size.width < 1100;
+    final locale = FarmerLocaleService.instance;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F8F5),
-      body: Row(
-        children: [
-          if (!isCompact)
-            Expanded(
-              child: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF064E3B), Color(0xFF047857)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+    return ListenableBuilder(
+      listenable: locale,
+      builder: (context, _) {
+        final isPasswordValid = _passwordController.text.isNotEmpty &&
+            _passwordController.text == _confirmPasswordController.text &&
+            _passwordController.text.length >= 6;
+
+        return Scaffold(
+          backgroundColor: FarmerTheme.backgroundLight,
+          body: Row(
+            children: [
+              // Left: High-Contrast Agriculture Billboard (Desktop Only)
+              if (!isCompact)
+                Expanded(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF064E3B), Color(0xFF047857)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(56),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.agriculture_rounded,
+                                color: Colors.white,
+                                size: 54,
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                            Text(
+                              locale.t('complete_profile'),
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 36,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                height: 1.15,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              locale.t('complete_profile_sub'),
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                color: Colors.white.withValues(alpha: 0.85),
+                                height: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 40),
+                            _buildFeatureBadge(
+                              icon: Icons.check_circle_rounded,
+                              label: locale.isFilipino
+                                  ? 'Direktang Koneksyon sa Mamimili'
+                                  : 'Direct Connection to Buyers',
+                            ),
+                            const SizedBox(height: 12),
+                            _buildFeatureBadge(
+                              icon: Icons.security_rounded,
+                              label: locale.isFilipino
+                                  ? 'Ligtas at Protektadong Impormasyon'
+                                  : 'Safe & Protected Account Security',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
+
+              // Right: Farmer-Friendly 2-Step Form Card
+              Expanded(
                 child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(48),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.verified_user_rounded,
-                          color: Colors.white,
-                          size: 92,
-                        ),
-                        const SizedBox(height: 28),
-                        Text(
-                          'Finish Your Profile',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 34,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            height: 1.15,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 36,
+                    ),
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 560),
+                      padding: EdgeInsets.all(isCompact ? 24 : 36),
+                      decoration: FarmerTheme.cardDecoration,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Top Header Row: Icon & Instant Language Toggle
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                width: 52,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  color: FarmerTheme.softMint,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Icon(
+                                  Icons.eco_rounded,
+                                  color: FarmerTheme.primaryAction,
+                                  size: 28,
+                                ),
+                              ),
+                              const FarmerLanguageToggle(),
+                            ],
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Your email is verified. Verify your mobile phone and create your password to activate your account.',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(
-                            fontSize: 15,
-                            color: Colors.white.withValues(alpha: 0.7),
-                            height: 1.45,
+                          const SizedBox(height: 20),
+
+                          // Header Text
+                          Text(
+                            locale.t('complete_profile'),
+                            style: FarmerTheme.headline,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 6),
+                          Text(
+                            '${locale.isFilipino ? "Maligayang pagdating" : "Welcome"}, ${widget.name}. ${locale.t("complete_profile_sub")}',
+                            style: FarmerTheme.bodyMuted,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Verified Email Capsule
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: FarmerTheme.softMint,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: FarmerTheme.primaryAction.withValues(
+                                  alpha: 0.3,
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.mark_email_read_rounded,
+                                  color: FarmerTheme.primaryAction,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    widget.email,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF064E3B),
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    locale.t('verified_badge'),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: FarmerTheme.primaryAction,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Step 1: Mobile Phone Number Card
+                          FarmerStepCard(
+                            stepNumber: '1',
+                            title: locale.t('phone_step_title'),
+                            subtitle: locale.t('phone_step_sub'),
+                            icon: Icons.phone_iphone_rounded,
+                            isCompleted:
+                                _isPhoneVerified && _verifiedPhone.isNotEmpty,
+                            child: DistinctivePhoneInput(
+                              initialPhone: _verifiedPhone,
+                              onChanged: (formattedE164, isValidAndUnique) {
+                                setState(() {
+                                  _verifiedPhone = formattedE164;
+                                  _isPhoneVerified = isValidAndUnique;
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Step 2: Create Account Password Card
+                          FarmerStepCard(
+                            stepNumber: '2',
+                            title: locale.t('password_step_title'),
+                            subtitle: locale.t('password_step_sub'),
+                            icon: Icons.lock_outline_rounded,
+                            isCompleted: isPasswordValid,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  locale.t('password_label'),
+                                  style: FarmerTheme.body.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: _passwordController,
+                                  obscureText: _obscurePassword,
+                                  style: FarmerTheme.body.copyWith(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  decoration: _farmerInputDecoration(
+                                    hintText: locale.t('password_hint'),
+                                    prefixIcon: Icons.lock_rounded,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_off_rounded
+                                            : Icons.visibility_rounded,
+                                        color: FarmerTheme.textMuted,
+                                      ),
+                                      onPressed: () => setState(
+                                        () =>
+                                            _obscurePassword = !_obscurePassword,
+                                      ),
+                                    ),
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  locale.t('confirm_password_label'),
+                                  style: FarmerTheme.body.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: _confirmPasswordController,
+                                  obscureText: _obscureConfirmPassword,
+                                  style: FarmerTheme.body.copyWith(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  decoration: _farmerInputDecoration(
+                                    hintText: locale.t('confirm_password_hint'),
+                                    prefixIcon: Icons.lock_clock_rounded,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscureConfirmPassword
+                                            ? Icons.visibility_off_rounded
+                                            : Icons.visibility_rounded,
+                                        color: FarmerTheme.textMuted,
+                                      ),
+                                      onPressed: () => setState(
+                                        () => _obscureConfirmPassword =
+                                            !_obscureConfirmPassword,
+                                      ),
+                                    ),
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+
+                          // Giant 58px Tactile CTA Button
+                          FarmerButton(
+                            label: locale.t('create_account_cta'),
+                            icon: Icons.check_circle_rounded,
+                            height: 58,
+                            isLoading: _isLoading,
+                            onPressed: _handleComplete,
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Clear Exit Option
+                          Center(
+                            child: TextButton.icon(
+                              onPressed: _isLoading ? null : _handleLogout,
+                              icon: const Icon(
+                                Icons.logout_rounded,
+                                size: 18,
+                                color: FarmerTheme.statusError,
+                              ),
+                              label: Text(
+                                locale.t('logout_sign_in_later'),
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: FarmerTheme.statusError,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          Expanded(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 500),
-                  padding: EdgeInsets.all(isCompact ? 24 : 36),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: const Color(0xFFDDE6DF)),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x14000000),
-                        blurRadius: 28,
-                        offset: Offset(0, 14),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 76,
-                          height: 76,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE9F8EF),
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: const Icon(
-                            Icons.person_add_alt_1_rounded,
-                            color: Color(0xFF15803D),
-                            size: 38,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Complete Your Profile',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textHeadline,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Welcome, ${widget.name}. Verify your mobile phone number and set your password to complete setup.',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: AppColors.textSubtle,
-                          height: 1.45,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FBF8),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: const Color(0xFFCCE4D0)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.verified_rounded,
-                                color: Color(0xFF15803D),
-                                size: 18,
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  widget.email,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF14532D),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 28),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-                      // Step 1: Phone Verification Widget
-                      PhoneVerificationInputWidget(
-                        onVerified: (verifiedPhone) {
-                          setState(() {
-                            _verifiedPhone = verifiedPhone;
-                            _isPhoneVerified = true;
-                          });
-                        },
-                        onVerificationStateChanged: (isVerified) {
-                          setState(() {
-                            _isPhoneVerified = isVerified;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Step 2: Password Inputs
-                      _buildLabel('Account Password *'),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        style: GoogleFonts.inter(fontSize: 14),
-                        decoration: _inputDecoration(
-                          hintText: 'Create a password (min. 6 characters)',
-                          prefixIcon: Icons.lock_outline_rounded,
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                            ),
-                            onPressed: () => setState(
-                              () => _obscurePassword = !_obscurePassword,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _confirmPasswordController,
-                        obscureText: _obscureConfirmPassword,
-                        style: GoogleFonts.inter(fontSize: 14),
-                        decoration: _inputDecoration(
-                          hintText: 'Confirm password',
-                          prefixIcon: Icons.lock_outline_rounded,
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureConfirmPassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                            ),
-                            onPressed: () => setState(
-                              () => _obscureConfirmPassword =
-                                  !_obscureConfirmPassword,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-
-                      // Finalize CTA
-                      SizedBox(
-                        height: 52,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _handleComplete,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF15803D),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: AppShimmerLoader(
-                                    strokeWidth: 2.4,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Text(
-                                  'Create Account',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Center(
-                        child: TextButton.icon(
-                          onPressed: _isLoading ? null : _handleLogout,
-                          icon: const Icon(
-                            Icons.logout_rounded,
-                            size: 16,
-                            color: Color(0xFFDC2626),
-                          ),
-                          label: Text(
-                            'Log Out & Sign In Later',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFFDC2626),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+  Widget _buildFeatureBadge({
+    required IconData icon,
+    required String label,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 20),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
               ),
             ),
           ),
@@ -402,41 +509,35 @@ class _WebCompleteProfileScreenState extends State<WebCompleteProfileScreen> {
     );
   }
 
-  Widget _buildLabel(String text) {
-    return Text(
-      text,
-      style: GoogleFonts.inter(
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textHeadline,
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration({
+  InputDecoration _farmerInputDecoration({
     required String hintText,
     required IconData prefixIcon,
     Widget? suffixIcon,
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: GoogleFonts.inter(color: AppColors.textSubtle, fontSize: 14),
-      prefixIcon: Icon(prefixIcon, color: AppColors.textSubtle, size: 20),
+      hintStyle: FarmerTheme.bodyMuted.copyWith(
+        fontSize: 15,
+        color: const Color(0xFF64748B),
+      ),
+      prefixIcon: Icon(prefixIcon, color: FarmerTheme.primaryAction, size: 22),
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: const Color(0xFFF8FAF8),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFE1E7E2)),
-      ),
+      fillColor: const Color(0xFFF8FAFC),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFE1E7E2)),
+        borderRadius: BorderRadius.circular(FarmerTheme.buttonBorderRadius),
+        borderSide: const BorderSide(
+          color: FarmerTheme.borderCrisp,
+          width: 1.5,
+        ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF15803D), width: 1.4),
+        borderRadius: BorderRadius.circular(FarmerTheme.buttonBorderRadius),
+        borderSide: const BorderSide(
+          color: FarmerTheme.borderFocused,
+          width: 2.0,
+        ),
       ),
     );
   }
