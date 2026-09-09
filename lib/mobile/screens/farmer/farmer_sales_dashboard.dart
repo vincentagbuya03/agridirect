@@ -358,7 +358,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildHeader(),
+                      _buildHeader(locale),
                       const SizedBox(height: 18),
                       _buildWeatherAiCard(locale),
                       const SizedBox(height: 24),
@@ -408,130 +408,159 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   // ===========================================================================
   // 1. TOP HEADER COMPONENT
   // ===========================================================================
-  Widget _buildHeader() {
+  Widget _buildHeader(FarmerLocaleService locale) {
     final avatarUrl = _farmerAvatarUrl;
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Avatar + Emerald Online Dot
-        Stack(
+        // Top Row: Avatar + Greeting & Name + Action Buttons
+        Row(
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.25),
-                  width: 2,
+            // Avatar + Emerald Online Dot
+            Stack(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.25),
+                      width: 2,
+                    ),
+                    color: Colors.white,
+                  ),
+                  child: ClipOval(
+                    child: avatarUrl != null && avatarUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: avatarUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => _buildAvatarFallback(),
+                            errorWidget: (context, url, error) =>
+                                _buildAvatarFallback(),
+                          )
+                        : _buildAvatarFallback(),
+                  ),
                 ),
-                color: Colors.white,
-              ),
-              child: ClipOval(
-                child: avatarUrl != null && avatarUrl.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: avatarUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: const Color(0xFFF1F5F9),
-                          child: const Center(
-                            child: SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) =>
-                            _buildAvatarFallback(),
-                      )
-                    : _buildAvatarFallback(),
+                Positioned(
+                  right: 1,
+                  bottom: 1,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+
+            // Greeting & Name (spacious, never squeezed or vertical)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$_greeting,',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                  Text(
+                    _farmerDisplayName,
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0F172A),
+                      letterSpacing: -0.3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
-            Positioned(
-              right: 1,
-              bottom: 1,
-              child: Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
+            const SizedBox(width: 8),
+
+            // Header Action Icons
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Messages
+                StreamBuilder<int>(
+                  stream: _unreadMessagesStream,
+                  builder: (context, snapshot) {
+                    final unread = snapshot.data ?? 0;
+                    return _buildHeaderIconButton(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      badgeCount: unread,
+                      onTap: () => context.push(AppRoutes.messages),
+                    );
+                  },
                 ),
-              ),
+                const SizedBox(width: 8),
+
+                // Notifications
+                ValueListenableBuilder<int>(
+                  valueListenable: NotificationService().unreadCountNotifier,
+                  builder: (context, unread, _) {
+                    return _buildHeaderIconButton(
+                      icon: Icons.notifications_none_rounded,
+                      badgeCount: unread,
+                      onTap: () => context.push(AppRoutes.notifications),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+
+                // Settings
+                _buildHeaderIconButton(
+                  icon: Icons.settings_outlined,
+                  onTap: () => context.push(AppRoutes.appSettings),
+                ),
+              ],
             ),
           ],
         ),
-        const SizedBox(width: 12),
+        const SizedBox(height: 12),
 
-        // Greeting & Name
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '$_greeting,',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-              Text(
-                _farmerDisplayName,
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF0F172A),
-                  letterSpacing: -0.3,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-
-        // Header Action Icons
+        // Sub-bar: Farmer Store Pill + Bilingual Toggle
         Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFA7F3D0)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.storefront_rounded, size: 14, color: Color(0xFF059669)),
+                  const SizedBox(width: 5),
+                  Text(
+                    locale.t('farmer_mode_badge'),
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF047857),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const FarmerLanguageToggle(compact: true),
-            const SizedBox(width: 8),
-
-            // Messages
-            StreamBuilder<int>(
-              stream: _unreadMessagesStream,
-              builder: (context, snapshot) {
-                final unread = snapshot.data ?? 0;
-                return _buildHeaderIconButton(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  badgeCount: unread,
-                  onTap: () => context.push(AppRoutes.messages),
-                );
-              },
-            ),
-            const SizedBox(width: 8),
-
-            // Notifications
-            ValueListenableBuilder<int>(
-              valueListenable: NotificationService().unreadCountNotifier,
-              builder: (context, unread, _) {
-                return _buildHeaderIconButton(
-                  icon: Icons.notifications_none_rounded,
-                  badgeCount: unread,
-                  onTap: () => context.push(AppRoutes.notifications),
-                );
-              },
-            ),
-            const SizedBox(width: 8),
-
-            // Settings
-            _buildHeaderIconButton(
-              icon: Icons.settings_outlined,
-              onTap: () => context.push(AppRoutes.appSettings),
-            ),
           ],
         ),
       ],
