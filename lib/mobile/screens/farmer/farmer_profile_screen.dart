@@ -8,6 +8,8 @@ import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/router/app_routes.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
+import '../../../shared/widgets/farmer/farmer_language_toggle.dart';
 import 'package:agridirect/shared/widgets/premium_confirm_dialog.dart';
 
 /// Mobile Profile screen specifically for Farmers.
@@ -175,39 +177,46 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = AuthService();
-    return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
-      body: Column(
-        children: [
-          _buildHeroHeader(auth),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildMySales(),
-                  const SizedBox(height: 24),
-                  _buildShopStats(),
-                  const SizedBox(height: 24),
-                  _buildExploreMore(),
-                  const SizedBox(height: 24),
-                  _buildAboutMyFarm(),
-                  const SizedBox(height: 24),
-                  _buildSupportAndLegal(),
-                  const SizedBox(height: 40),
-                ],
+    final locale = FarmerLocaleService.instance;
+
+    return ListenableBuilder(
+      listenable: locale,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: const Color(0xFFF1F5F9),
+          body: Column(
+            children: [
+              _buildHeroHeader(auth, locale),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildMySales(locale),
+                      const SizedBox(height: 24),
+                      _buildShopStats(locale),
+                      const SizedBox(height: 24),
+                      _buildExploreMore(locale),
+                      const SizedBox(height: 24),
+                      _buildAboutMyFarm(),
+                      const SizedBox(height: 24),
+                      _buildSupportAndLegal(locale),
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   // ─── Hero Header (Green Gradient matching Customer Mode) ───
-  Widget _buildHeroHeader(AuthService auth) {
+  Widget _buildHeroHeader(AuthService auth, FarmerLocaleService locale) {
     final displayName = _farmerName ?? auth.userName;
 
     return Stack(
@@ -290,7 +299,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            'Buyer Mode',
+                            locale.isFilipino ? 'Pamilihan' : 'Buyer Mode',
                             style: GoogleFonts.inter(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w700,
@@ -301,13 +310,20 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.settings_outlined,
-                      size: 24,
-                      color: Colors.white,
-                    ),
-                    onPressed: () => context.push(AppRoutes.appSettings),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const FarmerLanguageToggle(compact: true),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.settings_outlined,
+                          size: 24,
+                          color: Colors.white,
+                        ),
+                        onPressed: () => context.push(AppRoutes.appSettings),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -410,7 +426,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
 }
 
   // ─── Farm Stats Section ───
-  Widget _buildShopStats() {
+  Widget _buildShopStats(FarmerLocaleService locale) {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -422,36 +438,33 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                 await context.push(AppRoutes.farmerFollowers);
                 _loadDashboardStats();
               },
-              borderRadius: BorderRadius.circular(12),
               child: _buildStatItem(
-                '${_dashboardStats['followers'] ?? 0}',
-                'Followers',
-                Icons.groups_rounded,
+                _dashboardStats['followers']?.toString() ?? '0',
+                locale.isFilipino ? 'Tagasubaybay' : 'Followers',
+                Icons.people_alt_rounded,
                 Colors.blue,
               ),
             ),
           ),
-          Container(width: 1, height: 30, color: const Color(0xFFF1F5F9)),
+          Container(width: 1, height: 24, color: const Color(0xFFE2E8F0)),
           Expanded(
             child: _buildStatItem(
-              _dashboardStats['rating']?.toString() ?? '5.0',
-              'Rating',
+              _dashboardStats['rating'] ?? '5.0',
+              locale.isFilipino ? 'Marka' : 'Rating',
               Icons.star_rounded,
               Colors.amber,
             ),
           ),
-          Container(width: 1, height: 30, color: const Color(0xFFF1F5F9)),
+          Container(width: 1, height: 24, color: const Color(0xFFE2E8F0)),
           Expanded(
             child: InkWell(
               onTap: () {
-                SupabaseDataService.navigationTabNotifier.value =
-                    1; // Products tab
+                SupabaseDataService.navigationTabNotifier.value = 1;
                 widget.onModeChanged();
               },
-              borderRadius: BorderRadius.circular(12),
               child: _buildStatItem(
-                '${_dashboardStats['activeListings'] ?? 0}',
-                'Products',
+                _dashboardStats['activeListings']?.toString() ?? '0',
+                locale.isFilipino ? 'Paninda' : 'Products',
                 Icons.inventory_2_rounded,
                 Colors.green,
               ),
@@ -499,7 +512,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
   }
 
   // ─── My Sales Section ───
-  Widget _buildMySales() {
+  Widget _buildMySales(FarmerLocaleService locale) {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(16),
@@ -510,7 +523,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'My Sales',
+                locale.isFilipino ? 'Aking Benta' : 'My Sales',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -526,7 +539,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                 child: Row(
                   children: [
                     Text(
-                      'View Sales History',
+                      locale.isFilipino ? 'Kasaysayan ng Benta' : 'View Sales History',
                       style: GoogleFonts.inter(fontSize: 12, color: _muted),
                     ),
                     const Icon(
@@ -543,22 +556,22 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildIconAction(Icons.dashboard_rounded, 'Dashboard', () {
+              _buildIconAction(Icons.dashboard_rounded, locale.isFilipino ? 'Tindahan' : 'Dashboard', () {
                 SupabaseDataService.navigationTabNotifier.value = 0;
                 widget.onModeChanged();
               }),
-              _buildIconAction(Icons.inventory_2_outlined, 'My Products', () {
+              _buildIconAction(Icons.inventory_2_outlined, locale.isFilipino ? 'Paninda' : 'My Products', () {
                 SupabaseDataService.navigationTabNotifier.value = 1;
                 widget.onModeChanged();
               }),
               _buildIconAction(
                 Icons.add_circle_outline_rounded,
-                'Add Product',
+                locale.isFilipino ? 'Magdagdag' : 'Add Product',
                 () => context.push(AppRoutes.addProduct),
               ),
               _buildIconAction(
                 Icons.confirmation_number_outlined,
-                'Vouchers',
+                locale.isFilipino ? 'Voucher' : 'Vouchers',
                 () => context.push(AppRoutes.farmerVouchers),
               ),
             ],
@@ -569,7 +582,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
   }
 
   // ─── Explore More ───
-  Widget _buildExploreMore() {
+  Widget _buildExploreMore(FarmerLocaleService locale) {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(16),
@@ -577,7 +590,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Explore More',
+            locale.isFilipino ? 'Iba pang Aksyon' : 'Explore More',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -595,13 +608,13 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
             children: [
               _buildGridAction(
                 Icons.groups_rounded,
-                'Followers',
+                locale.isFilipino ? 'Mga Suki' : 'Followers',
                 Colors.blue,
                 () => context.push(AppRoutes.farmerFollowers),
               ),
               _buildGridAction(
                 Icons.forum_outlined,
-                'Community',
+                locale.isFilipino ? 'Komunidad' : 'Community',
                 Colors.green,
                 () {
                   SupabaseDataService.navigationTabNotifier.value = 3;
@@ -610,13 +623,13 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
               ),
               _buildGridAction(
                 Icons.chat_bubble_outline_rounded,
-                'Messages',
+                locale.isFilipino ? 'Mensahe' : 'Messages',
                 Colors.orange,
                 () => context.push(AppRoutes.farmerMessages),
               ),
               _buildGridAction(
                 Icons.shield_outlined,
-                'Security',
+                locale.isFilipino ? 'Seguridad' : 'Security',
                 Colors.red,
                 () => context.push(AppRoutes.appSettings),
               ),
@@ -723,7 +736,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
   }
 
   // ─── Support & Legal ───
-  Widget _buildSupportAndLegal() {
+  Widget _buildSupportAndLegal(FarmerLocaleService locale) {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(16),
@@ -731,7 +744,7 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Support & Legal',
+            locale.isFilipino ? 'Mga Setting at Suporta' : 'Support & Legal',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -741,22 +754,22 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
           const SizedBox(height: 12),
           _buildListAction(
             Icons.help_outline_rounded,
-            'Help Center',
+            locale.isFilipino ? 'Help Center' : 'Help Center',
             () => context.push(AppRoutes.helpCenter),
           ),
           _buildListAction(
             Icons.description_outlined,
-            'Terms of Service',
+            locale.isFilipino ? 'Kasunduan sa Serbisyo' : 'Terms of Service',
             () => context.push(AppRoutes.termsOfService),
           ),
           _buildListAction(
             Icons.privacy_tip_outlined,
-            'Privacy Policy',
+            locale.isFilipino ? 'Patakaran sa Privacy' : 'Privacy Policy',
             () => context.push(AppRoutes.privacyPolicy),
           ),
           _buildListAction(
             Icons.policy_outlined,
-            'Community Rules',
+            locale.isFilipino ? 'Mga Panuntunan ng Komunidad' : 'Community Rules',
             () => context.push(AppRoutes.communityRules),
           ),
           const Divider(height: 24, color: Color(0xFFF1F5F9)),
@@ -770,9 +783,9 @@ class _FarmerProfileScreenState extends State<FarmerProfileScreen> {
                   const Icon(Icons.logout_rounded, color: Colors.red, size: 20),
                   const SizedBox(width: 10),
                   Text(
-                    'Log Out',
+                    locale.isFilipino ? 'Mag-Log Out' : 'Log Out',
                     style: GoogleFonts.inter(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: Colors.red,
                     ),

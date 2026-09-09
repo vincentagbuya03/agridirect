@@ -106,6 +106,161 @@ class FarmerStrings {
       'en': 'Filipino',
       'fil': 'Filipino',
     },
+    // Farmer Dashboard - Greetings
+    'good_morning': {
+      'en': 'Good morning',
+      'fil': 'Magandang umaga',
+    },
+    'good_afternoon': {
+      'en': 'Good afternoon',
+      'fil': 'Magandang hapon',
+    },
+    'good_evening': {
+      'en': 'Good evening',
+      'fil': 'Magandang gabi',
+    },
+    // Farmer Dashboard - Section Titles
+    'performance_overview': {
+      'en': 'Performance Overview',
+      'fil': 'Pangkalahatang Katayuan',
+    },
+    'performance_overview_sub': {
+      'en': 'Real-time sales & inventory metrics',
+      'fil': 'Benta at bilang ng paninda ngayon',
+    },
+    'quick_operations': {
+      'en': 'Quick Operations',
+      'fil': 'Mabilisang Aksyon',
+    },
+    'quick_operations_sub': {
+      'en': 'Primary shortcuts for your farm',
+      'fil': 'Pangunahing aksyon para sa sakahan',
+    },
+    'sales_analytics': {
+      'en': 'Sales Analytics',
+      'fil': 'Pagsusuri ng Benta',
+    },
+    'sales_analytics_sub': {
+      'en': 'Gross revenue trajectory & trends',
+      'fil': 'Direksyon at takbo ng kinita',
+    },
+    // Bento Metrics
+    'total_revenue': {
+      'en': 'TOTAL REVENUE',
+      'fil': 'KABUUANG BENTA',
+    },
+    'all_time_sales': {
+      'en': 'All-time gross sales',
+      'fil': 'Kabuuang benta mula simula',
+    },
+    'active_listings': {
+      'en': 'ACTIVE LISTINGS',
+      'fil': 'AKTIBONG PANINDA',
+    },
+    'published_in_store': {
+      'en': 'Published in store',
+      'fil': 'Nakatinda sa tindahan',
+    },
+    'subscribers': {
+      'en': 'SUBSCRIBERS',
+      'fil': 'MGA TAGASUBAYBAY',
+    },
+    'farmer_fans': {
+      'en': 'Farmer store fans',
+      'fil': 'Mga suki ng tindahan',
+    },
+    'community_posts': {
+      'en': 'COMMUNITY POSTS',
+      'fil': 'MGA POST SA KOMUNIDAD',
+    },
+    'community_updates': {
+      'en': 'Community updates',
+      'fil': 'Mga update sa komunidad',
+    },
+    // Quick Actions
+    'add_produce': {
+      'en': 'Add Produce',
+      'fil': 'Magdagdag',
+    },
+    'orders_action': {
+      'en': 'Orders',
+      'fil': 'Mga Order',
+    },
+    'vouchers_action': {
+      'en': 'Vouchers',
+      'fil': 'Voucher',
+    },
+    'community_action': {
+      'en': 'Community',
+      'fil': 'Komunidad',
+    },
+    // Revenue Trajectory
+    'revenue_trajectory_title': {
+      'en': 'REVENUE TRAJECTORY',
+      'fil': 'DIREKSYON NG KINITA',
+    },
+    'past_7_days': {
+      'en': 'Past 7 Days',
+      'fil': 'Nakalipas na 7 Araw',
+    },
+    'past_30_days': {
+      'en': 'Past 30 Days',
+      'fil': 'Nakalipas na 30 Araw',
+    },
+    'past_year': {
+      'en': 'Past Year',
+      'fil': 'Nakalipas na 1 Taon',
+    },
+    // Weather Card
+    'weather_ai_tag': {
+      'en': 'WEATHER AI',
+      'fil': 'ULAT PANAHON AI',
+    },
+    'consult_kiko_ai': {
+      'en': 'Consult Kiko AI',
+      'fil': 'Magtanong kay Kiko AI',
+    },
+    'radar_details': {
+      'en': 'Radar & Details',
+      'fil': 'Radar at Detalye',
+    },
+    // Navigation Tabs
+    'nav_dashboard': {
+      'en': 'Dashboard',
+      'fil': 'Tindahan',
+    },
+    'nav_products': {
+      'en': 'Products',
+      'fil': 'Paninda',
+    },
+    'nav_orders': {
+      'en': 'Orders',
+      'fil': 'Mga Order',
+    },
+    'nav_community': {
+      'en': 'Community',
+      'fil': 'Komunidad',
+    },
+    'nav_profile': {
+      'en': 'Profile',
+      'fil': 'Aking Profile',
+    },
+    'nav_home': {
+      'en': 'Home',
+      'fil': 'Home',
+    },
+    'nav_marketplace': {
+      'en': 'Marketplace',
+      'fil': 'Pamilihan',
+    },
+    'nav_preorders': {
+      'en': 'Pre-Orders',
+      'fil': 'Pre-Order',
+    },
+    'nav_weather': {
+      'en': 'Weather',
+      'fil': 'Panahon',
+    },
   };
 
   /// Retrieve localized string for [key] in specified [lang] or fallback to English.
