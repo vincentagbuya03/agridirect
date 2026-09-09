@@ -1361,88 +1361,41 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Period Selector Header
+          // Period Selector Header: Title + Chips
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'REVENUE TRAJECTORY',
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF94A3B8),
-                          letterSpacing: 0.6,
-                        ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Text(
+                      'REVENUE TRAJECTORY',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF94A3B8),
+                        letterSpacing: 0.6,
                       ),
-                      const SizedBox(width: 6),
-                      Text(
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
                         '• $periodSubtitle',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF059669),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        '₱${periodRevenue.toStringAsFixed(2)}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF0F172A),
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: (isPositiveTrend ? const Color(0xFF10B981) : const Color(0xFFF59E0B))
-                              .withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isPositiveTrend
-                                  ? Icons.trending_up_rounded
-                                  : Icons.trending_flat_rounded,
-                              size: 13,
-                              color: isPositiveTrend
-                                  ? const Color(0xFF059669)
-                                  : const Color(0xFFD97706),
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              periodTrend,
-                              style: GoogleFonts.inter(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                color: isPositiveTrend
-                                  ? const Color(0xFF059669)
-                                  : const Color(0xFFD97706),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 6),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildPeriodChip(0, '7D'),
                   const SizedBox(width: 4),
@@ -1450,6 +1403,57 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   const SizedBox(width: 4),
                   _buildPeriodChip(2, '1Y'),
                 ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          // Amount & Trend
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '₱${periodRevenue.toStringAsFixed(2)}',
+                style: GoogleFonts.poppins(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: (isPositiveTrend ? const Color(0xFF10B981) : const Color(0xFFF59E0B))
+                      .withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isPositiveTrend
+                          ? Icons.trending_up_rounded
+                          : Icons.trending_flat_rounded,
+                      size: 13,
+                      color: isPositiveTrend
+                          ? const Color(0xFF059669)
+                          : const Color(0xFFD97706),
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      periodTrend,
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: isPositiveTrend
+                            ? const Color(0xFF059669)
+                            : const Color(0xFFD97706),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

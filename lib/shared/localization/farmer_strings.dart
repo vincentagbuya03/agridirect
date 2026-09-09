@@ -58,7 +58,7 @@ class FarmerStrings {
     },
     'switch_to_farmer': {
       'en': 'Go to Farmer Store',
-      'fil': 'Pumunta sa Tindahan ng Magsasaka',
+      'fil': 'Tindahan ng Magsasaka',
     },
     'switch_to_consumer': {
       'en': 'Switch to Customer View',

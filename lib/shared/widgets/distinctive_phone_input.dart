@@ -188,17 +188,21 @@ class _DistinctivePhoneInputState extends State<DistinctivePhoneInput> {
         children: [
           if (widget.label != null) ...[
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  widget.label!,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF334155),
-                    letterSpacing: -0.1,
+                Expanded(
+                  child: Text(
+                    widget.label!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF334155),
+                      letterSpacing: -0.1,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

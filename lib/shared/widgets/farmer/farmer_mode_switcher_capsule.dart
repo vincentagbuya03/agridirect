@@ -61,13 +61,17 @@ class FarmerModeSwitcherCapsule extends StatelessWidget {
               children: [
                 Icon(icon, size: compact ? 18 : 22, color: Colors.white),
                 const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: compact ? 13 : 15,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: 0.2,
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: compact ? 13 : 15,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.2,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 6),
