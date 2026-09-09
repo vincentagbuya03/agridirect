@@ -23,6 +23,7 @@ class CompleteProfileScreen extends StatefulWidget {
 
 class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final PageController _pageController = PageController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -36,13 +37,14 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
   void _goToPasswordStep() {
-    final rawInput = _verifiedPhone.trim();
+    final rawInput = (_verifiedPhone.isNotEmpty ? _verifiedPhone : _phoneController.text).trim();
     final cleanDigits = rawInput.replaceAll(RegExp(r'[^\d]'), '');
     final nationalDigits = cleanDigits.startsWith('63')
         ? cleanDigits.substring(2)
@@ -186,143 +188,129 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       listenable: locale,
       builder: (context, _) {
         return Scaffold(
-          backgroundColor: FarmerTheme.backgroundLight,
+          backgroundColor: Colors.white,
           body: SafeArea(
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: FarmerTheme.borderCrisp, width: 1.5),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x0C000000),
-                        blurRadius: 24,
-                        offset: Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Stack(
-                    children: [
-                      Column(
-                        children: [
-                          // Top App Bar & Step Indicator
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                if (_currentStep == 1)
-                                  IconButton(
-                                    onPressed: _goToPhoneStep,
-                                    icon: const Icon(
-                                      Icons.arrow_back_rounded,
-                                      color: FarmerTheme.textHeadline,
-                                    ),
-                                  )
-                                else
-                                  const SizedBox(width: 44),
-                                // Step Pill Indicator
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 6,
+                child: Stack(
+                  children: [
+                    Column(
+                      children: [
+                        // Top App Bar & Step Indicator (Zero Overflow)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                          child: Row(
+                            children: [
+                              if (_currentStep == 1) ...[
+                                IconButton(
+                                  onPressed: _goToPhoneStep,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  icon: const Icon(
+                                    Icons.arrow_back_rounded,
+                                    color: FarmerTheme.textHeadline,
+                                    size: 22,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: FarmerTheme.softMint,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: FarmerTheme.primaryAction.withValues(alpha: 0.3),
+                                ),
+                                const SizedBox(width: 10),
+                              ],
+                              // Step Pill Indicator
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: FarmerTheme.softMint,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: FarmerTheme.primaryAction.withValues(
+                                      alpha: 0.3,
                                     ),
                                   ),
-                                  child: Text(
-                                    locale.isFilipino
-                                        ? 'Hakbang ${_currentStep + 1} ng 2'
-                                        : 'Step ${_currentStep + 1} of 2',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
+                                ),
+                                child: Text(
+                                  locale.isFilipino
+                                      ? 'Hakbang ${_currentStep + 1} ng 2'
+                                      : 'Step ${_currentStep + 1} of 2',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: FarmerTheme.primaryAction,
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              const FarmerLanguageToggle(compact: true),
+                            ],
+                          ),
+                        ),
+
+                        // Page View: Step 1 (Phone) and Step 2 (Password)
+                        Expanded(
+                          child: PageView(
+                            controller: _pageController,
+                            physics: const NeverScrollableScrollPhysics(),
+                            children: [
+                              _buildStep1Phone(auth, locale),
+                              _buildStep2Password(locale),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (_isLoading)
+                      Positioned.fill(
+                        child: Container(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 20,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x14000000),
+                                    blurRadius: 20,
+                                    offset: Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox(
+                                    width: 32,
+                                    height: 32,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
                                       color: FarmerTheme.primaryAction,
                                     ),
                                   ),
-                                ),
-                                const FarmerLanguageToggle(compact: true),
-                              ],
-                            ),
-                          ),
-
-                          // Page View: Step 1 (Phone) and Step 2 (Password)
-                          Expanded(
-                            child: PageView(
-                              controller: _pageController,
-                              physics: const NeverScrollableScrollPhysics(),
-                              children: [
-                                _buildStep1Phone(auth, locale),
-                                _buildStep2Password(locale),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      if (_isLoading)
-                        Positioned.fill(
-                          child: Container(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            child: Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 20,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0x14000000),
-                                      blurRadius: 20,
-                                      offset: Offset(0, 8),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    locale.isFilipino
+                                        ? 'Inihahanda ang iyong account...'
+                                        : 'Securing your account...',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      color: FarmerTheme.textHeadline,
                                     ),
-                                  ],
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const SizedBox(
-                                      width: 32,
-                                      height: 32,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        color: FarmerTheme.primaryAction,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 14),
-                                    Text(
-                                      locale.isFilipino
-                                          ? 'Inihahanda ang iyong account...'
-                                          : 'Securing your account...',
-                                      style: GoogleFonts.inter(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 14,
-                                        color: FarmerTheme.textHeadline,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -380,12 +368,16 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
           // Distinctive Phone Input (Zero OTP, Instant Uniqueness Check)
           DistinctivePhoneInput(
+            key: const ValueKey('mobile_complete_profile_phone_input'),
+            controller: _phoneController,
             initialPhone: _verifiedPhone,
             onChanged: (formattedE164, isValidAndUnique) {
-              setState(() {
-                _verifiedPhone = formattedE164;
-                _isPhoneVerified = isValidAndUnique;
-              });
+              if (_verifiedPhone != formattedE164 || _isPhoneVerified != isValidAndUnique) {
+                setState(() {
+                  _verifiedPhone = formattedE164;
+                  _isPhoneVerified = isValidAndUnique;
+                });
+              }
             },
           ),
 
@@ -393,7 +385,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
           // Save & Continue Button (56px FarmerButton)
           FarmerButton(
-            label: locale.isFilipino ? 'I-save at Magpatuloy' : 'Save & Continue',
+            label: locale.isFilipino
+                ? 'I-save at Magpatuloy'
+                : 'Save & Continue',
             icon: Icons.arrow_forward_rounded,
             height: 56,
             onPressed: _goToPasswordStep,
