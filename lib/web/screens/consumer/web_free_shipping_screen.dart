@@ -6,7 +6,8 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/commerce/cart_service.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
-import '../../widgets/web_promo_header.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
+import '../../../shared/router/app_routes.dart';
 import 'package:intl/intl.dart';
 
 class WebFreeShippingScreen extends StatefulWidget {
@@ -115,7 +116,7 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
           action: SnackBarAction(
             label: 'VIEW VOUCHERS',
             textColor: const Color(0xFF6EE7B7),
-            onPressed: () => context.push('/vouchers'),
+            onPressed: () => context.go('/vouchers'),
           ),
         ));
       } else {
@@ -159,7 +160,7 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
         action: SnackBarAction(
           label: 'VIEW CART',
           textColor: Colors.white,
-          onPressed: () => context.push('/cart'),
+          onPressed: () => context.go('/cart'),
         ),
       ));
     }
@@ -175,10 +176,16 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
       body: SingleChildScrollView(
         child: Column(
           children: [
-            WebPromoHeader(
-              activeTab: 'free_shipping',
-              searchPlaceholder: 'Search free shipping produce & crops...',
-              onSearchChanged: (q) => setState(() => _searchQuery = q.toLowerCase()),
+            WebEcomHeader(
+              currentIndex: 1,
+              onNavigate: (index, [route]) {
+                if (route != null) {
+                  context.go(route);
+                } else {
+                  context.go(AppRoutes.webTabRoute(index));
+                }
+              },
+              onSearch: (q) => setState(() => _searchQuery = q.toLowerCase()),
             ),
             _buildHeroBanner(),
             const SizedBox(height: 32),
@@ -635,7 +642,7 @@ class _WebFreeShippingScreenState extends State<WebFreeShippingScreen>
                   ],
                 ),
                 TextButton.icon(
-                  onPressed: () => context.push('/vouchers'),
+                  onPressed: () => context.go('/vouchers'),
                   icon: const Icon(Icons.wallet_rounded, size: 16),
                   label: const Text('View All Vouchers'),
                   style: TextButton.styleFrom(
@@ -1133,7 +1140,7 @@ class _WebFreeShippingCardState extends State<_WebFreeShippingCard> {
       child: GestureDetector(
         onTap: () {
           if (product.productId != null) {
-            context.push('/product/${product.productId}');
+            context.go('/product/${product.productId}');
           }
         },
         child: AnimatedContainer(

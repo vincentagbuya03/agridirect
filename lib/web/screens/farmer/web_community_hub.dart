@@ -8,7 +8,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../widgets/animated_components.dart';
-import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/widgets/create_post_dialog.dart';
 import '../../../shared/widgets/report_content_dialog.dart';
 import '../../../shared/services/auth/auth_service.dart';
@@ -16,9 +15,9 @@ import '../../../shared/router/app_routes.dart';
 import '../../../shared/utils/share_util.dart';
 import '../../../shared/services/integration/weather_service.dart';
 import '../../../shared/models/weather_model.dart';
-import '../../widgets/web_consumer_nav_bar.dart';
-import '../../widgets/web_hamburger_menu_button.dart';
 import '../../widgets/web_footer.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
+import '../../widgets/farmer/web_farmer_header.dart';
 import '../../../shared/widgets/image_widgets.dart';
 
 import '../../../shared/screens/article_detail_screen.dart';
@@ -53,7 +52,6 @@ class _WebCommunityHubState extends State<WebCommunityHub>
   List<ForumPostItem>? _postsList;
   late Future<WeatherData?> _weatherFuture;
   final Set<int> _hoveredPosts = {};
-  int _hoveredNav = -1;
 
   static const Color _primary = Color(0xFF10B981); // Unified Emerald
   static const Color _dark = Color(0xFF0F172A);
@@ -209,7 +207,7 @@ class _WebCommunityHubState extends State<WebCommunityHub>
     final farmerId = await SupabaseDataService().getFarmerIdByUserId(userId);
     if (!mounted) return;
     if (farmerId != null && farmerId.isNotEmpty) {
-      context.push(AppRoutes.farmerProfile(farmerId));
+      context.go(AppRoutes.farmerProfile(farmerId));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('This user does not have a public farm profile.')),
@@ -326,144 +324,32 @@ class _WebCommunityHubState extends State<WebCommunityHub>
 
   // ─── Site Header (consistent across all pages) ───
   Widget _buildNavBar() {
-    final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 900;
-    final isCompact = sw < 1100;
-
-    if (!AuthService().isViewingAsFarmer) {
-      return WebConsumerNavBar(
-        currentIndex: widget.currentIndex,
-        onNavigate: widget.onNavigate,
-        onCartTap: () => context.go(AppRoutes.cart),
-        margin: isMobile
-            ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-            : const EdgeInsets.fromLTRB(32, 24, 32, 12),
+    final isFarmer = AuthService().isViewingAsFarmer || widget.currentIndex == 3;
+    if (!isFarmer) {
+      return WebEcomHeader(
+        currentIndex: 2,
+        onNavigate: (index, [route]) {
+          if (route != null) {
+            context.go(route);
+          } else {
+            widget.onNavigate(index);
+          }
+        },
+        onSearch: (query) {
+          context.go(AppRoutes.shop, extra: {'search': query});
+        },
       );
     }
 
-    final navItems = ['Dashboard', 'Products', 'Orders', 'Community', 'Pre-Orders'];
-    return Container(
-      margin: isMobile
-          ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-          : (isCompact
-              ? const EdgeInsets.fromLTRB(20, 16, 20, 8)
-              : const EdgeInsets.fromLTRB(32, 24, 32, 12)),
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : (isCompact ? 16 : 28),
-        vertical: isMobile ? 12 : (isCompact ? 10 : 14),
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _border.withValues(alpha: 0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: _dark.withValues(alpha: 0.03),
-            blurRadius: 30,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Logo with pulsing glow
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(0),
-              child: BrandLogo(
-                size: (isMobile || isCompact) ? BrandLogoSize.small : BrandLogoSize.medium,
-              ),
-            ),
-          ),
-          if (!isMobile) ...[
-            SizedBox(width: isCompact ? 16 : 48),
-            // Nav items
-            ...List.generate(navItems.length, (i) {
-              final isActive = i == widget.currentIndex;
-              final isHovered = _hoveredNav == i;
-              return Padding(
-                padding: EdgeInsets.symmetric(horizontal: isCompact ? 2 : 4),
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  onEnter: (_) => setState(() => _hoveredNav = i),
-                  onExit: (_) => setState(() => _hoveredNav = -1),
-                  child: GestureDetector(
-                    onTap: () => widget.onNavigate(i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isCompact ? 12 : 20,
-                        vertical: isCompact ? 10 : 12,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        color: isActive
-                            ? _primary.withValues(alpha: 0.1)
-                            : isHovered
-                            ? _border.withValues(alpha: 0.35)
-                            : Colors.transparent,
-                      ),
-                      child: Text(
-                        navItems[i],
-                        style: GoogleFonts.inter(
-                          fontSize: isCompact ? 13 : 15,
-                          fontWeight: isActive
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: isActive
-                              ? _primary
-                              : isHovered
-                              ? _dark
-                              : _muted,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ],
-          const Spacer(),
-          // Circle person icon
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(5), // Profile is index 5
-              child: Container(
-                width: (isMobile || isCompact) ? 38 : 46,
-                height: (isMobile || isCompact) ? 38 : 46,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_primary, Color(0xFF059669)],
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _primary.withValues(alpha: 0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.person_outline_rounded,
-                  color: Colors.white,
-                  size: (isMobile || isCompact) ? 20 : 24,
-                ),
-              ),
-            ),
-          ),
-          if (isMobile) ...[
-            const SizedBox(width: 8),
-            WebHamburgerMenuButton(
-              currentIndex: widget.currentIndex,
-              onNavigate: widget.onNavigate,
-            ),
-          ],
-        ],
-      ),
+    return WebFarmerHeader(
+      currentIndex: 3,
+      onNavigate: (index, [route]) {
+        if (route != null) {
+          context.go(route);
+        } else {
+          widget.onNavigate(index);
+        }
+      },
     );
   }
 

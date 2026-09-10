@@ -57,6 +57,9 @@ import '../../web/screens/consumer/web_preorder_hub.dart';
 import '../../web/screens/consumer/web_checkout_screen.dart';
 import '../../web/screens/consumer/web_cart_checkout_screen.dart';
 import '../../web/screens/consumer/web_order_success_screen.dart';
+import '../../web/screens/consumer/web_customer_orders_screen.dart';
+import '../../web/screens/consumer/web_notifications_screen.dart';
+import '../../web/screens/consumer/web_messages_screen.dart';
 import '../../web/screens/consumer/web_consumer_weather_radar_screen.dart';
 import '../../web/screens/consumer/web_free_shipping_screen.dart';
 import '../../web/screens/consumer/web_flash_sale_screen.dart';
@@ -66,6 +69,8 @@ import '../../web/screens/consumer/web_wholesale_screen.dart';
 import '../../web/screens/consumer/web_local_shops_screen.dart';
 import '../../web/screens/common/web_articles_screen.dart';
 import '../../web/screens/common/web_about_us_screen.dart';
+import '../../web/screens/common/web_faqs_screen.dart';
+import '../../web/screens/common/web_welcome_screen.dart';
 import '../../mobile/screens/consumer/free_shipping_screen.dart';
 import '../../mobile/screens/consumer/flash_sale_screen.dart';
 import '../../mobile/screens/consumer/vouchers_screen.dart';
@@ -73,7 +78,6 @@ import '../../mobile/screens/consumer/fresh_produce_screen.dart';
 import '../../mobile/screens/consumer/wholesale_screen.dart';
 import '../../mobile/screens/consumer/local_shops_screen.dart';
 import '../../web/screens/admin/admin_dashboard_redesigned.dart';
-import '../../web/screens/common/web_welcome_screen.dart';
 import '../screens/messages/messages_screen.dart';
 import '../screens/messages/in_app_call_screen.dart';
 import '../../mobile/screens/common/loading_screen.dart';
@@ -109,21 +113,19 @@ Widget _buildFarmerProfileRoute(BuildContext context, GoRouterState state) {
 
   if (isMobile) {
     return FutureBuilder<Map<String, dynamic>?>(
-      future: SupabaseDataService().getFarmerProfileByFarmerId(
-        farmerId,
-      ),
+      future: SupabaseDataService().getFarmerProfileByFarmerId(farmerId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator(color: Color(0xFF16A34A))),
+            body: Center(
+              child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+            ),
           );
         }
         if (snapshot.hasError || snapshot.data == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('Farmer Profile')),
-            body: const Center(
-              child: Text('Farmer not found or offline.'),
-            ),
+            body: const Center(child: Text('Farmer not found or offline.')),
           );
         }
 
@@ -132,10 +134,7 @@ Widget _buildFarmerProfileRoute(BuildContext context, GoRouterState state) {
           ...dbProfile,
           'farmerId': dbProfile['farmer_id'],
           'farmerUserId': dbProfile['user_id'],
-          'name':
-              dbProfile['farm_name'] ??
-              dbProfile['full_name'] ??
-              'Farm',
+          'name': dbProfile['farm_name'] ?? dbProfile['full_name'] ?? 'Farm',
           'specialty': dbProfile['specialty'],
           'location': dbProfile['location'],
           'imageUrl': dbProfile['image_url'],
@@ -159,8 +158,11 @@ Widget _buildFarmerProfileRoute(BuildContext context, GoRouterState state) {
 }
 
 Widget _buildPreorderDetailsRoute(BuildContext context, GoRouterState state) {
-  final product = state.extra is ProductItem ? state.extra as ProductItem : null;
-  final productId = state.pathParameters['id'] ?? state.uri.queryParameters['id'];
+  final product = state.extra is ProductItem
+      ? state.extra as ProductItem
+      : null;
+  final productId =
+      state.pathParameters['id'] ?? state.uri.queryParameters['id'];
 
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -202,7 +204,8 @@ Widget _buildPreorderDetailsRoute(BuildContext context, GoRouterState state) {
 }
 
 Widget _buildProductDetailsRoute(BuildContext context, GoRouterState state) {
-  final productId = state.pathParameters['id'] ?? state.uri.queryParameters['id'];
+  final productId =
+      state.pathParameters['id'] ?? state.uri.queryParameters['id'];
   final ProductItem? productFromExtra = state.extra is ProductItem
       ? state.extra as ProductItem
       : null;
@@ -222,9 +225,7 @@ Widget _buildProductDetailsRoute(BuildContext context, GoRouterState state) {
       // Otherwise fetch by ID (deep link case or /product/:id direct navigation)
       if (productId == null || productId.isEmpty) {
         if (isMobile) {
-          return const Scaffold(
-            body: Center(child: Text('Product not found')),
-          );
+          return const Scaffold(body: Center(child: Text('Product not found')));
         }
         return const WebProductDetails(initialProduct: null);
       }
@@ -252,9 +253,7 @@ Widget _buildProductDetailsRoute(BuildContext context, GoRouterState state) {
                       color: Colors.grey,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Product not found or no longer available.',
-                    ),
+                    const Text('Product not found or no longer available.'),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () => GoRouter.of(context).go(AppRoutes.home),
@@ -389,21 +388,19 @@ GoRouter createAppRouter({String? initialRoute}) {
         }
 
         // Skip auth pages
-        if (location == AppRoutes.login ||
-            location == AppRoutes.register ||
-            location == AppRoutes.webWelcome) {
+        if (location == AppRoutes.login || location == AppRoutes.register) {
           if (!auth.isEmailVerified) {
             return null; // Stay on login or register to allow fresh start or resume
           }
           return AppRoutes.loading;
         }
 
-        // If on home/base path, go to correct dashboard
+        // If on home/base path, go to welcome screen (or farmer dashboard if farmer)
         if (location == AppRoutes.home) {
           // On mobile, the home path (/) is already the dashboard
           if (isMobile) return null;
 
-          return isFarmer ? AppRoutes.farmerDashboard : AppRoutes.marketplace;
+          return isFarmer ? AppRoutes.farmerDashboard : AppRoutes.webWelcome;
         }
       } else {
         // 5. Unauthenticated Users logic
@@ -414,7 +411,7 @@ GoRouter createAppRouter({String? initialRoute}) {
         // Home redirect for unauthenticated
         if (location == AppRoutes.home) {
           if (kIsWeb) {
-            // For web, always show welcome screen if not logged in
+            // For web e-commerce, show welcome landing page first
             return AppRoutes.webWelcome;
           } else {
             // For native mobile apps, show onboarding then login
@@ -429,17 +426,15 @@ GoRouter createAppRouter({String? initialRoute}) {
       if (kIsWeb && !isLoggedIn) {
         if (protectedRoutes.contains(location)) {
           debugPrint(
-            'â†ªï¸ Router: Unauthenticated web user on protected route, going to welcome',
+            'â†ªï¸  Router: Unauthenticated web user on protected route, going to login',
           );
-          return AppRoutes.webWelcome;
+          return AppRoutes.login;
         }
       }
 
       // Prevent redundant redirects if we are already where we need to be
       if (isLoggedIn &&
-          (location == AppRoutes.login ||
-              location == AppRoutes.webWelcome ||
-              location == AppRoutes.onboarding)) {
+          (location == AppRoutes.login || location == AppRoutes.onboarding)) {
         // On mobile, the "Dashboard" is just the home route (/)
         if (isMobile) {
           debugPrint(
@@ -461,23 +456,13 @@ GoRouter createAppRouter({String? initialRoute}) {
     },
 
     routes: [
-      // â”€â”€ Home (acts as redirect hub) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ─── Home (shows Welcome Screen first on Web) ────────────────────────
       GoRoute(
         path: AppRoutes.home,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
             if (kIsWeb || constraints.maxWidth > 800) {
-              final tabParam = state.uri.queryParameters['tab'];
-              final tabIndex = tabParam != null
-                  ? int.tryParse(tabParam) ?? 0
-                  : 0;
-              return WebNavigation(
-                initialIndex: tabIndex,
-                onLogout: () async {
-                  await AuthService().logout();
-                  if (context.mounted) context.go(AppRoutes.login);
-                },
-              );
+              return const WebWelcomeScreen();
             }
             return MobileNavigation(
               onLogout: () async {
@@ -518,12 +503,25 @@ GoRouter createAppRouter({String? initialRoute}) {
         builder: (context, state) {
           final showPreOrders =
               state.uri.queryParameters['mode'] == 'preorders';
+          final category =
+              state.uri.queryParameters['category'] ??
+              (state.extra is Map
+                  ? (state.extra as Map)['category'] as String?
+                  : null);
+          final search =
+              state.uri.queryParameters['search'] ??
+              (state.extra is Map
+                  ? (state.extra as Map)['search'] as String?
+                  : null);
+
           return LayoutBuilder(
             builder: (context, constraints) {
               if (kIsWeb || constraints.maxWidth > 800) {
                 return WebNavigation(
                   initialIndex: 1,
                   showPreOrdersInShop: showPreOrders,
+                  initialCategory: category,
+                  initialSearchQuery: search,
                   onLogout: () async {
                     await AuthService().logout();
                     if (context.mounted) context.go(AppRoutes.login);
@@ -570,9 +568,12 @@ GoRouter createAppRouter({String? initialRoute}) {
         path: AppRoutes.profile,
         builder: (context, state) => LayoutBuilder(
           builder: (context, constraints) {
+            final tabParam = state.uri.queryParameters['tab'];
+            final profileTab = int.tryParse(tabParam ?? '0') ?? 0;
             if (kIsWeb || constraints.maxWidth > 800) {
               return WebNavigation(
                 initialIndex: AuthService().isViewingAsFarmer ? 5 : 3,
+                initialProfileTab: profileTab,
                 onLogout: () async {
                   await AuthService().logout();
                   if (context.mounted) context.go(AppRoutes.login);
@@ -683,7 +684,8 @@ GoRouter createAppRouter({String? initialRoute}) {
       GoRoute(
         path: AppRoutes.freshProduce,
         builder: (context, state) => LayoutBuilder(
-          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+          builder: (context, constraints) =>
+              (kIsWeb || constraints.maxWidth > 800)
               ? const WebFreshProduceScreen()
               : const FreshProduceScreen(),
         ),
@@ -691,7 +693,8 @@ GoRouter createAppRouter({String? initialRoute}) {
       GoRoute(
         path: AppRoutes.flashSale,
         builder: (context, state) => LayoutBuilder(
-          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+          builder: (context, constraints) =>
+              (kIsWeb || constraints.maxWidth > 800)
               ? const WebFlashSaleScreen()
               : const FlashSaleScreen(),
         ),
@@ -699,7 +702,8 @@ GoRouter createAppRouter({String? initialRoute}) {
       GoRoute(
         path: AppRoutes.freeShipping,
         builder: (context, state) => LayoutBuilder(
-          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+          builder: (context, constraints) =>
+              (kIsWeb || constraints.maxWidth > 800)
               ? const WebFreeShippingScreen()
               : const FreeShippingScreen(),
         ),
@@ -707,7 +711,8 @@ GoRouter createAppRouter({String? initialRoute}) {
       GoRoute(
         path: AppRoutes.vouchers,
         builder: (context, state) => LayoutBuilder(
-          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+          builder: (context, constraints) =>
+              (kIsWeb || constraints.maxWidth > 800)
               ? const WebVouchersScreen()
               : const VouchersScreen(),
         ),
@@ -715,7 +720,8 @@ GoRouter createAppRouter({String? initialRoute}) {
       GoRoute(
         path: AppRoutes.wholesale,
         builder: (context, state) => LayoutBuilder(
-          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+          builder: (context, constraints) =>
+              (kIsWeb || constraints.maxWidth > 800)
               ? const WebWholesaleScreen()
               : const WholesaleScreen(),
         ),
@@ -723,9 +729,22 @@ GoRouter createAppRouter({String? initialRoute}) {
       GoRoute(
         path: AppRoutes.localShops,
         builder: (context, state) => LayoutBuilder(
-          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+          builder: (context, constraints) =>
+              (kIsWeb || constraints.maxWidth > 800)
               ? const WebLocalShopsScreen()
               : const LocalShopsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.preorders,
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) =>
+              (kIsWeb || constraints.maxWidth > 800)
+              ? WebPreOrderHub(
+                  currentIndex: 1,
+                  onNavigate: (i) => context.go(AppRoutes.webTabRoute(i)),
+                )
+              : const PreOrderHubScreen(),
         ),
       ),
       GoRoute(
@@ -741,7 +760,16 @@ GoRouter createAppRouter({String? initialRoute}) {
       ),
       GoRoute(
         path: AppRoutes.notifications,
-        builder: (context, state) => const NotificationsScreen(),
+        builder: (context, state) {
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              if (kIsWeb || constraints.maxWidth > 800) {
+                return const WebNotificationsScreen();
+              }
+              return const NotificationsScreen();
+            },
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.messages,
@@ -757,10 +785,21 @@ GoRouter createAppRouter({String? initialRoute}) {
               ? extra['asFarmer'] as bool?
               : null;
 
-          return MessagesScreen(
-            initialFarmerId: farmerId,
-            initialConversationId: conversationId,
-            asFarmer: asFarmer ?? (farmerId == null ? null : false),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              if (kIsWeb || constraints.maxWidth > 800) {
+                return WebMessagesScreen(
+                  initialFarmerId: farmerId,
+                  initialConversationId: conversationId,
+                  asFarmer: asFarmer ?? (farmerId == null ? null : false),
+                );
+              }
+              return MessagesScreen(
+                initialFarmerId: farmerId,
+                initialConversationId: conversationId,
+                asFarmer: asFarmer ?? (farmerId == null ? null : false),
+              );
+            },
           );
         },
       ),
@@ -775,10 +814,21 @@ GoRouter createAppRouter({String? initialRoute}) {
               ? extra['product'] as ProductItem?
               : null;
 
-          return MessagesScreen(
-            initialFarmerId: farmerId,
-            asFarmer: false,
-            initialProduct: product,
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              if (kIsWeb || constraints.maxWidth > 800) {
+                return WebMessagesScreen(
+                  initialFarmerId: farmerId,
+                  asFarmer: false,
+                  initialProduct: product,
+                );
+              }
+              return MessagesScreen(
+                initialFarmerId: farmerId,
+                asFarmer: false,
+                initialProduct: product,
+              );
+            },
           );
         },
       ),
@@ -790,17 +840,28 @@ GoRouter createAppRouter({String? initialRoute}) {
               ? extra['customerId'] as String?
               : null;
 
-          return MessagesScreen(asFarmer: true, initialCustomerId: customerId);
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              if (kIsWeb || constraints.maxWidth > 800) {
+                return WebMessagesScreen(
+                  asFarmer: true,
+                  initialCustomerId: customerId,
+                );
+              }
+              return MessagesScreen(
+                asFarmer: true,
+                initialCustomerId: customerId,
+              );
+            },
+          );
         },
       ),
 
-      // â”€â”€ Web Welcome (landing page for first-time visitors) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.webWelcome,
         builder: (context, state) => const WebWelcomeScreen(),
       ),
 
-      // â”€â”€ Onboarding (mobile only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.onboarding,
         builder: (context, state) => OnboardingScreen(
@@ -818,7 +879,7 @@ GoRouter createAppRouter({String? initialRoute}) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!context.mounted) return;
                 if (!auth.isLoggedIn) {
-                  context.go(AppRoutes.webWelcome);
+                  context.go(AppRoutes.marketplace);
                   return;
                 }
                 if (auth.isAdmin) {
@@ -1076,6 +1137,13 @@ GoRouter createAppRouter({String? initialRoute}) {
         builder: (context, state) {
           final tabStr = state.uri.queryParameters['tab'];
           final int tab = int.tryParse(tabStr ?? '0') ?? 0;
+          final orderId = state.uri.queryParameters['orderId'];
+          if (kIsWeb) {
+            return WebCustomerOrdersScreen(
+              initialTab: tab,
+              initialOrderId: orderId,
+            );
+          }
           return OrdersScreen(initialTab: tab);
         },
       ),
@@ -1083,6 +1151,9 @@ GoRouter createAppRouter({String? initialRoute}) {
         path: '/orders/:orderId',
         builder: (context, state) {
           final orderId = state.pathParameters['orderId'] ?? '';
+          if (kIsWeb) {
+            return WebCustomerOrdersScreen(initialOrderId: orderId);
+          }
           return OrdersScreen(initialOrderId: orderId);
         },
       ),
@@ -1149,12 +1220,18 @@ GoRouter createAppRouter({String? initialRoute}) {
       ),
       GoRoute(
         path: AppRoutes.helpCenter,
-        builder: (context, state) => const HelpCenterScreen(),
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) =>
+              (kIsWeb || constraints.maxWidth > 800)
+              ? const WebFaqsScreen()
+              : const HelpCenterScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.appSettings,
         builder: (context, state) => LayoutBuilder(
-          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+          builder: (context, constraints) =>
+              (kIsWeb || constraints.maxWidth > 800)
               ? const WebAppSettingsScreen()
               : const AppSettingsScreen(),
         ),
@@ -1162,7 +1239,8 @@ GoRouter createAppRouter({String? initialRoute}) {
       GoRoute(
         path: AppRoutes.updatePhone,
         builder: (context, state) => LayoutBuilder(
-          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+          builder: (context, constraints) =>
+              (kIsWeb || constraints.maxWidth > 800)
               ? const WebUpdatePhoneScreen()
               : const UpdatePhoneScreen(),
         ),
@@ -1170,7 +1248,8 @@ GoRouter createAppRouter({String? initialRoute}) {
       GoRoute(
         path: AppRoutes.updateEmail,
         builder: (context, state) => LayoutBuilder(
-          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+          builder: (context, constraints) =>
+              (kIsWeb || constraints.maxWidth > 800)
               ? const WebUpdateEmailScreen()
               : const UpdateEmailScreen(),
         ),
@@ -1186,7 +1265,8 @@ GoRouter createAppRouter({String? initialRoute}) {
       GoRoute(
         path: AppRoutes.changePassword,
         builder: (context, state) => LayoutBuilder(
-          builder: (context, constraints) => (kIsWeb || constraints.maxWidth > 800)
+          builder: (context, constraints) =>
+              (kIsWeb || constraints.maxWidth > 800)
               ? const WebChangePasswordScreen()
               : const ChangePasswordScreen(),
         ),
@@ -1197,7 +1277,12 @@ GoRouter createAppRouter({String? initialRoute}) {
       ),
       GoRoute(
         path: AppRoutes.faqs,
-        builder: (context, state) => const FaqsScreen(),
+        builder: (context, state) => LayoutBuilder(
+          builder: (context, constraints) =>
+              (kIsWeb || constraints.maxWidth > 800)
+              ? const WebFaqsScreen()
+              : const FaqsScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.contactSupport,
@@ -1240,16 +1325,9 @@ GoRouter createAppRouter({String? initialRoute}) {
         builder: (context, state) => const WebPasswordResetScreen(),
       ),
 
-      // â”€â”€ Password Reset with Code â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       GoRoute(
         path: AppRoutes.resetPasswordWithCode,
         builder: (context, state) => const WebPasswordResetWithCodeScreen(),
-      ),
-
-      // â”€â”€ 2FA MFA Challenge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      GoRoute(
-        path: AppRoutes.mfaChallenge,
-        builder: (context, state) => const MfaChallengeScreen(),
       ),
     ],
 

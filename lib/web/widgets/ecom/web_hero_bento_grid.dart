@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_routes.dart';
+import '../../../shared/services/core/supabase_data_service.dart';
 import '../../constants/web_design_tokens.dart';
 
 /// Hero Bento Grid: Main Carousel (8 cols) + Dual Promotional Micro-Cards (4 cols)
@@ -23,6 +25,7 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
   Timer? _autoPlayTimer;
   Timer? _countdownTimer;
   Duration _flashRemaining = const Duration(hours: 3, minutes: 42, seconds: 15);
+  Map<String, dynamic>? _featuredFarmer;
 
   final List<Map<String, dynamic>> _heroSlides = [
     {
@@ -39,7 +42,7 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
         const Color(0xFF059669)
       ],
       'cta': 'SHOP TODAY\'S HARVEST',
-      'route': AppRoutes.freshProduce,
+      'route': AppRoutes.shop,
     },
     {
       'tag': 'SEASONAL HARVEST RADAR',
@@ -78,6 +81,8 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
   @override
   void initState() {
     super.initState();
+    _calculateFlashRemaining();
+    _loadFeaturedFarmer();
     _pageController = PageController();
     _autoPlayTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (_pageController.hasClients) {
@@ -91,12 +96,34 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
     });
 
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && _flashRemaining.inSeconds > 0) {
-        setState(() {
-          _flashRemaining = _flashRemaining - const Duration(seconds: 1);
-        });
+      if (mounted) {
+        if (_flashRemaining.inSeconds > 0) {
+          setState(() {
+            _flashRemaining = _flashRemaining - const Duration(seconds: 1);
+          });
+        } else {
+          _calculateFlashRemaining();
+          setState(() {});
+        }
       }
     });
+  }
+
+  Future<void> _loadFeaturedFarmer() async {
+    try {
+      final farmers = await SupabaseDataService().getFeaturedFarmers();
+      if (farmers.isNotEmpty && mounted) {
+        setState(() {
+          _featuredFarmer = farmers.first;
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _calculateFlashRemaining() {
+    final now = DateTime.now();
+    final midnight = DateTime(now.year, now.month, now.day + 1);
+    _flashRemaining = midnight.difference(now);
   }
 
   @override
@@ -118,19 +145,26 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
   Widget build(BuildContext context) {
     final sw = MediaQuery.of(context).size.width;
     final isStacked = sw < 1024;
+    final isMobile = sw < 650;
 
     if (isStacked) {
       return Column(
         children: [
-          _buildMainSlider(height: 380),
+          _buildMainSlider(height: isMobile ? 320 : 380, sw: sw),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: _buildFlashDealMiniCard(context)),
-              const SizedBox(width: 16),
-              Expanded(child: _buildFarmerSpotlightMiniCard(context)),
-            ],
-          ),
+          if (isMobile) ...[
+            _buildFlashDealMiniCard(context),
+            const SizedBox(height: 16),
+            _buildFarmerSpotlightMiniCard(context),
+          ] else ...[
+            Row(
+              children: [
+                Expanded(child: _buildFlashDealMiniCard(context)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildFarmerSpotlightMiniCard(context)),
+              ],
+            ),
+          ],
         ],
       );
     }
@@ -143,7 +177,7 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
           // 8 Columns: Main Hero Slider
           Expanded(
             flex: 8,
-            child: _buildMainSlider(),
+            child: _buildMainSlider(sw: sw),
           ),
           const SizedBox(width: 20),
           // 4 Columns: Side Promotional Bento Cards
@@ -162,7 +196,11 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
     );
   }
 
-  Widget _buildMainSlider({double? height}) {
+  Widget _buildMainSlider({double? height, required double sw}) {
+    final titleFontSize = sw < 450 ? 18.0 : (sw < 650 ? 22.0 : (sw < 1024 ? 26.0 : 30.0));
+    final subtitleFontSize = sw < 450 ? 12.0 : 14.0;
+    final isMobile = sw < 650;
+
     return Container(
       height: height,
       decoration: BoxDecoration(
@@ -189,8 +227,10 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
                       end: Alignment.bottomRight,
                     ),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 40, vertical: 36),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 20 : 40,
+                    vertical: isMobile ? 20 : 36,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -209,40 +249,42 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
                         child: Text(
                           slide['tag'],
                           style: GoogleFonts.rubik(
-                            fontSize: 11,
+                            fontSize: isMobile ? 10 : 11,
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
                             letterSpacing: 0.8,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      SizedBox(height: isMobile ? 8 : 14),
 
                       // Headline
                       Text(
                         slide['title'],
                         style: GoogleFonts.rubik(
-                          fontSize: 30,
+                          fontSize: titleFontSize,
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
                           height: 1.15,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: isMobile ? 6 : 12),
 
                       // Subtitle
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 480),
                         child: Text(
                           slide['subtitle'],
+                          maxLines: isMobile ? 2 : 3,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.nunitoSans(
-                            fontSize: 14,
+                            fontSize: subtitleFontSize,
                             color: Colors.white.withValues(alpha: 0.9),
-                            height: 1.4,
+                            height: 1.35,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      SizedBox(height: isMobile ? 12 : 20),
 
                       // Badges
                       Wrap(
@@ -269,7 +311,7 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
                               horizontal: 24, vertical: 14),
                         ),
                         onPressed: () {
-                          widget.onNavigate(1, slide['route']);
+                          context.go(slide['route']);
                         },
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -407,7 +449,7 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
           ),
           const SizedBox(height: 8),
           InkWell(
-            onTap: () => widget.onNavigate(1, AppRoutes.flashSale),
+            onTap: () => context.go(AppRoutes.flashSale),
             child: Row(
               children: [
                 Text(
@@ -494,27 +536,40 @@ class _WebHeroBentoGridState extends State<WebHeroBentoGrid> {
           ),
           const SizedBox(height: 8),
           Text(
-            'San Carlos Organic Growers',
+            _featuredFarmer?['farm_name'] ??
+                _featuredFarmer?['shop_name'] ??
+                'San Carlos Organic Growers',
             style: GoogleFonts.rubik(
               fontSize: 15,
               fontWeight: FontWeight.w700,
               color: WebDesignTokens.dark,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
-            'Brgy. Roxas Cooperative • 45 Registered Local Growers • ⭐ 4.9 Rating',
+            '${_featuredFarmer?['location'] ?? _featuredFarmer?['farm_address'] ?? 'Brgy. Roxas, San Carlos City'} • ⭐ ${_featuredFarmer?['average_rating']?.toString() ?? _featuredFarmer?['rating']?.toString() ?? '4.9'} Rating',
             style: GoogleFonts.nunitoSans(
               fontSize: 12,
               color: WebDesignTokens.slate600,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
           InkWell(
-            onTap: () => widget.onNavigate(1, AppRoutes.localShops),
+            onTap: () {
+              final fid = _featuredFarmer?['farmer_id'] ?? _featuredFarmer?['id'];
+              if (fid != null && fid.toString().isNotEmpty) {
+                context.go('${AppRoutes.farmerProfileBase}/$fid');
+              } else {
+                context.go(AppRoutes.localShops);
+              }
+            },
             child: Row(
               children: [
                 Text(
-                  'Visit Farm Cooperative',
+                  'Visit Farm Storefront',
                   style: GoogleFonts.rubik(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,

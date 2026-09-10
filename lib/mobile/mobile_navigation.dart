@@ -13,6 +13,8 @@ import 'screens/farmer/farmer_community_hub.dart';
 import 'screens/farmer/farmer_profile_screen.dart';
 import 'screens/consumer/customer_profile_screen.dart';
 
+import '../shared/localization/farmer_locale_service.dart';
+
 class MobileNavigation extends StatefulWidget {
   final VoidCallback onLogout;
   final int initialIndex;
@@ -30,8 +32,8 @@ class MobileNavigation extends StatefulWidget {
 }
 
 class _MobileNavigationState extends State<MobileNavigation> {
-  late int _currentIndex;
-  final _auth = AuthService();
+  final AuthService _auth = AuthService();
+  int _currentIndex = 0;
 
   @override
   void initState() {
@@ -95,75 +97,83 @@ class _MobileNavigationState extends State<MobileNavigation> {
   }
 
   List<_NavItemData> get _navItems {
+    final locale = FarmerLocaleService.instance;
     if (_auth.isViewingAsFarmer) {
       return [
-        _NavItemData(Icons.dashboard_rounded, 'Dashboard'),
-        _NavItemData(Icons.inventory_2_rounded, 'Products'),
-        _NavItemData(Icons.receipt_long_rounded, 'Orders'),
-        _NavItemData(Icons.groups_rounded, 'Community'),
-        _NavItemData(Icons.person_rounded, 'Profile'),
+        _NavItemData(Icons.dashboard_rounded, locale.t('nav_dashboard')),
+        _NavItemData(Icons.inventory_2_rounded, locale.t('nav_products')),
+        _NavItemData(Icons.receipt_long_rounded, locale.t('nav_orders')),
+        _NavItemData(Icons.groups_rounded, locale.t('nav_community')),
+        _NavItemData(Icons.person_rounded, locale.t('nav_profile')),
       ];
     }
     return [
-      _NavItemData(Icons.home_rounded, 'Home'),
-      _NavItemData(Icons.storefront_rounded, 'Marketplace'),
-      _NavItemData(Icons.timer_rounded, 'Pre-Orders'),
-      _NavItemData(Icons.radar_rounded, 'Weather'),
-      _NavItemData(Icons.person_rounded, 'Profile'),
+      _NavItemData(Icons.home_rounded, locale.t('nav_home')),
+      _NavItemData(Icons.storefront_rounded, locale.t('nav_marketplace')),
+      _NavItemData(Icons.timer_rounded, locale.t('nav_preorders')),
+      _NavItemData(Icons.radar_rounded, locale.t('nav_weather')),
+      _NavItemData(Icons.person_rounded, locale.t('nav_profile')),
     ];
   }
 
   @override
   Widget build(BuildContext context) {
-    final screens = _screens;
-    final navItems = _navItems;
+    final locale = FarmerLocaleService.instance;
 
-    // Clamp index to valid range
-    if (_currentIndex >= screens.length) {
-      _currentIndex = 0;
-    }
+    return ListenableBuilder(
+      listenable: locale,
+      builder: (context, _) {
+        final screens = _screens;
+        final navItems = _navItems;
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 16,
-              offset: const Offset(0, -4),
+        // Clamp index to valid range
+        if (_currentIndex >= screens.length) {
+          _currentIndex = 0;
+        }
+
+        return Scaffold(
+          body: IndexedStack(
+            index: _currentIndex,
+            children: screens,
+          ),
+          bottomNavigationBar: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 16,
+                  offset: const Offset(0, -4),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(navItems.length, (i) {
-                // Special center Pre-Order button for consumer mode
-                final isCenter = !_auth.isViewingAsFarmer && i == 2;
-                if (isCenter) {
-                  return _buildCenterNavItem(
-                    icon: navItems[i].icon,
-                    label: navItems[i].label,
-                    index: i,
-                  );
-                }
-                return _buildNavItem(
-                  icon: navItems[i].icon,
-                  label: navItems[i].label,
-                  index: i,
-                );
-              }),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: List.generate(navItems.length, (i) {
+                    // Special center Pre-Order button for consumer mode
+                    final isCenter = !_auth.isViewingAsFarmer && i == 2;
+                    if (isCenter) {
+                      return _buildCenterNavItem(
+                        icon: navItems[i].icon,
+                        label: navItems[i].label,
+                        index: i,
+                      );
+                    }
+                    return _buildNavItem(
+                      icon: navItems[i].icon,
+                      label: navItems[i].label,
+                      index: i,
+                    );
+                  }),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

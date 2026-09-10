@@ -3,14 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/commerce/product_service.dart';
-import '../../../shared/widgets/brand_logo.dart';
 import '../../widgets/animated_components.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/widgets/image_widgets.dart';
-import '../../../shared/services/auth/auth_service.dart';
-import '../../widgets/web_consumer_nav_bar.dart';
-import '../../widgets/web_hamburger_menu_button.dart';
+import '../../widgets/farmer/web_farmer_header.dart';
 
 class WebFarmerProducts extends StatefulWidget {
   final Function(int) onNavigate;
@@ -27,9 +24,8 @@ class WebFarmerProducts extends StatefulWidget {
 }
 
 class _WebFarmerProductsState extends State<WebFarmerProducts>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late AnimationController _fadeInController;
-  int _hoveredNav = -1;
   String _searchQuery = '';
   String _selectedCategoryFilter = 'All';
   String _selectedStockFilter = 'All';
@@ -107,7 +103,10 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
           ),
           Column(
             children: [
-              _buildNavBar(),
+              WebFarmerHeader(
+                currentIndex: widget.currentIndex,
+                onNavigate: (index, [route]) => widget.onNavigate(index),
+              ),
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
@@ -136,149 +135,6 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavBar() {
-    final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 900;
-    final isCompact = sw < 1100;
-
-    if (!AuthService().isViewingAsFarmer) {
-      return WebConsumerNavBar(
-        currentIndex: widget.currentIndex,
-        onNavigate: widget.onNavigate,
-        onCartTap: () => context.go(AppRoutes.cart),
-        margin: isMobile
-            ? const EdgeInsets.fromLTRB(16, 12, 16, 8)
-            : const EdgeInsets.fromLTRB(32, 16, 32, 12),
-      );
-    }
-
-    final navItems = [
-      'Dashboard',
-      'Products',
-      'Orders',
-      'Community',
-      'Pre-Orders',
-    ];
-    return Container(
-      margin: isMobile
-          ? const EdgeInsets.fromLTRB(16, 12, 16, 8)
-          : (isCompact
-              ? const EdgeInsets.fromLTRB(20, 14, 20, 8)
-              : const EdgeInsets.fromLTRB(32, 16, 32, 12)),
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : (isCompact ? 16 : 28),
-        vertical: isMobile ? 10 : (isCompact ? 10 : 12),
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _border),
-        boxShadow: [
-          BoxShadow(
-            color: _dark.withValues(alpha: 0.03),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(0),
-              child: BrandLogo(
-                size: (isMobile || isCompact)
-                    ? BrandLogoSize.small
-                    : BrandLogoSize.medium,
-              ),
-            ),
-          ),
-          if (!isMobile) ...[
-            SizedBox(width: isCompact ? 16 : 40),
-            ...List.generate(navItems.length, (i) {
-              final isActive = i == widget.currentIndex;
-              final isHovered = _hoveredNav == i;
-              return Padding(
-                padding: EdgeInsets.symmetric(horizontal: isCompact ? 2 : 4),
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  onEnter: (_) => setState(() => _hoveredNav = i),
-                  onExit: (_) => setState(() => _hoveredNav = -1),
-                  child: GestureDetector(
-                    onTap: () => widget.onNavigate(i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isCompact ? 12 : 18,
-                        vertical: isCompact ? 8 : 10,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: isActive
-                            ? _primaryLight
-                            : isHovered
-                                ? const Color(0xFFF1F5F9)
-                                : Colors.transparent,
-                      ),
-                      child: Text(
-                        navItems[i],
-                        style: GoogleFonts.inter(
-                          fontSize: isCompact ? 13 : 14,
-                          fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
-                          color: isActive ? _primaryDark : (isHovered ? _dark : _muted),
-                          letterSpacing: 0.1,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ],
-          const Spacer(),
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(5),
-              child: Container(
-                width: (isMobile || isCompact) ? 38 : 42,
-                height: (isMobile || isCompact) ? 38 : 42,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_primary, Color(0xFF059669)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _primary.withValues(alpha: 0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.person_outline_rounded,
-                  color: Colors.white,
-                  size: (isMobile || isCompact) ? 20 : 22,
-                ),
-              ),
-            ),
-          ),
-          if (isMobile) ...[
-            const SizedBox(width: 8),
-            WebHamburgerMenuButton(
-              currentIndex: widget.currentIndex,
-              onNavigate: widget.onNavigate,
-            ),
-          ],
         ],
       ),
     );
@@ -342,7 +198,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
         ),
         if (!isMobile)
           ElevatedButton.icon(
-            onPressed: () => context.push(AppRoutes.addProduct),
+            onPressed: () => context.go(AppRoutes.addProduct),
             icon: const Icon(Icons.add_rounded, size: 20),
             label: Text(
               'Add New Product',
@@ -625,7 +481,7 @@ class _WebFarmerProductsState extends State<WebFarmerProducts>
               if (isMobile) ...[
                 const SizedBox(width: 8),
                 IconButton(
-                  onPressed: () => context.push(AppRoutes.addProduct),
+                  onPressed: () => context.go(AppRoutes.addProduct),
                   icon: const Icon(Icons.add_rounded, color: Colors.white),
                   style: IconButton.styleFrom(
                     backgroundColor: _primary,

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../shared/services/auth/auth_service.dart';
 import '../../shared/services/commerce/cart_service.dart';
 import '../../shared/widgets/brand_logo.dart';
+import '../../shared/widgets/image_widgets.dart';
 import 'web_hamburger_menu_button.dart';
 import '../../shared/services/community/notification_service.dart';
 import '../../shared/services/community/message_service.dart';
@@ -275,6 +276,8 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                       final currentPath = GoRouterState.of(context).uri.path;
                       final isProfileActive = (isFarmerMode && widget.currentIndex == 5) ||
                           (!isFarmerMode && (widget.currentIndex == 3 || currentPath.startsWith(AppRoutes.profile)));
+                      final avatarUrl = AuthService().userAvatarUrl;
+                      final hasAvatar = avatarUrl.trim().isNotEmpty;
 
                       return MouseRegion(
                         cursor: SystemMouseCursors.click,
@@ -288,29 +291,58 @@ class _WebConsumerNavBarState extends State<WebConsumerNavBar> {
                           },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
-                            width: compact ? 36 : 44,
-                            height: compact ? 36 : 44,
+                            width: compact ? 36 : 42,
+                            height: compact ? 36 : 42,
+                            padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
                               color: isProfileActive ? _primary : const Color(0xFFDCFCE7),
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: _primary,
+                                color: isProfileActive ? _primary : const Color(0xFF86EFAC),
                                 width: isProfileActive ? 2.5 : 1.5,
                               ),
                               boxShadow: isProfileActive
                                   ? [
                                       BoxShadow(
                                         color: _primary.withValues(alpha: 0.35),
-                                        blurRadius: 8,
+                                        blurRadius: 10,
                                         offset: const Offset(0, 2),
                                       ),
                                     ]
                                   : null,
                             ),
-                            child: Icon(
-                              Icons.person_rounded,
-                              color: isProfileActive ? Colors.white : _primary,
-                              size: compact ? 18 : 22,
+                            child: ClipOval(
+                              child: hasAvatar
+                                  ? SafeNetworkImage(
+                                      imageUrl: avatarUrl,
+                                      defaultBucket: 'uploads',
+                                      width: compact ? 32 : 38,
+                                      height: compact ? 32 : 38,
+                                      fit: BoxFit.cover,
+                                      placeholder: Container(
+                                        color: const Color(0xFFDCFCE7),
+                                        child: Center(
+                                          child: SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: isProfileActive ? Colors.white : _primary,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      errorWidget: Icon(
+                                        Icons.person_rounded,
+                                        color: isProfileActive ? Colors.white : _primary,
+                                        size: compact ? 18 : 22,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.person_rounded,
+                                      color: isProfileActive ? Colors.white : _primary,
+                                      size: compact ? 18 : 22,
+                                    ),
                             ),
                           ),
                         ),

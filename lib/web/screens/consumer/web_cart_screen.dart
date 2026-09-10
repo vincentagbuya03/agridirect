@@ -65,7 +65,7 @@ class _WebCartScreenState extends State<WebCartScreen> {
         final items = cart.items;
         final selectedItems = cart.selectedItems;
         final subtotal = cart.selectedTotal;
-        final deliveryFee = subtotal >= 500 || subtotal == 0 ? 0.0 : 45.0;
+        final deliveryFee = subtotal >= 500 || subtotal == 0 ? 0.0 : 50.0;
         final finalTotal = (subtotal + deliveryFee - _discountAmount).clamp(0.0, double.infinity);
 
         // Group items by Farm
@@ -280,7 +280,7 @@ class _WebCartScreenState extends State<WebCartScreen> {
           onQuantityChanged: (item, qty) =>
               cart.updateQuantity(item.productId, qty),
           onItemRemoved: (item) => cart.removeItem(item.productId),
-          onChatFarmer: () => context.push(AppRoutes.messages),
+          onChatFarmer: () => context.go(AppRoutes.messages),
         );
       }).toList(),
     );

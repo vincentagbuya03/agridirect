@@ -18,6 +18,9 @@ class WebNavigation extends StatefulWidget {
   final int initialIndex;
   final bool showPreOrdersInShop;
   final String? initialPostId;
+  final String? initialCategory;
+  final String? initialSearchQuery;
+  final int initialProfileTab;
 
   const WebNavigation({
     super.key,
@@ -25,6 +28,9 @@ class WebNavigation extends StatefulWidget {
     this.initialIndex = 0,
     this.showPreOrdersInShop = false,
     this.initialPostId,
+    this.initialCategory,
+    this.initialSearchQuery,
+    this.initialProfileTab = 0,
   });
 
   @override
@@ -40,7 +46,16 @@ class _WebNavigationState extends State<WebNavigation> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _selectedCategoryFilter = widget.initialCategory;
     _auth.addListener(_onAuthChanged);
+  }
+
+  @override
+  void didUpdateWidget(WebNavigation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialIndex != oldWidget.initialIndex) {
+      _currentIndex = widget.initialIndex;
+    }
   }
 
   @override
@@ -55,8 +70,17 @@ class _WebNavigationState extends State<WebNavigation> {
   }
 
   void _navigateTo(int index, [String? category]) {
-    // If trying to access Profile (index 3) and not logged in, show login instead
-    if (index == 3 && !_auth.isLoggedIn) {
+    // If target is a direct route path, navigate immediately
+    if (category != null && category.startsWith('/')) {
+      context.go(category);
+      return;
+    }
+
+    final isFarmer = _auth.isViewingAsFarmer;
+    final profileIndex = isFarmer ? 5 : 3;
+
+    // If trying to access Profile and not logged in, show login instead
+    if (index == profileIndex && !_auth.isLoggedIn) {
       _showLoginDialog();
       return;
     }
@@ -64,8 +88,12 @@ class _WebNavigationState extends State<WebNavigation> {
       _currentIndex = index;
       _selectedCategoryFilter = category;
     });
-    if (!_auth.isViewingAsFarmer) {
-      context.go(AppRoutes.webTabRoute(index));
+
+    final targetRoute = AppRoutes.webTabRoute(index, isFarmer: isFarmer);
+    if (category != null && category.isNotEmpty && !category.startsWith('/')) {
+      context.go('$targetRoute?category=${Uri.encodeComponent(category)}');
+    } else {
+      context.go(targetRoute);
     }
   }
 
@@ -105,6 +133,7 @@ class _WebNavigationState extends State<WebNavigation> {
           onLogout: _handleLogout,
           onNavigate: _navigateTo,
           currentIndex: _currentIndex,
+          initialTab: widget.initialProfileTab,
         ),
       ];
     }
@@ -115,6 +144,7 @@ class _WebNavigationState extends State<WebNavigation> {
         currentIndex: _currentIndex,
         initialShowPreOrders: widget.showPreOrdersInShop,
         initialCategory: _selectedCategoryFilter,
+        initialSearchQuery: widget.initialSearchQuery,
       ),
       WebCommunityHub(onNavigate: _navigateTo, currentIndex: _currentIndex, initialPostId: widget.initialPostId),
       WebProfileScreen(
@@ -122,6 +152,7 @@ class _WebNavigationState extends State<WebNavigation> {
         onLogout: _handleLogout,
         onNavigate: _navigateTo,
         currentIndex: _currentIndex,
+        initialTab: widget.initialProfileTab,
       ),
     ];
   }
@@ -140,7 +171,7 @@ class _WebNavigationState extends State<WebNavigation> {
       if (_currentIndex >= screens.length) {
         _currentIndex = 0;
       }
-      return Scaffold(body: AppOpenBanner(child: screens[_currentIndex]));
+      return AppOpenBanner(child: screens[_currentIndex]);
     }
 
     debugPrint('   → Showing consumer dashboard (current tab: $_currentIndex, isAdmin: ${_auth.isAdmin})');
@@ -150,6 +181,6 @@ class _WebNavigationState extends State<WebNavigation> {
       _currentIndex = 0;
     }
 
-    return Scaffold(body: AppOpenBanner(child: screens[_currentIndex]));
+    return AppOpenBanner(child: screens[_currentIndex]);
   }
 }

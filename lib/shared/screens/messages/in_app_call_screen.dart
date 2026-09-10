@@ -226,11 +226,19 @@ class _InAppCallScreenState extends State<InAppCallScreen>
     if (widget.isIncoming) {
       if (widget.isAlreadyAccepted) {
         debugPrint('📞 Already accepted via CallKit, joining channel directly');
+        if (!kIsWeb) {
+          try {
+            await FlutterCallkitIncoming.setCallConnected(widget.callId);
+          } catch (e) {
+            debugPrint('Error setting CallKit call connected: $e');
+          }
+        }
         await _joinAgoraChannel();
         await _callService.updateCallStatus(widget.callId, 'connected');
         if (mounted) setState(() => _status = 'Connected');
         _listenToCallStatus();
         _startDurationTimer();
+        _startStatusPolling();
       } else {
         _listenToCallStatus();
       }

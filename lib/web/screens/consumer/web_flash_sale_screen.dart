@@ -6,7 +6,8 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/commerce/cart_service.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
-import '../../widgets/web_promo_header.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
+import '../../../shared/router/app_routes.dart';
 import 'dart:async';
 
 class WebFlashSaleScreen extends StatefulWidget {
@@ -36,9 +37,34 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
   @override
   void initState() {
     super.initState();
-    _productsFuture = SupabaseDataService().getFlashSaleProducts();
+    _productsFuture = _loadFlashProducts();
     _calculateTimeLeft();
     _startTimer();
+  }
+
+  Future<List<ProductItem>> _loadFlashProducts() async {
+    try {
+      final flashItems = await SupabaseDataService().getFlashSaleProducts();
+      if (flashItems.isNotEmpty) return flashItems;
+
+      // Fallback: If no products have is_flash_sale flag set in DB,
+      // load active fresh produce from local farmers and display them with flash discounts
+      final allItems = await SupabaseDataService().getNearbyProducts();
+      if (allItems.isNotEmpty) {
+        return allItems.map((p) {
+          final double disc = (p.discountPercent != null && p.discountPercent! > 0)
+              ? p.discountPercent!
+              : 30.0;
+          return p.copyWith(
+            isFlashSale: true,
+            discountPercent: disc,
+          );
+        }).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
   }
 
   void _calculateTimeLeft() {
@@ -110,7 +136,7 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
           action: SnackBarAction(
             label: 'VIEW CART',
             textColor: Colors.white,
-            onPressed: () => context.push('/cart'),
+            onPressed: () => context.go('/cart'),
           ),
         ),
       );
@@ -127,10 +153,16 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            WebPromoHeader(
-              activeTab: 'flash_sale',
-              searchPlaceholder: 'Search flash deals on fresh harvest...',
-              onSearchChanged: (q) =>
+            WebEcomHeader(
+              currentIndex: 1,
+              onNavigate: (index, [route]) {
+                if (route != null) {
+                  context.go(route);
+                } else {
+                  context.go(AppRoutes.webTabRoute(index));
+                }
+              },
+              onSearch: (q) =>
                   setState(() => _searchQuery = q.toLowerCase()),
             ),
             _buildHeroBanner(),
@@ -367,7 +399,7 @@ class _WebFlashSaleScreenState extends State<WebFlashSaleScreen> {
                                   maxWidth: 620,
                                 ),
                                 child: Text(
-                                  'Snag farm fresh crops and surplus harvest at live discounted flash prices before midnight!',
+                                  'San Carlos & Pangasinan Fresh Pick Deals • Snag morning harvests of tomatoes, eggplants, native greens & fresh crops at live discounted flash prices before midnight!',
                                   style: GoogleFonts.inter(
                                     color: Colors.white.withValues(alpha: 0.9),
                                     fontSize: isMobile ? 12.5 : 14.5,
@@ -822,7 +854,7 @@ class _WebFlashSaleCardState extends State<_WebFlashSaleCard> {
       child: GestureDetector(
         onTap: () {
           if (product.productId != null) {
-            context.push('/product/${product.productId}');
+            context.go('/product/${product.productId}');
           }
         },
         child: AnimatedContainer(

@@ -100,7 +100,7 @@ class WebMultiFarmCartGroup extends StatelessWidget {
 
           // ─── Farm-Specific Voucher Strip ───
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: WebDesignTokens.dealAmber.withValues(alpha: 0.06),
               border: Border(
@@ -114,12 +114,16 @@ class WebMultiFarmCartGroup extends StatelessWidget {
                 const Icon(Icons.local_offer_outlined,
                     size: 14, color: WebDesignTokens.dealAmber),
                 const SizedBox(width: 8),
-                Text(
-                  'Farm Voucher: ₱20 OFF on orders over ₱300 from this grower',
-                  style: GoogleFonts.nunitoSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: WebDesignTokens.dealAmber,
+                Expanded(
+                  child: Text(
+                    'Farm Voucher: ₱20 OFF on orders over ₱300 from this grower',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.nunitoSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: WebDesignTokens.dealAmber,
+                    ),
                   ),
                 ),
               ],
@@ -135,134 +139,260 @@ class WebMultiFarmCartGroup extends StatelessWidget {
                 Divider(height: 1, color: WebDesignTokens.border.withValues(alpha: 0.6)),
             itemBuilder: (context, index) {
               final item = items[index];
-              return Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    // Checkbox
-                    Checkbox(
-                      value: item.isSelected,
-                      activeColor: WebDesignTokens.primary,
-                      onChanged: (val) => onToggleItem(item, val ?? false),
-                    ),
-                    const SizedBox(width: 4),
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 480;
 
-                    // Image Thumbnail
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        width: 56,
-                        height: 56,
-                        color: WebDesignTokens.bg,
-                        child: item.imageUrl.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: item.imageUrl,
-                                fit: BoxFit.cover,
-                                errorWidget: (_, error, stackTrace) =>
-                                    const Icon(Icons.eco,
-                                        size: 24,
-                                        color: WebDesignTokens.primary),
-                              )
-                            : const Icon(Icons.eco,
-                                size: 24, color: WebDesignTokens.primary),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-
-                    // Title & Unit Price
-                    Expanded(
-                      flex: 4,
+                  if (isNarrow) {
+                    // Responsive compact layout for narrow screens
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            item.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.rubik(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: WebDesignTokens.dark,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '₱${item.priceValue.toStringAsFixed(0)} / ${item.unit}',
-                            style: GoogleFonts.nunitoSans(
-                              fontSize: 12,
-                              color: WebDesignTokens.slate500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Quantity Stepper
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: WebDesignTokens.border),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.remove_rounded, size: 14),
-                            onPressed: item.quantity > 1
-                                ? () => onQuantityChanged(
-                                    item, item.quantity - 1)
-                                : null,
-                            padding: const EdgeInsets.all(4),
-                            constraints: const BoxConstraints(),
-                          ),
-                          Container(
-                            width: 32,
-                            alignment: Alignment.center,
-                            child: Text(
-                              '${item.quantity}',
-                              style: GoogleFonts.rubik(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: WebDesignTokens.dark,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Checkbox(
+                                value: item.isSelected,
+                                activeColor: WebDesignTokens.primary,
+                                onChanged: (val) => onToggleItem(item, val ?? false),
                               ),
-                            ),
+                              const SizedBox(width: 4),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  width: 52,
+                                  height: 52,
+                                  color: WebDesignTokens.bg,
+                                  child: item.imageUrl.isNotEmpty
+                                      ? CachedNetworkImage(
+                                          imageUrl: item.imageUrl,
+                                          fit: BoxFit.cover,
+                                          errorWidget: (_, error, stackTrace) =>
+                                              const Icon(Icons.eco,
+                                                  size: 24,
+                                                  color: WebDesignTokens.primary),
+                                        )
+                                      : const Icon(Icons.eco,
+                                          size: 24, color: WebDesignTokens.primary),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.rubik(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: WebDesignTokens.dark,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '₱${item.priceValue.toStringAsFixed(0)} / ${item.unit}',
+                                      style: GoogleFonts.nunitoSans(
+                                        fontSize: 12,
+                                        color: WebDesignTokens.slate500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded,
+                                    size: 18, color: WebDesignTokens.slate400),
+                                onPressed: () => onItemRemoved(item),
+                                splashRadius: 18,
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.add_rounded, size: 14),
-                            onPressed: () => onQuantityChanged(
-                                item, item.quantity + 1),
-                            padding: const EdgeInsets.all(4),
-                            constraints: const BoxConstraints(),
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 48, right: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: WebDesignTokens.border),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.remove_rounded, size: 14),
+                                        onPressed: item.quantity > 1
+                                            ? () => onQuantityChanged(
+                                                item, item.quantity - 1)
+                                            : null,
+                                        padding: const EdgeInsets.all(4),
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                      Container(
+                                        width: 32,
+                                        alignment: Alignment.center,
+                                        child: Text(
+                                          '${item.quantity}',
+                                          style: GoogleFonts.rubik(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: WebDesignTokens.dark,
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.add_rounded, size: 14),
+                                        onPressed: () => onQuantityChanged(
+                                            item, item.quantity + 1),
+                                        padding: const EdgeInsets.all(4),
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  '₱${item.total.toStringAsFixed(0)}',
+                                  style: GoogleFonts.rubik(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: WebDesignTokens.primaryDark,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 24),
+                    );
+                  }
 
-                    // Line Item Total
-                    SizedBox(
-                      width: 80,
-                      child: Text(
-                        '₱${item.total.toStringAsFixed(0)}',
-                        textAlign: TextAlign.right,
-                        style: GoogleFonts.rubik(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: WebDesignTokens.primaryDark,
+                  // Standard wide desktop layout
+                  return Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: item.isSelected,
+                          activeColor: WebDesignTokens.primary,
+                          onChanged: (val) => onToggleItem(item, val ?? false),
                         ),
-                      ),
+                        const SizedBox(width: 4),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            width: 56,
+                            height: 56,
+                            color: WebDesignTokens.bg,
+                            child: item.imageUrl.isNotEmpty
+                                ? CachedNetworkImage(
+                                    imageUrl: item.imageUrl,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, error, stackTrace) =>
+                                        const Icon(Icons.eco,
+                                            size: 24,
+                                            color: WebDesignTokens.primary),
+                                  )
+                                : const Icon(Icons.eco,
+                                    size: 24, color: WebDesignTokens.primary),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          flex: 4,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.rubik(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: WebDesignTokens.dark,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '₱${item.priceValue.toStringAsFixed(0)} / ${item.unit}',
+                                style: GoogleFonts.nunitoSans(
+                                  fontSize: 12,
+                                  color: WebDesignTokens.slate500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: WebDesignTokens.border),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.remove_rounded, size: 14),
+                                onPressed: item.quantity > 1
+                                    ? () => onQuantityChanged(
+                                        item, item.quantity - 1)
+                                    : null,
+                                padding: const EdgeInsets.all(4),
+                                constraints: const BoxConstraints(),
+                              ),
+                              Container(
+                                width: 32,
+                                alignment: Alignment.center,
+                                child: Text(
+                                  '${item.quantity}',
+                                  style: GoogleFonts.rubik(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: WebDesignTokens.dark,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.add_rounded, size: 14),
+                                onPressed: () => onQuantityChanged(
+                                    item, item.quantity + 1),
+                                padding: const EdgeInsets.all(4),
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 24),
+                        SizedBox(
+                          width: 80,
+                          child: Text(
+                            '₱${item.total.toStringAsFixed(0)}',
+                            textAlign: TextAlign.right,
+                            style: GoogleFonts.rubik(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: WebDesignTokens.primaryDark,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded,
+                              size: 18, color: WebDesignTokens.slate400),
+                          onPressed: () => onItemRemoved(item),
+                          splashRadius: 18,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-
-                    // Remove Button
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded,
-                          size: 18, color: WebDesignTokens.slate400),
-                      onPressed: () => onItemRemoved(item),
-                      splashRadius: 18,
-                    ),
-                  ],
-                ),
+                  );
+                },
               );
             },
           ),

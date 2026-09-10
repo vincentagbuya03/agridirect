@@ -1,18 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../shared/services/core/supabase_data_service.dart';
-import '../../../shared/widgets/brand_logo.dart';
 import '../../widgets/animated_components.dart';
 import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/models/order/order_model.dart';
 import '../../../mobile/screens/farmer/farmer_order_details_screen.dart';
-import '../../../shared/services/auth/auth_service.dart';
-import '../../widgets/web_consumer_nav_bar.dart';
-import '../../widgets/web_hamburger_menu_button.dart';
-import '../../../shared/router/app_routes.dart';
+import '../../widgets/farmer/web_farmer_header.dart';
 
 class WebFarmerOrders extends StatefulWidget {
   final Function(int) onNavigate;
@@ -31,7 +26,6 @@ class WebFarmerOrders extends StatefulWidget {
 class _WebFarmerOrdersState extends State<WebFarmerOrders>
     with TickerProviderStateMixin {
   late AnimationController _fadeInController;
-  int _hoveredNav = -1;
   String _searchQuery = '';
   String _selectedStatus = 'ALL';
   String _selectedFulfillment = 'ALL'; // 'ALL', 'DELIVERY', 'PICKUP'
@@ -70,18 +64,21 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
 
   void _loadOrders() {
     setState(() => _ordersLoaded = false);
-    SupabaseDataService().getFarmerOrders().then((data) {
-      if (mounted) {
-        setState(() {
-          _orders = List<Map<String, dynamic>>.from(data);
-          _ordersLoaded = true;
+    SupabaseDataService()
+        .getFarmerOrders()
+        .then((data) {
+          if (mounted) {
+            setState(() {
+              _orders = List<Map<String, dynamic>>.from(data);
+              _ordersLoaded = true;
+            });
+          }
+          return data;
+        })
+        .catchError((_) {
+          if (mounted) setState(() => _ordersLoaded = true);
+          return <Map<String, dynamic>>[];
         });
-      }
-      return data;
-    }).catchError((_) {
-      if (mounted) setState(() => _ordersLoaded = true);
-      return <Map<String, dynamic>>[];
-    });
   }
 
   void _updateOrderStatusLocally(String rawOrderId, String newStatus) {
@@ -112,7 +109,8 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
       final isCop = o['paymentMethod']?.toString().toUpperCase() == 'COP';
 
       final query = _searchQuery.toLowerCase();
-      final matchesSearch = query.isEmpty ||
+      final matchesSearch =
+          query.isEmpty ||
           id.contains(query) ||
           customer.contains(query) ||
           items.contains(query);
@@ -120,7 +118,8 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
       final matchesStatus =
           _selectedStatus == 'ALL' || status == _selectedStatus;
 
-      final matchesFulfillment = _selectedFulfillment == 'ALL' ||
+      final matchesFulfillment =
+          _selectedFulfillment == 'ALL' ||
           (_selectedFulfillment == 'PICKUP' && isCop) ||
           (_selectedFulfillment == 'DELIVERY' && !isCop);
 
@@ -153,14 +152,21 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
 
   int _countForStatus(String status) {
     if (status == 'ALL') return _orders.length;
-    return _orders.where((o) => (o['status']?.toString().toUpperCase() ?? '') == status).length;
+    return _orders
+        .where((o) => (o['status']?.toString().toUpperCase() ?? '') == status)
+        .length;
   }
 
   // ─── Metrics Calculations ──────────────────────────────────────────────────
   double get _totalDeliveredRevenue {
     return _orders
-        .where((o) => (o['status']?.toString().toUpperCase() ?? '') == 'DELIVERED')
-        .fold(0.0, (sum, o) => sum + ((o['rawTotal'] as num?)?.toDouble() ?? 0.0));
+        .where(
+          (o) => (o['status']?.toString().toUpperCase() ?? '') == 'DELIVERED',
+        )
+        .fold(
+          0.0,
+          (sum, o) => sum + ((o['rawTotal'] as num?)?.toDouble() ?? 0.0),
+        );
   }
 
   int get _pendingCount => _countForStatus('PENDING');
@@ -180,21 +186,21 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
         children: [
           Positioned.fill(
             child: CustomPaint(
-              painter: DotPatternPainter(
-                opacity: 0.025,
-                color: _primary,
-              ),
+              painter: DotPatternPainter(opacity: 0.025, color: _primary),
             ),
           ),
           Column(
             children: [
-              _buildNavBar(),
+              WebFarmerHeader(
+                currentIndex: widget.currentIndex,
+                onNavigate: (index, [route]) => widget.onNavigate(index),
+              ),
               Expanded(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(
                     isMobile ? 16 : 36,
-                    0,
+                    12,
                     isMobile ? 16 : 36,
                     48,
                   ),
@@ -202,7 +208,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                     opacity: _fadeInController,
                     child: Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1360),
+                        constraints: const BoxConstraints(maxWidth: 1400),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -227,147 +233,6 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
     );
   }
 
-  // ─── Nav Bar ───────────────────────────────────────────────────────────────
-  Widget _buildNavBar() {
-    final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 900;
-    final isCompact = sw < 1100;
-
-    if (!AuthService().isViewingAsFarmer) {
-      return WebConsumerNavBar(
-        currentIndex: widget.currentIndex,
-        onNavigate: widget.onNavigate,
-        onCartTap: () => context.go(AppRoutes.cart),
-        margin: isMobile
-            ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-            : const EdgeInsets.fromLTRB(32, 24, 32, 12),
-      );
-    }
-
-    final navItems = [
-      'Dashboard',
-      'Products',
-      'Orders',
-      'Community',
-      'Pre-Orders',
-    ];
-    return Container(
-      margin: isMobile
-          ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-          : (isCompact
-              ? const EdgeInsets.fromLTRB(20, 16, 20, 8)
-              : const EdgeInsets.fromLTRB(32, 24, 32, 12)),
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : (isCompact ? 16 : 28),
-        vertical: isMobile ? 12 : (isCompact ? 10 : 14),
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _border),
-        boxShadow: [
-          BoxShadow(
-            color: _dark.withValues(alpha: 0.03),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(0),
-              child: BrandLogo(
-                size: (isMobile || isCompact) ? BrandLogoSize.small : BrandLogoSize.medium,
-              ),
-            ),
-          ),
-          if (!isMobile) ...[
-            SizedBox(width: isCompact ? 16 : 48),
-            ...List.generate(navItems.length, (i) {
-              final isActive = i == widget.currentIndex;
-              final isHovered = _hoveredNav == i;
-              return Padding(
-                padding: EdgeInsets.symmetric(horizontal: isCompact ? 2 : 4),
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  onEnter: (_) => setState(() => _hoveredNav = i),
-                  onExit: (_) => setState(() => _hoveredNav = -1),
-                  child: GestureDetector(
-                    onTap: () => widget.onNavigate(i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isCompact ? 12 : 20,
-                        vertical: isCompact ? 10 : 12,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        color: isActive
-                            ? _primary.withValues(alpha: 0.1)
-                            : isHovered
-                                ? _border.withValues(alpha: 0.35)
-                                : Colors.transparent,
-                      ),
-                      child: Text(
-                        navItems[i],
-                        style: GoogleFonts.inter(
-                          fontSize: isCompact ? 13 : 15,
-                          fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                          color: isActive ? _primary : (isHovered ? _dark : _muted),
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ],
-          const Spacer(),
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(5),
-              child: Container(
-                width: (isMobile || isCompact) ? 38 : 44,
-                height: (isMobile || isCompact) ? 38 : 44,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_primary, _primaryDark],
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _primary.withValues(alpha: 0.25),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.person_outline_rounded,
-                  color: Colors.white,
-                  size: (isMobile || isCompact) ? 20 : 22,
-                ),
-              ),
-            ),
-          ),
-          if (isMobile) ...[
-            const SizedBox(width: 8),
-            WebHamburgerMenuButton(
-              currentIndex: widget.currentIndex,
-              onNavigate: widget.onNavigate,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ─── Header ────────────────────────────────────────────────────────────────
   Widget _buildTopHeader(bool isMobile) {
     return Row(
       children: [
@@ -378,16 +243,25 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFDCFCE7),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: _primary.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: _primary.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.storefront_rounded, size: 14, color: _primary),
+                        const Icon(
+                          Icons.storefront_rounded,
+                          size: 14,
+                          color: _primary,
+                        ),
                         const SizedBox(width: 5),
                         Text(
                           'FARMER ORDER HUB',
@@ -510,16 +384,14 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
 
     if (isMobile) {
       return SizedBox(
-        height: 120,
+        height: 136,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
           itemCount: metrics.length,
           separatorBuilder: (_, _) => const SizedBox(width: 12),
-          itemBuilder: (ctx, i) => SizedBox(
-            width: 220,
-            child: _buildMetricCard(metrics[i]),
-          ),
+          itemBuilder: (ctx, i) =>
+              SizedBox(width: 220, child: _buildMetricCard(metrics[i])),
         ),
       );
     }
@@ -540,7 +412,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
 
   Widget _buildMetricCard(_MetricData data) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -561,16 +433,19 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   color: data.bgColor,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(data.icon, size: 18, color: data.color),
+                child: Icon(data.icon, size: 17, color: data.color),
               ),
               if (data.badgeText != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.red.shade50,
                     borderRadius: BorderRadius.circular(6),
@@ -587,7 +462,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                 ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Text(
             data.value,
             style: GoogleFonts.plusJakartaSans(
@@ -600,9 +475,19 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
           ),
           const SizedBox(height: 2),
           Text(
+            data.title,
+            style: GoogleFonts.inter(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: _dark,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
             data.subtitle,
             style: GoogleFonts.inter(
-              fontSize: 11,
+              fontSize: 10.5,
               color: _muted,
               fontWeight: FontWeight.w500,
             ),
@@ -654,7 +539,9 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: isSelected ? _primary : const Color(0xFFF1F5F9),
+                          color: isSelected
+                              ? _primary
+                              : const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: isSelected ? _primary : Colors.transparent,
@@ -667,13 +554,20 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                               st,
                               style: GoogleFonts.inter(
                                 fontSize: 12,
-                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                                color: isSelected ? Colors.white : const Color(0xFF475569),
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
+                                color: isSelected
+                                    ? Colors.white
+                                    : const Color(0xFF475569),
                               ),
                             ),
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1,
+                              ),
                               decoration: BoxDecoration(
                                 color: isSelected
                                     ? Colors.white.withValues(alpha: 0.25)
@@ -723,7 +617,11 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                   decoration: InputDecoration(
                     hintText: 'Search order #, customer, item...',
                     hintStyle: GoogleFonts.inter(color: _muted, fontSize: 12.5),
-                    prefixIcon: const Icon(Icons.search_rounded, color: _muted, size: 18),
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      color: _muted,
+                      size: 18,
+                    ),
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -743,15 +641,34 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     value: _selectedFulfillment,
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: _muted),
-                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: _dark),
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: _muted,
+                    ),
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: _dark,
+                    ),
                     onChanged: (val) {
-                      if (val != null) setState(() => _selectedFulfillment = val);
+                      if (val != null) {
+                        setState(() => _selectedFulfillment = val);
+                      }
                     },
                     items: const [
-                      DropdownMenuItem(value: 'ALL', child: Text('All Methods')),
-                      DropdownMenuItem(value: 'DELIVERY', child: Text('🚚 Delivery Orders')),
-                      DropdownMenuItem(value: 'PICKUP', child: Text('🏪 Farm Pickups (COP)')),
+                      DropdownMenuItem(
+                        value: 'ALL',
+                        child: Text('All Methods'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'DELIVERY',
+                        child: Text('🚚 Delivery Orders'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'PICKUP',
+                        child: Text('🏪 Farm Pickups (COP)'),
+                      ),
                     ],
                   ),
                 ),
@@ -769,15 +686,32 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     value: _sortBy,
-                    icon: const Icon(Icons.sort_rounded, size: 18, color: _muted),
-                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: _dark),
+                    icon: const Icon(
+                      Icons.sort_rounded,
+                      size: 18,
+                      color: _muted,
+                    ),
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: _dark,
+                    ),
                     onChanged: (val) {
                       if (val != null) setState(() => _sortBy = val);
                     },
                     items: const [
-                      DropdownMenuItem(value: 'NEWEST', child: Text('Sort: Newest First')),
-                      DropdownMenuItem(value: 'OLDEST', child: Text('Sort: Oldest First')),
-                      DropdownMenuItem(value: 'HIGHEST', child: Text('Sort: Highest Amount')),
+                      DropdownMenuItem(
+                        value: 'NEWEST',
+                        child: Text('Sort: Newest First'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'OLDEST',
+                        child: Text('Sort: Oldest First'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'HIGHEST',
+                        child: Text('Sort: Highest Amount'),
+                      ),
                     ],
                   ),
                 ),
@@ -792,7 +726,7 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
   // ─── Orders Data View ──────────────────────────────────────────────────────
   Widget _buildOrdersContent(bool isMobile) {
     if (!_ordersLoaded) {
-      return _buildSkeleton();
+      return _buildSkeleton(isMobile);
     }
 
     final filtered = _filteredOrders;
@@ -912,7 +846,8 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: filtered.length,
-              separatorBuilder: (_, _) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              separatorBuilder: (_, _) =>
+                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
               itemBuilder: (ctx, i) => _buildDesktopTableRow(filtered[i]),
             ),
           ],
@@ -921,7 +856,11 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
     );
   }
 
-  Widget _headerCell(String label, {int flex = 1, TextAlign align = TextAlign.start}) {
+  Widget _headerCell(
+    String label, {
+    int flex = 1,
+    TextAlign align = TextAlign.start,
+  }) {
     return Expanded(
       flex: flex,
       child: Text(
@@ -1054,9 +993,14 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: isCop ? const Color(0xFFFEF3C7) : const Color(0xFFE0F2FE),
+                      color: isCop
+                          ? const Color(0xFFFEF3C7)
+                          : const Color(0xFFE0F2FE),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -1064,7 +1008,9 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                       style: GoogleFonts.inter(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: isCop ? const Color(0xFFB45309) : const Color(0xFF0369A1),
+                        color: isCop
+                            ? const Color(0xFFB45309)
+                            : const Color(0xFF0369A1),
                       ),
                     ),
                   ),
@@ -1128,7 +1074,10 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                             ),
                           )
                         : Tooltip(
-                            message: _getNextActionLabel(status, o['paymentMethod']),
+                            message: _getNextActionLabel(
+                              status,
+                              o['paymentMethod'],
+                            ),
                             child: ElevatedButton(
                               onPressed: () => _processOrderConfirmation(o),
                               style: ElevatedButton.styleFrom(
@@ -1144,7 +1093,10 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                                 ),
                               ),
                               child: Text(
-                                _getNextActionShortLabel(status, o['paymentMethod']),
+                                _getNextActionShortLabel(
+                                  status,
+                                  o['paymentMethod'],
+                                ),
                                 style: GoogleFonts.inter(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w700,
@@ -1155,7 +1107,11 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                   const SizedBox(width: 6),
                   IconButton(
                     onPressed: () => _viewOrderDetails(o),
-                    icon: const Icon(Icons.chevron_right_rounded, size: 20, color: _muted),
+                    icon: const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: _muted,
+                    ),
                     tooltip: 'View Full Details',
                     splashRadius: 18,
                   ),
@@ -1209,9 +1165,14 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: isCop ? const Color(0xFFFEF3C7) : const Color(0xFFE0F2FE),
+                      color: isCop
+                          ? const Color(0xFFFEF3C7)
+                          : const Color(0xFFE0F2FE),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -1219,7 +1180,9 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                       style: GoogleFonts.inter(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: isCop ? const Color(0xFFB45309) : const Color(0xFF0369A1),
+                        color: isCop
+                            ? const Color(0xFFB45309)
+                            : const Color(0xFF0369A1),
                       ),
                     ),
                   ),
@@ -1279,7 +1242,10 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               Expanded(
                 child: Text(
                   o['items'] ?? '',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF475569)),
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF475569),
+                  ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1295,7 +1261,14 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('TOTAL AMOUNT', style: GoogleFonts.inter(fontSize: 9.5, color: _muted, fontWeight: FontWeight.w700)),
+                  Text(
+                    'TOTAL AMOUNT',
+                    style: GoogleFonts.inter(
+                      fontSize: 9.5,
+                      color: _muted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   Text(
                     o['total'] ?? '₱0.00',
                     style: GoogleFonts.plusJakartaSans(
@@ -1313,10 +1286,21 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _dark,
                       side: const BorderSide(color: _border),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
-                    child: Text('Details', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                    child: Text(
+                      'Details',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                   if (canProgress) ...[
                     const SizedBox(width: 8),
@@ -1324,7 +1308,10 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                         ? const SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: _primary),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: _primary,
+                            ),
                           )
                         : ElevatedButton(
                             onPressed: () => _processOrderConfirmation(o),
@@ -1332,12 +1319,23 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
                               backgroundColor: _primary,
                               foregroundColor: Colors.white,
                               elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
                             child: Text(
-                              _getNextActionShortLabel(status, o['paymentMethod']),
-                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+                              _getNextActionShortLabel(
+                                status,
+                                o['paymentMethod'],
+                              ),
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                   ],
@@ -1384,36 +1382,85 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
   }
 
   // ─── Skeleton Loading ──────────────────────────────────────────────────────
-  Widget _buildSkeleton() {
+  Widget _buildSkeleton(bool isMobile) {
+    if (isMobile) {
+      return Column(
+        children: List.generate(
+          3,
+          (i) => Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _skeletonBox(110),
+                    _skeletonBox(70),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _skeletonBox(140),
+                const SizedBox(height: 8),
+                _skeletonBox(200),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _skeletonBox(80),
+                    _skeletonBox(90),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: _border),
       ),
-      child: Column(
-        children: List.generate(
-          5,
-          (i) => Container(
-            height: 64,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(
-              border: i < 4 ? const Border(bottom: BorderSide(color: Color(0xFFF1F5F9))) : null,
-            ),
-            child: Row(
-              children: [
-                _skeletonBox(100),
-                const SizedBox(width: 24),
-                _skeletonBox(80),
-                const SizedBox(width: 24),
-                _skeletonBox(120),
-                const SizedBox(width: 24),
-                _skeletonBox(160),
-                const Spacer(),
-                _skeletonBox(70),
-                const SizedBox(width: 16),
-                _skeletonBox(80),
-              ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: 900,
+          child: Column(
+            children: List.generate(
+              5,
+              (i) => Container(
+                height: 64,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: BoxDecoration(
+                  border: i < 4
+                      ? const Border(bottom: BorderSide(color: Color(0xFFF1F5F9)))
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    _skeletonBox(100),
+                    const SizedBox(width: 24),
+                    _skeletonBox(80),
+                    const SizedBox(width: 24),
+                    _skeletonBox(120),
+                    const SizedBox(width: 24),
+                    _skeletonBox(160),
+                    const Spacer(),
+                    _skeletonBox(70),
+                    const SizedBox(width: 16),
+                    _skeletonBox(80),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -1477,7 +1524,8 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
     if (status == 'PENDING') {
       nextStatus = 'CONFIRMED';
       actionText = 'Confirm Order';
-      confirmationMsg = 'Accept and confirm Order $orderIdStr? The buyer will be notified.';
+      confirmationMsg =
+          'Accept and confirm Order $orderIdStr? The buyer will be notified.';
     } else if (status == 'CONFIRMED') {
       nextStatus = 'PROCESSING';
       actionText = 'Prepare Order';
@@ -1552,7 +1600,9 @@ class _WebFarmerOrdersState extends State<WebFarmerOrders>
               content: Text(cleanError),
               backgroundColor: Colors.red.shade700,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
               duration: const Duration(seconds: 4),
             ),
           );
@@ -1805,9 +1855,7 @@ class _ConfirmDialog extends StatelessWidget {
                       ),
                       child: Text(
                         confirmLabel,
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w700),
                       ),
                     ),
                   ),
@@ -1854,10 +1902,7 @@ class _StatusSuccessOverlayState extends State<_StatusSuccessOverlay>
       parent: _controller,
       curve: Curves.easeOutBack,
     );
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeIn,
-    );
+    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
 
     _controller.forward();
 

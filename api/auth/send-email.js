@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 
 const fallbackGmailUser = 'noreplyagridirect@gmail.com';
-const fallbackGmailPass = 'snoe apvj svld cank';
+const fallbackGmailPass = 'tzah xwho pmqa poyx';
 
 const allowedOrigins = new Set([
   'http://localhost:3000',

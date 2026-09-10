@@ -4,9 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/core/supabase_config.dart';
-import '../../../shared/router/app_routes.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
-import '../../widgets/web_promo_header.dart';
+import '../../../shared/router/app_routes.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
 
 class WebLocalShopsScreen extends StatefulWidget {
   const WebLocalShopsScreen({super.key});
@@ -55,7 +55,7 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
   void _showFarmerProfile(BuildContext context, Map<String, dynamic> farmer) {
     final farmerId = farmer['farmer_id'] ?? farmer['id'];
     if (farmerId != null && farmerId.toString().isNotEmpty) {
-      context.push('${AppRoutes.farmerProfileBase}/$farmerId');
+      context.go('${AppRoutes.farmerProfileBase}/$farmerId');
     }
   }
 
@@ -69,10 +69,16 @@ class _WebLocalShopsScreenState extends State<WebLocalShopsScreen>
       body: SingleChildScrollView(
         child: Column(
           children: [
-            WebPromoHeader(
-              activeTab: 'local_shops',
-              searchPlaceholder: 'Search registered farm shops, growers & cooperatives...',
-              onSearchChanged: (q) => setState(() => _searchQuery = q.toLowerCase()),
+            WebEcomHeader(
+              currentIndex: 0,
+              onNavigate: (index, [route]) {
+                if (route != null) {
+                  context.go(route);
+                } else {
+                  context.go(AppRoutes.webTabRoute(index));
+                }
+              },
+              onSearch: (q) => setState(() => _searchQuery = q.toLowerCase()),
             ),
             _buildHeroBanner(),
             const SizedBox(height: 32),
@@ -730,21 +736,19 @@ class _WebShopCardState extends State<_WebShopCard> {
       return SupabaseConfig.client.storage.from('uploads').getPublicUrl(cleanPath);
     }
 
-    final rawAvatar = (farmer['avatar_url'] ??
+    final rawAvatar = (farmer['image_url'] ??
+            farmer['logo_url'] ??
+            farmer['avatar_url'] ??
             farmer['users']?['avatar_url'] ??
             farmer['profile_picture'] ??
-            farmer['face_photo_path'] ??
             '')
         .toString()
         .trim();
     final avatarUrl = resolveImg(rawAvatar) ?? '';
 
-    // Check multiple possible image fields for cover banner (strictly separate from personal avatar)
-    String rawImg = (farmer['image_url'] ??
+    // Check multiple possible image fields for cover banner (strictly separate from personal avatar/logo)
+    String rawImg = (farmer['cover_url'] ??
             farmer['cover_image_url'] ??
-            farmer['cover_url'] ??
-            farmer['farm_photo_path'] ??
-            farmer['farm_image_url'] ??
             farmer['farm_banner_url'] ??
             farmer['banner_url'] ??
             '')

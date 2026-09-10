@@ -29,6 +29,7 @@ import 'shared/services/offline/offline_cache_service.dart';
 import 'shared/utils/url_strategy.dart';
 import 'mobile/screens/common/loading_screen.dart';
 import 'shared/screens/messages/in_app_call_screen.dart';
+import 'shared/localization/farmer_locale_service.dart';
 
 // Handle background notifications
 @pragma('vm:entry-point')
@@ -143,10 +144,35 @@ void main() async {
   } catch (_) {}
 
   if (!kIsWeb) {
-    // We removed the synchronous FlutterCallkitIncoming.activeCalls() check here
-    // because it is known to deadlock the Android engine on cold start when
-    // opened via an Intent (deep link). Events are queued by the plugin and
-    // will be handled by the listener in _BootstrapAppState anyway.
+    try {
+      final activeCalls = await FlutterCallkitIncoming.activeCalls()
+          .timeout(const Duration(milliseconds: 600), onTimeout: () => []);
+      if (activeCalls.isNotEmpty) {
+        final acceptedCall = activeCalls.firstWhere(
+          (c) => c.isAccepted,
+          orElse: () => activeCalls.first,
+        );
+        final extra = acceptedCall.extra ?? {};
+        final callId = extra['callId']?.toString() ?? acceptedCall.id;
+        final channelName = extra['channelName']?.toString() ?? '';
+        final isVideo = extra['isVideo'] == true || extra['isVideo'] == 'true';
+        final callerName = acceptedCall.nameCaller ?? 'AgriDirect User';
+        final avatarUrl = acceptedCall.avatar;
+
+        if (callId.isNotEmpty && channelName.isNotEmpty && acceptedCall.isAccepted) {
+          _globalPendingAcceptedCall = (
+            callId: callId,
+            channelName: channelName,
+            isVideo: isVideo,
+            callerName: callerName,
+            avatarUrl: avatarUrl,
+          );
+          debugPrint('📞 Synchronous cold-start CallKit check found accepted call: $callId');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Could not check active CallKit calls in main(): $e');
+    }
   }
 
   // Capture the initial deep link via AppLinks for reliable scheme & web link handling
@@ -188,6 +214,10 @@ void main() async {
     debugPrint('⚠️ Could not capture initial link: $e');
   }
 
+  try {
+    await FarmerLocaleService.instance.init();
+  } catch (_) {}
+
   initialRoute ??= WidgetsBinding.instance.platformDispatcher.defaultRouteName;
 
   runApp(_BootstrapApp(initialRoute: initialRoute, isDeepLink: isDeepLink));
@@ -217,7 +247,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
   bool _isAnimationDone = false;
   bool _isFullyInitialized = false;
   PendingCall? _pendingCall;
-  bool _callScreenLaunched = false;
+  bool _callScreenEnded = false;
   StreamSubscription<CallEvent?>? _callkitSubscription;
 
   @override
@@ -228,6 +258,8 @@ class _BootstrapAppState extends State<_BootstrapApp> {
         _pendingCall = _globalPendingAcceptedCall;
         _globalPendingAcceptedCall = null;
         debugPrint('📞 Cold-start pending call pre-assigned in initState');
+      } else {
+        _checkActiveCallsOnStartup();
       }
 
       // Listen in state so setState() can be called regardless of timing
@@ -243,7 +275,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
           final callerName = params.nameCaller ?? 'AgriDirect User';
           final avatarUrl = params.avatar;
 
-          if (_isFullyInitialized) {
+          if (_isFullyInitialized && _pendingCall == null) {
             debugPrint('📞 Bootstrap: App already running, delegating to NotificationService.launchCallScreen');
             NotificationService.launchCallScreen(
               name: callerName,
@@ -258,7 +290,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
           }
 
           if (callId.isNotEmpty && channelName.isNotEmpty) {
-            debugPrint('📞 Bootstrap: CallKit accept received during cold start, forcing rebuild');
+            debugPrint('📞 Bootstrap: CallKit accept received during startup, launching call screen directly');
             setState(() {
               _pendingCall = (
                 callId: callId,
@@ -271,6 +303,52 @@ class _BootstrapAppState extends State<_BootstrapApp> {
           }
         }
       });
+    }
+  }
+
+  Future<void> _checkActiveCallsOnStartup() async {
+    if (kIsWeb || _pendingCall != null) return;
+    try {
+      final activeCalls = await FlutterCallkitIncoming.activeCalls()
+          .timeout(const Duration(milliseconds: 1000), onTimeout: () => []);
+      if (activeCalls.isNotEmpty && mounted && _pendingCall == null) {
+        final acceptedCall = activeCalls.where((c) => c.isAccepted).firstOrNull ?? activeCalls.first;
+        if (acceptedCall.isAccepted) {
+          final extra = acceptedCall.extra ?? {};
+          final callId = extra['callId']?.toString() ?? acceptedCall.id;
+          final channelName = extra['channelName']?.toString() ?? '';
+          final isVideo = extra['isVideo'] == true || extra['isVideo'] == 'true';
+          final callerName = acceptedCall.nameCaller ?? 'AgriDirect User';
+          final avatarUrl = acceptedCall.avatar;
+
+          if (callId.isNotEmpty && channelName.isNotEmpty) {
+            debugPrint('📞 Async startup check found accepted CallKit call: $callId');
+            if (_isFullyInitialized) {
+              NotificationService.launchCallScreen(
+                name: callerName,
+                avatarUrl: avatarUrl,
+                callId: callId,
+                channelName: channelName,
+                isVideo: isVideo,
+                isIncoming: true,
+                isAlreadyAccepted: true,
+              );
+            } else {
+              setState(() {
+                _pendingCall = (
+                  callId: callId,
+                  channelName: channelName,
+                  isVideo: isVideo,
+                  callerName: callerName,
+                  avatarUrl: avatarUrl,
+                );
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error checking active calls on startup: $e');
     }
   }
 
@@ -288,8 +366,10 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     final startTime = DateTime.now();
     await _initializeApp();
     final elapsed = DateTime.now().difference(startTime);
-    // Remove the artificial waiting delay on web, and reduce it to 1.5s on mobile
-    final minDelay = kIsWeb ? Duration.zero : const Duration(milliseconds: 1500);
+    // Remove the artificial waiting delay on web or when opening directly into an accepted call
+    final minDelay = (kIsWeb || _pendingCall != null || _globalPendingAcceptedCall != null)
+        ? Duration.zero
+        : const Duration(milliseconds: 1500);
     final remaining = minDelay - elapsed;
     if (remaining > Duration.zero) {
       await Future.delayed(remaining);
@@ -395,10 +475,36 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     });
 
     // Check if app was launched by tapping an incoming CallKit notification
-    if (!kIsWeb) {
+    if (!kIsWeb && _pendingCall == null) {
       if (_globalPendingAcceptedCall != null) {
         _pendingCall = _globalPendingAcceptedCall;
         _globalPendingAcceptedCall = null;
+      } else {
+        try {
+          final activeCalls = await FlutterCallkitIncoming.activeCalls()
+              .timeout(const Duration(milliseconds: 600), onTimeout: () => []);
+          final acceptedCall = activeCalls.where((c) => c.isAccepted).firstOrNull;
+          if (acceptedCall != null) {
+            final extra = acceptedCall.extra ?? {};
+            final callId = extra['callId']?.toString() ?? acceptedCall.id;
+            final channelName = extra['channelName']?.toString() ?? '';
+            final isVideo = extra['isVideo'] == true || extra['isVideo'] == 'true';
+            final callerName = acceptedCall.nameCaller ?? 'AgriDirect User';
+            final avatarUrl = acceptedCall.avatar;
+            if (callId.isNotEmpty && channelName.isNotEmpty) {
+              _pendingCall = (
+                callId: callId,
+                channelName: channelName,
+                isVideo: isVideo,
+                callerName: callerName,
+                avatarUrl: avatarUrl,
+              );
+              debugPrint('📞 _initializeApp detected active accepted call: $callId');
+            }
+          }
+        } catch (e) {
+          debugPrint('⚠️ Error in _initializeApp activeCalls check: $e');
+        }
       }
     }
   }
@@ -406,12 +512,11 @@ class _BootstrapAppState extends State<_BootstrapApp> {
   @override
   Widget build(BuildContext context) {
     // ── If launched via CallKit accept, show ONLY the call screen immediately. ──
-    // This runs before FutureBuilder is even evaluated, so no loading or splash screen shows!
-    if (_pendingCall != null && !kIsWeb && !_callScreenLaunched) {
-      _callScreenLaunched = true;
+    // As long as _pendingCall is active, stay on the call screen without showing loading/splash screen!
+    if (_pendingCall != null && !kIsWeb) {
       _isAnimationDone = true;
       final call = _pendingCall!;
-      debugPrint('📞 Early Launch: standalone call screen for ${call.callId}');
+      debugPrint('📞 Standalone call screen active for ${call.callId}');
       return MaterialApp(
         debugShowCheckedModeBanner: false,
         navigatorKey: appNavigatorKey,
@@ -428,7 +533,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
             if (mounted) {
               setState(() {
                 _pendingCall = null;
-                _callScreenLaunched = true;
+                _callScreenEnded = true;
                 _isAnimationDone = true;
               });
             }
@@ -439,8 +544,8 @@ class _BootstrapAppState extends State<_BootstrapApp> {
       );
     }
 
-    if (_callScreenLaunched) {
-      // Call screen was shown; after popping it falls to AgriDirectApp
+    if (_callScreenEnded) {
+      // Call screen was shown and has ended; seamlessly fall to AgriDirectApp
       return AgriDirectApp(initialRoute: widget.initialRoute);
     }
 
@@ -463,9 +568,10 @@ class _BootstrapAppState extends State<_BootstrapApp> {
           // - Animation already done
           // - Coming from OAuth callback (the callback screen handles its own transition)
           // - Opened via a deep link (user wants to see content ASAP, no branding delay)
+          // - Call just ended (go directly to dashboard/home, no loading animation)
           final isOAuthCallback = kIsWeb && Uri.base.path.contains('/auth/callback');
 
-          if (kIsWeb || !auth.isLoggedIn || _isAnimationDone || isOAuthCallback || widget.isDeepLink) {
+          if (kIsWeb || !auth.isLoggedIn || _isAnimationDone || isOAuthCallback || widget.isDeepLink || _callScreenEnded) {
             debugPrint('   → Launching AgriDirectApp()');
             return AgriDirectApp(initialRoute: widget.initialRoute);
           }

@@ -13,6 +13,7 @@ class WebFilterState {
   final bool flashSaleOnly;
   final bool freeShippingOnly;
   final bool wholesaleOnly;
+  final bool preorderOnly;
 
   const WebFilterState({
     this.selectedBarangays = const {},
@@ -24,6 +25,7 @@ class WebFilterState {
     this.flashSaleOnly = false,
     this.freeShippingOnly = false,
     this.wholesaleOnly = false,
+    this.preorderOnly = false,
   });
 
   bool get hasActiveFilters =>
@@ -36,7 +38,8 @@ class WebFilterState {
       verifiedOnly ||
       flashSaleOnly ||
       freeShippingOnly ||
-      wholesaleOnly;
+      wholesaleOnly ||
+      preorderOnly;
 
   int get activeFiltersCount {
     int count = 0;
@@ -49,6 +52,7 @@ class WebFilterState {
     if (flashSaleOnly) count++;
     if (freeShippingOnly) count++;
     if (wholesaleOnly) count++;
+    if (preorderOnly) count++;
     return count;
   }
 
@@ -62,6 +66,7 @@ class WebFilterState {
     bool? flashSaleOnly,
     bool? freeShippingOnly,
     bool? wholesaleOnly,
+    bool? preorderOnly,
   }) {
     return WebFilterState(
       selectedBarangays: selectedBarangays ?? this.selectedBarangays,
@@ -73,6 +78,7 @@ class WebFilterState {
       flashSaleOnly: flashSaleOnly ?? this.flashSaleOnly,
       freeShippingOnly: freeShippingOnly ?? this.freeShippingOnly,
       wholesaleOnly: wholesaleOnly ?? this.wholesaleOnly,
+      preorderOnly: preorderOnly ?? this.preorderOnly,
     );
   }
 }
@@ -338,6 +344,12 @@ class _WebFilterSidebarState extends State<WebFilterSidebar> {
             value: widget.state.freeShippingOnly,
             onChanged: (val) =>
                 widget.onChanged(widget.state.copyWith(freeShippingOnly: val)),
+          ),
+          _buildSwitchTile(
+            title: '🌱 Pre-Order Campaigns',
+            value: widget.state.preorderOnly,
+            onChanged: (val) =>
+                widget.onChanged(widget.state.copyWith(preorderOnly: val)),
           ),
           _buildSwitchTile(
             title: '📦 Wholesale / Bulk Sacks',

@@ -9,12 +9,23 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class EmailService {
-  // Use .env variables with hardcoded fallbacks
-  static String get _gmailUser =>
-      dotenv.env['GMAIL_USER'] ?? 'noreplyagridirect@gmail.com';
+  static const String _gmailUserEnv = String.fromEnvironment('GMAIL_USER');
+  static const String _gmailPassEnv = String.fromEnvironment('GMAIL_PASS');
 
-  static String get _gmailPass =>
-      dotenv.env['GMAIL_PASS'] ?? 'snoe apvj svld cank';
+  // Use environment variables (--dart-define or .env) with configured fallback
+  static String get _gmailUser {
+    if (_gmailUserEnv.isNotEmpty) return _gmailUserEnv;
+    final envUser = dotenv.env['GMAIL_USER']?.trim();
+    if (envUser != null && envUser.isNotEmpty) return envUser;
+    return 'noreplyagridirect@gmail.com';
+  }
+
+  static String get _gmailPass {
+    if (_gmailPassEnv.isNotEmpty) return _gmailPassEnv;
+    final envPass = dotenv.env['GMAIL_PASS']?.trim();
+    if (envPass != null && envPass.isNotEmpty) return envPass;
+    return 'tzah xwho pmqa poyx';
+  }
 
   static String get _webEmailApiBase {
     final configured = dotenv.env['WEB_EMAIL_API_BASE']?.trim() ?? '';

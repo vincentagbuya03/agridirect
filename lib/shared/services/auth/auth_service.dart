@@ -10,6 +10,32 @@ import '../community/notification_service.dart';
 import '../offline/network_status_service.dart';
 import 'onboarding_service.dart';
 
+/// Status of phone number availability check
+enum PhoneAvailabilityStatus {
+  available,
+  alreadyRegistered,
+  invalidFormat,
+}
+
+/// Rich result of a Philippine phone availability and format check
+class PhoneAvailabilityResult {
+  final PhoneAvailabilityStatus status;
+  final String? message;
+  final String normalizedE164;
+  final String formattedDisplay;
+  final String? carrier;
+
+  const PhoneAvailabilityResult({
+    required this.status,
+    this.message,
+    this.normalizedE164 = '',
+    this.formattedDisplay = '',
+    this.carrier,
+  });
+
+  bool get isAvailable => status == PhoneAvailabilityStatus.available;
+}
+
 /// Auth Service using Supabase
 /// Handles user registration, login, logout, and seller mode
 class AuthService extends ChangeNotifier {
@@ -1052,6 +1078,18 @@ class AuthService extends ChangeNotifier {
         return false;
       }
 
+      // 0. Ensure phone is not already registered to another user
+      final isTaken = await isPhoneAlreadyRegistered(
+        phoneNumber,
+        excludeUserId: user.id,
+      );
+      if (isTaken) {
+        _errorMessage = 'This mobile number is already linked to another account.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
       // 1. Update password in Supabase Auth
       await _client.auth.updateUser(UserAttributes(password: password));
 
@@ -1368,6 +1406,65 @@ class AuthService extends ChangeNotifier {
     return 'Google Sign-In failed.';
   }
 
+  /// Normalizes any Philippine phone input to canonical E.164 format (+639XXXXXXXXX)
+  static String normalizeToE164(String input) {
+    var digits = input.replaceAll(RegExp(r'[^\d]'), '');
+    if (digits.startsWith('639') && digits.length == 12) {
+      return '+$digits';
+    }
+    if (digits.startsWith('09') && digits.length == 11) {
+      return '+63${digits.substring(1)}';
+    }
+    if (digits.startsWith('9') && digits.length == 10) {
+      return '+63$digits';
+    }
+    if (input.startsWith('+639') && digits.length == 12) {
+      return '+63${digits.substring(2)}';
+    }
+    return input.trim();
+  }
+
+  /// Formats phone number for user-friendly display: "09XX XXX XXXX"
+  static String formatDisplayPhone(String input) {
+    final e164 = normalizeToE164(input);
+    final digits = e164.replaceAll(RegExp(r'[^\d]'), '');
+    if (digits.length >= 12 && digits.startsWith('639')) {
+      final local = '0${digits.substring(2)}';
+      return '${local.substring(0, 4)} ${local.substring(4, 7)} ${local.substring(7)}';
+    }
+    return input;
+  }
+
+  /// Detects major Philippine carrier by 4-digit mobile prefix
+  static String? detectPhilippineCarrier(String input) {
+    final e164 = normalizeToE164(input);
+    final digits = e164.replaceAll(RegExp(r'[^\d]'), '');
+    if (digits.length < 5 || !digits.startsWith('639')) return null;
+    final prefix = '0${digits.substring(2, 5)}';
+
+    const globePrefixes = {
+      '0905', '0906', '0915', '0916', '0917', '0926', '0927', '0935', '0936',
+      '0945', '0953', '0954', '0955', '0956', '0965', '0966', '0967', '0975',
+      '0976', '0977', '0978', '0979', '0995', '0996', '0997'
+    };
+    if (globePrefixes.contains(prefix)) return 'Globe / TM';
+
+    const smartPrefixes = {
+      '0907', '0908', '0909', '0910', '0911', '0912', '0913', '0914', '0918',
+      '0919', '0920', '0921', '0928', '0929', '0930', '0938', '0939', '0946',
+      '0947', '0948', '0949', '0950', '0951', '0961', '0963', '0968', '0969',
+      '0970', '0971', '0981', '0989', '0998', '0999', '0922', '0923', '0924',
+      '0925', '0931', '0932', '0933', '0934', '0940', '0941', '0942', '0943',
+      '0944'
+    };
+    if (smartPrefixes.contains(prefix)) return 'Smart / TNT';
+
+    const ditoPrefixes = {'0895', '0896', '0897', '0898', '0991', '0992', '0993', '0994'};
+    if (ditoPrefixes.contains(prefix)) return 'Dito';
+
+    return null;
+  }
+
   /// Checks whether a mobile number is already registered to another account
   static Future<bool> isPhoneAlreadyRegistered(
     String phoneNumber, {
@@ -1376,16 +1473,23 @@ class AuthService extends ChangeNotifier {
     final clean = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '').trim();
     if (clean.isEmpty) return false;
 
-    String e164 = clean;
-    if (clean.startsWith('09') && clean.length == 11) {
-      e164 = '+63${clean.substring(1)}';
-    } else if (clean.startsWith('9') && clean.length == 10) {
-      e164 = '+63$clean';
-    } else if (clean.startsWith('63') && !clean.startsWith('+')) {
-      e164 = '+$clean';
-    }
-
+    final e164 = normalizeToE164(clean);
     final raw09 = e164.startsWith('+63') ? '0${e164.substring(3)}' : e164;
+
+    try {
+      final rpcRes = await SupabaseConfig.client.rpc(
+        'check_phone_availability',
+        params: {
+          'p_phone': e164,
+          'p_exclude_user_id': ?excludeUserId,
+        },
+      );
+      if (rpcRes is bool) {
+        return !rpcRes; // available = true means isRegistered = false
+      }
+    } catch (_) {
+      // Fallback to direct table query if RPC is not yet applied
+    }
 
     try {
       final response = await SupabaseConfig.client
@@ -1406,6 +1510,105 @@ class AuthService extends ChangeNotifier {
       debugPrint('Error checking phone uniqueness: $e');
     }
     return false;
+  }
+
+  /// Detailed availability check for distinctive phone input feedback
+  static Future<PhoneAvailabilityResult> checkPhoneAvailability(
+    String phoneNumber, {
+    String? excludeUserId,
+  }) async {
+    final digits = phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
+
+    final isValidLength = (digits.length == 10 && digits.startsWith('9')) ||
+        (digits.length == 11 && digits.startsWith('09')) ||
+        (digits.length == 12 && digits.startsWith('639'));
+
+    if (!isValidLength) {
+      return const PhoneAvailabilityResult(
+        status: PhoneAvailabilityStatus.invalidFormat,
+        message: 'Enter a valid 10 or 11-digit Philippine mobile number',
+      );
+    }
+
+    final e164 = normalizeToE164(phoneNumber);
+    final display = formatDisplayPhone(e164);
+    final carrier = detectPhilippineCarrier(e164);
+
+    final isTaken = await isPhoneAlreadyRegistered(
+      e164,
+      excludeUserId: excludeUserId,
+    );
+
+    if (isTaken) {
+      return PhoneAvailabilityResult(
+        status: PhoneAvailabilityStatus.alreadyRegistered,
+        message: 'This mobile number is already registered to another account.',
+        normalizedE164: e164,
+        formattedDisplay: display,
+        carrier: carrier,
+      );
+    }
+
+    return PhoneAvailabilityResult(
+      status: PhoneAvailabilityStatus.available,
+      message: 'Mobile number available',
+      normalizedE164: e164,
+      formattedDisplay: display,
+      carrier: carrier,
+    );
+  }
+
+  /// Directly updates current user's phone number without SMS OTP
+  Future<bool> updatePhoneNumber(String newPhone) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final user = _client.auth.currentUser;
+      if (user == null) {
+        _errorMessage = 'User not authenticated.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      final check = await checkPhoneAvailability(newPhone, excludeUserId: user.id);
+      if (!check.isAvailable) {
+        _errorMessage = check.message ?? 'Invalid or unavailable phone number.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      final e164 = check.normalizedE164;
+
+      // Update in public.users
+      await _client
+          .from('users')
+          .update({
+            'phone': e164,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('user_id', user.id);
+
+      // Update Auth metadata
+      try {
+        await _client.auth.updateUser(UserAttributes(data: {'phone': e164}));
+      } catch (_) {}
+
+      // Refresh cached user profile
+      await initialize();
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = _extractErrorMessage(e);
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<bool> completeProfile({
@@ -1445,7 +1648,17 @@ class AuthService extends ChangeNotifier {
             true, // If we reach here, they must be verified or have a session
       );
 
-      await _client.auth.updateUser(UserAttributes(password: password));
+      try {
+        await _client.auth.updateUser(UserAttributes(password: password));
+      } catch (e) {
+        final errStr = e.toString().toLowerCase();
+        if (errStr.contains('same_password') ||
+            errStr.contains('different from the old password')) {
+          // Password entered is already the user's current password - accept and proceed
+        } else {
+          rethrow;
+        }
+      }
 
       final roles = await SupabaseDatabase.getUserRoles(_pendingUserId);
       _userId = _pendingUserId;

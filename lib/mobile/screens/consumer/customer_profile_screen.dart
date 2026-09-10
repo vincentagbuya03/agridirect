@@ -8,6 +8,7 @@ import '../../../shared/services/core/supabase_config.dart';
 import '../../../shared/router/app_routes.dart';
 import '../../../shared/services/commerce/order_service.dart';
 import '../../../shared/widgets/premium_confirm_dialog.dart';
+import '../../../shared/widgets/farmer/farmer_mode_switcher_capsule.dart';
 import '../../widgets/auth/mobile_two_factor_sheet.dart';
 
 class CustomerProfileScreen extends StatefulWidget {
@@ -174,6 +175,13 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildHeroHeader(auth),
+            if (auth.isSeller)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: FarmerModeSwitcherCapsule(
+                  onSwitch: _handleSwitchToFarmer,
+                ),
+              ),
             const SizedBox(height: 12),
             _buildMyPurchases(),
             const SizedBox(height: 12),

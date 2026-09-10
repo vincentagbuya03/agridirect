@@ -2,19 +2,14 @@ import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/animated_components.dart';
-import '../../../shared/widgets/brand_logo.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/integration/weather_service.dart';
 import '../../../shared/models/weather_model.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import 'package:intl/intl.dart';
-import 'package:go_router/go_router.dart';
-import '../../../shared/router/app_routes.dart';
-import '../../widgets/web_consumer_nav_bar.dart';
-import '../../widgets/web_hamburger_menu_button.dart';
+import '../../widgets/farmer/web_farmer_header.dart';
 import '../../../shared/services/commerce/voucher_service.dart';
-import 'package:geolocator/geolocator.dart';
 import 'web_weather_radar_screen.dart';
 
 
@@ -41,7 +36,6 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   
   static const Color _dark = Color(0xFF0F172A);
   static const Color _muted = Color(0xFF64748B);
-  static const Color _border = Color(0xFFE2E8F0);
   static const Color _surface = Color(0xFFF8FAFC);
   static const Color _white = Color(0xFFFFFFFF);
 
@@ -51,7 +45,6 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   late AnimationController _fadeInController;
   late List<AnimationController> _metricControllers;
   final Set<int> _hoveredMetrics = {};
-  int _hoveredNav = -1;
 
   // Data State
   int _pendingOrders = 0;
@@ -108,43 +101,33 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
   Future<void> _loadDashboardData() async {
     try {
       final name = AuthService().userName;
-      final products = await SupabaseDataService().getFarmerProducts();
-      final orders = await SupabaseDataService().getFarmerOrders();
-      final farmerResponse = await SupabaseDataService().getFarmerProfile(AuthService().userId);
-      
+      final results = await Future.wait([
+        SupabaseDataService().getFarmerProducts().timeout(
+          const Duration(seconds: 6),
+          onTimeout: () => [],
+        ),
+        SupabaseDataService().getFarmerOrders().timeout(
+          const Duration(seconds: 6),
+          onTimeout: () => [],
+        ),
+        SupabaseDataService().getFarmerProfile(AuthService().userId).timeout(
+          const Duration(seconds: 6),
+          onTimeout: () => null,
+        ),
+      ]);
+
+      final products = results[0] as List<Map<String, dynamic>>;
+      final orders = results[1] as List<Map<String, dynamic>>;
+      final farmerResponse = results[2] as Map<String, dynamic>?;
+
       final rating = farmerResponse?['average_rating']?.toString() ?? '4.9';
       final reviews = farmerResponse?['review_count']?.toString() ?? '120+';
 
       final lat = (farmerResponse?['farm_latitude'] as num?)?.toDouble();
       final lon = (farmerResponse?['farm_longitude'] as num?)?.toDouble();
-      final locName = farmerResponse?['location']?.toString() ?? farmerResponse?['farm_name']?.toString() ?? 'My Farm';
-
-      WeatherData? weather;
-      double finalLat = lat ?? 14.5995;
-      double finalLon = lon ?? 120.9842;
-      String finalLocName = locName;
-
-      if (lat != null && lon != null) {
-        weather = await WeatherService().getWeatherByCoordinates(
-          latitude: lat,
-          longitude: lon,
-        );
-      } else {
-        try {
-          final permission = await Geolocator.checkPermission();
-          if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
-            final pos = await Geolocator.getCurrentPosition(timeLimit: const Duration(seconds: 3));
-            finalLat = pos.latitude;
-            finalLon = pos.longitude;
-            weather = await WeatherService().getWeatherByCoordinates(
-              latitude: pos.latitude,
-              longitude: pos.longitude,
-            );
-          }
-        } catch (_) {}
-
-        weather ??= await WeatherService().getWeatherByCity('Manila');
-      }
+      final locName = farmerResponse?['location']?.toString() ??
+          farmerResponse?['farm_name']?.toString() ??
+          'My Farm';
 
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
@@ -161,7 +144,8 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
 
           final createdAt = order['createdAt'] as DateTime?;
           if (createdAt != null) {
-            final orderDate = DateTime(createdAt.year, createdAt.month, createdAt.day);
+            final orderDate =
+                DateTime(createdAt.year, createdAt.month, createdAt.day);
             final diff = today.difference(orderDate).inDays;
             if (diff >= 0 && diff < 7) {
               salesLast7Days[6 - diff] += total;
@@ -187,9 +171,13 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           inStockCount++;
         }
       }
-      
+
       final totalInventory = inStockCount + lowStockCount + outOfStockCount;
-      List<double> inventoryData = [inStockCount.toDouble(), lowStockCount.toDouble(), outOfStockCount.toDouble()];
+      List<double> inventoryData = [
+        inStockCount.toDouble(),
+        lowStockCount.toDouble(),
+        outOfStockCount.toDouble()
+      ];
       if (totalInventory == 0) {
         inventoryData = [1.0, 0.0, 0.0];
       }
@@ -197,7 +185,8 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
       if (mounted) {
         setState(() {
           _farmerName = name.isEmpty ? 'Farmer' : name;
-          _activeListings = products.where((p) => (p['available_quantity'] ?? 0) > 0).length;
+          _activeListings =
+              products.where((p) => (p['available_quantity'] ?? 0) > 0).length;
           _pendingOrders = pending;
           _weeklyRevenue = revenue;
           _recentOrders = List<Map<String, dynamic>>.from(orders.take(6));
@@ -206,15 +195,16 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           _inventoryData = inventoryData;
           _farmerRating = rating;
           _farmerReviews = '$reviews Reviews';
-          _farmLatitude = finalLat;
-          _farmLongitude = finalLon;
-          _farmLocationName = finalLocName;
-          _weatherData = weather;
-          _isLoadingWeather = false;
+          _farmLatitude = lat ?? 14.5995;
+          _farmLongitude = lon ?? 120.9842;
+          _farmLocationName = locName;
           if (totalInventory > 0) {
-            _inventoryLegend1 = '${((inStockCount / totalInventory) * 100).toStringAsFixed(0)}%';
-            _inventoryLegend2 = '${((lowStockCount / totalInventory) * 100).toStringAsFixed(0)}%';
-            _inventoryLegend3 = '${((outOfStockCount / totalInventory) * 100).toStringAsFixed(0)}%';
+            _inventoryLegend1 =
+                '${((inStockCount / totalInventory) * 100).toStringAsFixed(0)}%';
+            _inventoryLegend2 =
+                '${((lowStockCount / totalInventory) * 100).toStringAsFixed(0)}%';
+            _inventoryLegend3 =
+                '${((outOfStockCount / totalInventory) * 100).toStringAsFixed(0)}%';
           } else {
             _inventoryLegend1 = '0%';
             _inventoryLegend2 = '0%';
@@ -222,9 +212,42 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
           }
           _isLoading = false;
         });
+
+        // Trigger weather in the background — never blocks metrics!
+        _loadWeatherDataAsync(lat, lon, locName);
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadWeatherDataAsync(
+      double? lat, double? lon, String locName) async {
+    try {
+      WeatherData? weather;
+      if (lat != null && lon != null) {
+        weather = await WeatherService()
+            .getWeatherByCoordinates(
+              latitude: lat,
+              longitude: lon,
+            )
+            .timeout(const Duration(seconds: 4), onTimeout: () => null);
+      } else {
+        weather = await WeatherService()
+            .getWeatherByCity(locName.isNotEmpty ? locName : 'Manila')
+            .timeout(const Duration(seconds: 4), onTimeout: () => null);
+      }
+
+      if (mounted && weather != null) {
+        setState(() {
+          _weatherData = weather;
+          _isLoadingWeather = false;
+        });
+      } else if (mounted) {
+        setState(() => _isLoadingWeather = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingWeather = false);
     }
   }
 
@@ -264,7 +287,6 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               height: 1200,
             ),
           ),
-          // Gradient blobs
           Positioned(
             top: -100,
             right: -100,
@@ -279,10 +301,12 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
               ),
             ),
           ),
-
           Column(
             children: [
-              _buildNavBar(),
+              WebFarmerHeader(
+                currentIndex: widget.currentIndex,
+                onNavigate: (index, [route]) => widget.onNavigate(index),
+              ),
               Expanded(
                 child: _isLoading 
                   ? _buildDashboardSkeleton()
@@ -295,241 +319,110 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
     );
   }
 
-  Widget _buildNavBar() {
-    final sw = MediaQuery.of(context).size.width;
-    final isMobile = sw < 900;
-    final isCompact = sw < 1100;
-
-    if (!AuthService().isViewingAsFarmer) {
-      return WebConsumerNavBar(
-        currentIndex: widget.currentIndex,
-        onNavigate: widget.onNavigate,
-        onCartTap: () => context.go(AppRoutes.cart),
-        margin: isMobile
-            ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-            : const EdgeInsets.fromLTRB(32, 24, 32, 12),
-      );
-    }
-
-    final navItems = ['Dashboard', 'Products', 'Orders', 'Community', 'Pre-Orders'];
-    return Container(
-      margin: isMobile
-          ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-          : (isCompact
-              ? const EdgeInsets.fromLTRB(20, 16, 20, 8)
-              : const EdgeInsets.fromLTRB(32, 24, 32, 12)),
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : (isCompact ? 16 : 28),
-        vertical: isMobile ? 12 : (isCompact ? 10 : 14),
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _border.withValues(alpha: 0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: _dark.withValues(alpha: 0.03),
-            blurRadius: 30,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(0),
-              child: BrandLogo(
-                size: (isMobile || isCompact) ? BrandLogoSize.small : BrandLogoSize.medium,
-              ),
-            ),
-          ),
-          if (!isMobile) ...[
-            SizedBox(width: isCompact ? 16 : 48),
-            ...List.generate(navItems.length, (i) {
-              final isActive = i == widget.currentIndex;
-              final isHovered = _hoveredNav == i;
-              return Padding(
-                padding: EdgeInsets.symmetric(horizontal: isCompact ? 2 : 4),
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  onEnter: (_) => setState(() => _hoveredNav = i),
-                  onExit: (_) => setState(() => _hoveredNav = -1),
-                  child: GestureDetector(
-                    onTap: () => widget.onNavigate(i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isCompact ? 12 : 20,
-                        vertical: isCompact ? 10 : 12,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        color: isActive
-                            ? _primary.withValues(alpha: 0.1)
-                            : isHovered
-                            ? _border.withValues(alpha: 0.35)
-                            : Colors.transparent,
-                      ),
-                      child: Text(
-                        navItems[i],
-                        style: GoogleFonts.inter(
-                          fontSize: isCompact ? 13 : 15,
-                          fontWeight: isActive
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: isActive
-                              ? _primary
-                              : isHovered
-                              ? _dark
-                              : _muted,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ],
-          const Spacer(),
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => widget.onNavigate(5),
-              child: Container(
-                width: (isMobile || isCompact) ? 38 : 46,
-                height: (isMobile || isCompact) ? 38 : 46,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_primary, Color(0xFF059669)],
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _primary.withValues(alpha: 0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.person_outline_rounded,
-                  color: Colors.white,
-                  size: (isMobile || isCompact) ? 20 : 24,
-                ),
-              ),
-            ),
-          ),
-          if (isMobile) ...[
-            const SizedBox(width: 8),
-            WebHamburgerMenuButton(
-              currentIndex: widget.currentIndex,
-              onNavigate: widget.onNavigate,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _buildDashboardSkeleton() {
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 650;
     
     return SingleChildScrollView(
-      padding: EdgeInsets.all(isMobile ? 16 : 40),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 32,
+        vertical: isMobile ? 20 : 32,
+      ),
       physics: const NeverScrollableScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header shimmer
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1400),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Header shimmer
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppShimmerLoader.rectangle(width: isMobile ? 180 : 320, height: 32, borderRadius: 8),
+                        const SizedBox(height: 12),
+                        AppShimmerLoader.rectangle(width: isMobile ? 220 : 450, height: 16, borderRadius: 6),
+                      ],
+                    ),
+                  ),
+                  if (!isMobile) ...[
+                    AppShimmerLoader.rectangle(width: 150, height: 48, borderRadius: 12),
+                    const SizedBox(width: 16),
+                    AppShimmerLoader.rectangle(width: 200, height: 60, borderRadius: 16),
+                  ],
+                ],
+              ),
+              SizedBox(height: isMobile ? 24 : 36),
+              
+              // Metrics Row Shimmer
+              if (isMobile)
+                Column(
                   children: [
-                    AppShimmerLoader.rectangle(width: isMobile ? 180 : 320, height: 32, borderRadius: 8),
+                    Row(
+                      children: [
+                        Expanded(child: AppShimmerLoader.rectangle(height: 120, borderRadius: 24)),
+                        const SizedBox(width: 12),
+                        Expanded(child: AppShimmerLoader.rectangle(height: 120, borderRadius: 24)),
+                      ],
+                    ),
                     const SizedBox(height: 12),
-                    AppShimmerLoader.rectangle(width: isMobile ? 220 : 450, height: 16, borderRadius: 6),
+                    Row(
+                      children: [
+                        Expanded(child: AppShimmerLoader.rectangle(height: 120, borderRadius: 24)),
+                        const SizedBox(width: 12),
+                        Expanded(child: AppShimmerLoader.rectangle(height: 120, borderRadius: 24)),
+                      ],
+                    ),
+                  ],
+                )
+              else
+                Row(
+                  children: List.generate(4, (i) => Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(right: i == 3 ? 0 : 24),
+                      child: AppShimmerLoader.rectangle(height: 140, borderRadius: 24),
+                    ),
+                  )),
+                ),
+              SizedBox(height: isMobile ? 24 : 36),
+              
+              // Insights Shimmer
+              if (isMobile)
+                Column(
+                  children: [
+                    AppShimmerLoader.rectangle(height: 300, borderRadius: 28),
+                    const SizedBox(height: 24),
+                    AppShimmerLoader.rectangle(height: 300, borderRadius: 28),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(flex: 2, child: AppShimmerLoader.rectangle(height: 400, borderRadius: 28)),
+                    const SizedBox(width: 32),
+                    Expanded(flex: 1, child: AppShimmerLoader.rectangle(height: 400, borderRadius: 28)),
                   ],
                 ),
-              ),
-              if (!isMobile) ...[
-                AppShimmerLoader.rectangle(width: 150, height: 48, borderRadius: 12),
-                const SizedBox(width: 16),
-                AppShimmerLoader.rectangle(width: 200, height: 60, borderRadius: 16),
-              ],
+              SizedBox(height: isMobile ? 24 : 36),
+              
+              // Activity Shimmer
+              if (isMobile)
+                AppShimmerLoader.rectangle(height: 250, borderRadius: 28)
+              else
+                Row(
+                  children: [
+                    Expanded(flex: 2, child: AppShimmerLoader.rectangle(height: 300, borderRadius: 28)),
+                    const SizedBox(width: 32),
+                    Expanded(flex: 1, child: AppShimmerLoader.rectangle(height: 300, borderRadius: 28)),
+                  ],
+                ),
             ],
           ),
-          SizedBox(height: isMobile ? 24 : 40),
-          
-          // Metrics Row Shimmer
-          if (isMobile)
-            Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: AppShimmerLoader.rectangle(height: 120, borderRadius: 24)),
-                    const SizedBox(width: 12),
-                    Expanded(child: AppShimmerLoader.rectangle(height: 120, borderRadius: 24)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: AppShimmerLoader.rectangle(height: 120, borderRadius: 24)),
-                    const SizedBox(width: 12),
-                    Expanded(child: AppShimmerLoader.rectangle(height: 120, borderRadius: 24)),
-                  ],
-                ),
-              ],
-            )
-          else
-            Row(
-              children: List.generate(4, (i) => Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: i == 3 ? 0 : 24),
-                  child: AppShimmerLoader.rectangle(height: 140, borderRadius: 24),
-                ),
-              )),
-            ),
-          SizedBox(height: isMobile ? 24 : 40),
-          
-          // Insights Shimmer
-          if (isMobile)
-            Column(
-              children: [
-                AppShimmerLoader.rectangle(height: 300, borderRadius: 28),
-                const SizedBox(height: 24),
-                AppShimmerLoader.rectangle(height: 300, borderRadius: 28),
-              ],
-            )
-          else
-            Row(
-              children: [
-                Expanded(flex: 2, child: AppShimmerLoader.rectangle(height: 400, borderRadius: 28)),
-                const SizedBox(width: 40),
-                Expanded(flex: 1, child: AppShimmerLoader.rectangle(height: 400, borderRadius: 28)),
-              ],
-            ),
-          SizedBox(height: isMobile ? 24 : 40),
-          
-          // Activity Shimmer
-          if (isMobile)
-            AppShimmerLoader.rectangle(height: 250, borderRadius: 28)
-          else
-            Row(
-              children: [
-                Expanded(flex: 2, child: AppShimmerLoader.rectangle(height: 300, borderRadius: 28)),
-                const SizedBox(width: 40),
-                Expanded(flex: 1, child: AppShimmerLoader.rectangle(height: 300, borderRadius: 28)),
-              ],
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -538,21 +431,29 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
     final sw = MediaQuery.of(context).size.width;
     final isMobile = sw < 650;
     return SingleChildScrollView(
-      padding: EdgeInsets.all(isMobile ? 16 : 40),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 32,
+        vertical: isMobile ? 20 : 32,
+      ),
       physics: const BouncingScrollPhysics(),
-      child: FadeTransition(
-        opacity: _fadeInController,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildWelcomeHeader(),
-            SizedBox(height: isMobile ? 24 : 40),
-            _buildMetricsRow(),
-            SizedBox(height: isMobile ? 24 : 40),
-            _buildInsightsGrid(),
-            SizedBox(height: isMobile ? 24 : 40),
-            _buildActivityAndAlertsGrid(),
-          ],
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1400),
+          child: FadeTransition(
+            opacity: _fadeInController,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildWelcomeHeader(),
+                SizedBox(height: isMobile ? 24 : 36),
+                _buildMetricsRow(),
+                SizedBox(height: isMobile ? 24 : 36),
+                _buildInsightsGrid(),
+                SizedBox(height: isMobile ? 24 : 36),
+                _buildActivityAndAlertsGrid(),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -567,6 +468,9 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width - (isMobile ? 40 : 80),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
             color: _primary.withValues(alpha: 0.1),
@@ -585,12 +489,16 @@ class _WebSalesDashboardState extends State<WebSalesDashboard> with TickerProvid
                 ),
               ),
               const SizedBox(width: 6),
-              Text(
-                'Storefront Active · ${_farmLocationName ?? 'Local Farm'}',
-                style: GoogleFonts.inter(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: _primary,
+              Flexible(
+                child: Text(
+                  'Storefront Active · ${_farmLocationName ?? 'Local Farm'}',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: _primary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

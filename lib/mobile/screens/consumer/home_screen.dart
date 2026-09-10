@@ -19,6 +19,8 @@ import '../../../shared/services/community/message_service.dart';
 
 import 'farmer_public_profile_screen.dart';
 import 'community_stories_screen.dart';
+import '../../../shared/services/auth/auth_service.dart';
+import '../../../shared/widgets/farmer/farmer_mode_switcher_capsule.dart';
 import 'home/widgets/ecom_sliver_app_bar.dart';
 import 'home/widgets/ecom_hero_banner.dart';
 import 'home/widgets/ecom_quick_channels.dart';
@@ -118,6 +120,18 @@ class _HomeScreenState extends State<HomeScreen>
               onLocationTap: () => _showAddressPicker(context),
               unreadMessagesStream: _unreadCountStream,
             ),
+            if (AuthService().isSeller)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: FarmerModeSwitcherCapsule(
+                    onSwitch: () {
+                      AuthService().switchToFarmerMode();
+                      context.go(AppRoutes.farmerDashboard);
+                    },
+                  ),
+                ),
+              ),
             const SliverToBoxAdapter(child: SizedBox(height: 6)),
             const SliverToBoxAdapter(child: EcomHeroBanner()),
             const SliverToBoxAdapter(child: EcomQuickChannels()),

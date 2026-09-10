@@ -18,6 +18,8 @@ import '../../../shared/services/offline/offline_product_service.dart';
 import '../../../shared/services/community/notification_service.dart';
 import '../../../shared/services/community/message_service.dart';
 import '../../../shared/services/core/supabase_data_service.dart';
+import '../../../shared/localization/farmer_locale_service.dart';
+import '../../../shared/widgets/farmer/farmer_language_toggle.dart';
 import '../support/kiko_ai_chat_screen.dart';
 import 'weather_detail_screen.dart';
 
@@ -109,9 +111,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
   String get _greeting {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+    final isFil = FarmerLocaleService.instance.isFilipino;
+    if (hour < 12) return isFil ? 'Magandang umaga' : 'Good morning';
+    if (hour < 17) return isFil ? 'Magandang hapon' : 'Good afternoon';
+    return isFil ? 'Magandang gabi' : 'Good evening';
   }
 
   String? get _farmerAvatarUrl {
@@ -329,8 +332,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = FarmerLocaleService.instance;
+
     return ListenableBuilder(
-      listenable: _auth,
+      listenable: Listenable.merge([_auth, locale]),
       builder: (context, _) {
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
@@ -353,30 +358,30 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildHeader(),
+                      _buildHeader(locale),
                       const SizedBox(height: 18),
-                      _buildWeatherAiCard(),
+                      _buildWeatherAiCard(locale),
                       const SizedBox(height: 24),
                       _buildSectionTitle(
-                        'Performance Overview',
-                        subtitle: 'Real-time sales & inventory metrics',
+                        locale.t('performance_overview'),
+                        subtitle: locale.t('performance_overview_sub'),
                       ),
                       const SizedBox(height: 14),
-                      _buildPerformanceBento(),
+                      _buildPerformanceBento(locale),
                       const SizedBox(height: 24),
                       _buildSectionTitle(
-                        'Quick Operations',
-                        subtitle: 'Primary shortcuts for your farm',
+                        locale.t('quick_operations'),
+                        subtitle: locale.t('quick_operations_sub'),
                       ),
                       const SizedBox(height: 14),
-                      _buildQuickOperationsGrid(),
+                      _buildQuickOperationsGrid(locale),
                       const SizedBox(height: 24),
                       _buildSectionTitle(
-                        'Sales Analytics',
-                        subtitle: 'Gross revenue trajectory & trends',
+                        locale.t('sales_analytics'),
+                        subtitle: locale.t('sales_analytics_sub'),
                       ),
                       const SizedBox(height: 14),
-                      _buildSalesAnalyticsCard(),
+                      _buildSalesAnalyticsCard(locale),
                     ],
                   ),
                 ),
@@ -403,127 +408,166 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   // ===========================================================================
   // 1. TOP HEADER COMPONENT
   // ===========================================================================
-  Widget _buildHeader() {
+  Widget _buildHeader(FarmerLocaleService locale) {
     final avatarUrl = _farmerAvatarUrl;
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Avatar + Emerald Online Dot
-        Stack(
+        // Top Row: Avatar + Greeting & Name + Action Buttons
+        Row(
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.25),
-                  width: 2,
+            // Avatar + Emerald Online Dot
+            Stack(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.25),
+                      width: 2,
+                    ),
+                    color: Colors.white,
+                  ),
+                  child: ClipOval(
+                    child: avatarUrl != null && avatarUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: avatarUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => _buildAvatarFallback(),
+                            errorWidget: (context, url, error) =>
+                                _buildAvatarFallback(),
+                          )
+                        : _buildAvatarFallback(),
+                  ),
                 ),
-                color: Colors.white,
-              ),
-              child: ClipOval(
-                child: avatarUrl != null && avatarUrl.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: avatarUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: const Color(0xFFF1F5F9),
-                          child: const Center(
-                            child: SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) =>
-                            _buildAvatarFallback(),
-                      )
-                    : _buildAvatarFallback(),
+                Positioned(
+                  right: 1,
+                  bottom: 1,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+
+            // Greeting & Name (spacious, never squeezed or vertical)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$_greeting,',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                  Text(
+                    _farmerDisplayName,
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0F172A),
+                      letterSpacing: -0.3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
-            Positioned(
-              right: 1,
-              bottom: 1,
-              child: Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
+            const SizedBox(width: 8),
+
+            // Header Action Icons
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Messages
+                StreamBuilder<int>(
+                  stream: _unreadMessagesStream,
+                  builder: (context, snapshot) {
+                    final unread = snapshot.data ?? 0;
+                    return _buildHeaderIconButton(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      badgeCount: unread,
+                      onTap: () => context.push(AppRoutes.messages),
+                    );
+                  },
                 ),
-              ),
+                const SizedBox(width: 8),
+
+                // Notifications
+                ValueListenableBuilder<int>(
+                  valueListenable: NotificationService().unreadCountNotifier,
+                  builder: (context, unread, _) {
+                    return _buildHeaderIconButton(
+                      icon: Icons.notifications_none_rounded,
+                      badgeCount: unread,
+                      onTap: () => context.push(AppRoutes.notifications),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+
+                // Settings
+                _buildHeaderIconButton(
+                  icon: Icons.settings_outlined,
+                  onTap: () => context.push(AppRoutes.appSettings),
+                ),
+              ],
             ),
           ],
         ),
-        const SizedBox(width: 12),
+        const SizedBox(height: 12),
 
-        // Greeting & Name
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '$_greeting,',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-              Text(
-                _farmerDisplayName,
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF0F172A),
-                  letterSpacing: -0.3,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-
-        // Header Action Icons
+        // Sub-bar: Farmer Store Pill + Bilingual Toggle
         Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Messages
-            StreamBuilder<int>(
-              stream: _unreadMessagesStream,
-              builder: (context, snapshot) {
-                final unread = snapshot.data ?? 0;
-                return _buildHeaderIconButton(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  badgeCount: unread,
-                  onTap: () => context.push(AppRoutes.messages),
-                );
-              },
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.storefront_rounded, size: 14, color: Color(0xFF059669)),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        locale.t('farmer_mode_badge'),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF047857),
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(width: 8),
-
-            // Notifications
-            ValueListenableBuilder<int>(
-              valueListenable: NotificationService().unreadCountNotifier,
-              builder: (context, unread, _) {
-                return _buildHeaderIconButton(
-                  icon: Icons.notifications_none_rounded,
-                  badgeCount: unread,
-                  onTap: () => context.push(AppRoutes.notifications),
-                );
-              },
-            ),
-            const SizedBox(width: 8),
-
-            // Settings
-            _buildHeaderIconButton(
-              icon: Icons.settings_outlined,
-              onTap: () => context.push(AppRoutes.appSettings),
-            ),
+            const SizedBox(width: 6),
+            const FarmerLanguageToggle(compact: true),
           ],
         ),
       ],
@@ -608,7 +652,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   // ===========================================================================
   // 2. AGRONOMIC WEATHER AI CARD (CLICKABLE TO WEATHER DETAILS)
   // ===========================================================================
-  Widget _buildWeatherAiCard() {
+  Widget _buildWeatherAiCard(FarmerLocaleService locale) {
     if (_isLoadingWeather && _weatherData == null) {
       return Container(
         height: 180,
@@ -640,19 +684,28 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
     IconData advisoryIcon;
 
     if (isRainy) {
-      aiTitle = 'Rain Defense & Field Drainage';
-      aiAdvisory =
-          'Rainfall detected in $location. Postpone foliar spraying to prevent chemical runoff. Inspect drainage furrows for root crops like potatoes & carrots.';
+      aiTitle = locale.isFilipino
+          ? 'Proteksyon sa Ulan at Daluyan ng Tubig'
+          : 'Rain Defense & Field Drainage';
+      aiAdvisory = locale.isFilipino
+          ? 'May ulan sa $location. Ipagpaliban ang foliar spray para hindi maanod. Suriin ang kanal ng pananim.'
+          : 'Rainfall detected in $location. Postpone foliar spraying to prevent chemical runoff. Inspect drainage furrows for root crops like potatoes & carrots.';
       advisoryIcon = Icons.thunderstorm_rounded;
     } else if (isHot) {
-      aiTitle = 'Heat Stress & Irrigation Window';
-      aiAdvisory =
-          'High temperature ($temp°C) forecast. Accelerate early morning irrigation (5:30–7:30 AM) and inspect mulching to conserve moisture in root zones.';
+      aiTitle = locale.isFilipino
+          ? 'Proteksyon sa Init at Oras ng Pagdidilig'
+          : 'Heat Stress & Irrigation Window';
+      aiAdvisory = locale.isFilipino
+          ? 'Mataas ang temperatura ($temp°C). Magdilig nang maaga (5:30–7:30 AM) at maglagay ng mulch para mapanatili ang moisture.'
+          : 'High temperature ($temp°C) forecast. Accelerate early morning irrigation (5:30–7:30 AM) and inspect mulching to conserve moisture in root zones.';
       advisoryIcon = Icons.wb_sunny_rounded;
     } else {
-      aiTitle = 'Optimal Cultivation Window';
-      aiAdvisory =
-          'Favorable weather in $location ($temp°C). Optimal window for transplanting seedlings, weeding, and applying organic bio-stimulants.';
+      aiTitle = locale.isFilipino
+          ? 'Magandang Panahon para sa Pagtatanim'
+          : 'Optimal Cultivation Window';
+      aiAdvisory = locale.isFilipino
+          ? 'Maganda ang lagay ng panahon sa $location ($temp°C). Tamang oras para sa paglipat-tanim, pagdamo, at paglalagay ng pataba.'
+          : 'Favorable weather in $location ($temp°C). Optimal window for transplanting seedlings, weeding, and applying organic bio-stimulants.';
       advisoryIcon = Icons.eco_rounded;
     }
 
@@ -714,7 +767,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                         ),
                         const SizedBox(width: 5),
                         Text(
-                          'WEATHER AI',
+                          locale.t('weather_ai_tag'),
                           style: GoogleFonts.inter(
                             color: Colors.white,
                             fontSize: 10,
@@ -872,7 +925,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                         color: Color(0xFFFBBF24),
                       ),
                       label: Text(
-                        'Consult Kiko AI',
+                        locale.t('consult_kiko_ai'),
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -900,7 +953,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                       color: Colors.white,
                     ),
                     label: Text(
-                      'Radar & Details',
+                      locale.t('radar_details'),
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -980,7 +1033,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   // ===========================================================================
   // 3. EXECUTIVE PERFORMANCE BENTO GRID
   // ===========================================================================
-  Widget _buildPerformanceBento() {
+  Widget _buildPerformanceBento(FarmerLocaleService locale) {
     final revenue = (_stats['totalRevenue'] as num?)?.toDouble() ?? 0.0;
     final revenueTrend = _stats['revenueTrend']?.toString() ?? '+0%';
     final activeListings = _stats['activeListings'] as int? ?? 0;
@@ -997,11 +1050,11 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                 icon: Icons.account_balance_wallet_rounded,
                 iconColor: const Color(0xFF059669),
                 iconBg: const Color(0xFFECFDF5),
-                title: 'TOTAL REVENUE',
+                title: locale.t('total_revenue'),
                 value: '₱${revenue.toStringAsFixed(2)}',
                 trendText: revenueTrend,
                 isPositiveTrend: !revenueTrend.startsWith('-'),
-                subtitle: 'All-time gross sales',
+                subtitle: locale.t('all_time_sales'),
                 onTap: () {
                   SupabaseDataService.navigationTabNotifier.value = 2;
                 },
@@ -1015,11 +1068,11 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                 icon: Icons.inventory_2_rounded,
                 iconColor: const Color(0xFF2563EB),
                 iconBg: const Color(0xFFEFF6FF),
-                title: 'ACTIVE LISTINGS',
+                title: locale.t('active_listings'),
                 value: '$activeListings',
-                trendText: '$activeListings Live',
+                trendText: '$activeListings ${locale.isFilipino ? "Tinda" : "Live"}',
                 isPositiveTrend: activeListings > 0,
-                subtitle: 'Published in store',
+                subtitle: locale.t('published_in_store'),
                 onTap: () {
                   SupabaseDataService.navigationTabNotifier.value = 1;
                 },
@@ -1036,11 +1089,11 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                 icon: Icons.people_alt_rounded,
                 iconColor: const Color(0xFF7C3AED),
                 iconBg: const Color(0xFFF5F3FF),
-                title: 'SUBSCRIBERS',
+                title: locale.t('subscribers'),
                 value: '$followers',
-                trendText: 'Reach',
+                trendText: locale.isFilipino ? 'Suki' : 'Reach',
                 isPositiveTrend: true,
-                subtitle: 'Farmer store fans',
+                subtitle: locale.t('farmer_fans'),
                 onTap: () => context.push(AppRoutes.farmerFollowers),
               ),
             ),
@@ -1052,11 +1105,11 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
                 icon: Icons.forum_rounded,
                 iconColor: const Color(0xFFD97706),
                 iconBg: const Color(0xFFFFFBEB),
-                title: 'COMMUNITY POSTS',
+                title: locale.t('community_posts'),
                 value: '$posts',
-                trendText: 'Engaged',
+                trendText: locale.isFilipino ? 'Aktibo' : 'Engaged',
                 isPositiveTrend: true,
-                subtitle: 'Community updates',
+                subtitle: locale.t('community_updates'),
                 onTap: () {
                   SupabaseDataService.navigationTabNotifier.value = 3;
                 },
@@ -1187,12 +1240,12 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   // ===========================================================================
   // 4. QUICK OPERATIONS
   // ===========================================================================
-  Widget _buildQuickOperationsGrid() {
+  Widget _buildQuickOperationsGrid(FarmerLocaleService locale) {
     return Row(
       children: [
         Expanded(
           child: _buildOperationTile(
-            title: 'Add Produce',
+            title: locale.t('add_produce'),
             icon: Icons.add_circle_outline_rounded,
             color: const Color(0xFF059669),
             bg: const Color(0xFFECFDF5),
@@ -1202,7 +1255,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         const SizedBox(width: 10),
         Expanded(
           child: _buildOperationTile(
-            title: 'Orders',
+            title: locale.t('orders_action'),
             icon: Icons.receipt_long_rounded,
             color: const Color(0xFF2563EB),
             bg: const Color(0xFFEFF6FF),
@@ -1214,7 +1267,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         const SizedBox(width: 10),
         Expanded(
           child: _buildOperationTile(
-            title: 'Vouchers',
+            title: locale.t('vouchers_action'),
             icon: Icons.confirmation_number_outlined,
             color: const Color(0xFF7C3AED),
             bg: const Color(0xFFF5F3FF),
@@ -1224,7 +1277,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
         const SizedBox(width: 10),
         Expanded(
           child: _buildOperationTile(
-            title: 'Community',
+            title: locale.t('community_action'),
             icon: Icons.hub_outlined,
             color: const Color(0xFFD97706),
             bg: const Color(0xFFFFFBEB),
@@ -1299,7 +1352,7 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
   // ===========================================================================
   // 5. SALES ANALYTICS CARD (DYNAMIC & INTERACTIVE)
   // ===========================================================================
-  Widget _buildSalesAnalyticsCard() {
+  Widget _buildSalesAnalyticsCard(FarmerLocaleService locale) {
     final analyticsMap = (_stats['analytics'] as Map<String, dynamic>?) ?? {};
     final activeKey = _selectedAnalyticsPeriod == 0
         ? '7D'
@@ -1341,8 +1394,10 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
 
     final isPositiveTrend = !periodTrend.startsWith('-');
     final periodSubtitle = _selectedAnalyticsPeriod == 0
-        ? 'Past 7 Days'
-        : (_selectedAnalyticsPeriod == 1 ? 'Past 30 Days' : 'This Year');
+        ? locale.t('past_7_days')
+        : (_selectedAnalyticsPeriod == 1
+              ? locale.t('past_30_days')
+              : locale.t('past_year'));
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -1361,95 +1416,99 @@ class _FarmerSalesDashboardState extends State<FarmerSalesDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Period Selector Header
+          // Period Selector Header: Title + Chips
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'REVENUE TRAJECTORY',
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF94A3B8),
-                          letterSpacing: 0.6,
-                        ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Text(
+                      locale.t('revenue_trajectory_title'),
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF94A3B8),
+                        letterSpacing: 0.6,
                       ),
-                      const SizedBox(width: 6),
-                      Text(
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
                         '• $periodSubtitle',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFF059669),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        '₱${periodRevenue.toStringAsFixed(2)}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF0F172A),
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: (isPositiveTrend ? const Color(0xFF10B981) : const Color(0xFFF59E0B))
-                              .withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isPositiveTrend
-                                  ? Icons.trending_up_rounded
-                                  : Icons.trending_flat_rounded,
-                              size: 13,
-                              color: isPositiveTrend
-                                  ? const Color(0xFF059669)
-                                  : const Color(0xFFD97706),
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              periodTrend,
-                              style: GoogleFonts.inter(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                color: isPositiveTrend
-                                  ? const Color(0xFF059669)
-                                  : const Color(0xFFD97706),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildPeriodChip(0, locale.isFilipino ? '7A' : '7D'),
+                  const SizedBox(width: 4),
+                  _buildPeriodChip(1, locale.isFilipino ? '30A' : '30D'),
+                  const SizedBox(width: 4),
+                  _buildPeriodChip(2, locale.isFilipino ? '1T' : '1Y'),
                 ],
               ),
-              Row(
-                children: [
-                  _buildPeriodChip(0, '7D'),
-                  const SizedBox(width: 4),
-                  _buildPeriodChip(1, '30D'),
-                  const SizedBox(width: 4),
-                  _buildPeriodChip(2, '1Y'),
-                ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          // Amount & Trend
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '₱${periodRevenue.toStringAsFixed(2)}',
+                style: GoogleFonts.poppins(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: (isPositiveTrend ? const Color(0xFF10B981) : const Color(0xFFF59E0B))
+                      .withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isPositiveTrend
+                          ? Icons.trending_up_rounded
+                          : Icons.trending_flat_rounded,
+                      size: 13,
+                      color: isPositiveTrend
+                          ? const Color(0xFF059669)
+                          : const Color(0xFFD97706),
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      periodTrend,
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: isPositiveTrend
+                            ? const Color(0xFF059669)
+                            : const Color(0xFFD97706),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

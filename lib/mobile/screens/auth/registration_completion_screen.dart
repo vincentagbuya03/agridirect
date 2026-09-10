@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:agridirect/shared/widgets/app_shimmer_loader.dart';
 import '../../../shared/services/auth/auth_service.dart';
 import '../../../shared/styles/app_theme.dart';
+import '../../../shared/widgets/distinctive_phone_input.dart';
 
 /// Final step of manual registration after OTP verification.
 /// Collects required profile details before entering the app.
@@ -26,7 +27,8 @@ class RegistrationCompletionScreen extends StatefulWidget {
 
 class _RegistrationCompletionScreenState
     extends State<RegistrationCompletionScreen> {
-  final _phoneController = TextEditingController();
+  String _phoneE164 = '';
+  bool _isPhoneValid = false;
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
@@ -35,19 +37,22 @@ class _RegistrationCompletionScreenState
 
   @override
   void dispose() {
-    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
   void _handleFinalize() async {
-    final phone = _phoneController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    if (phone.isEmpty || password.isEmpty) {
-      _showErrorModal('Missing Fields', 'Please fill in all fields');
+    if (!_isPhoneValid || _phoneE164.isEmpty) {
+      _showErrorModal('Invalid Phone Number', 'Please enter a valid, unique Philippine mobile number');
+      return;
+    }
+
+    if (password.isEmpty) {
+      _showErrorModal('Missing Password', 'Please create a password for your account');
       return;
     }
 
@@ -68,7 +73,7 @@ class _RegistrationCompletionScreenState
       // 1. Update the user password and phone in database
       // Pass the email to ensure it's not wiped in the upsert
       final success = await AuthService().updateUserPasswordAndPhone(
-        phoneNumber: phone,
+        phoneNumber: _phoneE164,
         password: password,
         email: widget.email,
       );
@@ -133,13 +138,13 @@ class _RegistrationCompletionScreenState
               ),
               const SizedBox(height: 40),
 
-              _buildInputLabel('Phone Number'),
-              const SizedBox(height: 8),
-              _buildTextField(
-                controller: _phoneController,
-                hintText: 'Enter phone number',
-                prefixIcon: Icons.phone_android_rounded,
-                keyboardType: TextInputType.phone,
+              DistinctivePhoneInput(
+                onChanged: (formattedE164, isValidAndUnique) {
+                  setState(() {
+                    _phoneE164 = formattedE164;
+                    _isPhoneValid = isValidAndUnique;
+                  });
+                },
               ),
               const SizedBox(height: 24),
 

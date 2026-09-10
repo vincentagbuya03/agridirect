@@ -6,7 +6,8 @@ import '../../../shared/services/core/supabase_data_service.dart';
 import '../../../shared/services/commerce/cart_service.dart';
 import '../../../shared/data/app_data.dart';
 import '../../../shared/widgets/app_shimmer_loader.dart';
-import '../../widgets/web_promo_header.dart';
+import '../../widgets/ecom/web_ecom_header.dart';
+import '../../../shared/router/app_routes.dart';
 
 class WebFreshProduceScreen extends StatefulWidget {
   const WebFreshProduceScreen({super.key});
@@ -74,7 +75,7 @@ class _WebFreshProduceScreenState extends State<WebFreshProduceScreen>
           action: SnackBarAction(
             label: 'VIEW CART',
             textColor: Colors.white,
-            onPressed: () => context.push('/cart'),
+            onPressed: () => context.go('/cart'),
           ),
         ),
       );
@@ -91,10 +92,16 @@ class _WebFreshProduceScreenState extends State<WebFreshProduceScreen>
       body: SingleChildScrollView(
         child: Column(
           children: [
-            WebPromoHeader(
-              activeTab: 'fresh_produce',
-              searchPlaceholder: 'Search fresh vegetables, fruits, herbs & greens...',
-              onSearchChanged: (q) => setState(() => _searchQuery = q.toLowerCase()),
+            WebEcomHeader(
+              currentIndex: 1,
+              onNavigate: (index, [route]) {
+                if (route != null) {
+                  context.go(route);
+                } else {
+                  context.go(AppRoutes.webTabRoute(index));
+                }
+              },
+              onSearch: (q) => setState(() => _searchQuery = q.toLowerCase()),
             ),
             _buildHeroBanner(),
             const SizedBox(height: 32),
@@ -811,7 +818,7 @@ class _WebFreshProduceCardState extends State<_WebFreshProduceCard> {
       child: GestureDetector(
         onTap: () {
           if (product.productId != null) {
-            context.push('/product/${product.productId}');
+            context.go('/product/${product.productId}');
           }
         },
         child: AnimatedContainer(

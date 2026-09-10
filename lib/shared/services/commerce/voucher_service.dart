@@ -128,7 +128,7 @@ class VoucherService {
       for (var v in vouchers) {
         final farmer = v['farmers'] as Map<String, dynamic>? ?? {};
         v['farm_name'] = farmer['farm_name'] ?? 'Local Verified Farm';
-        v['avatar_url'] = farmer['image_url'] ?? farmer['face_photo_path'];
+        v['avatar_url'] = farmer['image_url'];
         v['location'] = farmer['location'] ??
             farmer['residential_address'] ??
             'San Carlos City';
@@ -185,7 +185,7 @@ class VoucherService {
         map['vouchers'] = {
           ...voucher,
           'farm_name': farmer['farm_name'] ?? 'Local Farm',
-          'avatar_url': farmer['image_url'] ?? farmer['face_photo_path'],
+          'avatar_url': farmer['image_url'],
         };
         return map;
       }).toList();
@@ -213,7 +213,7 @@ class VoucherService {
         map['vouchers'] = {
           ...voucher,
           'farm_name': farmer['farm_name'] ?? 'Local Farm',
-          'avatar_url': farmer['image_url'] ?? farmer['face_photo_path'],
+          'avatar_url': farmer['image_url'],
         };
         return map;
       }).toList();

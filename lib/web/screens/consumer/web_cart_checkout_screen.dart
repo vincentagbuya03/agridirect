@@ -113,9 +113,11 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
         (p) => p?.profileId == entry.key,
         orElse: () => null,
       );
-      final minAmount = profile?.freeDeliveryMinAmount ?? 0.0;
-      if (minAmount > 0 && entry.value >= minAmount) {
-        // Free delivery for this farmer
+      final minAmount = (profile?.freeDeliveryMinAmount != null && profile!.freeDeliveryMinAmount! > 0)
+          ? profile.freeDeliveryMinAmount!
+          : 500.0;
+      if (entry.value >= minAmount) {
+        // Free delivery for this farmer (unlocked at ₱500+ or custom farmer threshold)
       } else {
         fee += 50.0;
       }
@@ -212,11 +214,13 @@ class _WebCartCheckoutScreenState extends State<WebCartCheckoutScreen> {
           (p) => p?.profileId == entry.key,
           orElse: () => null,
         );
-        final minAmount = profile?.freeDeliveryMinAmount ?? 0.0;
+        final minAmount = (profile?.freeDeliveryMinAmount != null && profile!.freeDeliveryMinAmount! > 0)
+            ? profile.freeDeliveryMinAmount!
+            : 500.0;
         double farmerDeliveryFee = 50.0;
         if (_paymentMethod != 'COD') {
           farmerDeliveryFee = 0.0;
-        } else if (minAmount > 0 && farmerSubtotal >= minAmount) {
+        } else if (farmerSubtotal >= minAmount) {
           farmerDeliveryFee = 0.0;
         }
 

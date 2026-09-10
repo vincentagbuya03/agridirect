@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../constants/web_design_tokens.dart';
 
 /// Featured Local Cooperative Spotlight Card for Web Marketplace
@@ -10,6 +11,7 @@ class WebFarmerSpotlightCard extends StatelessWidget {
   final String rating;
   final int totalReviews;
   final String cropsSummary;
+  final String? avatarUrl;
   final VoidCallback onVisit;
 
   const WebFarmerSpotlightCard({
@@ -20,11 +22,18 @@ class WebFarmerSpotlightCard extends StatelessWidget {
     required this.rating,
     required this.totalReviews,
     required this.cropsSummary,
+    this.avatarUrl,
     required this.onVisit,
   });
 
   @override
   Widget build(BuildContext context) {
+    final ratingNum = double.tryParse(rating) ?? 0.0;
+    final hasValidReviews = totalReviews > 0 && ratingNum > 0.0;
+    final displayCrops = cropsSummary.trim().isNotEmpty
+        ? cropsSummary
+        : 'San Carlos Fresh Harvest';
+
     return Container(
       decoration: BoxDecoration(
         color: WebDesignTokens.surface,
@@ -39,11 +48,44 @@ class WebFarmerSpotlightCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: WebDesignTokens.primaryLight,
-                child: const Icon(Icons.agriculture_rounded,
-                    color: WebDesignTokens.primaryDark, size: 28),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: WebDesignTokens.primaryLight,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: WebDesignTokens.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: (avatarUrl != null && avatarUrl!.trim().isNotEmpty)
+                      ? CachedNetworkImage(
+                          imageUrl: avatarUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: WebDesignTokens.primary,
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => const Icon(
+                            Icons.agriculture_rounded,
+                            color: WebDesignTokens.primaryDark,
+                            size: 26,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.agriculture_rounded,
+                          color: WebDesignTokens.primaryDark,
+                          size: 26,
+                        ),
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -93,20 +135,34 @@ class WebFarmerSpotlightCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.15),
+                  color: hasValidReviews
+                      ? Colors.amber.withValues(alpha: 0.15)
+                      : WebDesignTokens.primaryLight,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.star_rounded,
-                        size: 14, color: Colors.amber),
-                    const SizedBox(width: 3),
+                    Icon(
+                      hasValidReviews
+                          ? Icons.star_rounded
+                          : Icons.verified_rounded,
+                      size: 14,
+                      color: hasValidReviews
+                          ? Colors.amber
+                          : WebDesignTokens.primaryDark,
+                    ),
+                    const SizedBox(width: 4),
                     Text(
-                      '$rating ($totalReviews)',
+                      hasValidReviews
+                          ? '$rating ($totalReviews)'
+                          : 'Verified Grower',
                       style: GoogleFonts.rubik(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: WebDesignTokens.dark,
+                        color: hasValidReviews
+                            ? WebDesignTokens.dark
+                            : WebDesignTokens.primaryDark,
                       ),
                     ),
                   ],
@@ -115,7 +171,7 @@ class WebFarmerSpotlightCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  cropsSummary,
+                  displayCrops,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.nunitoSans(

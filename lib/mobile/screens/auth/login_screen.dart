@@ -135,9 +135,9 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
       setState(() => _isLoading = false);
       if (success) {
         if (auth.requiresMfa) {
-          context.push(AppRoutes.mfaChallenge);
+          context.go(AppRoutes.mfaChallenge);
         } else if (auth.needsProfileCompletion) {
-          context.push(AppRoutes.completeProfile);
+          context.go(AppRoutes.completeProfile);
         } else {
           widget.onLoginSuccess();
         }
@@ -167,7 +167,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
       setState(() => _isGoogleLoading = false);
       if (success) {
         if (AuthService().needsProfileCompletion) {
-          context.push(AppRoutes.completeProfile);
+          context.go(AppRoutes.completeProfile);
         } else {
           widget.onLoginSuccess();
         }
@@ -524,7 +524,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                                       child: TextButton(
                                         onPressed: _isLoading
                                             ? null
-                                            : () => context.push(AppRoutes.resetPasswordWithCode),
+                                            : () => context.go(AppRoutes.resetPasswordWithCode),
                                         style: TextButton.styleFrom(
                                           padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
                                           minimumSize: Size.zero,
@@ -678,7 +678,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                                         ),
                                       ),
                                       GestureDetector(
-                                        onTap: () => context.push(AppRoutes.register),
+                                        onTap: () => context.go(AppRoutes.register),
                                         child: Text(
                                           'Sign Up',
                                           style: GoogleFonts.inter(
